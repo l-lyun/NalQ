@@ -5,3 +5,8 @@ args = ["-y", "@seed-design/docs-mcp"]
 [mcp_servers.figma]
 url = "https://mcp.figma.com/mcp"
 auth = "oauth"
+
+[mcp_servers.seed-design-figma]
+command = "bunx"
+args = ["-y", "@seed-design/mcp@latest", "--mode=rest"]
+env_vars = ["FIGMA_PERSONAL_ACCESS_TOKEN"]
