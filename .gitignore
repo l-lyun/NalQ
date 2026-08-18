@@ -1,0 +1,42 @@
+# Environment files
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+# Java and Gradle
+.gradle/
+**/build/
+out/
+*.class
+
+# Node.js and build outputs
+node_modules/
+**/node_modules/
+.pnpm-store/
+**/.pnpm-store/
+dist/
+**/dist/
+coverage/
+.vite/
+*.tsbuildinfo
+
+# Expo
+.expo/
+.expo-shared/
+web-build/
+
+# IDE and editor files
+.idea/
+.vscode/
+*.iml
+*.swp
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db

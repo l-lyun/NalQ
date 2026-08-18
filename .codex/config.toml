@@ -1,0 +1,7 @@
+[mcp_servers.seed-docs]
+command = "npx"
+args = ["-y", "@seed-design/docs-mcp"]
+
+[mcp_servers.figma]
+url = "https://mcp.figma.com/mcp"
+auth = "oauth"
