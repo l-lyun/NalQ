@@ -20,6 +20,8 @@
 | 공통 용어 | [glossary.md](product/glossary.md) | 초안 |
 | 홈 | [00-home.md](features/00-home.md) | 초안 |
 | 자체 로그인 | [01-local-auth.md](features/01-local-auth.md) | 초안 |
+| 사용자·인증 데이터 | [authentication.md](contracts/data/authentication.md) | 초안 |
+| 인증 API | [authentication.md](contracts/api/authentication.md) | 초안 |
 | 학습자료 가져오기 | [02-content-import.md](features/02-content-import.md) | 초안 |
 | 퀴즈 생성과 채점 | [03-quiz-generation.md](features/03-quiz-generation.md) | 초안 |
 | 인증 흐름 | [authentication.md](flows/authentication.md) | 초안 |
@@ -42,7 +44,7 @@
 ## 현재 열린 제품 질문
 
 - 첫 배포 대상이 Expo 앱, 모바일 웹뷰, 웹 중 어디까지인지
-- 자체 로그인에서 이메일 인증과 비밀번호 복구를 MVP에 포함할지
+- Refresh Token의 최종 수명과 웹/앱별 전달·보관 방식 (Access Token은 5분으로 확정)
 - Notion 연결의 인증·페이지 선택 범위와 동기화 정책
 - 난이도의 단계 수, 문제 수 선택 방식, 주관식 채점의 허용 기준
 - 경험치·랭킹·친구·꾸미기 기능의 출시 순서와 운영 정책
