@@ -1,3 +1,9 @@
+[agents]
+enabled = true
+max_concurrent_threads_per_session = 2
+default_subagent_model = "gpt-5.6-sol"
+default_subagent_reasoning_effort = "high"
+
 [mcp_servers.seed-docs]
 command = "npx"
 args = ["-y", "@seed-design/docs-mcp"]
