@@ -26,6 +26,8 @@
 - Access Token은 HMAC SHA-256으로 서명한 JWT이며 보호 API의 `Authorization: Bearer <access token>`으로 전달한다.
 - Access Token은 발급 시점부터 정확히 5분 동안 유효하다.
 - 초기 API의 Refresh Token은 요청·응답 JSON 본문으로 전달한다. 네이티브 앱은 수신 즉시 OS 보안 저장소에 보관해야 한다.
+- 공개 `/api/v1/auth/**` 요청에 우연히 잘못된 Bearer Token이 포함되어도 공개 인증 흐름을 단락하지 않는다. 보호 API의 잘못되거나 만료된 Bearer Token은 `AUTH_005`로 거절한다.
+- CORS 허용 origin은 환경설정으로 제한하며 개발 기본값은 웹 개발 서버 `http://localhost:5173`이다. `OPTIONS` preflight와 `GET`, `POST`, `DELETE`, `Authorization`, `Content-Type`을 허용하고 JSON body 토큰 전송을 사용하므로 credentialed CORS는 사용하지 않는다.
 - 모든 시각은 ISO 8601 UTC 문자열로 반환한다.
 
 ## 엔드포인트 목록
@@ -223,6 +225,7 @@
 | 이메일 인증 코드 만료·시도 소진 | `410` | `AUTH_004` | 새 코드 요청 |
 | 이메일/비밀번호 불일치 또는 비활성 인증 | `401` | `AUTH_001` | 재입력 |
 | 접근·갱신 자격 없음/잘못됨/만료 | `401` | `AUTH_005` | 갱신 또는 재로그인 |
+| 인증 메일 전달 실패 | `503` | `AUTH_008` | 잠시 후 가입 또는 재발송 재시도 |
 
 초기 구현은 계정 상태를 구분하는 오류를 공개하지 않고 로그인 실패를 `AUTH_001`로 통일한다.
 
@@ -233,7 +236,8 @@
 - Refresh Token의 session ID와 secret은 충분히 무작위로 만들고 Redis에는 secret의 SHA-256 digest만 저장한다. session ID는 조회 경로일 뿐 신뢰하지 않는다.
 - 재발송 60초 제한 외의 IP·기기 단위 요청 제한은 운영 정책 확정 후 추가한다. 이메일을 제한 로그 키로 남겨서는 안 된다.
 - 인증 성공/실패 로그에는 요청 추적 ID, 결과 코드와 필요한 최소 메타데이터만 남기고 이메일·비밀번호·토큰을 마스킹 또는 제외한다.
-- 브라우저에서 쿠키를 사용하면 CSRF 방어, 허용 origin, credentialed CORS 정책을 함께 확정한다.
+- 허용 origin은 `OPENMD_CORS_ALLOWED_ORIGINS`로 설정하며 여러 origin은 쉼표로 구분한다. 기본 개발 origin은 `http://localhost:5173`이고 운영에서는 명시적으로 덮어쓴다.
+- 초기 브라우저 흐름은 토큰을 JSON body로 전달하므로 credentialed CORS를 비활성화한다. 향후 쿠키로 전환하면 CSRF 방어와 credentialed CORS 정책을 함께 다시 확정한다.
 - 네이티브 앱의 Refresh Token은 일반 로컬 저장소가 아니라 OS 보안 저장소에 보관한다.
 - 이메일 인증 코드와 Access/Refresh Token 원문을 로그, 분석 사건, Redis key/value에 남기지 않는다.
 

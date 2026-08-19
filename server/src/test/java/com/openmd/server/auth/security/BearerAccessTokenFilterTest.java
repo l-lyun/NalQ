@@ -55,4 +55,18 @@ class BearerAccessTokenFilterTest {
 		assertEquals(401, response.getStatus());
 		assertTrue(response.getContentAsString().contains("AUTH_005"));
 	}
+
+	@Test
+	void ignoresInvalidBearerTokensOnPublicAuthenticationEndpoints() throws Exception {
+		AccessTokenService tokens = AccessTokenService.create(SECRET, Clock.fixed(NOW, ZoneOffset.UTC));
+		BearerAccessTokenFilter filter = new BearerAccessTokenFilter(tokens, JsonMapper.builder().build());
+		MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/auth/sessions");
+		request.addHeader("Authorization", "Bearer expired-or-forged");
+		MockHttpServletResponse response = new MockHttpServletResponse();
+
+		filter.doFilter(request, response, new MockFilterChain());
+
+		assertEquals(200, response.getStatus());
+		assertEquals("", response.getContentAsString());
+	}
 }

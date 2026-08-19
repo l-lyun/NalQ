@@ -9,6 +9,8 @@ public interface EmailVerificationStore {
 
 	VerificationResult verify(long userId, String digest);
 
+	boolean cancelIssue(long userId, String digest);
+
 	void consume(long userId);
 
 	record IssueResult(boolean issued, long retryAfterSeconds) {

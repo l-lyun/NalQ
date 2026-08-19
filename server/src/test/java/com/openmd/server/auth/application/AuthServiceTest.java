@@ -114,6 +114,29 @@ class AuthServiceTest {
 		verify(refreshTokens, never()).issue(23L);
 	}
 
+	@Test
+	void propagatesMailFailureAndCompensatesOnlyTheFailedCode() throws Exception {
+		when(users.findByNormalizedEmail("learner@example.com")).thenReturn(Optional.empty());
+		when(passwords.encode("password1")).thenReturn("argon2-hash");
+		when(users.saveAndFlush(any(User.class))).thenAnswer(invocation -> {
+			User user = invocation.getArgument(0);
+			setId(user, 25L);
+			return user;
+		});
+		when(codes.generate()).thenReturn("A7K9M2");
+		when(verifications.issue(eq(25L), any(), eq(NOW), any(), any(), eq(false)))
+			.thenReturn(EmailVerificationStore.IssueResult.success());
+		BusinessException deliveryFailure = new BusinessException(AuthErrorCode.EMAIL_DELIVERY_FAILED);
+		org.mockito.Mockito.doThrow(deliveryFailure)
+			.when(emails).sendVerificationCode("learner@example.com", "A7K9M2");
+
+		BusinessException thrown = assertThrows(BusinessException.class,
+			() -> service.signUp("learner@example.com", "password1"));
+
+		assertEquals(AuthErrorCode.EMAIL_DELIVERY_FAILED, thrown.getErrorCode());
+		verify(verifications).cancelIssue(25L, digests.create(25L, "A7K9M2"));
+	}
+
 	private User pendingUser(long id) throws Exception {
 		User user = User.pending("learner@example.com", "learner@example.com", "argon2-hash");
 		setId(user, id);

@@ -142,6 +142,25 @@ class AuthenticationInfrastructureIntegrationTest {
 	}
 
 	@Test
+	void cancelsOnlyTheFailedMailIssueAndImmediatelyReleasesItsCooldownInRedis74() {
+		RedisEmailVerificationStore store = new RedisEmailVerificationStore(redisTemplate);
+		Instant now = Instant.now();
+		String key = RedisEmailVerificationStore.key(43L);
+
+		assertTrue(store.issue(
+			43L, "delivered-by-newer-request", now, Duration.ofMinutes(10), Duration.ofSeconds(60), false
+		).issued());
+		assertFalse(store.cancelIssue(43L, "stale-failed-digest"));
+		assertTrue(Boolean.TRUE.equals(redisTemplate.hasKey(key)));
+
+		assertTrue(store.cancelIssue(43L, "delivered-by-newer-request"));
+		assertFalse(Boolean.TRUE.equals(redisTemplate.hasKey(key)));
+		assertTrue(store.issue(
+			43L, "retry-digest", now.plusSeconds(1), Duration.ofMinutes(10), Duration.ofSeconds(60), true
+		).issued());
+	}
+
+	@Test
 	void rotatesRefreshTokensCreatesTombstonesAndRevokesTheSessionOnReuseInRedis74() throws Exception {
 		RedisRefreshSessionStore store = new RedisRefreshSessionStore(redisTemplate);
 		RefreshTokenService service = new RefreshTokenService(store, Clock.systemUTC(), Duration.ofSeconds(20));

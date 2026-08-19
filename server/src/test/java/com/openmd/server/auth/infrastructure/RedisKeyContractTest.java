@@ -38,6 +38,10 @@ class RedisKeyContractTest {
 		String createScript = RedisRefreshSessionStore.CREATE_SCRIPT.getScriptAsString();
 		assertTrue(createScript.contains("HSET"));
 		assertTrue(createScript.contains("PEXPIREAT"));
+
+		String cancellationScript = RedisEmailVerificationStore.CANCEL_ISSUE_SCRIPT.getScriptAsString();
+		assertTrue(cancellationScript.contains("codeDigest') == ARGV[1]"));
+		assertTrue(cancellationScript.contains("DEL"));
 	}
 
 	private String hashTag(String key) {

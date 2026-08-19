@@ -33,6 +33,14 @@ public class RedisEmailVerificationStore implements EmailVerificationStore {
 		return 0
 		""", Long.class);
 
+	static final DefaultRedisScript<Long> CANCEL_ISSUE_SCRIPT = new DefaultRedisScript<>("""
+		if redis.call('HGET', KEYS[1], 'codeDigest') == ARGV[1] then
+		  redis.call('DEL', KEYS[1])
+		  return 1
+		end
+		return 0
+		""", Long.class);
+
 	private final StringRedisTemplate redisTemplate;
 
 	public RedisEmailVerificationStore(StringRedisTemplate redisTemplate) {
@@ -71,6 +79,12 @@ public class RedisEmailVerificationStore implements EmailVerificationStore {
 			return VerificationResult.MISMATCHED;
 		}
 		return VerificationResult.EXPIRED;
+	}
+
+	@Override
+	public boolean cancelIssue(long userId, String digest) {
+		Long result = redisTemplate.execute(CANCEL_ISSUE_SCRIPT, List.of(key(userId)), digest);
+		return result != null && result == 1;
 	}
 
 	@Override

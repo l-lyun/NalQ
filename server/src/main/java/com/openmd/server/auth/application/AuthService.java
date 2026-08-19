@@ -155,9 +155,10 @@ public class AuthService {
 
 	private void issueAndSend(User user, boolean enforceCooldown) {
 		String code = codeGenerator.generate();
+		String digest = codeDigest.create(user.getId(), code);
 		EmailVerificationStore.IssueResult result = verificationStore.issue(
 			user.getId(),
-			codeDigest.create(user.getId(), code),
+			digest,
 			clock.instant(),
 			VERIFICATION_TTL,
 			RESEND_COOLDOWN,
@@ -169,9 +170,14 @@ public class AuthService {
 		try {
 			emailSender.sendVerificationCode(user.getEmail(), code);
 		} catch (BusinessException exception) {
-			if (exception.getErrorCode() != AuthErrorCode.EMAIL_DELIVERY_FAILED) {
-				throw exception;
+			if (exception.getErrorCode() == AuthErrorCode.EMAIL_DELIVERY_FAILED) {
+				try {
+					verificationStore.cancelIssue(user.getId(), digest);
+				} catch (RuntimeException compensationFailure) {
+					exception.addSuppressed(compensationFailure);
+				}
 			}
+			throw exception;
 		}
 	}
 
