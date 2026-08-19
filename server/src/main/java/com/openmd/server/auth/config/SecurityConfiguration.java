@@ -26,19 +26,34 @@ import java.util.List;
 @ConditionalOnProperty(name = "openmd.auth.enabled", havingValue = "true", matchIfMissing = true)
 public class SecurityConfiguration {
 
+	private static final String[] API_DOCUMENTATION_PATHS = {
+		"/v3/api-docs/**",
+		"/v3/api-docs.yaml",
+		"/swagger-ui/**",
+		"/swagger-ui.html"
+	};
+
 	@Bean
-	SecurityFilterChain securityFilterChain(HttpSecurity http, AccessTokenService tokens, ObjectMapper mapper)
+	SecurityFilterChain securityFilterChain(
+		HttpSecurity http,
+		AccessTokenService tokens,
+		ObjectMapper mapper,
+		@Value("${springdoc.api-docs.enabled:false}") boolean apiDocsEnabled
+	)
 		throws Exception {
 		BearerAccessTokenFilter bearerFilter = new BearerAccessTokenFilter(tokens, mapper);
 		return http
 			.cors(Customizer.withDefaults())
 			.csrf(csrf -> csrf.ignoringRequestMatchers("/api/v1/auth/**"))
 			.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-			.authorizeHttpRequests(authorize -> authorize
-				.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-				.requestMatchers("/api/v1/auth/**").permitAll()
-				.anyRequest().authenticated()
-			)
+			.authorizeHttpRequests(authorize -> {
+				authorize.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll();
+				authorize.requestMatchers("/api/v1/auth/**").permitAll();
+				if (apiDocsEnabled) {
+					authorize.requestMatchers(API_DOCUMENTATION_PATHS).permitAll();
+				}
+				authorize.anyRequest().authenticated();
+			})
 			.exceptionHandling(errors -> errors.authenticationEntryPoint((request, response, exception) -> {
 				response.setStatus(401);
 				response.setContentType(MediaType.APPLICATION_JSON_VALUE);

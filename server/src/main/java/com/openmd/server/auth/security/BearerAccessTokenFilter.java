@@ -28,7 +28,13 @@ public class BearerAccessTokenFilter extends OncePerRequestFilter {
 
 	@Override
 	protected boolean shouldNotFilter(HttpServletRequest request) {
-		return request.getRequestURI().startsWith("/api/v1/auth/");
+		String requestUri = request.getRequestURI();
+		return requestUri.startsWith("/api/v1/auth/")
+			|| requestUri.equals("/v3/api-docs")
+			|| requestUri.startsWith("/v3/api-docs/")
+			|| requestUri.equals("/v3/api-docs.yaml")
+			|| requestUri.equals("/swagger-ui.html")
+			|| requestUri.startsWith("/swagger-ui/");
 	}
 
 	@Override
