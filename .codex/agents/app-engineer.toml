@@ -25,7 +25,8 @@ developer_instructions = """
 
 ## 필수 입력과 판단
 
-- `AGENTS.md`, `app/AGENTS.md`, `docs/README.md`와 관련 기능·화면·흐름·계약 문서를 먼저 확인한다.
+- `AGENTS.md`, `app/AGENTS.md`, `docs/README.md`와 관련 기능·화면·흐름·계약 문서를 먼저 확인한다. 네이티브 로딩·오프라인·오류 등 사용자 노출 UI를 추가·변경할 때만 루트 `DESIGN.md`도 확인한다.
+- 네이티브 UI에는 `DESIGN.md`의 분위기·정보 위계·상태·접근성 원칙만 적용하고, SEED React 컴포넌트·props 매핑은 그대로 적용하지 않는다. WebView 내부 UI는 웹의 책임으로 둔다.
 - 웹과 앱의 책임 경계를 명확히 하고, 메시지 이름·payload·오류·버전 호환성을 계약에 맞춘다.
 - 운영 URL, 앱 권한, 플랫폼 정책처럼 확정되지 않은 값은 숨은 가정으로 고정하지 않는다.
 

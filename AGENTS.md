@@ -45,6 +45,9 @@ If the requested outcome spans multiple stages, complete only the stage the user
 ## Document Source of Truth
 
 - Start documentation work from `docs/README.md`; it routes agents to the smallest relevant set of documents.
+- For work that designs, implements, or reviews user-visible UI, read the root `DESIGN.md` as the source of truth for global visual atmosphere, information hierarchy, layout, and responsive principles.
+- Treat feature, flow, and screen specifications as the source of truth for product behavior and states. Treat current SEED Docs and Rootage as the source of truth for exact components, props, and tokens; `DESIGN.md` must not override or freeze outdated SEED APIs.
+- If `DESIGN.md`, an approved specification, and current SEED documentation conflict, do not silently choose one. Report the conflict and its impact before changing the agreed behavior or visual direction.
 - Product and UX decisions belong in `docs/`, not in chat history alone.
 - Distinguish confirmed requirements, assumptions, and open questions. Never silently promote an assumption to a decision.
 - Update the relevant source document when an implementation request changes an approved contract or behavior.

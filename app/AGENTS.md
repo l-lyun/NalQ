@@ -7,6 +7,8 @@
 - Expo, React Native, TypeScript와 pnpm을 사용한다.
 - 앱은 모바일 셸과 WebView·네이티브 경계를 담당한다. 웹 화면 구현은 `web/`, API 구현은 `server/`의 책임이다.
 - 작업 전 `docs/README.md`에서 관련 기능·화면·흐름·계약을 찾고 기존 `app/` 구조를 확인한다.
+- 네이티브 로딩·오프라인·오류처럼 사용자가 직접 보는 앱 UI를 추가·변경할 때만 루트 `DESIGN.md`의 분위기, 정보 위계, 상태와 접근성 원칙을 확인한다.
+- `DESIGN.md`의 SEED React 컴포넌트·props 매핑은 Expo 네이티브 UI에 그대로 적용하지 않는다. WebView 내부 UI는 `web/` 지침과 `DESIGN.md`를 따른다.
 
 ## 구현 원칙
 
