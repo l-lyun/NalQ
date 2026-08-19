@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@karrotmarket/react-monochrome-icon':
+        specifier: 1.25.0
+        version: 1.25.0(@types/react@19.2.18)(react@19.2.8)
       '@seed-design/css':
         specifier: 2.5.0
         version: 2.5.0
@@ -20,6 +23,9 @@ importers:
       axios:
         specifier: ^1.19.0
         version: 1.19.0(debug@4.4.3)
+      pretendard:
+        specifier: 1.3.9
+        version: 1.3.9
       react:
         specifier: ^19.2.8
         version: 19.2.8
@@ -80,6 +86,12 @@ packages:
 
   '@internationalized/date@3.12.3':
     resolution: {integrity: sha512-fuLX+3ZKLsxI73y8b01EG/WjHb6gE6weCqlfawPO27kBWGMh9G1yH6Csv1uU7/cac9H2GHmOMt6CjmuQ1aia4Q==}
+
+  '@karrotmarket/react-monochrome-icon@1.25.0':
+    resolution: {integrity: sha512-lUz+APCpCC+XsKgwQuJwjgSe96iBnUFlGmA4+ijFn1smB+rIJwzS7JRHKiHKQ5q29ICqLzBjng+1QLYICUAiMQ==}
+    peerDependencies:
+      '@types/react': '*'
+      react: ^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc
 
   '@oxc-project/types@0.144.0':
     resolution: {integrity: sha512-nuhZIOLuI6TFQ32I/WnUx+SCPY7SdSKwgnFHydAuoS1+Z4BRcaP+RRJmGzl9lw+0OFF7UmaESf7KQRXaNLHypg==}
@@ -973,6 +985,9 @@ packages:
     resolution: {integrity: sha512-u82N74LFzG8ca+dD8puPnplTXoGH4fTPpVGuIbt36G3qvNlkvfD0lEAZSxaly3KX8TS/L1A1gsCEmvKmBcVbkQ==}
     engines: {node: ^10 || ^12 || >=14}
 
+  pretendard@1.3.9:
+    resolution: {integrity: sha512-PaQAADyLY5v4kYFwkpSJHbSSYIkiriY/1xXw75TKoZ9UQQqeU+tvP05yTdZAWibiIYoo8ZKtRv8PM7w0IaywSw==}
+
   proxy-from-env@2.1.0:
     resolution: {integrity: sha512-cJ+oHTW1VAEa8cJslgmUZrc+sjRKgAKl3Zyse6+PV38hZe/V6Z14TbCuXcan9F9ghlz4QrFr2c92TNF82UkYHA==}
     engines: {node: '>=10'}
@@ -1112,6 +1127,11 @@ snapshots:
   '@internationalized/date@3.12.3':
     dependencies:
       '@swc/helpers': 0.5.23
+
+  '@karrotmarket/react-monochrome-icon@1.25.0(@types/react@19.2.18)(react@19.2.8)':
+    dependencies:
+      '@types/react': 19.2.18
+      react: 19.2.8
 
   '@oxc-project/types@0.144.0': {}
 
@@ -2079,6 +2099,8 @@ snapshots:
       nanoid: 3.3.18
       picocolors: 1.1.1
       source-map-js: 1.2.1
+
+  pretendard@1.3.9: {}
 
   proxy-from-env@2.1.0: {}
 

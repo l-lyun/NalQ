@@ -6,7 +6,7 @@ omitted:
   - section: colors
     reason: SEED semantic color tokens and theme resolution are the authoritative runtime source; this document records roles, not duplicate literal values.
   - section: typography
-    reason: SEED text styles are authoritative, while the inherited application font family remains an OpenMD runtime decision.
+    reason: SEED text styles remain authoritative for size, line height, and weight; OpenMD's approved Pretendard-first family and platform boundaries are recorded below without duplicating font assets or implementation details.
   - section: spacing
     reason: SEED dimension and semantic spacing tokens are authoritative and are referenced in the Layout section.
   - section: rounded
@@ -60,6 +60,7 @@ OpenMD is an application, not a Notion marketing-site replica. Do not reproduce 
 ### Design decisions in this document
 
 - Use SEED semantic tokens and component recipes instead of Notion values or local look-alike primitives.
+- Use Pretendard as OpenMD's approved web and WebView-first Korean font family while preserving SEED text styles for size, line height, and weight.
 - Use a mobile-first, single-column study flow; introduce multiple columns only when they improve comparison or scanning.
 - Prefer lists and whitespace over repeating dashboard cards.
 - Keep one prominent solid CTA per screen or local task region.
@@ -68,7 +69,6 @@ OpenMD is an application, not a Notion marketing-site replica. Do not reproduce 
 ### Open decisions and exceptions
 
 - OpenMD's proprietary illustration, character, and decorative asset language is not defined. Do not invent a Notion-like sticker palette.
-- SEED Rootage does not define the application font family. Use the platform/system sans stack as an OpenMD runtime decision until typography assets are approved; this is not a SEED foundation fact.
 - A verified SEED bottom-navigation React component was not found in the current Docs MCP listing. The three-tab product structure remains confirmed, but its implementation primitive must be checked against the installed package before coding.
 - Exact desktop content max-width and whether the product exposes dark appearance remain implementation/design review decisions. Do not turn example widths into global contracts.
 
@@ -114,7 +114,7 @@ Use semantic token names in design and implementation. Never copy the token's re
 
 ### Typography Rules
 
-Use SEED `Text` and its `textStyle` prop. A text style combines font size, line height, and weight; prefer it over setting each property independently. Use scalable `t*` styles by default so user font scaling is respected. `Static` styles are exceptions for cases proven to require fixed typography, not a visual shortcut.
+Use SEED `Text` and its `textStyle` prop. A text style combines font size, line height, and weight; prefer it over setting each property independently. Use scalable `t*` styles by default so user font scaling is respected. `Static` styles are exceptions for cases proven to require fixed typography, not a visual shortcut. The OpenMD font-family decision changes glyph design and fallback behavior, not the SEED text scale or semantic hierarchy.
 
 | OpenMD role | SEED text style | Typical use |
 | --- | --- | --- |
@@ -144,7 +144,17 @@ SEED Rootage provides scalable `t1`–`t14` sizes equivalent to 11, 12, 13, 14, 
 
 ### Font-family boundary
 
-`NotionInter` and custom Inter tracking are removed. Until an OpenMD font decision is approved, use the runtime's platform/system sans stack. Do not claim that this font family comes from SEED Rootage.
+Pretendard is the approved OpenMD font direction for Korean reading quality and consistent web-based UI across platforms. This is an OpenMD design decision, not a SEED Rootage foundation fact.
+
+SEED officially recommends its cross-platform system-font stack. OpenMD intentionally overrides only the font-family for Korean reading quality and web/WebView consistency; SEED text styles remain authoritative for font size, line height, and weight.
+
+- Web and WebView content use `Pretendard Variable` first, followed by a Korean-capable platform system sans fallback and then generic system sans. Do not rely on a Latin-oriented system stack as the only Korean fallback.
+- WebView content uses the same font assets delivered by the web bundle. The native shell must not load a second independent font for content rendered inside that WebView.
+- Prefer locally bundled, reproducible font assets so the core interface remains usable offline and does not depend on a third-party CDN. A CDN is not a design requirement.
+- Native-only UI outside the WebView may bundle the same font after the app team reviews binary size, startup cost, platform behavior, and licensing. Until that implementation decision is made, native UI may use its Korean-capable system font; visual and line-break differences must still be reviewed.
+- Keep SEED `textStyle` values authoritative for font size, line height, and weight. Font loading must provide the weights used by the approved styles without remapping the typography scale.
+- Do not reintroduce `NotionInter`, custom Inter tracking, or screen-specific font families. Font family is an application-wide decision.
+- Exact packages, versions, font file paths, subsetting, preload strategy, fallback declarations, and bundler configuration belong in the relevant application TRD and implementation, not in this design baseline.
 
 ## Components
 
@@ -260,6 +270,7 @@ Use semantic layer colors before shadows. Let SEED overlay components own their 
 - Do make the next learning action the most prominent control.
 - Do use SEED semantic tokens and current component recipes as the source of truth.
 - Do use `Text` styles instead of recreating size, line height, and weight combinations.
+- Do use the approved Pretendard-first family for web and WebView content with a Korean-capable system fallback.
 - Do prefer `ListButtonItem` / `ListLinkItem` for one-action rows and reserve custom containers for unique content structures.
 - Do show original-source access and uncertainty alongside AI-generated questions and ambiguous grading.
 - Do provide loading, empty, partial error, full error, success, disabled, and permission-limited states.
@@ -270,6 +281,7 @@ Use semantic layer colors before shadows. Let SEED overlay components own their 
 ### Don't
 
 - Don't copy Notion HEX values, `NotionInter`, sticker colors, tracking, or shadow stacks.
+- Don't make a third-party font CDN a requirement for rendering core product UI.
 - Don't hardcode resolved light-theme color values; doing so breaks theme semantics.
 - Don't use palette colors for ordinary application chrome.
 - Don't use multiple brand-solid or neutral-solid CTAs at the same hierarchy on one screen.
@@ -312,6 +324,7 @@ SEED is mobile-first. Values set at a breakpoint continue into wider viewports u
 Mood: calm document-like study workspace; neutral, spacious, action-led
 Primary surface: bg.layerDefault over bg.layerBasement
 Primary text: fg.neutral; support: fg.neutralMuted / fg.neutralSubtle
+Font: Pretendard Variable first for web/WebView, then Korean-capable system sans fallback
 Primary learning action: ActionButton brandSolid, one prominent solid CTA
 Default body: Text t5Regular; screen title: t12Bold
 Layout: mobile-first VStack/List; Grid only for real comparison
@@ -336,6 +349,10 @@ deprecation status, icons, and Rootage tokens in the official SEED Docs MCP befo
 implementation code. Prefer Text, Box/VStack/HStack/Grid, ActionButton, TextField, List,
 ChipTabs/SegmentedControl, BottomSheet/Dialog, Skeleton, ResultSection, PageBanner, and
 Snackbar when their documented role matches.
+
+Use the approved Pretendard-first font family for web and WebView content while keeping
+SEED textStyle values authoritative. Preserve a Korean-capable system fallback and do not
+make a third-party CDN necessary for the core interface.
 
 Do not copy Notion HEX values, typography, stickers, or shadows. Do not hardcode resolved
 token values or invent a SEED API. Preserve visible focus, semantic labels, heading order,
