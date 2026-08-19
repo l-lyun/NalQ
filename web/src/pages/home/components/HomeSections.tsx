@@ -156,6 +156,37 @@ export function NextActionSection({ nextAction }: Pick<HomePageProps, 'nextActio
   )
 }
 
+export function RecommendationFallbackSection({
+  onStartLearning,
+}: {
+  onStartLearning: () => void
+}) {
+  return (
+    <VStack as="section" gap="x4" aria-labelledby="home-recommendation-fallback-title">
+      <VStack bg="bg.neutralWeak" borderRadius="r3" p="x5" gap="x4">
+        <VStack gap="spacingY.betweenText">
+          <Text
+            as="h2"
+            id="home-recommendation-fallback-title"
+            textStyle="t8Bold"
+            color="fg.neutral"
+          >
+            새 학습을 시작해보세요
+          </Text>
+          <Text as="p" textStyle="t5Regular" color="fg.neutralMuted">
+            학습자료를 가져와 바로 시작할 수 있어요.
+          </Text>
+        </VStack>
+        <Flex width="full">
+          <ActionButton flexGrow size="large" variant="brandSolid" onClick={onStartLearning}>
+            학습 시작
+          </ActionButton>
+        </Flex>
+      </VStack>
+    </VStack>
+  )
+}
+
 export function FirstVisitSection({ studyMethods }: Pick<HomePageProps, 'studyMethods'>) {
   return (
     <VStack as="section" gap="x4" aria-labelledby="home-first-title">

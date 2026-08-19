@@ -25,8 +25,6 @@ export function HomeBottomNavigation({ items }: { items: HomeNavigationItem[] })
       as="nav"
       className="home-bottom-navigation"
       aria-label="주요 메뉴"
-      position="sticky"
-      bottom={0}
       bg="bg.layerDefault"
       borderTopWidth={1}
       borderColor="stroke.neutralSubtle"

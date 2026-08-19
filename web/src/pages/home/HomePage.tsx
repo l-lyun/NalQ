@@ -6,6 +6,7 @@ import {
   FirstVisitSection,
   NextActionSection,
   RecentMaterialsSection,
+  RecommendationFallbackSection,
   ReviewSection,
   StudyMethodsSection,
   TodaySection,
@@ -30,7 +31,7 @@ export function HomePage(props: HomePageProps) {
   } = props
 
   return (
-    <VStack minHeight="100dvh" bg="bg.layerBasement">
+    <VStack className="home-shell" minHeight="100dvh" bg="bg.layerBasement">
       <Box as="main" className="home-main" bg="bg.layerDefault" width="full" pt="safeArea">
         <VStack
           className="home-content"
@@ -69,8 +70,14 @@ export function HomePage(props: HomePageProps) {
             </VStack>
           ) : (
             <VStack gap="x5">
-              <NextActionSection nextAction={nextAction} />
-              {nextAction ? <HomeSectionDivider /> : null}
+              {nextAction ? (
+                <NextActionSection nextAction={nextAction} />
+              ) : recommendationWarning ? (
+                <RecommendationFallbackSection
+                  onStartLearning={recommendationWarning.onStartLearning}
+                />
+              ) : null}
+              {nextAction || recommendationWarning ? <HomeSectionDivider /> : null}
               <ReviewSection state={review} onViewAll={onViewAllReviews} />
               <HomeSectionDivider />
               <RecentMaterialsSection state={recentMaterials} onViewAll={onViewAllMaterials} />

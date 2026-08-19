@@ -49,6 +49,7 @@ export type HomePageProps = {
     title: string
     description: string
     onRetry: () => void
+    onStartLearning: () => void
   }
   onViewAllReviews: () => void
   onViewAllMaterials: () => void

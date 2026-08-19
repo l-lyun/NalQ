@@ -61,13 +61,15 @@ export function InteractiveList({ items, label }: { items: HomeListItem[]; label
                   disabled={item.disabled}
                   onClick={item.onClick}
                 >
-                  <List.Title data-disabled={disabledState}>{item.title}</List.Title>
-                  <List.Detail data-disabled={disabledState}>{item.detail}</List.Detail>
+                  <VStack minWidth="0px" flexGrow gap="x1_5" align="flex-start">
+                    <List.Title data-disabled={disabledState}>{item.title}</List.Title>
+                    <List.Detail data-disabled={disabledState}>{item.detail}</List.Detail>
+                  </VStack>
+                  <List.Suffix data-disabled={disabledState}>
+                    <Icon svg={<IconChevronRightLine />} size="x4_5" />
+                  </List.Suffix>
                 </button>
               </List.Content>
-              <List.Suffix data-disabled={disabledState}>
-                <Icon svg={<IconChevronRightLine />} size="x4_5" />
-              </List.Suffix>
             </List.Item>
             {index < items.length - 1 ? (
               <Divider as="li" aria-hidden color="stroke.neutralSubtle" inset />

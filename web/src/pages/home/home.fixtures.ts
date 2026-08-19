@@ -124,6 +124,7 @@ export const homeRecommendationWarningFixture: HomePageProps = {
     title: '추천을 완성하지 못했어요',
     description: '일부 학습 상태를 확인하지 못했어요. 새 학습은 계속 시작할 수 있어요.',
     onRetry: noop,
+    onStartLearning: noop,
   },
   nextAction: undefined,
 }
