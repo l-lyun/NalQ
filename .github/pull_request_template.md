@@ -1,4 +1,13 @@
-<!-- PR 제목은 feat(server):, fix(app):, hotfix(web):, docs:, chore: 등 목적에 맞는 접두어와 폴더로 시작하고 설명은 한국어로 명확하게 작성합니다. PR은 Draft가 아닌 Ready for review로 생성합니다. -->
+<!--
+PR 제목은 변경 대상 애플리케이션에 따라 아래 형식으로 작성합니다.
+- server/: [BE] feat: 작업 요약
+- web/: [FE] feat: 작업 요약
+- app/: [APP] feat: 작업 요약
+
+여러 애플리케이션을 함께 변경하면 해당 접두어를 [BE] [FE] 순서처럼 나란히 작성합니다.
+작업 종류에 따라 feat 대신 fix, hotfix, refactor, docs, test, chore 등을 사용하고, 작업 요약은 한국어로 명확하게 작성합니다.
+PR은 Draft가 아닌 Ready for review로 생성합니다.
+-->
 
 ## #️⃣연관된 이슈
 
