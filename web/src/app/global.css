@@ -1,0 +1,75 @@
+:root {
+  --openmd-font-family:
+    "Pretendard Variable",
+    Pretendard,
+    -apple-system,
+    BlinkMacSystemFont,
+    system-ui,
+    Roboto,
+    "Helvetica Neue",
+    "Segoe UI",
+    "Apple SD Gothic Neo",
+    "Noto Sans KR",
+    "Malgun Gothic",
+    "Apple Color Emoji",
+    "Segoe UI Emoji",
+    "Segoe UI Symbol",
+    sans-serif;
+  color: var(--seed-color-fg-neutral);
+  background: var(--seed-color-bg-layer-basement);
+}
+
+html:root,
+html[data-seed-platform="ios"][data-seed-font-scaling="enabled"],
+body,
+#root {
+  font-family: var(--openmd-font-family);
+}
+
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
+}
+
+/*
+ * Safe-area ownership contract:
+ * - By default, the web layer consumes SEED's env(safe-area-inset-*) values.
+ * - A native shell that already consumes the insets must set this attribute
+ *   before first paint so the WebView does not apply the same insets again.
+ */
+html[data-openmd-safe-area="consumed"] {
+  --seed-safe-area-top: 0px;
+  --seed-safe-area-bottom: 0px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-width: 320px;
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  min-height: 100dvh;
+}
+
+h1,
+h2,
+h3,
+p,
+dl,
+dd {
+  margin: 0;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
