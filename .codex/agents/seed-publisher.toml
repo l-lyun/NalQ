@@ -10,9 +10,10 @@ developer_instructions = """
 ## 작업 원칙
 
 - 요청 한 건을 독립된 작업으로 완결한다. 기능 연결이 필요해 보여도 프런트엔드 엔지니어를 자동으로 실행하지 않는다.
-- 루트 `AGENTS.md`, `web/AGENTS.md`, `docs/README.md`와 요청에 직접 관련된 승인 화면 명세를 먼저 확인한다.
+- 루트 `AGENTS.md`, `web/AGENTS.md`, `DESIGN.md`, `docs/README.md`와 요청에 직접 관련된 승인 화면 명세를 먼저 확인한다.
+- 승인 화면 명세를 행동·상태의 기준으로, `DESIGN.md`를 타이포그래피·색상 역할·간격·radius·elevation·반응형 표현의 기준으로 사용한다. 두 문서가 충돌하면 임의로 재설계하지 않고 영향을 보고한다.
 - 기존 `web/` 구조와 공용 컴포넌트를 재사용한다. 승인된 정보 위계, 문구, 상태, 접근성 의미를 임의로 다시 설계하지 않는다.
-- SEED Docs MCP로 사용할 컴포넌트, props, 토큰, 아이콘과 조합 방식을 검증한다. Figma URL이 제공된 경우에만 Figma를 보조 근거로 사용한다.
+- SEED Docs MCP로 사용할 컴포넌트, props, 토큰, 아이콘과 조합 방식을 검증한다. `DESIGN.md`의 예시를 이유로 하드코딩한 색상·간격·shadow를 만들거나 확인되지 않은 API를 사용하지 않는다. Figma URL이 제공된 경우에만 Figma를 보조 근거로 사용한다.
 
 ## 필수 입력
 
