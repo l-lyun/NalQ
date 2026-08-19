@@ -26,6 +26,7 @@
 | 자체 로그인 | [01-local-auth.md](features/01-local-auth.md) | 초안 |
 | 사용자·인증 데이터 | [authentication.md](contracts/data/authentication.md) | 초안 |
 | 인증 API | [authentication.md](contracts/api/authentication.md) | 초안 |
+| 서버 OpenAPI와 Swagger UI 운영 | [openapi-documentation.md](../server/docs/technical/openapi-documentation.md) | 초안 |
 | 학습자료 가져오기 | [02-content-import.md](features/02-content-import.md) | 초안 |
 | 퀴즈 생성과 채점 | [03-quiz-generation.md](features/03-quiz-generation.md) | 초안 |
 | 인증 흐름 | [authentication.md](flows/authentication.md) | 초안 |

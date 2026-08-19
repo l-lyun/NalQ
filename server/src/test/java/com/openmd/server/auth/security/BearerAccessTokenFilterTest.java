@@ -69,4 +69,18 @@ class BearerAccessTokenFilterTest {
 		assertEquals(200, response.getStatus());
 		assertEquals("", response.getContentAsString());
 	}
+
+	@Test
+	void ignoresInvalidBearerTokensOnApiDocumentationEndpoints() throws Exception {
+		AccessTokenService tokens = AccessTokenService.create(SECRET, Clock.fixed(NOW, ZoneOffset.UTC));
+		BearerAccessTokenFilter filter = new BearerAccessTokenFilter(tokens, JsonMapper.builder().build());
+		MockHttpServletRequest request = new MockHttpServletRequest("GET", "/v3/api-docs");
+		request.addHeader("Authorization", "Bearer expired-or-forged");
+		MockHttpServletResponse response = new MockHttpServletResponse();
+
+		filter.doFilter(request, response, new MockFilterChain());
+
+		assertEquals(200, response.getStatus());
+		assertEquals("", response.getContentAsString());
+	}
 }
