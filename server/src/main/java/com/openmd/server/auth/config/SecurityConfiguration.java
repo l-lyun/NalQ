@@ -4,6 +4,7 @@ import tools.jackson.databind.ObjectMapper;
 import com.openmd.server.auth.domain.AuthErrorCode;
 import com.openmd.server.auth.security.AccessTokenService;
 import com.openmd.server.auth.security.BearerAccessTokenFilter;
+import com.openmd.server.auth.security.BrowserSessionRequestGuard;
 import com.openmd.server.global.api.ApiError;
 import com.openmd.server.global.api.ApiResponse;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -20,6 +21,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.CorsFilter;
 import java.util.List;
 
 @Configuration
@@ -38,10 +40,15 @@ public class SecurityConfiguration {
 		HttpSecurity http,
 		AccessTokenService tokens,
 		ObjectMapper mapper,
+		@Value("${openmd.auth.browser.allowed-origins}") List<String> browserAllowedOrigins,
 		@Value("${springdoc.api-docs.enabled:false}") boolean apiDocsEnabled
 	)
 		throws Exception {
 		BearerAccessTokenFilter bearerFilter = new BearerAccessTokenFilter(tokens, mapper);
+		BrowserSessionRequestGuard browserSessionGuard = new BrowserSessionRequestGuard(
+			browserAllowedOrigins,
+			mapper
+		);
 		return http
 			.cors(Customizer.withDefaults())
 			.csrf(csrf -> csrf.ignoringRequestMatchers("/api/v1/auth/**"))
@@ -62,26 +69,44 @@ public class SecurityConfiguration {
 					AuthErrorCode.INVALID_CREDENTIAL.code(), AuthErrorCode.INVALID_CREDENTIAL.message()
 				)));
 			}))
+			.addFilterBefore(browserSessionGuard, CorsFilter.class)
 			.addFilterBefore(bearerFilter, UsernamePasswordAuthenticationFilter.class)
 			.build();
 	}
 
 	@Bean
 	CorsConfigurationSource corsConfigurationSource(
-		@Value("${openmd.cors.allowed-origins}") List<String> allowedOrigins
+		@Value("${openmd.cors.allowed-origins}") List<String> allowedOrigins,
+		@Value("${openmd.auth.browser.allowed-origins}") List<String> browserAllowedOrigins
 	) {
-		return buildCorsConfigurationSource(allowedOrigins);
+		return buildCorsConfigurationSource(allowedOrigins, browserAllowedOrigins);
 	}
 
-	static CorsConfigurationSource buildCorsConfigurationSource(List<String> allowedOrigins) {
-		CorsConfiguration configuration = new CorsConfiguration();
-		configuration.setAllowedOrigins(List.copyOf(allowedOrigins));
-		configuration.setAllowedMethods(List.of("GET", "POST", "DELETE", "OPTIONS"));
-		configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
-		configuration.setAllowCredentials(false);
-		configuration.setMaxAge(3600L);
+	static CorsConfigurationSource buildCorsConfigurationSource(
+		List<String> allowedOrigins,
+		List<String> browserAllowedOrigins
+	) {
+		if (browserAllowedOrigins.stream().anyMatch("*"::equals)) {
+			throw new IllegalArgumentException("Browser credentialed CORS does not allow wildcard origins");
+		}
+
+		CorsConfiguration browser = new CorsConfiguration();
+		browser.setAllowedOrigins(List.copyOf(browserAllowedOrigins));
+		browser.setAllowedMethods(List.of("POST", "DELETE", "OPTIONS"));
+		browser.setAllowedHeaders(List.of("Content-Type", BrowserSessionRequestGuard.CSRF_HEADER));
+		browser.setAllowCredentials(true);
+		browser.setMaxAge(3600L);
+
+		CorsConfiguration general = new CorsConfiguration();
+		general.setAllowedOrigins(List.copyOf(allowedOrigins));
+		general.setAllowedMethods(List.of("GET", "POST", "DELETE", "OPTIONS"));
+		general.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+		general.setAllowCredentials(false);
+		general.setMaxAge(3600L);
+
 		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-		source.registerCorsConfiguration("/**", configuration);
+		source.registerCorsConfiguration("/api/v1/auth/web/**", browser);
+		source.registerCorsConfiguration("/**", general);
 		return source;
 	}
 }

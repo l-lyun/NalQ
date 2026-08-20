@@ -1,6 +1,7 @@
 package com.openmd.server.auth.config;
 
 import com.openmd.server.auth.application.*;
+import com.openmd.server.auth.api.BrowserRefreshCookie;
 import com.openmd.server.auth.domain.UserRepository;
 import com.openmd.server.auth.infrastructure.*;
 import com.openmd.server.auth.security.AccessTokenService;
@@ -22,6 +23,17 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 public class AuthConfiguration {
 
 	@Bean Clock clock() { return Clock.systemUTC(); }
+
+	@Bean
+	BrowserRefreshCookie browserRefreshCookie(
+		Clock clock,
+		@Value("${openmd.auth.browser.cookie.name:__Host-openmd_refresh}") String name,
+		@Value("${openmd.auth.browser.cookie.secure:true}") boolean secure,
+		@Value("${openmd.auth.browser.cookie.same-site:Lax}") String sameSite,
+		@Value("${openmd.auth.browser.cookie.path:/}") String path
+	) {
+		return new BrowserRefreshCookie(name, secure, sameSite, path, clock);
+	}
 	@Bean PasswordEncoder passwordEncoder() { return Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8(); }
 	@Bean VerificationCodeGenerator verificationCodeGenerator() { return new VerificationCodeGenerator(new SecureRandom()); }
 
