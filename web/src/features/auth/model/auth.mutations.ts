@@ -1,12 +1,14 @@
 import { useMutation } from '@tanstack/react-query'
 
 import {
+  checkNicknameAvailability,
   confirmEmailVerification,
   requestSignUp,
   resendVerificationEmail,
 } from '@/features/auth/api/auth.api'
 
 import {
+  completeSignUpAndLoadCurrentUser,
   completeCurrentUserSession,
   loginAndLoadCurrentUser,
   logoutCurrentSession,
@@ -30,6 +32,14 @@ export function useConfirmEmailMutation() {
 
 export function useResendVerificationMutation() {
   return useMutation({ mutationFn: resendVerificationEmail, retry: false })
+}
+
+export function useNicknameAvailabilityMutation() {
+  return useMutation({ mutationFn: checkNicknameAvailability, retry: false })
+}
+
+export function useCompleteSignUpMutation() {
+  return useMutation({ mutationFn: completeSignUpAndLoadCurrentUser, retry: false })
 }
 
 export function useLogoutMutation() {

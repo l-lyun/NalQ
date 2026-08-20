@@ -1,7 +1,10 @@
 import { queryClient } from '@/app/providers/queryClient'
 import { createSession } from '@/features/auth/api/auth.api'
-import { logoutSessionTransport } from '@/features/auth/api/authTransport'
-import type { LoginRequest } from '@/features/auth/api/auth.types'
+import {
+  completeBrowserSignUpTransport,
+  logoutSessionTransport,
+} from '@/features/auth/api/authTransport'
+import type { CompleteSignUpRequest, LoginRequest } from '@/features/auth/api/auth.types'
 import { ApiClientError } from '@/shared/api/apiError'
 
 import { currentUserQueryOptions } from './auth.queries'
@@ -15,6 +18,13 @@ let bootstrapPromise: Promise<void> | null = null
 
 export async function loginAndLoadCurrentUser(payload: LoginRequest) {
   const tokens = await createSession(payload)
+  setSessionTokens(tokens)
+  await clearAuthAndPrivateCaches()
+  return completeCurrentUserSession()
+}
+
+export async function completeSignUpAndLoadCurrentUser(payload: CompleteSignUpRequest) {
+  const tokens = await completeBrowserSignUpTransport(payload)
   setSessionTokens(tokens)
   await clearAuthAndPrivateCaches()
   return completeCurrentUserSession()

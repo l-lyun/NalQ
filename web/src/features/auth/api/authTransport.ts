@@ -1,4 +1,9 @@
-import type { ApiResponse, LoginRequest, SessionTokens } from './auth.types'
+import type {
+  ApiResponse,
+  CompleteSignUpRequest,
+  LoginRequest,
+  SessionTokens,
+} from './auth.types'
 import { publicApi } from '@/shared/api/publicApi'
 import { toApiClientError, unwrapApiResponse } from '@/shared/api/apiError'
 
@@ -15,6 +20,21 @@ export async function createBrowserSessionTransport(
   try {
     const response = await publicApi.post<ApiResponse<SessionTokens>>(
       '/api/v1/auth/web/sessions',
+      payload,
+      browserSessionConfig,
+    )
+    return unwrapApiResponse(response.data)
+  } catch (error) {
+    throw toApiClientError(error)
+  }
+}
+
+export async function completeBrowserSignUpTransport(
+  payload: CompleteSignUpRequest,
+): Promise<SessionTokens> {
+  try {
+    const response = await publicApi.post<ApiResponse<SessionTokens>>(
+      '/api/v1/auth/web/sign-ups',
       payload,
       browserSessionConfig,
     )
