@@ -5,6 +5,7 @@ import { queryClient } from '@/app/providers/queryClient'
 import { AuthBootstrap } from '@/app/router/AuthBootstrap'
 import { AuthGate, PublicOnlyGate } from '@/app/router/AuthGate'
 import { AuthenticatedHomePage } from '@/pages/home/AuthenticatedHomePage'
+import { AuthenticatedLearningPage } from '@/pages/learning/AuthenticatedLearningPage'
 import { LoginPage } from '@/pages/login/LoginPage'
 import { SignUpPage } from '@/pages/sign-up/SignUpPage'
 import { VerifyEmailPage } from '@/pages/verify-email/VerifyEmailPage'
@@ -22,6 +23,7 @@ export function App() {
             </Route>
             <Route element={<AuthGate />}>
               <Route path="/" element={<AuthenticatedHomePage />} />
+              <Route path="/learning" element={<AuthenticatedLearningPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
