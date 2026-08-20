@@ -11,7 +11,6 @@ import {
   LearningTextInput,
   LearningTextarea,
 } from './components/LearningPrimitives'
-import { learningMaterialFixtures, learningReviewFixture } from './learning.fixtures'
 import { countUnicodeCodePoints } from './learning.text'
 import type {
   LearningMaterial,
@@ -54,8 +53,8 @@ function canEditMaterialBody(material: LearningMaterial) {
 const sourceLabel = { PASTE: '직접 입력', NOTION: 'Notion에서 가져옴' } as const
 
 export function LearningPage({
-  initialMaterials = learningMaterialFixtures,
-  review = learningReviewFixture,
+  initialMaterials = [],
+  review = null,
   reviewState,
   materialsState,
   callbacks,
@@ -200,21 +199,17 @@ export function LearningPage({
     })
   }
 
-  const createMaterial = (nextDraft: LearningMaterialDraft) => {
+  const createMaterial = async (nextDraft: LearningMaterialDraft) => {
     const normalizedDraft = { ...nextDraft, title: nextDraft.title.trim() }
-    const created: LearningMaterial = {
-      id: `demo-material-${Date.now()}`,
-      title: normalizedDraft.title,
-      body: normalizedDraft.body,
-      source: 'PASTE',
-      updatedAtLabel: '방금 수정',
-      generating: false,
+    if (!callbacks?.onCreateMaterial) {
+      throw new Error('학습자료 저장 기능을 연결하고 있어요. 잠시 후 다시 시도해주세요.')
     }
+
+    const created = await callbacks.onCreateMaterial(normalizedDraft)
     setMaterials((current) => [created, ...current])
     const emptyDraft = { title: '', body: '' }
     draftRef.current = emptyDraft
     setDraft(emptyDraft)
-    callbacks?.onCreateMaterial?.(normalizedDraft)
     callbacks?.onOpenQuizConditions?.(created)
     push({
       id: 'handoff',
@@ -247,8 +242,8 @@ export function LearningPage({
               onNewQuiz={() => push({ id: 'new-quiz' })}
               onStartReview={startReview}
               onEditMaterial={(materialId) => push({ id: 'edit-material', materialId })}
-              onRetryReview={() => callbacks?.onRetryReview?.()}
-              onRetryMaterials={() => callbacks?.onRetryMaterials?.()}
+              onRetryReview={callbacks?.onRetryReview}
+              onRetryMaterials={callbacks?.onRetryMaterials}
             />
           ) : screen.id === 'new-quiz' ? (
             <ChoiceScreen
@@ -354,8 +349,8 @@ function LearningMain({
   onNewQuiz: () => void
   onStartReview: () => void
   onEditMaterial: (materialId: string) => void
-  onRetryReview: () => void
-  onRetryMaterials: () => void
+  onRetryReview?: () => void
+  onRetryMaterials?: () => void
 }) {
   const visibleMaterials =
     materialsState.status === 'ready'
@@ -402,6 +397,10 @@ function LearningMain({
               },
             ]}
           />
+        ) : reviewState.data === null ? (
+          <Text as="p" textStyle="t5Regular" color="fg.neutralMuted">
+            문제를 완료하면 복습할 문항이 여기에 보여요.
+          </Text>
         ) : (
           <Text as="p" textStyle="t5Regular" color="fg.neutralMuted">
             지금 복습할 문항이 없어요. 가장 최근에 완료한 퀴즈는 모두 해결했어요.
@@ -469,15 +468,17 @@ function LearningSectionSkeleton({ label, rows }: { label: string; rows: number 
   )
 }
 
-function LearningInlineError({ message, onRetry }: { message: string; onRetry: () => void }) {
+function LearningInlineError({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
     <VStack gap="x2" align="flex-start" role="status">
       <Text as="p" textStyle="t5Regular" color="fg.neutralMuted">
         {message}
       </Text>
-      <ActionButton type="button" size="small" variant="ghost" onClick={onRetry}>
-        다시 시도
-      </ActionButton>
+      {onRetry ? (
+        <ActionButton type="button" size="small" variant="ghost" onClick={onRetry}>
+          다시 시도
+        </ActionButton>
+      ) : null}
     </VStack>
   )
 }
@@ -565,12 +566,14 @@ function DirectInputScreen({ draft, onDraftChange, onBack, onSubmit, headingRef 
   draft: LearningMaterialDraft
   onDraftChange: (draft: LearningMaterialDraft) => void
   onBack: () => void
-  onSubmit: (draft: LearningMaterialDraft) => void
+  onSubmit: (draft: LearningMaterialDraft) => Promise<void>
   headingRef: React.RefObject<HTMLHeadingElement | null>
 }) {
   const [errors, setErrors] = useState<Partial<Record<keyof LearningMaterialDraft, string>>>({})
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string>()
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const titleLength = countUnicodeCodePoints(draft.title.trim())
     const bodyLength = countUnicodeCodePoints(draft.body)
@@ -588,7 +591,19 @@ function DirectInputScreen({ draft, onDraftChange, onBack, onSubmit, headingRef 
     }
     setErrors(nextErrors)
     if (nextErrors.title || nextErrors.body) return
-    onSubmit(draft)
+    setSubmitting(true)
+    setSubmitError(undefined)
+    try {
+      await onSubmit(draft)
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error
+          ? error.message
+          : '학습자료를 저장하지 못했어요. 입력한 내용을 유지한 채 다시 시도해주세요.',
+      )
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -620,8 +635,13 @@ function DirectInputScreen({ draft, onDraftChange, onBack, onSubmit, headingRef 
               onChange={(event) => onDraftChange({ ...draft, body: event.currentTarget.value })}
             />
           </LearningField>
-          <ActionButton type="submit" size="large" variant="brandSolid">
-            저장하고 문제 만들기
+          {submitError ? (
+            <Text as="p" textStyle="t5Regular" color="fg.critical" role="alert">
+              {submitError}
+            </Text>
+          ) : null}
+          <ActionButton type="submit" size="large" variant="brandSolid" disabled={submitting}>
+            {submitting ? '저장하는 중...' : '저장하고 문제 만들기'}
           </ActionButton>
         </VStack>
       </form>

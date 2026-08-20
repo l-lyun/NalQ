@@ -14,5 +14,11 @@ export function AuthenticatedLearningPage() {
     // 학습은 현재 경로라 유지하고, 프로필은 라우트가 생길 때 연결한다.
   }
 
-  return <LearningPage callbacks={{ onNavigate: handleNavigate }} />
+  return (
+    <LearningPage
+      reviewState={{ status: 'error', message: '복습 데이터 연동을 준비하고 있어요.' }}
+      materialsState={{ status: 'error', message: '학습자료 데이터 연동을 준비하고 있어요.' }}
+      callbacks={{ onNavigate: handleNavigate }}
+    />
+  )
 }
