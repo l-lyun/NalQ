@@ -1,4 +1,4 @@
-import { Box, PageBanner, Text, VStack } from '@seed-design/react'
+import { ActionButton, Box, PageBanner, Text, VStack } from '@seed-design/react'
 
 import { HomeBottomNavigation } from './components/HomeBottomNavigation'
 import { HomeSectionDivider } from './components/HomePrimitives'
@@ -25,6 +25,7 @@ export function HomePage(props: HomePageProps) {
     today,
     navigation,
     recommendationWarning,
+    session,
     onViewAllReviews,
     onViewAllMaterials,
     onRetryAll,
@@ -40,11 +41,28 @@ export function HomePage(props: HomePageProps) {
           pb="spacingY.screenBottom"
           gap="x3"
         >
-          <Box as="header">
+          <VStack as="header" gap="x2">
             <Text as="h1" textStyle="t12Bold" color="fg.neutral">
               홈
             </Text>
-          </Box>
+            {session ? (
+              <VStack gap="x1" align="flex-start">
+                <Text textStyle="t4Regular" color="fg.neutralMuted">
+                  현재 사용자: {session.email}
+                </Text>
+                <ActionButton
+                  type="button"
+                  size="small"
+                  variant="ghost"
+                  loading={session.logoutPending}
+                  disabled={session.logoutPending}
+                  onClick={session.onLogout}
+                >
+                  로그아웃
+                </ActionButton>
+              </VStack>
+            ) : null}
+          </VStack>
 
           {recommendationWarning ? (
             <PageBanner.Root tone="warning" variant="weak">
