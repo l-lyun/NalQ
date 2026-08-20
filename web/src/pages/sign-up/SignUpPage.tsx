@@ -48,10 +48,12 @@ function isSameNickname(left: string, right: string) {
   )
 }
 
+type SignUpRouteState = AuthReturnState & { signUpStep?: 1 | 2 }
+
 export function SignUpPage() {
   const location = useLocation()
   const navigate = useNavigate()
-  const routeState = location.state as AuthReturnState | null
+  const routeState = location.state as SignUpRouteState | null
 
   const requestVerification = useSignUpMutation()
   const resendVerification = useResendVerificationMutation()
@@ -59,7 +61,7 @@ export function SignUpPage() {
   const checkNickname = useNicknameAvailabilityMutation()
   const completeSignUp = useCompleteSignUpMutation()
 
-  const [step, setStep] = useState<1 | 2>(1)
+  const [profileStepUnlocked, setProfileStepUnlocked] = useState(false)
   const [email, setEmail] = useState('')
   const [verificationCode, setVerificationCode] = useState('')
   const [password, setPassword] = useState('')
@@ -115,6 +117,15 @@ export function SignUpPage() {
     nicknameCheckStatus === 'available' &&
     serviceTermsAccepted &&
     privacyTermsAccepted
+  const step: 1 | 2 =
+    profileStepUnlocked && routeState?.signUpStep === 2 ? 2 : 1
+
+  function openProfileStep() {
+    setProfileStepUnlocked(true)
+    navigate('/sign-up', {
+      state: { from: routeState?.from, signUpStep: 2 } satisfies SignUpRouteState,
+    })
+  }
 
   function resetVerificationState() {
     setVerificationCode('')
@@ -155,7 +166,7 @@ export function SignUpPage() {
       setVerificationExpiresAt(null)
       setResendAvailableAt(null)
       setSignUpToken(null)
-      setStep(2)
+      openProfileStep()
       return
     }
 
@@ -205,7 +216,15 @@ export function SignUpPage() {
             return
           }
 
-          setSignUpToken(response.nextAction === 'COMPLETE_PROFILE' ? response.signUpToken : null)
+          if (response.nextAction === 'LOGIN') {
+            navigate('/login', {
+              replace: true,
+              state: { email: normalizedEmail, from: routeState?.from },
+            })
+            return
+          }
+
+          setSignUpToken(response.signUpToken)
           setVerificationStatus('verified')
         },
         onError: () => setVerificationStatus('error'),
@@ -214,7 +233,7 @@ export function SignUpPage() {
   }
 
   function handleContinue() {
-    if (canContinue) setStep(2)
+    if (canContinue) openProfileStep()
   }
 
   function handleNicknameChange(value: string) {
@@ -391,7 +410,7 @@ export function SignUpPage() {
       }}
       onBack={() => {
         if (step === 2) {
-          setStep(1)
+          navigate(-1)
           return
         }
         navigate('/login', { state: { from: routeState?.from } })
