@@ -1,19 +1,32 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { QueryClientProvider } from '@tanstack/react-query'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 
-import { homeReadyFixture } from '@/pages/home/home.fixtures'
-import { HomePage } from '@/pages/home/HomePage'
-
-const queryClient = new QueryClient()
+import { queryClient } from '@/app/providers/queryClient'
+import { AuthBootstrap } from '@/app/router/AuthBootstrap'
+import { AuthGate, PublicOnlyGate } from '@/app/router/AuthGate'
+import { AuthenticatedHomePage } from '@/pages/home/AuthenticatedHomePage'
+import { LoginPage } from '@/pages/login/LoginPage'
+import { SignUpPage } from '@/pages/sign-up/SignUpPage'
+import { VerifyEmailPage } from '@/pages/verify-email/VerifyEmailPage'
 
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <Routes>
-          <Route path="*" element={<HomePage {...homeReadyFixture} />} />
-        </Routes>
-      </BrowserRouter>
+      <AuthBootstrap>
+        <BrowserRouter>
+          <Routes>
+            <Route element={<PublicOnlyGate />}>
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/sign-up" element={<SignUpPage />} />
+              <Route path="/verify-email" element={<VerifyEmailPage />} />
+            </Route>
+            <Route element={<AuthGate />}>
+              <Route path="/" element={<AuthenticatedHomePage />} />
+            </Route>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </AuthBootstrap>
     </QueryClientProvider>
   )
 }

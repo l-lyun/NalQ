@@ -54,4 +54,9 @@ export type HomePageProps = {
   onViewAllReviews: () => void
   onViewAllMaterials: () => void
   onRetryAll: () => void
+  session?: {
+    email: string
+    logoutPending: boolean
+    onLogout: () => void
+  }
 }

@@ -1,0 +1,19 @@
+.auth-page {
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.auth-form {
+  margin: 0;
+}
+
+.auth-link {
+  color: var(--seed-color-fg-brand);
+  text-underline-offset: 0.2em;
+}
+
+.auth-link:focus-visible {
+  outline: 2px solid var(--seed-color-stroke-focus-ring);
+  outline-offset: 2px;
+}
