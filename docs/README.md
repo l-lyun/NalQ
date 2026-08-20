@@ -28,11 +28,14 @@
 | 인증 API | [authentication.md](contracts/api/authentication.md) | 초안 |
 | 브라우저 Refresh Token Cookie 서버 설계 | [browser-refresh-cookie.md](../server/docs/technical/browser-refresh-cookie.md) | 초안 |
 | 서버 OpenAPI와 Swagger UI 운영 | [openapi-documentation.md](../server/docs/technical/openapi-documentation.md) | 초안 |
-| 학습자료 가져오기 | [02-content-import.md](features/02-content-import.md) | 초안 |
-| 퀴즈 생성과 채점 | [03-quiz-generation.md](features/03-quiz-generation.md) | 초안 |
+| 학습자료 만들기 | [02-content-import.md](features/02-content-import.md) | 검토 중 |
+| 퀴즈 생성·풀이·결과·복습 | [03-quiz-generation.md](features/03-quiz-generation.md) | 검토 중 |
 | 인증 흐름 | [authentication.md](flows/authentication.md) | 초안 |
-| 자료 가져오기 흐름 | [content-import.md](flows/content-import.md) | 초안 |
-| 문제 풀이 흐름 | [quiz-solving.md](flows/quiz-solving.md) | 초안 |
+| 학습자료 만들기 흐름 | [content-import.md](flows/content-import.md) | 검토 중 |
+| 퀴즈 생성부터 복습까지의 흐름 | [quiz-solving.md](flows/quiz-solving.md) | 검토 중 |
+| 학습자료·퀴즈·복습 API | [quiz-learning.md](contracts/api/quiz-learning.md) | 검토 중 |
+| 웹 본 퀴즈 임시 상태·보존 | [quiz-solving.md](../web/docs/technical/quiz-solving.md) | 검토 중 |
+| 앱 본 퀴즈 임시 상태·보존 | [quiz-solving.md](../app/docs/technical/quiz-solving.md) | 검토 중 |
 | 홈 화면 | [home.md](screens/home.md) | 초안 |
 | 학습 화면 | [learning.md](screens/learning.md) | 초안 |
 | 프로필 화면 | [profile.md](screens/profile.md) | 초안 |
@@ -51,6 +54,6 @@
 
 - 첫 배포 대상이 Expo 앱, 모바일 웹뷰, 웹 중 어디까지인지
 - Refresh Token의 최종 수명과 앱/WebView별 전달·보관 방식 (브라우저 HttpOnly Cookie 서버 계약과 Access Token 5분은 확정)
-- Notion 연결의 인증·페이지 선택 범위와 동기화 정책
-- 난이도의 단계 수, 문제 수 선택 방식, 주관식 채점의 허용 기준
+- Notion 인증 방식과 사용자가 페이지를 선택할 수 있는 권한 범위 (일회성 복사와 비동기화는 확정)
+- 학습자료 제목의 필수 여부와 미입력 시 기본 제목 규칙
 - 경험치·랭킹·친구·꾸미기 기능의 출시 순서와 운영 정책

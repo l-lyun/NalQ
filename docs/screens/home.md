@@ -10,6 +10,8 @@
 - 관련 흐름: [문제 생성과 풀이](../flows/quiz-solving.md), [학습자료 가져오기](../flows/content-import.md)
 - 공통 용어: [용어집](../product/glossary.md)
 
+> 동기화 주의: 이 화면 초안의 새 학습 입력 방식, 제출 전 풀이 세션, 복습 범위 관련 내용은 최신 [학습자료 기능명세](../features/02-content-import.md), [퀴즈 기능명세](../features/03-quiz-generation.md), [학습자료 흐름](../flows/content-import.md), [퀴즈 흐름](../flows/quiz-solving.md)과 아직 동기화되지 않았다. 해당 부분은 구현 기준으로 사용하지 않으며 후속 화면 명세 개정이 필요하다.
+
 ## 목표와 범위
 
 ### 사용자 목표
