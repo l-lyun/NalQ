@@ -18,6 +18,12 @@
 - 서버는 Access Token에서 얻은 `userId`로 학습자료, 문제 세트, 본 퀴즈 회차와 복습 세션의 소유권을 판단한다. 요청 body의 `userId`는 받지 않는다.
 - 존재하지 않거나 현재 사용자 소유가 아닌 리소스는 모두 `404 COMMON_003`으로 응답해 타인의 리소스 존재를 노출하지 않는다.
 
+### 브라우저 전송 경계
+
+- stateless Bearer API는 브라우저가 자격 증명을 자동 첨부하는 Cookie API가 아니므로 CSRF token을 요구하지 않는다. 유효한 Access Token과 엔드포인트별 권한 검사는 그대로 적용한다.
+- 일반 API CORS는 설정된 정확한 origin에만 허용하며 wildcard origin을 사용하지 않는다. 허용 method는 `GET`, `POST`, `PATCH`, `DELETE`, `OPTIONS`이고 허용 header는 `Authorization`, `Content-Type`, `Idempotency-Key`다.
+- 브라우저 Refresh Cookie endpoint는 이 예외에 포함하지 않는다. 해당 endpoint의 credentialed CORS와 정확한 `Origin` + `X-OpenMD-CSRF` guard는 [인증 API 계약](authentication.md#cors와-csrf)을 유지한다.
+
 ### 응답 봉투
 
 서버의 기존 `ApiResponse`와 `ApiError(fields)` 모양을 유지한다. 클라이언트는 `error.message`가 아니라 안정적인 `error.code`로 분기한다.
@@ -46,11 +52,13 @@
 
 - 모든 시각은 ISO 8601 UTC 문자열이다.
 - 식별자는 예시의 문자열처럼 opaque하게 취급한다.
+- `materialId`의 wire 형식은 서버 `BIGINT` 식별자의 10진 문자열이다. 클라이언트는 이를 숫자로 변환하거나 산술에 사용하지 않고 opaque 문자열로 보존한다.
 - 외부 생성 서비스와 Notion의 원본 응답, 모델명, 프롬프트, 내부 검증 상세와 stack trace는 공개 응답·오류에 포함하지 않는다.
 
 ### 멱등 키
 
 - 명시된 쓰기 요청은 `Idempotency-Key` 헤더가 필수다.
+- 키는 대소문자를 구분하는 공백 없는 출력 가능 ASCII 1~128자다. 누락, 빈 값, 공백 포함, 범위 밖 문자와 128자 초과는 `400 COMMON_001`이며 `fields.field`는 `Idempotency-Key`다. 클라이언트는 충돌 가능성이 낮은 UUID 사용을 권장하되 UUID 형식만 강제하지 않는다.
 - 키 범위는 `현재 사용자 + HTTP method + 정규화 path`다.
 - 같은 키와 같은 의미의 payload 재요청은 최초 처리 결과와 같은 리소스 식별자를 반환한다.
 - 같은 키에 다른 payload를 보내면 새 오류 코드를 만들지 않는다. 일반 payload 불일치는 `COMMON_001`, 이미 전이된 attempt·복습 상태와의 충돌은 각각 `ATTEMPT_001`, `REVIEW_001`로 처리한다. 생성 중인 같은 자료에 대한 충돌은 `QUIZ_001`이다.
@@ -92,15 +100,15 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 }
 ```
 
-- `content`: 필수, 공백뿐인 값 불가, 최대 20,000자.
-- `sourceType`: 필수, `PASTE` 또는 `NOTION`.
-- 제목의 필수 여부와 기본값은 [학습자료 기능명세의 열린 질문](../../features/02-content-import.md#열린-질문)이 확정될 때 이 계약을 갱신한다.
+- `title`: 필수. Unicode 공백 기준으로 앞뒤를 제거한 값을 저장하며, 정리한 결과가 1~255 Unicode code point여야 한다. 공백뿐인 값에 기본 제목을 만들지 않는다.
+- `content`: 저장할 원문을 앞뒤 제거하거나 자르지 않는다. Unicode 공백 문자만으로 이루어진 값은 거절하고, 공백·줄바꿈을 포함한 Unicode code point 수가 최대 20,000이어야 한다. 정확히 20,000자는 허용하며 20,001자부터 `413 MATERIAL_002`다.
+- `sourceType`: 필수, 정확히 `PASTE` 또는 `NOTION`이다. `NOTION`은 사용자가 Notion 복사 결과에서 시작했다는 출처 표시일 뿐 페이지 연결·동기화 상태가 아니며, 저장 전 내용을 수정해도 `NOTION`을 유지한다.
 
 ```json
 {
   "success": true,
   "data": {
-    "materialId": "mat_123",
+    "materialId": "123",
     "title": "운영체제 스케줄링",
     "contentLength": 8240,
     "contentEditStatus": "EDITABLE",
@@ -111,6 +119,13 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 ```
 
 이 요청이 학습자료를 만드는 유일한 MVP 저장 경계다. 붙여넣기와 Notion 복사 결과를 위한 `importId`, preview, draft, 만료 API는 없다.
+
+- 생성 직후 `contentEditStatus`는 항상 `EDITABLE`이다.
+- `contentLength`는 요청 검증과 같은 Unicode code point 계산을 사용한다.
+- 같은 사용자·같은 `Idempotency-Key`·같은 의미의 payload 재요청은 새 행을 만들지 않고 최초와 동일한 `201 Created` 응답 body를 반환한다. 여기에는 `materialId`, `createdAt`과 `contentLength`가 포함된다.
+- 학습자료 생성에서 payload의 의미는 `앞뒤 공백을 제거한 title + 원문 content + sourceType`이다. JSON 속성 순서나 표현만 다른 요청은 같고, 이 세 값 중 하나라도 다르면 `400 COMMON_001`이다.
+- 입력 검증 실패와 저장 트랜잭션 롤백은 키를 점유하지 않는다. 같은 키의 동시 요청도 학습자료 한 건만 만들고 두 요청은 같은 성공 결과를 관찰해야 한다.
+- 생성 멱등 결과는 연결된 학습자료가 존재하는 동안 만료하지 않는다. MVP에는 학습자료 삭제 API가 없으므로 자동 만료하지 않는다.
 
 ### 수정
 
@@ -190,7 +205,7 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
   "success": true,
   "data": {
     "quizSetId": "qset_123",
-    "materialId": "mat_123",
+    "materialId": "123",
     "status": "GENERATING",
     "pollAfterSeconds": 3,
     "requestedConfig": {
@@ -217,7 +232,7 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
   "success": true,
   "data": {
     "quizSetId": "qset_123",
-    "materialId": "mat_123",
+    "materialId": "123",
     "status": "GENERATING",
     "requestedConfig": {
       "selectedTypes": ["MULTIPLE_CHOICE", "ESSAY"],
@@ -257,7 +272,7 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
   "success": true,
   "data": {
     "quizSetId": "qset_123",
-    "materialId": "mat_123",
+    "materialId": "123",
     "status": "GENERATING",
     "requestedConfig": {
       "selectedTypes": ["MULTIPLE_CHOICE", "ESSAY"],
@@ -733,6 +748,5 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 
 ## 열린 질문
 
-- [학습자료 기능명세의 열린 질문](../../features/02-content-import.md#열린-질문)이 입력·검증 계약에 영향을 주므로 확정 시 이 문서를 함께 갱신한다.
 - 재연결 뒤 페이지 선택 복원 여부는 [학습자료 흐름의 열린 질문](../../flows/content-import.md#열린-질문)이 책임진다.
-- `Idempotency-Key` 결과의 최소 보존 기간. 비동기 생성의 종료 전과 일반적인 네트워크 응답 유실 재시도 동안에는 만료할 수 없다.
+- 학습자료 생성을 제외한 비동기 생성·제출·복습 `Idempotency-Key` 결과의 최소 보존 기간. 비동기 생성의 종료 전과 일반적인 네트워크 응답 유실 재시도 동안에는 만료할 수 없다.

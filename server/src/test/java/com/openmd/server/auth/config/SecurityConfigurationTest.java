@@ -35,6 +35,25 @@ class SecurityConfigurationTest {
 	}
 
 	@Test
+	void learningMaterialPreflightAllowsPatchAndIdempotencyKey() throws Exception {
+		CorsFilter filter = new CorsFilter(SecurityConfiguration.buildCorsConfigurationSource(
+			List.of("http://localhost:5173"),
+			List.of("http://localhost:5173")
+		));
+		MockHttpServletRequest request = new MockHttpServletRequest("OPTIONS", "/api/v1/learning-materials");
+		request.addHeader("Origin", "http://localhost:5173");
+		request.addHeader("Access-Control-Request-Method", "POST");
+		request.addHeader("Access-Control-Request-Headers", "authorization,content-type,idempotency-key");
+		MockHttpServletResponse response = new MockHttpServletResponse();
+
+		filter.doFilter(request, response, new MockFilterChain());
+
+		assertEquals(200, response.getStatus());
+		assertTrue(response.getHeader("Access-Control-Allow-Methods").contains("PATCH"));
+		assertTrue(response.getHeader("Access-Control-Allow-Headers").contains("idempotency-key"));
+	}
+
+	@Test
 	void browserSessionCorsAllowsCredentialsAndTheCsrfHeaderOnlyForExactOrigin() throws Exception {
 		CorsFilter filter = new CorsFilter(SecurityConfiguration.buildCorsConfigurationSource(
 			List.of("http://localhost:5173"),
@@ -78,6 +97,14 @@ class SecurityConfigurationTest {
 		assertThrows(IllegalArgumentException.class, () -> SecurityConfiguration.buildCorsConfigurationSource(
 			List.of("http://localhost:5173"),
 			List.of("*")
+		));
+	}
+
+	@Test
+	void rejectsWildcardGeneralOriginsBecauseBearerApiUsesAnExactAllowlist() {
+		assertThrows(IllegalArgumentException.class, () -> SecurityConfiguration.buildCorsConfigurationSource(
+			List.of("*"),
+			List.of("http://localhost:5173")
 		));
 	}
 }

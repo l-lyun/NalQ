@@ -176,7 +176,7 @@ openmd.auth.browser.allowed-origins
 
 ## 8. CORS와 CSRF
 
-현재의 `allowCredentials(false)`와 `/api/v1/auth/**` 전체 CSRF 제외를 그대로 사용할 수 없다.
+일반 stateless Bearer API와 브라우저 Refresh Cookie API는 자격 증명 전송 방식이 다르므로 CORS와 CSRF 경계를 경로별로 분리한다.
 
 ### CORS
 
@@ -189,7 +189,9 @@ openmd.auth.browser.allowed-origins
 
 ### CSRF
 
-다음 두 조건을 모두 요구한다.
+Spring Security 기본 CSRF 검사는 `/api/v1/**`에 대해 제외한다. 이 설정은 인증·인가를 해제하지 않는다. 보호 API의 Bearer filter와 `authenticated()` 규칙은 그대로 적용하며, 유효한 Access Token이 없는 요청은 계속 `401 AUTH_005`다.
+
+브라우저 Refresh Cookie API인 `/api/v1/auth/web/**`는 기본 CSRF token 대신 기존 `BrowserSessionRequestGuard`에서 다음 두 조건을 모두 요구한다.
 
 1. 모든 브라우저 세션 변경 요청의 `Origin`을 정확한 allowlist와 비교한다.
 2. JSON 요청에 단순 form이 만들 수 없는 custom header를 요구해 CORS preflight를 강제한다.
@@ -198,10 +200,10 @@ openmd.auth.browser.allowed-origins
 
 이 경우 JavaScript가 읽는 CSRF Cookie는 인증 자격이 아니므로 Refresh Cookie와 분리한다. Refresh Cookie의 `HttpOnly`는 해제하지 않는다.
 
-Security 설정은 최소한 다음처럼 경계를 좁혀야 한다.
+Security 설정은 다음 경계를 유지한다.
 
-- 가입·인증 코드와 native body session endpoint는 현재 정책을 별도 검토
-- browser session endpoint는 전체 CSRF ignore 대상에서 제외
+- `/api/v1/**`는 Spring 기본 CSRF ignore 대상이지만 인증·인가 대상에서는 제외하지 않음
+- `/api/v1/auth/web/**`는 정확한 browser origin allowlist와 `X-OpenMD-CSRF: 1` 검증을 service·Redis 접근 전에 수행
 - Origin/CSRF 실패는 Redis rotate 이전에 `403 AUTH_009`로 종료
 - `AUTH_009`는 `AUTH_005`와 구분해 refresh loop를 막음
 
