@@ -20,6 +20,7 @@ export type SignUpRequest = {
 
 export type VerificationRequired = {
   verificationRequired: boolean
+  resendAvailableAt?: string
 }
 
 export type EmailVerificationRequest = {
@@ -27,9 +28,38 @@ export type EmailVerificationRequest = {
   code: string
 }
 
-export type EmailVerified = {
+export type LegacyEmailVerified = {
   emailVerified: boolean
   nextAction: 'LOGIN'
+}
+
+export type ProfileCompletionRequired = {
+  emailVerified: boolean
+  signUpToken: string
+  nextAction: 'COMPLETE_PROFILE'
+}
+
+export type EmailVerified = LegacyEmailVerified | ProfileCompletionRequired
+
+export type NicknameAvailabilityRequest = {
+  nickname: string
+}
+
+export type NicknameAvailability = {
+  available: boolean
+  checkedNickname: string
+}
+
+export type TermsAgreement = {
+  termsId: 'SERVICE_TERMS' | 'PRIVACY_COLLECTION'
+  version: string
+}
+
+export type CompleteSignUpRequest = {
+  signUpToken: string
+  password: string
+  nickname: string
+  agreements: TermsAgreement[]
 }
 
 export type LoginRequest = {

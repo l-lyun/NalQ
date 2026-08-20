@@ -40,6 +40,7 @@
 | 홈 화면 | [home.md](screens/home.md) | 초안 |
 | 학습 화면 | [learning.md](screens/learning.md) | 초안 |
 | 프로필 화면 | [profile.md](screens/profile.md) | 초안 |
+| 회원가입 화면 | [signup.md](screens/signup.md) | 초안 |
 
 화면 문서는 기능명세의 규칙을 복제하지 않고 관련 원장을 링크한다.
 
