@@ -64,8 +64,10 @@
 | 학습자료 수정 | `PATCH /api/v1/learning-materials/{materialId}` | `200 OK` |
 | Notion 페이지 일회성 복사 | `POST /api/v1/learning-material-imports/notion` | `200 OK` |
 | 문제 세트 생성 접수 | `POST /api/v1/learning-materials/{materialId}/quiz-sets` | `202 Accepted` |
+| 자료의 활성 생성 조회 | `GET /api/v1/learning-materials/{materialId}/quiz-sets/active` | `200 OK` |
 | 문제 세트 상태·풀이 데이터 조회 | `GET /api/v1/quiz-sets/{quizSetId}` | `200 OK` |
 | 본 퀴즈 최종 제출 | `POST /api/v1/quiz-sets/{quizSetId}/attempts` | `201 Created` |
+| 미완료 서술형 자기평가 회차 조회 | `GET /api/v1/quiz-sets/{quizSetId}/attempts/pending-self-assessment` | `200 OK` |
 | 서술형 자기평가 저장 | `PUT /api/v1/quiz-attempts/{attemptId}/essay-assessments/{questionId}` | `200 OK` |
 | 결과 조회 | `GET /api/v1/quiz-attempts/{attemptId}/result` | `200 OK` |
 | 최신 복습 현황 조회 | `GET /api/v1/quiz-reviews/latest` | `200 OK` |
@@ -202,11 +204,48 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 }
 ```
 
+### 자료의 활성 생성 조회
+
+`GET /api/v1/learning-materials/{materialId}/quiz-sets/active`
+
+- 현재 인증 사용자가 소유한 학습자료에서 `GENERATING` 상태인 QuizSet 하나를 찾는다.
+- 활성 생성이 없으면 정상 빈 상태이므로 새 오류 코드를 만들지 않고 `200 OK`, `data=null`을 반환한다.
+- 활성 생성이 있으면 반환한 `quizSetId`로 [상태·풀이 데이터 조회](#상태풀이-데이터-조회)를 계속한다.
+
+```json
+{
+  "success": true,
+  "data": {
+    "quizSetId": "qset_123",
+    "materialId": "mat_123",
+    "status": "GENERATING",
+    "requestedConfig": {
+      "selectedTypes": ["MULTIPLE_CHOICE", "ESSAY"],
+      "difficulty": "NORMAL",
+      "maxQuestionCount": 10
+    },
+    "pollAfterSeconds": 3
+  },
+  "error": null
+}
+```
+
+활성 생성이 없을 때의 응답은 다음과 같다.
+
+```json
+{
+  "success": true,
+  "data": null,
+  "error": null
+}
+```
+
 ### 상태·풀이 데이터 조회
 
 `GET /api/v1/quiz-sets/{quizSetId}`
 
-- `status`: `GENERATING`, `READY`, `FAILED`.
+- `GENERATING`, `READY`, `FAILED` 모두 `quizSetId`, `materialId`, `status`, `requestedConfig`를 반환한다.
+- `GENERATING`은 다음 조회 권고값 `pollAfterSeconds`도 반환한다.
 - `READY`는 유효 문제가 1개 이상이고 요청한 유형이 각각 최소 1문제 포함됐다는 뜻이다. 실제 수가 최대 문제 수보다 적을 수 있다.
 - `FAILED`에는 문제를 포함하지 않는다. 사용자에게는 재시도 가능한 일반 안내만 제공하고 외부 생성 서비스 상세는 노출하지 않는다.
 - 문제는 `number` 오름차순이다.
@@ -218,7 +257,14 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
   "success": true,
   "data": {
     "quizSetId": "qset_123",
+    "materialId": "mat_123",
     "status": "GENERATING",
+    "requestedConfig": {
+      "selectedTypes": ["MULTIPLE_CHOICE", "ESSAY"],
+      "difficulty": "NORMAL",
+      "maxQuestionCount": 10
+    },
+    "pollAfterSeconds": 3,
     "questions": [],
     "failure": null
   },
@@ -326,6 +372,38 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 - `automaticGrading`의 분모와 분자는 객관식·빈칸·단답형만 포함한다. 서술형을 0점으로 합산하지 않는다.
 - 자기평가에 필요한 서술형 상세는 결과 조회와 같은 공개 상세 모양으로 제공하되, `COMPLETED` 전에는 전체 완료 결과로 표시하지 않는다.
 
+### 미완료 서술형 자기평가 회차 조회
+
+`GET /api/v1/quiz-sets/{quizSetId}/attempts/pending-self-assessment`
+
+- 현재 인증 사용자와 QuizSet에 연결된 `SELF_ASSESSMENT_REQUIRED` attempt를 조회한다.
+- 복원할 attempt가 없으면 정상 빈 상태이므로 새 오류 코드를 만들지 않고 `200 OK`, `data=null`을 반환한다.
+- `pendingEssayQuestionIds`는 문제 번호 오름차순이다.
+- 이 응답은 최종 제출로 이미 생성된 attempt를 다시 찾는 계약이다. 중간 답안이나 서버 본 퀴즈 draft를 만들거나 조회하지 않는다.
+
+```json
+{
+  "success": true,
+  "data": {
+    "attemptId": "attempt_123",
+    "quizSetId": "qset_123",
+    "status": "SELF_ASSESSMENT_REQUIRED",
+    "pendingEssayQuestionIds": ["question_4", "question_7"]
+  },
+  "error": null
+}
+```
+
+복원할 attempt가 없을 때의 응답은 다음과 같다.
+
+```json
+{
+  "success": true,
+  "data": null,
+  "error": null
+}
+```
+
 ### 서술형 자기평가
 
 `PUT /api/v1/quiz-attempts/{attemptId}/essay-assessments/{questionId}`
@@ -391,6 +469,12 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
         "type": "MULTIPLE_CHOICE",
         "topic": "프로세스 스케줄링",
         "prompt": "일반 텍스트 문제",
+        "choices": [
+          { "choiceId": "choice_1", "text": "선입선출" },
+          { "choiceId": "choice_2", "text": "우선순위" },
+          { "choiceId": "choice_3", "text": "라운드 로빈" },
+          { "choiceId": "choice_4", "text": "최단 작업 우선" }
+        ],
         "response": { "selectedChoiceId": "choice_2" },
         "representativeAnswer": { "selectedChoiceId": "choice_3" },
         "outcome": "INCORRECT",
@@ -407,6 +491,8 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 
 - 자동 채점 `outcome`: `CORRECT`, `INCORRECT`.
 - 서술형 `outcome`: `CORRECT`, `PARTIAL`, `INCORRECT`.
+- 각 `questionResults` 항목은 다른 문제 조회 없이 렌더링할 수 있어야 한다. 객관식은 `choices: [{ choiceId, text }]`, 빈칸은 풀이 때와 같은 순서의 `segments`를 포함한다.
+- 객관식 `response.selectedChoiceId`와 `representativeAnswer.selectedChoiceId`, 빈칸 `response.blankAnswers[].blankId`와 `representativeAnswer.blankAnswers[].blankId`는 각각 함께 반환된 보기·segment 식별자를 그대로 참조한다.
 - 미응답은 `response=null`, `unanswered=true`, `outcome=INCORRECT`, `reviewRequired=true`로 포함한다. 별도 미응답 집계를 반환하지 않는다.
 - `representativeAnswer`는 결과 설명에 필요한 대표 정답만 공개한다. 빈칸·단답형의 허용 정답 전체를 반환하지 않는다. 서술형은 `modelAnswer`와 `keyPoints`를 제공한다.
 - 결과의 원래 `outcome`은 복습 뒤에도 바뀌지 않는다. `reviewRequired`는 현재 해결 여부에 따라 조회 시점에 계산할 수 있다.
@@ -494,8 +580,38 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 
 - `status`: `IN_PROGRESS`, `COMPLETED`.
 - 문항은 원래 `number` 오름차순이고 한 세션에 각 문항이 한 번만 존재한다.
-- 아직 답하지 않은 문항은 풀이 전 공개 모양만 포함한다. 처리된 문항은 저장된 응답과 판정을 함께 반환해 응답 유실 후 복구할 수 있다.
+- 문항별 `processingStatus`는 `PENDING`, `SELF_ASSESSMENT_REQUIRED`, `GRADED`다.
+- `PENDING` 문항은 풀이 전 공개 모양만 포함한다. `GRADED` 문항은 저장된 응답과 판정을 함께 반환해 응답 유실 후 복구할 수 있다.
+- `SELF_ASSESSMENT_REQUIRED` 서술형은 저장된 `answer`, `modelAnswer`, `keyPoints`, `explanation`, `sourceExcerpt`를 반환한다. 이 상태가 하나 있으면 최상위 `nextQuestionId`는 다른 미처리 문항이 아니라 해당 서술형 `questionId`다.
 - `nextQuestionId`는 번호가 가장 낮은 미처리 문항이며 모두 처리되면 `null`이다.
+
+```json
+{
+  "success": true,
+  "data": {
+    "reviewSessionId": "review_123",
+    "sourceAttemptId": "attempt_123",
+    "status": "IN_PROGRESS",
+    "nextQuestionId": "question_4",
+    "questions": [
+      {
+        "questionId": "question_4",
+        "number": 4,
+        "type": "ESSAY",
+        "topic": "기아 방지",
+        "prompt": "에이징의 목적을 설명하세요.",
+        "processingStatus": "SELF_ASSESSMENT_REQUIRED",
+        "answer": "오래 기다린 프로세스의 우선순위를 높인다.",
+        "modelAnswer": "대기 시간이 긴 프로세스의 우선순위를 점차 높여 기아를 방지한다.",
+        "keyPoints": ["대기 시간 반영", "우선순위 상승", "기아 방지"],
+        "explanation": "에이징은 장기 대기 프로세스가 실행 기회를 얻도록 돕습니다.",
+        "sourceExcerpt": "대기 시간이 길수록 우선순위를 높이는 에이징으로 기아를 방지한다."
+      }
+    ]
+  },
+  "error": null
+}
+```
 
 ### 문항 답안 저장
 
@@ -529,7 +645,7 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
     "reviewStatus": "RESOLVED",
     "sessionStatus": "IN_PROGRESS",
     "nextQuestionId": "question_2",
-    "representativeAnswer": { "selectedChoiceId": "choice_3" },
+    "representativeAnswer": { "selectedChoiceId": "choice_2" },
     "explanation": "학습을 위한 해설",
     "sourceExcerpt": "근거가 되는 원문 일부"
   },
@@ -537,7 +653,7 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 }
 ```
 
-서술형 답안 저장은 `processingStatus=SELF_ASSESSMENT_REQUIRED`, 저장한 답, `modelAnswer`, `keyPoints`, 해설과 원문 근거를 반환한다. 이때 `reviewStatus`와 `nextQuestionId`는 자기평가 전까지 `null`이다.
+서술형 답안 저장은 `processingStatus=SELF_ASSESSMENT_REQUIRED`, 저장한 `answer`, `modelAnswer`, `keyPoints`, `explanation`, `sourceExcerpt`를 반환한다. `reviewStatus`는 자기평가 전까지 `null`이고 `nextQuestionId`는 제출한 서술형 `questionId`다.
 
 ### 복습 서술형 자기평가
 
