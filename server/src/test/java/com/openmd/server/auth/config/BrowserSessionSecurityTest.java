@@ -81,6 +81,19 @@ class BrowserSessionSecurityTest {
 	}
 
 	@Test
+	void rejectsMissingCsrfHeaderWhenApplicationRunsUnderAContextPath() throws Exception {
+		mockMvc.perform(post("/openmd/api/v1/auth/web/sessions")
+				.contextPath("/openmd")
+				.header(HttpHeaders.ORIGIN, "http://localhost:5173")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(validLogin()))
+			.andExpect(status().isForbidden())
+			.andExpect(jsonPath("$.error.code").value("AUTH_009"));
+
+		verifyNoInteractions(authService);
+	}
+
+	@Test
 	void exposesInvalidCsrfRejectionToTheAllowedBrowserOrigin() throws Exception {
 		mockMvc.perform(post("/api/v1/auth/web/sessions")
 				.header(HttpHeaders.ORIGIN, "http://localhost:5173")

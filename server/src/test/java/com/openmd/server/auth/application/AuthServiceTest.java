@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -14,6 +15,7 @@ import com.openmd.server.auth.domain.User;
 import com.openmd.server.auth.domain.UserRepository;
 import com.openmd.server.auth.domain.UserStatus;
 import com.openmd.server.auth.security.AccessTokenService;
+import com.openmd.server.auth.security.IssuedAccessToken;
 import com.openmd.server.global.entity.BaseEntity;
 import com.openmd.server.global.error.BusinessException;
 import java.lang.reflect.Field;
@@ -24,6 +26,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 class AuthServiceTest {
@@ -137,9 +140,77 @@ class AuthServiceTest {
 		verify(verifications).cancelIssue(25L, digests.create(25L, "A7K9M2"));
 	}
 
+	@Test
+	void refreshCompletesUserValidationAndAccessTokenIssuanceBeforeConsumingTheRefreshToken() throws Exception {
+		User user = activeUser(31L);
+		RefreshTokenSession current = new RefreshTokenSession(
+			31L,
+			"session-id",
+			Instant.parse("2026-09-18T00:00:00Z")
+		);
+		IssuedRefreshToken replacement = new IssuedRefreshToken(
+			"session-id.new-secret",
+			"session-id",
+			current.expiresAt()
+		);
+		when(refreshTokens.inspect("current-refresh")).thenReturn(current);
+		when(users.findById(31L)).thenReturn(Optional.of(user));
+		when(accessTokens.issue(31L, "session-id"))
+			.thenReturn(new IssuedAccessToken("access-token", NOW.plusSeconds(300)));
+		when(refreshTokens.rotate("current-refresh"))
+			.thenReturn(new RotatedRefreshToken(31L, replacement));
+
+		SessionTokens result = service.refresh("current-refresh");
+
+		assertEquals("access-token", result.accessToken());
+		assertEquals("session-id.new-secret", result.refreshToken());
+		InOrder order = inOrder(refreshTokens, users, accessTokens);
+		order.verify(refreshTokens).inspect("current-refresh");
+		order.verify(users).findById(31L);
+		order.verify(accessTokens).issue(31L, "session-id");
+		order.verify(refreshTokens).rotate("current-refresh");
+	}
+
+	@Test
+	void refreshDoesNotConsumeTheTokenWhenUserLookupFails() {
+		when(refreshTokens.inspect("current-refresh")).thenReturn(new RefreshTokenSession(
+			31L,
+			"session-id",
+			Instant.parse("2026-09-18T00:00:00Z")
+		));
+		when(users.findById(31L)).thenThrow(new IllegalStateException("database unavailable"));
+
+		assertThrows(IllegalStateException.class, () -> service.refresh("current-refresh"));
+
+		verify(refreshTokens, never()).rotate("current-refresh");
+	}
+
+	@Test
+	void refreshDoesNotConsumeTheTokenWhenAccessTokenIssuanceFails() throws Exception {
+		User user = activeUser(31L);
+		when(refreshTokens.inspect("current-refresh")).thenReturn(new RefreshTokenSession(
+			31L,
+			"session-id",
+			Instant.parse("2026-09-18T00:00:00Z")
+		));
+		when(users.findById(31L)).thenReturn(Optional.of(user));
+		when(accessTokens.issue(31L, "session-id"))
+			.thenThrow(new IllegalStateException("signing unavailable"));
+
+		assertThrows(IllegalStateException.class, () -> service.refresh("current-refresh"));
+
+		verify(refreshTokens, never()).rotate("current-refresh");
+	}
+
 	private User pendingUser(long id) throws Exception {
 		User user = User.pending("learner@example.com", "learner@example.com", "argon2-hash");
 		setId(user, id);
+		return user;
+	}
+
+	private User activeUser(long id) throws Exception {
+		User user = pendingUser(id);
+		user.activate(NOW);
 		return user;
 	}
 

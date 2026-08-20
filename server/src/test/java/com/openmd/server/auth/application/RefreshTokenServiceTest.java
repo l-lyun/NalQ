@@ -36,6 +36,10 @@ class RefreshTokenServiceTest {
 		String storedDigest = store.sessions.get(first.sessionId()).digest();
 		assertNotEquals(first.token(), storedDigest);
 		assertNotEquals(first.token().split("\\.")[1], storedDigest);
+		RefreshTokenSession inspected = service.inspect(first.token());
+		assertEquals(7L, inspected.userId());
+		assertEquals(first.sessionId(), inspected.sessionId());
+		assertTrue(store.sessions.containsKey(first.sessionId()));
 
 		RotatedRefreshToken second = service.rotate(first.token());
 		assertEquals(7L, second.userId());
@@ -72,6 +76,23 @@ class RefreshTokenServiceTest {
 		@Override
 		public void create(String sessionId, long userId, String familyId, String digest, Instant expiresAt) {
 			sessions.put(sessionId, new Session(userId, digest));
+		}
+
+		@Override
+		public InspectionResult inspect(String sessionId, String currentDigest) {
+			String usedKey = sessionId + ":" + currentDigest;
+			if (used.contains(usedKey)) {
+				sessions.remove(sessionId);
+				return InspectionResult.reused();
+			}
+			Session session = sessions.get(sessionId);
+			if (session == null || !session.digest().equals(currentDigest)) {
+				return InspectionResult.invalid();
+			}
+			return InspectionResult.valid(
+				session.userId(),
+				Instant.parse("2026-09-18T00:00:00Z")
+			);
 		}
 
 		@Override

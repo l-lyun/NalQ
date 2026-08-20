@@ -49,6 +49,17 @@ public final class RefreshTokenService {
 		return new RotatedRefreshToken(result.userId(), refreshToken);
 	}
 
+	public RefreshTokenSession inspect(String token) {
+		Parts parts = parse(token);
+		RefreshSessionStore.InspectionResult result = store.inspect(
+			parts.sessionId(), digest(parts.secret())
+		);
+		if (result.status() != RefreshSessionStore.InspectionResult.Status.VALID) {
+			throw new BusinessException(AuthErrorCode.INVALID_CREDENTIAL);
+		}
+		return new RefreshTokenSession(result.userId(), parts.sessionId(), result.expiresAt());
+	}
+
 	public void revoke(String token) {
 		try {
 			Parts parts = parse(token);

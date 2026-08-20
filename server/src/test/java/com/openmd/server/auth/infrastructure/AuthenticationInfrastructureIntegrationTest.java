@@ -178,6 +178,10 @@ class AuthenticationInfrastructureIntegrationTest {
 		String storedDigest = (String) redisTemplate.opsForHash().get(sessionKey, "currentTokenDigest");
 		assertEquals(firstDigest, storedDigest);
 		assertNotEquals(firstSecret, storedDigest);
+		var inspected = service.inspect(first.token());
+		assertEquals(7L, inspected.userId());
+		assertEquals(first.sessionId(), inspected.sessionId());
+		assertEquals(firstDigest, redisTemplate.opsForHash().get(sessionKey, "currentTokenDigest"));
 
 		var rotated = service.rotate(first.token());
 		String tombstoneKey = RedisRefreshSessionStore.usedKey(first.sessionId(), firstDigest);
@@ -186,7 +190,7 @@ class AuthenticationInfrastructureIntegrationTest {
 		assertNotEquals(firstDigest, redisTemplate.opsForHash().get(sessionKey, "currentTokenDigest"));
 		assertEquals(first.expiresAt(), rotated.refreshToken().expiresAt());
 
-		BusinessException reused = assertThrows(BusinessException.class, () -> service.rotate(first.token()));
+		BusinessException reused = assertThrows(BusinessException.class, () -> service.inspect(first.token()));
 		assertEquals(AuthErrorCode.INVALID_CREDENTIAL, reused.getErrorCode());
 		assertFalse(Boolean.TRUE.equals(redisTemplate.hasKey(sessionKey)));
 		assertTrue(Boolean.TRUE.equals(redisTemplate.hasKey(tombstoneKey)));

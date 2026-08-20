@@ -7,6 +7,7 @@ import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import java.util.List;
 import org.springdoc.core.customizers.OpenApiCustomizer;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,7 +23,9 @@ public class OpenApiConfiguration {
 	private static final String BROWSER_LOGOUT_PATH = "/api/v1/auth/web/sessions/current";
 
 	@Bean
-	OpenAPI openMdOpenApi() {
+	OpenAPI openMdOpenApi(
+		@Value("${openmd.auth.browser.cookie.name}") String browserRefreshCookieName
+	) {
 		SecurityScheme bearerAuth = new SecurityScheme()
 			.type(SecurityScheme.Type.HTTP)
 			.scheme("bearer")
@@ -30,7 +33,7 @@ public class OpenApiConfiguration {
 		SecurityScheme browserRefreshCookie = new SecurityScheme()
 			.type(SecurityScheme.Type.APIKEY)
 			.in(SecurityScheme.In.COOKIE)
-			.name("__Host-openmd_refresh");
+			.name(browserRefreshCookieName);
 
 		return new OpenAPI()
 			.info(new Info()

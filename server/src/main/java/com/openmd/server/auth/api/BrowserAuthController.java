@@ -3,10 +3,14 @@ package com.openmd.server.auth.api;
 import com.openmd.server.auth.application.AuthService;
 import com.openmd.server.auth.application.SessionTokens;
 import com.openmd.server.auth.domain.AuthErrorCode;
+import com.openmd.server.auth.security.BrowserSessionRequestGuard;
 import com.openmd.server.global.api.ApiError;
 import com.openmd.server.global.api.ApiResponse;
 import com.openmd.server.global.error.BusinessException;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -39,6 +43,14 @@ public class BrowserAuthController {
 
 	@PostMapping("/sessions")
 	@Operation(operationId = "createBrowserSession", summary = "브라우저 세션으로 로그인한다")
+	@Parameter(
+		name = BrowserSessionRequestGuard.CSRF_HEADER,
+		description = "브라우저 인증 요청의 preflight를 강제하는 고정값",
+		in = ParameterIn.HEADER,
+		required = true,
+		example = "1",
+		schema = @Schema(allowableValues = "1")
+	)
 	public ResponseEntity<ApiResponse<BrowserSessionTokens>> login(
 		@Valid @RequestBody LoginRequest request
 	) {
@@ -51,6 +63,14 @@ public class BrowserAuthController {
 		operationId = "refreshBrowserSession",
 		summary = "브라우저 세션 토큰을 회전한다",
 		security = @SecurityRequirement(name = BROWSER_REFRESH_COOKIE)
+	)
+	@Parameter(
+		name = BrowserSessionRequestGuard.CSRF_HEADER,
+		description = "브라우저 인증 요청의 preflight를 강제하는 고정값",
+		in = ParameterIn.HEADER,
+		required = true,
+		example = "1",
+		schema = @Schema(allowableValues = "1")
 	)
 	public ResponseEntity<ApiResponse<BrowserSessionTokens>> refresh(HttpServletRequest request) {
 		String token = refreshCookie.read(request);
@@ -72,6 +92,14 @@ public class BrowserAuthController {
 		operationId = "deleteCurrentBrowserSession",
 		summary = "현재 브라우저 세션에서 로그아웃한다",
 		security = @SecurityRequirement(name = BROWSER_REFRESH_COOKIE)
+	)
+	@Parameter(
+		name = BrowserSessionRequestGuard.CSRF_HEADER,
+		description = "브라우저 인증 요청의 preflight를 강제하는 고정값",
+		in = ParameterIn.HEADER,
+		required = true,
+		example = "1",
+		schema = @Schema(allowableValues = "1")
 	)
 	public ApiResponse<Void> logout(HttpServletRequest request, HttpServletResponse response) {
 		String token = refreshCookie.read(request);

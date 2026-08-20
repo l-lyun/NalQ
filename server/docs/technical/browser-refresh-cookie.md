@@ -160,9 +160,10 @@ openmd.auth.browser.allowed-origins
 
 1. 브라우저 컨트롤러가 지정된 Cookie 하나를 읽는다.
 2. Cookie가 없거나 형식이 잘못되면 service 호출 없이 `401 AUTH_005`와 만료 Cookie를 반환한다.
-3. `AuthService.refresh(cookieValue)`가 기존 Redis RTR를 수행한다.
-4. 성공하면 회전된 Refresh Token을 같은 속성의 `Set-Cookie`로 덮어쓴다.
-5. body에는 새 Access Token과 승인된 만료 메타데이터만 반환한다.
+3. `AuthService.refresh(cookieValue)`가 Redis session을 비소모 방식으로 검사해 현재 digest, user와 절대 만료를 확인한다. 사용된 digest면 기존 strict 정책대로 session/family를 폐기한다.
+4. 사용자 활성 상태 조회와 session ID에 결합된 Access Token 발급을 완료한다. 이 단계의 DB·서명 실패는 Redis current digest를 바꾸지 않는다.
+5. 실패 가능성이 있는 후속 외부 작업이 남지 않은 시점에 기존 Redis 원자 RTR로 Refresh Token을 회전한다.
+6. 성공하면 회전된 Refresh Token을 같은 속성의 `Set-Cookie`로 덮어쓰고 body에는 미리 발급한 Access Token과 승인된 만료 메타데이터만 반환한다.
 
 확정적인 `AUTH_005`에는 만료 Cookie를 함께 보낸다. Redis timeout, 연결 실패와 5xx에서는 브라우저가 재시도할 수 있도록 기존 Cookie를 변경하지 않는다.
 
@@ -299,7 +300,6 @@ INVALID     세션 없음·상태 불일치
 - 운영 웹과 API가 same-site인지, `SameSite=Lax`를 사용할 수 있는지
 - 로컬 개발을 HTTPS로 통일할지 HTTP localhost 예외를 둘지
 - 기존 Cookie가 있는 상태의 새 로그인에서 이전 session/family를 폐기할지
-- 다중 탭과 응답 유실을 strict fail-closed로 둘지 제한된 grace를 설계할지
 - native body surface의 폐기 조건과 일정
 
 이 질문 중 API 요청·응답이나 소비자 동작을 바꾸는 항목은 인증 API 계약에서 승인한 뒤 구현한다.
