@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.openmd.server.auth.application.AuthService;
 import com.openmd.server.auth.api.BrowserRefreshCookie;
 import com.openmd.server.auth.security.AccessTokenService;
+import com.openmd.server.learningmaterial.application.LearningMaterialService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -32,6 +33,7 @@ class OpenApiDisabledTest {
 	@MockitoBean AuthService authService;
 	@MockitoBean AccessTokenService accessTokenService;
 	@MockitoBean BrowserRefreshCookie browserRefreshCookie;
+	@MockitoBean LearningMaterialService learningMaterialService;
 
 	@Test
 	void doesNotExposeApiDocumentationWhenDocumentationIsDisabled() throws Exception {

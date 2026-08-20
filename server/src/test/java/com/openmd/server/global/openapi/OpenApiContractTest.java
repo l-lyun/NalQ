@@ -15,6 +15,8 @@ import com.openmd.server.auth.api.UserController;
 import com.openmd.server.auth.application.AuthService;
 import com.openmd.server.auth.config.SecurityConfiguration;
 import com.openmd.server.auth.security.AccessTokenService;
+import com.openmd.server.learningmaterial.api.LearningMaterialController;
+import com.openmd.server.learningmaterial.application.LearningMaterialService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootConfiguration;
@@ -46,10 +48,18 @@ class OpenApiContractTest {
 	@MockitoBean AuthService authService;
 	@MockitoBean AccessTokenService accessTokenService;
 	@MockitoBean BrowserRefreshCookie browserRefreshCookie;
+	@MockitoBean LearningMaterialService learningMaterialService;
 
 	@SpringBootConfiguration
 	@EnableAutoConfiguration
-	@Import({AuthController.class, BrowserAuthController.class, UserController.class, SecurityConfiguration.class, OpenApiConfiguration.class})
+	@Import({
+		AuthController.class,
+		BrowserAuthController.class,
+		UserController.class,
+		LearningMaterialController.class,
+		SecurityConfiguration.class,
+		OpenApiConfiguration.class
+	})
 	static class TestApplication {
 	}
 
@@ -92,6 +102,30 @@ class OpenApiContractTest {
 				+ ".['application/json'].schema.$ref").value("#/components/schemas/RefreshTokenRequest"))
 			.andExpect(jsonPath("$.paths['/api/v1/users/me'].get.operationId").value("getCurrentUser"))
 			.andExpect(jsonPath("$.paths['/api/v1/users/me'].get.security").doesNotExist())
+			.andExpect(jsonPath("$.paths['/api/v1/learning-materials'].post.operationId")
+				.value("createLearningMaterial"))
+			.andExpect(jsonPath("$.paths['/api/v1/learning-materials'].post.security[0].bearerAuth")
+				.isArray())
+			.andExpect(jsonPath("$.paths['/api/v1/learning-materials'].post.parameters[0].name")
+				.value("Idempotency-Key"))
+			.andExpect(jsonPath("$.paths['/api/v1/learning-materials'].post.parameters[0].in")
+				.value("header"))
+			.andExpect(jsonPath("$.paths['/api/v1/learning-materials'].post.parameters[0].required")
+				.value(true))
+			.andExpect(jsonPath("$.paths['/api/v1/learning-materials'].post.requestBody.content"
+				+ ".['application/json'].schema.$ref")
+				.value("#/components/schemas/CreateLearningMaterialRequest"))
+			.andExpect(jsonPath("$.paths['/api/v1/learning-materials'].post.responses['201'].content"
+				+ ".['application/json'].schema.$ref")
+				.value("#/components/schemas/ApiResponseCreatedLearningMaterial"))
+			.andExpect(jsonPath("$.paths['/api/v1/learning-materials'].post.responses['400'].content"
+				+ ".['application/json'].schema.$ref").value("#/components/schemas/ApiResponse"))
+			.andExpect(jsonPath("$.paths['/api/v1/learning-materials'].post.responses['401'].content"
+				+ ".['application/json'].schema.$ref").value("#/components/schemas/ApiResponse"))
+			.andExpect(jsonPath("$.paths['/api/v1/learning-materials'].post.responses['413'].content"
+				+ ".['application/json'].schema.$ref").value("#/components/schemas/ApiResponse"))
+			.andExpect(jsonPath("$.paths['/api/v1/learning-materials'].post.responses['500'].content"
+				+ ".['application/json'].schema.$ref").value("#/components/schemas/ApiResponse"))
 			.andExpect(jsonPath("$.components.schemas.RefreshTokenRequest.properties.refreshToken.maxLength")
 				.value(128))
 			.andExpect(jsonPath("$.components.schemas.SessionTokens.properties.accessToken.type").value("string"))
