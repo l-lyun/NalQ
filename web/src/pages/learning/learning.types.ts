@@ -1,5 +1,10 @@
 export type LearningMaterialSource = 'PASTE' | 'NOTION'
 
+export type LearningMaterialContentEditStatus =
+  | 'EDITABLE'
+  | 'LOCKED_GENERATING'
+  | 'LOCKED_PERMANENT'
+
 export type LearningMaterial = {
   id: string
   title: string
@@ -7,6 +12,7 @@ export type LearningMaterial = {
   source: LearningMaterialSource
   updatedAtLabel: string
   generating: boolean
+  contentEditStatus?: LearningMaterialContentEditStatus
 }
 
 export type LearningReviewSummary = {
@@ -30,7 +36,7 @@ export type LearningMaterialUpdate = {
 export type LearningSectionState<T> =
   | { status: 'loading' }
   | { status: 'ready'; data: T }
-  | { status: 'error'; message: string }
+  | { status: 'error'; message: string; data?: T }
 
 export type LearningPageCallbacks = {
   onNavigate?: (destination: LearningNavigationDestination) => void

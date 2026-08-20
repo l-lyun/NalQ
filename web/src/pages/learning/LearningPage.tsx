@@ -31,6 +31,26 @@ type Screen =
   | { id: 'edit-material'; materialId: string }
   | { id: 'handoff'; title: string; description: string }
 
+type LearningHistoryEntry = {
+  screen: Screen
+  depth: number
+}
+
+const LEARNING_HISTORY_KEY = 'openmdLearning'
+
+function getLearningHistoryEntry(state: unknown): LearningHistoryEntry | null {
+  if (!state || typeof state !== 'object') return null
+  const entry = (state as Record<string, unknown>)[LEARNING_HISTORY_KEY]
+  if (!entry || typeof entry !== 'object') return null
+  const candidate = entry as Partial<LearningHistoryEntry>
+  if (!candidate.screen || typeof candidate.depth !== 'number') return null
+  return candidate as LearningHistoryEntry
+}
+
+function canEditMaterialBody(material: LearningMaterial) {
+  return !material.generating && material.contentEditStatus !== 'LOCKED_PERMANENT'
+}
+
 const sourceLabel = { PASTE: '직접 입력', NOTION: 'Notion에서 가져옴' } as const
 
 export function LearningPage({
@@ -40,29 +60,124 @@ export function LearningPage({
   materialsState,
   callbacks,
 }: LearningPageProps) {
-  const [screen, setScreen] = useState<Screen>({ id: 'main' })
+  const initialHistoryEntry = getLearningHistoryEntry(window.history.state)
+  const [screen, setScreen] = useState<Screen>(initialHistoryEntry?.screen ?? { id: 'main' })
   const [materials, setMaterials] = useState(
     materialsState?.status === 'ready' ? materialsState.data : initialMaterials,
   )
   const [draft, setDraft] = useState<LearningMaterialDraft>({ title: '', body: '' })
+  const [editDirty, setEditDirty] = useState(false)
   const headingRef = useRef<HTMLHeadingElement>(null)
+  const screenRef = useRef(screen)
+  const draftRef = useRef(draft)
+  const editDirtyRef = useRef(editDirty)
+  const historyDepthRef = useRef(initialHistoryEntry?.depth ?? 0)
+  const restoringHistoryRef = useRef(false)
+  const hasReadyMaterialsRef = useRef(materialsState?.status === 'ready')
   const resolvedReviewState: LearningSectionState<LearningReviewSummary | null> = reviewState ?? {
     status: 'ready',
     data: review,
   }
-  const resolvedMaterialsState: LearningSectionState<LearningMaterial[]> = materialsState ?? {
-    status: 'ready',
-    data: materials,
-  }
+  const resolvedMaterialsState: LearningSectionState<LearningMaterial[]> =
+    materialsState?.status === 'error' &&
+    materialsState.data === undefined &&
+    hasReadyMaterialsRef.current
+      ? { ...materialsState, data: materials }
+      : (materialsState ?? { status: 'ready', data: materials })
   const availableMaterials =
-    resolvedMaterialsState.status === 'ready' ? resolvedMaterialsState.data : materials
+    resolvedMaterialsState.status === 'ready'
+      ? resolvedMaterialsState.data
+      : resolvedMaterialsState.status === 'error'
+        ? (resolvedMaterialsState.data ?? materials)
+        : materials
+
+  screenRef.current = screen
+  draftRef.current = draft
+  editDirtyRef.current = editDirty
+
+  useEffect(() => {
+    if (materialsState?.status !== 'ready') return
+    hasReadyMaterialsRef.current = true
+    setMaterials(materialsState.data)
+  }, [materialsState])
+
+  useEffect(() => {
+    const existingEntry = getLearningHistoryEntry(window.history.state)
+    if (!existingEntry) {
+      window.history.replaceState(
+        {
+          ...window.history.state,
+          [LEARNING_HISTORY_KEY]: { screen: { id: 'main' }, depth: 0 },
+        },
+        '',
+      )
+    }
+
+    const handlePopState = (event: PopStateEvent) => {
+      const nextEntry = getLearningHistoryEntry(event.state)
+
+      if (restoringHistoryRef.current) {
+        restoringHistoryRef.current = false
+        if (nextEntry) {
+          historyDepthRef.current = nextEntry.depth
+          setScreen(nextEntry.screen)
+        }
+        return
+      }
+
+      const leavingDirtyEdit = screenRef.current.id === 'edit-material' && editDirtyRef.current
+      const leavingCreationFlow =
+        Boolean(draftRef.current.title || draftRef.current.body) &&
+        (!nextEntry || nextEntry.depth === 0)
+      const shouldLeave =
+        !leavingDirtyEdit && !leavingCreationFlow
+          ? true
+          : window.confirm(
+              leavingDirtyEdit
+                ? '수정한 내용이 저장되지 않아요. 변경사항을 버릴까요?'
+                : '작성한 내용이 저장되지 않아요. 변경사항을 버릴까요?',
+            )
+
+      if (!shouldLeave) {
+        restoringHistoryRef.current = true
+        window.history.forward()
+        return
+      }
+
+      if (leavingCreationFlow) {
+        const emptyDraft = { title: '', body: '' }
+        draftRef.current = emptyDraft
+        setDraft(emptyDraft)
+      }
+
+      if (nextEntry) {
+        historyDepthRef.current = nextEntry.depth
+        setScreen(nextEntry.screen)
+      }
+    }
+
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
 
   useEffect(() => {
     if (screen.id !== 'main') headingRef.current?.focus()
   }, [screen])
 
-  const push = (next: Screen) => setScreen(next)
-  const goMain = () => setScreen({ id: 'main' })
+  const push = (next: Screen) => {
+    const nextDepth = historyDepthRef.current + 1
+    window.history.pushState(
+      { ...window.history.state, [LEARNING_HISTORY_KEY]: { screen: next, depth: nextDepth } },
+      '',
+    )
+    historyDepthRef.current = nextDepth
+    screenRef.current = next
+    setScreen(next)
+  }
+  const goBack = () => window.history.back()
+  const goMain = () => {
+    if (historyDepthRef.current > 0) window.history.go(-historyDepthRef.current)
+  }
 
   const openQuizConditions = (material: LearningMaterial) => {
     callbacks?.onOpenQuizConditions?.(material)
@@ -96,6 +211,9 @@ export function LearningPage({
       generating: false,
     }
     setMaterials((current) => [created, ...current])
+    const emptyDraft = { title: '', body: '' }
+    draftRef.current = emptyDraft
+    setDraft(emptyDraft)
     callbacks?.onCreateMaterial?.(normalizedDraft)
     callbacks?.onOpenQuizConditions?.(created)
     push({
@@ -109,8 +227,12 @@ export function LearningPage({
     setMaterials((current) => current.map((item) => (item.id === updated.id ? updated : item)))
     callbacks?.onUpdateMaterial?.(
       updated.id,
-      updated.generating ? { title: updated.title } : { title: updated.title, body: updated.body },
+      canEditMaterialBody(updated)
+        ? { title: updated.title, body: updated.body }
+        : { title: updated.title },
     )
+    editDirtyRef.current = false
+    setEditDirty(false)
     goMain()
   }
 
@@ -133,7 +255,7 @@ export function LearningPage({
               title="새 문제 만들기"
               headingRef={headingRef}
               intro="어떤 학습자료를 사용할까요?"
-              onBack={goMain}
+              onBack={goBack}
               rows={[
                 {
                   id: 'existing',
@@ -153,7 +275,7 @@ export function LearningPage({
             <MaterialSelectionScreen
               materials={availableMaterials}
               headingRef={headingRef}
-              onBack={() => push({ id: 'new-quiz' })}
+              onBack={goBack}
               onSelect={openQuizConditions}
               onCreateNew={() => push({ id: 'new-material' })}
             />
@@ -162,7 +284,7 @@ export function LearningPage({
               title="새 학습자료로 만들기"
               headingRef={headingRef}
               intro="자료를 가져올 방법을 선택하세요"
-              onBack={() => push({ id: 'new-quiz' })}
+              onBack={goBack}
               rows={[
                 {
                   id: 'notion',
@@ -190,15 +312,16 @@ export function LearningPage({
               headingRef={headingRef}
               draft={draft}
               onDraftChange={setDraft}
-              onBack={() => push({ id: 'new-material' })}
+              onBack={goBack}
               onSubmit={createMaterial}
             />
           ) : screen.id === 'edit-material' ? (
             <EditMaterialScreen
               headingRef={headingRef}
               material={availableMaterials.find((item) => item.id === screen.materialId)}
-              onBack={goMain}
+              onBack={goBack}
               onSave={updateMaterial}
+              onDirtyChange={setEditDirty}
             />
           ) : (
             <HandoffScreen
@@ -234,6 +357,13 @@ function LearningMain({
   onRetryReview: () => void
   onRetryMaterials: () => void
 }) {
+  const visibleMaterials =
+    materialsState.status === 'ready'
+      ? materialsState.data
+      : materialsState.status === 'error'
+        ? (materialsState.data ?? [])
+        : []
+
   return (
     <VStack className="learning-content" px="spacingX.globalGutter" pt="x6" pb="spacingY.screenBottom" gap="x8">
       <VStack as="header" gap="x5">
@@ -285,30 +415,41 @@ function LearningMain({
         <LearningSectionTitle id="learning-materials-title">학습자료 관리</LearningSectionTitle>
         {materialsState.status === 'loading' ? (
           <LearningSectionSkeleton label="학습자료를 불러오는 중" rows={3} />
-        ) : materialsState.status === 'error' ? (
-          <LearningInlineError message={materialsState.message} onRetry={onRetryMaterials} />
-        ) : materialsState.data.length > 0 ? (
-          <LearningActionList
-            label="학습자료 목록"
-            rows={materialsState.data.map((material) => ({
-              id: material.id,
-              title: material.title,
-              detail: material.generating ? (
-                <>
-                  {sourceLabel[material.source]} · {material.updatedAtLabel}
-                  <br />
-                  문제 생성 중 · 본문 임시 잠금 · 제목 수정 가능
-                </>
-              ) : (
-                `${sourceLabel[material.source]} · ${material.updatedAtLabel}`
-              ),
-              onClick: () => onEditMaterial(material.id),
-            }))}
-          />
         ) : (
-          <Text as="p" textStyle="t5Regular" color="fg.neutralMuted">
-            아직 저장한 학습자료가 없어요. 위의 새 문제 만들기에서 새 자료를 만들 수 있어요.
-          </Text>
+          <VStack gap="x3">
+            {materialsState.status === 'error' ? (
+              <LearningInlineError message={materialsState.message} onRetry={onRetryMaterials} />
+            ) : null}
+            {visibleMaterials.length > 0 ? (
+              <LearningActionList
+                label="학습자료 목록"
+                rows={visibleMaterials.map((material) => ({
+                  id: material.id,
+                  title: material.title,
+                  detail: material.generating ? (
+                    <>
+                      {sourceLabel[material.source]} · {material.updatedAtLabel}
+                      <br />
+                      문제 생성 중 · 본문 임시 잠금 · 제목 수정 가능
+                    </>
+                  ) : material.contentEditStatus === 'LOCKED_PERMANENT' ? (
+                    <>
+                      {sourceLabel[material.source]} · {material.updatedAtLabel}
+                      <br />
+                      본문 잠금 · 제목 수정 가능
+                    </>
+                  ) : (
+                    `${sourceLabel[material.source]} · ${material.updatedAtLabel}`
+                  ),
+                  onClick: () => onEditMaterial(material.id),
+                }))}
+              />
+            ) : materialsState.status === 'ready' ? (
+              <Text as="p" textStyle="t5Regular" color="fg.neutralMuted">
+                아직 저장한 학습자료가 없어요. 위의 새 문제 만들기에서 새 자료를 만들 수 있어요.
+              </Text>
+            ) : null}
+          </VStack>
         )}
       </VStack>
     </VStack>
@@ -428,11 +569,6 @@ function DirectInputScreen({ draft, onDraftChange, onBack, onSubmit, headingRef 
   headingRef: React.RefObject<HTMLHeadingElement | null>
 }) {
   const [errors, setErrors] = useState<Partial<Record<keyof LearningMaterialDraft, string>>>({})
-  const dirty = Boolean(draft.title || draft.body)
-
-  const handleBack = () => {
-    if (!dirty || window.confirm('작성한 내용이 저장되지 않아요. 변경사항을 버릴까요?')) onBack()
-  }
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -457,7 +593,7 @@ function DirectInputScreen({ draft, onDraftChange, onBack, onSubmit, headingRef 
 
   return (
     <VStack className="learning-content" px="spacingX.globalGutter" pt="x4" pb="spacingY.screenBottom" gap="x6">
-      <LearningScreenHeader title="직접 입력하기" onBack={handleBack} headingRef={headingRef} />
+      <LearningScreenHeader title="직접 입력하기" onBack={onBack} headingRef={headingRef} />
       <form className="learning-form" onSubmit={handleSubmit}>
         <VStack gap="x5">
           <LearningField
@@ -493,15 +629,25 @@ function DirectInputScreen({ draft, onDraftChange, onBack, onSubmit, headingRef 
   )
 }
 
-function EditMaterialScreen({ material, onBack, onSave, headingRef }: {
+function EditMaterialScreen({ material, onBack, onSave, onDirtyChange, headingRef }: {
   material?: LearningMaterial
   onBack: () => void
   onSave: (material: LearningMaterial) => void
+  onDirtyChange: (dirty: boolean) => void
   headingRef: React.RefObject<HTMLHeadingElement | null>
 }) {
   const [title, setTitle] = useState(material?.title ?? '')
   const [body, setBody] = useState(material?.body ?? '')
   const [errors, setErrors] = useState<{ title?: string; body?: string }>({})
+  const bodyEditable = material ? canEditMaterialBody(material) : false
+  const dirty = material
+    ? title !== material.title || (bodyEditable && body !== material.body)
+    : false
+
+  useEffect(() => {
+    onDirtyChange(dirty)
+    return () => onDirtyChange(false)
+  }, [dirty, onDirtyChange])
 
   if (!material) {
     return (
@@ -514,11 +660,6 @@ function EditMaterialScreen({ material, onBack, onSave, headingRef }: {
     )
   }
 
-  const dirty = title !== material.title || body !== material.body
-  const handleBack = () => {
-    if (!dirty || window.confirm('수정한 내용이 저장되지 않아요. 변경사항을 버릴까요?')) onBack()
-  }
-
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const titleLength = countUnicodeCodePoints(title.trim())
@@ -529,11 +670,13 @@ function EditMaterialScreen({ material, onBack, onSave, headingRef }: {
         : titleLength > 255
           ? '제목은 255자 이하로 입력해주세요.'
           : undefined,
-      body: !body.trim()
-        ? '본문을 입력해주세요.'
-        : bodyLength > 20_000
-          ? '본문은 20,000자 이하로 입력해주세요.'
-          : undefined,
+      body: !bodyEditable
+        ? undefined
+        : !body.trim()
+          ? '본문을 입력해주세요.'
+          : bodyLength > 20_000
+            ? '본문은 20,000자 이하로 입력해주세요.'
+            : undefined,
     }
     setErrors(nextErrors)
     if (nextErrors.title || nextErrors.body) return
@@ -542,13 +685,17 @@ function EditMaterialScreen({ material, onBack, onSave, headingRef }: {
 
   return (
     <VStack className="learning-content" px="spacingX.globalGutter" pt="x4" pb="spacingY.screenBottom" gap="x5">
-      <LearningScreenHeader title="학습자료 편집" onBack={handleBack} headingRef={headingRef} />
+      <LearningScreenHeader title="학습자료 편집" onBack={onBack} headingRef={headingRef} />
       <Text as="p" textStyle="t4Regular" color="fg.neutralMuted">
         출처: {sourceLabel[material.source]} · 수정: {material.updatedAtLabel}
       </Text>
       {material.generating ? (
         <LearningNotice>
           문제 생성 중에는 본문을 수정할 수 없어요. 제목은 지금도 수정할 수 있고, 생성이 끝나면 본문을 다시 수정할 수 있어요.
+        </LearningNotice>
+      ) : material.contentEditStatus === 'LOCKED_PERMANENT' ? (
+        <LearningNotice>
+          이미 문제 생성에 사용된 본문은 수정할 수 없어요. 제목은 지금도 수정할 수 있어요.
         </LearningNotice>
       ) : null}
       <form className="learning-form" onSubmit={handleSubmit}>
@@ -567,14 +714,20 @@ function EditMaterialScreen({ material, onBack, onSave, headingRef }: {
           <LearningField
             label="본문"
             error={errors.body}
-            description={material.generating ? '문제 생성이 끝난 뒤 다시 수정할 수 있어요.' : undefined}
+            description={
+              material.generating
+                ? '문제 생성이 끝난 뒤 다시 수정할 수 있어요.'
+                : material.contentEditStatus === 'LOCKED_PERMANENT'
+                  ? '기존 문제의 근거를 유지하기 위해 본문은 읽기 전용이에요.'
+                  : undefined
+            }
             characterCount={{ current: countUnicodeCodePoints(body), max: 20_000 }}
           >
             <LearningTextarea
               invalid={Boolean(errors.body)}
               value={body}
-              readOnly={material.generating}
-              aria-readonly={material.generating}
+              readOnly={!bodyEditable}
+              aria-readonly={!bodyEditable}
               onChange={(event) => setBody(event.currentTarget.value)}
             />
           </LearningField>
