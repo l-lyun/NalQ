@@ -7,6 +7,7 @@ import { ApiClientError } from '@/shared/api/apiError'
 import { currentUserQueryOptions } from './auth.queries'
 import { refreshAccessToken } from './authRefresh'
 import { getAuthPhase, setAuthPhase } from './authPhaseStore'
+import { broadcastSessionEnded } from './authSessionChannel'
 import { clearAuthAndPrivateCaches, endLocalSession } from './sessionCleanup'
 import { setSessionTokens } from './tokenVault'
 
@@ -36,7 +37,11 @@ export async function logoutCurrentSession() {
   try {
     await logoutSessionTransport()
   } finally {
-    await endLocalSession()
+    try {
+      await endLocalSession()
+    } finally {
+      broadcastSessionEnded()
+    }
   }
 }
 
