@@ -36,6 +36,19 @@ public class RedisRefreshSessionStore implements RefreshSessionStore {
 		return userId .. ':' .. expiresAt
 		""", String.class);
 
+	static final DefaultRedisScript<String> INSPECT_SCRIPT = new DefaultRedisScript<>("""
+		if redis.call('EXISTS', KEYS[2]) == 1 then
+		  redis.call('DEL', KEYS[1])
+		  return 'REUSED'
+		end
+		if redis.call('EXISTS', KEYS[1]) == 0 then return 'INVALID' end
+		if redis.call('HGET', KEYS[1], 'status') ~= 'ACTIVE' then return 'INVALID' end
+		if redis.call('HGET', KEYS[1], 'currentTokenDigest') ~= ARGV[1] then return 'INVALID' end
+		local userId = redis.call('HGET', KEYS[1], 'userId')
+		local expiresAt = redis.call('HGET', KEYS[1], 'absoluteExpiresAt')
+		return userId .. ':' .. expiresAt
+		""", String.class);
+
 	private static final DefaultRedisScript<Long> REVOKE_SCRIPT = new DefaultRedisScript<>("""
 		if redis.call('EXISTS', KEYS[2]) == 1 then
 		  redis.call('DEL', KEYS[1])
@@ -64,6 +77,23 @@ public class RedisRefreshSessionStore implements RefreshSessionStore {
 			digest,
 			Long.toString(expiresAt.toEpochMilli())
 		);
+	}
+
+	@Override
+	public InspectionResult inspect(String sessionId, String currentDigest) {
+		String result = redisTemplate.execute(
+			INSPECT_SCRIPT,
+			List.of(sessionKey(sessionId), usedKey(sessionId, currentDigest)),
+			currentDigest
+		);
+		if (result == null || result.equals("INVALID")) {
+			return InspectionResult.invalid();
+		}
+		if (result.equals("REUSED")) {
+			return InspectionResult.reused();
+		}
+		String[] values = result.split(":", 2);
+		return InspectionResult.valid(Long.parseLong(values[0]), Instant.ofEpochMilli(Long.parseLong(values[1])));
 	}
 
 	@Override

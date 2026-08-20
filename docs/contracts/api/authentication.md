@@ -5,6 +5,8 @@
 - 소비 영역: 웹·앱 클라이언트
 - 관련 기능명세: [이메일 기반 자체 인증](../../features/01-local-auth.md)
 - 관련 데이터: [사용자·인증 데이터](../data/authentication.md)
+- 관련 웹 설계: [웹 인증 상태·토큰·API 통합 설계](../../../web/docs/technical/authentication.md)
+- 전환 상태: 서버의 브라우저 HttpOnly Cookie 계약 구현 완료, 웹 클라이언트 전환 전
 
 ## 목적
 
@@ -30,6 +32,14 @@
 - CORS 허용 origin은 환경설정으로 제한하며 개발 기본값은 웹 개발 서버 `http://localhost:5173`이다. `OPTIONS` preflight와 `GET`, `POST`, `DELETE`, `Authorization`, `Content-Type`을 허용하고 JSON body 토큰 전송을 사용하므로 credentialed CORS는 사용하지 않는다.
 - 모든 시각은 ISO 8601 UTC 문자열로 반환한다.
 
+### 브라우저 전환 목표
+
+- 기존 Redis 기반 Refresh Token Rotation과 재사용 탐지 규칙은 유지한다. 바꾸는 범위는 브라우저와 서버 사이의 Refresh Token 전달 경계다.
+- 브라우저 웹은 Refresh Token 원문을 JSON body로 받거나 보내지 않고, 서버가 발급·회전·삭제하는 HttpOnly Cookie만 사용한다.
+- Access Token과 `accessExpiresAt`은 기존처럼 JSON body로 반환하고 보호 API의 Bearer Token으로 사용한다.
+- 네이티브 앱용 body 계약과 브라우저 cookie 계약은 endpoint surface를 분리한다. 같은 endpoint가 Cookie와 body 중 하나를 암묵적으로 선택하거나 User-Agent로 소비자를 판별하지 않는다.
+- 기존 앱 소비자는 아래의 body 계약을 계속 사용하고, 웹은 브라우저 전용 surface로 전환한다.
+
 ## 엔드포인트 목록
 
 | 기능 | Method / Path | 인증 | 성공 상태 |
@@ -41,6 +51,20 @@
 | 인증 상태 갱신 | `POST /api/v1/auth/sessions/refresh` | Refresh Token | `200 OK` |
 | 현재 세션 로그아웃 | `DELETE /api/v1/auth/sessions/current` | Refresh Token | `200 OK` |
 | 현재 사용자 | `GET /api/v1/users/me` | Access Token | `200 OK` |
+
+### 브라우저 웹 전용 세션 surface
+
+가입·이메일 인증과 `GET /api/v1/users/me`는 기존 endpoint를 공통으로 사용한다. Refresh Token의 전달 방식이 다른 세션 endpoint만 분리한다.
+
+| 기능 | Method / Path | Refresh Token 전달 | 성공 상태 |
+| --- | --- | --- | --- |
+| 브라우저 로그인 | `POST /api/v1/auth/web/sessions` | 성공 응답 `Set-Cookie` | `200 OK` |
+| 브라우저 인증 상태 갱신 | `POST /api/v1/auth/web/sessions/refresh` | 요청 Cookie, 성공 응답 `Set-Cookie` | `200 OK` |
+| 브라우저 현재 세션 로그아웃 | `DELETE /api/v1/auth/web/sessions/current` | 요청 Cookie, 응답 만료 `Set-Cookie` | `200 OK` |
+
+- 기존 `/api/v1/auth/sessions*`는 네이티브 앱과 마이그레이션 중인 소비자를 위한 body surface로 유지한다.
+- 브라우저 endpoint는 Refresh Token body를 허용하지 않고, 기존 body endpoint는 Cookie를 인증 근거로 읽지 않는다.
+- WebView가 원격 웹을 로드하고 웹 JavaScript가 API를 호출하는 경우 브라우저 surface와 WebView cookie jar를 사용한다. React Native 코드가 직접 API를 호출하는 경우 native surface와 OS 보안 저장소를 사용한다. User-Agent가 아니라 호출 실행 경계로 선택한다.
 
 ## 가입 요청
 
@@ -184,6 +208,117 @@
 - 응답 성공 여부와 관계없이 클라이언트는 로컬 Access/Refresh Token과 개인 화면 데이터를 제거한다.
 - Access Token이 자체 포함 토큰이면 로그아웃 직후 서버 차단 수준을 별도 결정해야 한다. 최소한 Refresh Token 갱신은 불가능해야 한다.
 
+## 브라우저 HttpOnly Cookie 세션 계약
+
+이 절은 위의 body 계약을 대체하지 않는다. 서버는 웹 전용 세션 surface를 제공하며, 네이티브 소비자 폐기 계획이 별도로 승인될 때까지 두 계약을 병행한다.
+
+### 브라우저 로그인
+
+`POST /api/v1/auth/web/sessions`
+
+요청 body는 기존 로그인과 같다.
+
+```json
+{
+  "email": "learner@example.com",
+  "password": "<redacted>"
+}
+```
+
+성공 응답은 Refresh Token 원문을 포함하지 않는다.
+
+```http
+Set-Cookie: __Host-openmd_refresh=<redacted>; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=<remaining-seconds>
+```
+
+```json
+{
+  "success": true,
+  "data": {
+    "accessToken": "<redacted>",
+    "accessExpiresAt": "2026-08-19T00:00:00Z",
+    "refreshExpiresAt": "2026-09-18T00:00:00Z"
+  },
+  "error": null
+}
+```
+
+- `refreshExpiresAt`은 비밀값이 아니므로 세션 만료 안내와 진단을 위해 body에 유지한다.
+- 로그인 실패 응답은 기존 유효 Cookie를 덮어쓰거나 만료시키지 않는다.
+- 이미 유효한 브라우저 세션 Cookie가 있는 상태에서 새 로그인이 성공하면 새 세션으로 교체한다. 교체 전 세션을 즉시 폐기할지는 세션 한도 정책과 함께 확정한다.
+
+### 브라우저 인증 상태 갱신
+
+`POST /api/v1/auth/web/sessions/refresh`
+
+- 요청 body는 없다. 브라우저가 credentials를 포함한 요청에 Refresh Cookie를 자동 첨부한다.
+- 서버는 Cookie에서 받은 opaque token에 기존 Redis 원자 회전과 재사용 탐지 규칙을 동일하게 적용한다.
+- 성공하면 회전된 Refresh Token을 동일한 Cookie 이름·Domain·Path·보안 속성으로 덮어쓰고, body에는 새 Access Token과 만료 시각만 반환한다.
+- Cookie가 없거나 잘못됐거나 만료됐거나 재사용된 경우 `401 AUTH_005`를 반환한다. 확정적으로 사용할 수 없는 자격이면 동일 속성의 만료 `Set-Cookie`도 반환한다.
+- Redis나 서버의 일시 장애인 5xx에서는 Cookie를 만료시키지 않는다. 클라이언트는 자격 없음과 구분해 명시적으로 재시도할 수 있어야 한다.
+- 회전은 멱등 요청이 아니므로 자동 무한 재시도하지 않는다. 응답 유실 시 같은 Cookie가 이미 소비됐을 가능성을 별도 정책으로 다룬다.
+
+성공 body 모양은 브라우저 로그인 응답과 같다.
+
+### 브라우저 현재 세션 로그아웃
+
+`DELETE /api/v1/auth/web/sessions/current`
+
+- 요청 body는 없다. Cookie가 유효하면 Redis의 현재 session/family를 폐기한다.
+- Cookie가 없거나 이미 만료·폐기된 경우도 `200`으로 처리해 현재 세션 로그아웃을 멱등적으로 만든다.
+- 서버는 발급 때와 동일한 Cookie 이름·Domain·Path를 사용하고 `Max-Age=0`으로 Cookie를 만료시킨다.
+- 서버 응답 성공 여부와 관계없이 웹은 메모리 Access Token과 개인 cache를 제거한다.
+- 기존 5분 Access Token을 로그아웃 즉시 차단할지는 별도 열린 질문이며, 최소 보장은 Refresh Token으로 새 Access Token을 발급받을 수 없다는 것이다.
+
+### Cookie 속성
+
+| 속성 | 제안 | 근거와 조건 |
+| --- | --- | --- |
+| 이름 | 운영 `__Host-openmd_refresh` | `__Host-` 규칙으로 `Secure`, host-only, `Path=/`을 브라우저가 강제한다. 로컬 HTTP 예외는 별도 이름을 사용한다. |
+| `HttpOnly` | 항상 `true` | JavaScript 읽기와 직렬화를 막는다. |
+| `Secure` | 운영·공유 환경 `true` | HTTPS에서만 전송한다. HTTP localhost는 로컬 전용 이름과 `false`를 허용하는 개발 예외를 명시한다. |
+| `SameSite` | same-site 배포면 `Lax` 권장 | 웹과 API의 실제 site가 다르면 `None; Secure`가 필요하다. 운영 토폴로지 확인 전 하나로 확정하지 않는다. |
+| `Domain` | 생략 | host-only로 제한한다. 운영 `__Host-` Cookie에는 `Domain`을 설정할 수 없다. |
+| `Path` | 운영 `__Host-` 사용 시 `/` | Cookie는 더 넓게 전송되지만 서버는 웹 세션 endpoint에서만 읽는다. 좁은 Path가 더 중요하면 `__Secure-` 이름으로 바꾸는 선택을 별도 검토한다. |
+| `Max-Age` | Redis 세션의 남은 절대 수명 | 회전할 때 최초 세션의 절대 만료를 연장하지 않는다. 서버 시각을 기준으로 계산한다. |
+
+- 운영과 로컬 Cookie 이름·속성은 환경설정으로 명시하고, 발급·회전·삭제가 반드시 같은 설정 객체를 사용해야 한다.
+- Refresh Token 원문과 전체 `Set-Cookie` 값은 애플리케이션 로그, 프록시 로그, 오류 추적 payload와 OpenAPI 예제에 남기지 않는다.
+- Cookie의 절대 수명은 Redis session/family와 tombstone 수명을 넘지 않는다.
+
+### CORS와 CSRF
+
+브라우저 cookie 요청은 현재 `allowCredentials(false)`와 `/api/v1/auth/**` 전체 CSRF 제외 설정을 그대로 사용할 수 없다.
+
+- 브라우저 허용 origin은 환경별 정확한 scheme·host·port 목록으로 제한하고 와일드카드를 허용하지 않는다.
+- 웹 세션 endpoint에는 credentialed CORS를 허용하고, 브라우저 클라이언트는 credentials를 포함한다.
+- `POST`/`DELETE` 웹 세션 요청에는 `X-OpenMD-CSRF: 1` 고정 custom header를 필수로 요구한다. 이 값은 비밀 토큰이 아니라 preflight를 강제하는 신호다.
+- 서버는 위 header만 믿지 않고 `Origin`을 정확한 허용 목록과 비교한다. `Origin`이 없거나 허용되지 않은 브라우저 세션 요청은 세션 서비스 호출 전에 거절한다.
+- `SameSite`는 보조 방어이며 CSRF 검증을 대체하지 않는다. 특히 `SameSite=None`이 필요한 cross-site 배포에서는 custom header·preflight·정확한 Origin 검증이 필수다.
+- 가입·이메일 인증처럼 Cookie를 인증 근거로 사용하지 않는 기존 endpoint와 네이티브 body surface에는 브라우저 Cookie 인증을 섞지 않는다.
+- 현재 `/api/v1/auth/**` 전체에 적용된 CSRF 제외 정책을 웹 세션 endpoint에 그대로 적용하지 않는다. 구체적인 서버 구현 방식은 서버 TRD가 책임진다.
+
+### RTR와 다중 탭 경쟁
+
+- Redis의 current digest 확인, 이전 digest tombstone 생성, 새 digest 교체와 재사용 시 session/family 폐기 규칙은 유지한다.
+- 한 브라우저 탭 안에서는 refresh를 single-flight로 합친다.
+- 여러 탭은 Cookie jar를 공유하므로 탭별 single-flight만으로 충분하지 않다. 웹은 같은 origin의 탭 사이 refresh 호출을 직렬화하는 조정 수단을 사용해야 한다.
+- 서버는 클라이언트 조정을 보안 근거로 신뢰하지 않는다. 동일한 이전 Cookie가 실제로 동시에 도착하면 현재 RTR 규칙대로 하나만 성공하고 재사용 감지 시 family를 폐기한다.
+- 위 fail-closed 정책은 보안은 유지하지만 탭 경합이나 성공 응답 유실도 재사용으로 판정해 전 탭 재로그인을 유발할 수 있다. 짧은 grace window나 회전 결과 재전달은 Refresh Token 원문 비저장 원칙과 공격 탐지 강도를 바꾸므로 이번 제안에서 확정하지 않는다.
+
+### 오류와 세션 복구
+
+| 조건 | 서버 결과 | 브라우저 복구 |
+| --- | --- | --- |
+| Cookie 없음·만료·잘못됨 | `401 AUTH_005`, 만료 Cookie | 메모리·개인 cache 제거 후 로그인 |
+| 회전 토큰 재사용 탐지 | family 폐기, `401 AUTH_005`, 만료 Cookie | 모든 탭에서 세션 종료 후 로그인 |
+| refresh 일시적 네트워크·5xx | Cookie 변경 없음, 공통 5xx envelope | 익명으로 단정하지 않고 재시도 |
+| refresh 성공 응답 유실 | 기존 Cookie 소비 여부 불명 | 자동 무한 재시도 금지; 정책 확정 전 재로그인이 안전한 복구 |
+| logout Cookie 없음·이미 폐기 | `200`, 만료 Cookie | 로컬 정리 후 공개 화면 |
+| CSRF/Origin 검증 실패 | 서비스 호출 전 `403` | 자동 refresh하지 않고 요청 구성·origin 확인 |
+
+Origin/CSRF 검증 실패는 `403 AUTH_009`를 사용한다. 클라이언트는 이를 `AUTH_005`로 오인해 refresh loop를 만들지 않아야 한다.
+
 ## 현재 사용자
 
 `GET /api/v1/users/me`
@@ -237,7 +372,7 @@
 - 재발송 60초 제한 외의 IP·기기 단위 요청 제한은 운영 정책 확정 후 추가한다. 이메일을 제한 로그 키로 남겨서는 안 된다.
 - 인증 성공/실패 로그에는 요청 추적 ID, 결과 코드와 필요한 최소 메타데이터만 남기고 이메일·비밀번호·토큰을 마스킹 또는 제외한다.
 - 허용 origin은 `OPENMD_CORS_ALLOWED_ORIGINS`로 설정하며 여러 origin은 쉼표로 구분한다. 기본 개발 origin은 `http://localhost:5173`이고 운영에서는 명시적으로 덮어쓴다.
-- 초기 브라우저 흐름은 토큰을 JSON body로 전달하므로 credentialed CORS를 비활성화한다. 향후 쿠키로 전환하면 CSRF 방어와 credentialed CORS 정책을 함께 다시 확정한다.
+- 현재 구현의 body surface는 credentialed CORS를 사용하지 않는다. 제안한 브라우저 cookie surface를 도입할 때만 정확한 Origin, credentialed CORS와 CSRF 방어를 함께 적용한다.
 - 네이티브 앱의 Refresh Token은 일반 로컬 저장소가 아니라 OS 보안 저장소에 보관한다.
 - 이메일 인증 코드와 Access/Refresh Token 원문을 로그, 분석 사건, Redis key/value에 남기지 않는다.
 
@@ -248,8 +383,36 @@
 - 이메일 인증 완료와 로그아웃은 네트워크 응답 유실 뒤 재시도해도 계정·세션 상태를 중복 전이하지 않는다.
 - 갱신은 회전 때문에 일반적인 멱등 요청이 아니다. 소비자는 동시에 하나만 호출하고 실패 시 이전 자격을 무한 재시도하지 않는다.
 
+## 단계적 전환과 호환성 — 제안
+
+1. 기존 body endpoint와 DTO를 변경하지 않은 채 웹 전용 세션 endpoint, Cookie 설정과 계약 테스트를 추가한다.
+2. 서버가 Cookie 발급·회전·삭제, 정확한 Origin, credentialed CORS와 CSRF 검증을 모두 제공한 뒤에만 웹 클라이언트를 새 surface로 전환한다.
+3. 전환 기간에는 브라우저 응답에 Refresh Token body를 반환하거나, 같은 요청에서 body와 Cookie를 동시에 인증 근거로 받아들이는 호환 모드를 두지 않는다.
+4. 웹 배포 후 로그인·refresh·logout 성공률, `AUTH_005`, 재사용 탐지와 Origin/CSRF 거절을 토큰 원문 없이 관찰한다.
+5. 네이티브 앱과 WebView 호출 경계가 확정되고 모든 소비자 마이그레이션이 끝난 뒤에만 기존 body surface의 폐기 여부를 별도 승인한다.
+
+롤백은 웹이 기존 body endpoint로 자동 fallback하는 방식이 아니다. 서버와 웹 배포를 이전 호환 버전으로 함께 되돌리되, 이미 발급된 Cookie와 Redis session은 만료·폐기 정책에 따라 정리한다. 자동 fallback은 Refresh Token을 다시 JavaScript에 노출해 전환 목적을 훼손한다.
+
+## 전환 수용 기준 — 제안
+
+- 브라우저 로그인·refresh 성공 응답의 JSON, OpenAPI schema와 프론트 애플리케이션 상태 어디에도 Refresh Token 필드나 원문이 없다.
+- 로그인 성공 Cookie는 승인된 이름, `HttpOnly`, 환경에 맞는 `Secure`·`SameSite`, host-only, 승인된 Path와 Redis 절대 만료에 맞는 수명을 가진다.
+- refresh 요청은 body 없이 Cookie로 인증되고, 성공할 때마다 Redis current digest와 브라우저 Cookie가 같은 새 토큰 세대로 회전한다.
+- 회전 전 Cookie의 재사용은 기존 정책대로 session/family를 폐기하고 안정적인 `AUTH_005`를 반환한다.
+- logout은 Cookie나 Redis 세션이 이미 없어도 성공하며, 응답은 발급과 동일한 identity 속성으로 Cookie를 만료시킨다.
+- 허용되지 않은 Origin 또는 필수 CSRF header가 없는 웹 세션 변경 요청은 Redis 세션을 읽거나 회전하기 전에 거절된다.
+- credentialed CORS는 승인된 정확한 Origin에만 응답하며 와일드카드 Origin과 함께 사용되지 않는다.
+- 5xx나 네트워크 오류는 자격 없음으로 변환되지 않고 유효할 수 있는 Cookie를 서버가 삭제하지 않는다.
+- 네이티브 body endpoint는 웹 전환 동안 기존 요청·응답과 RTR 동작을 유지하며, 브라우저 endpoint와 토큰 전달 방식이 섞이지 않는다.
+- WebView가 웹 cookie surface를 사용할 때 JavaScript나 native bridge로 Refresh Token 원문을 전달하지 않는다.
+- 동일 Cookie의 동시 refresh, 성공 응답 유실, 회전 후 이전 Cookie 재사용과 다중 탭 세션 종료 시나리오를 통합 테스트로 재현해 승인된 fail-closed 결과를 확인한다.
+
 ## 열린 질문
 
 - Refresh Token의 최종 절대 수명과 즉시 로그아웃을 위한 Access Token 차단 수준
+- 운영 웹과 API의 실제 site 관계. same-site이면 `SameSite=Lax`를 권장하고, cross-site이면 `SameSite=None; Secure` 및 더 강한 CSRF 검증이 필요하다.
+- 로컬 개발을 HTTPS로 통일해 운영과 같은 `__Host-` Cookie 이름을 쓸지, HTTP localhost 전용 이름과 `Secure=false` 예외를 둘지
+- 기존 Cookie가 있는 상태에서 다른 계정 로그인에 성공할 때 이전 session/family를 즉시 폐기할지
+- 네이티브 앱과 WebView의 실제 호출 경계를 언제 확정하고 기존 body surface를 언제 폐기할지
 - 메일 발송을 비동기로 처리할 때 가입·재발송 상태 조회 API가 필요한지
 - 모든 기기 로그아웃 API의 초기 포함 여부

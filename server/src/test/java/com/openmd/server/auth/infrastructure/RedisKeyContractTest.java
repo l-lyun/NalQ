@@ -35,6 +35,11 @@ class RedisKeyContractTest {
 		assertTrue(rotationScript.contains("currentTokenDigest"));
 		assertTrue(rotationScript.contains("PEXPIREAT"));
 
+		String inspectionScript = RedisRefreshSessionStore.INSPECT_SCRIPT.getScriptAsString();
+		assertTrue(inspectionScript.contains("EXISTS', KEYS[2]"));
+		assertTrue(inspectionScript.contains("currentTokenDigest"));
+		assertFalse(inspectionScript.contains("HSET', KEYS[1], 'currentTokenDigest'"));
+
 		String createScript = RedisRefreshSessionStore.CREATE_SCRIPT.getScriptAsString();
 		assertTrue(createScript.contains("HSET"));
 		assertTrue(createScript.contains("PEXPIREAT"));

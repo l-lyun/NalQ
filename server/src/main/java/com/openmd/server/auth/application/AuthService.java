@@ -130,13 +130,14 @@ public class AuthService {
 	}
 
 	public SessionTokens refresh(String refreshToken) {
-		RotatedRefreshToken rotated = refreshTokenService.rotate(refreshToken);
-		User user = userRepository.findById(rotated.userId()).orElseThrow(this::invalidCredential);
+		RefreshTokenSession current = refreshTokenService.inspect(refreshToken);
+		User user = userRepository.findById(current.userId()).orElseThrow(this::invalidCredential);
 		if (user.getStatus() != UserStatus.ACTIVE || user.getEmailVerifiedAt() == null) {
-			refreshTokenService.revoke(rotated.refreshToken().token());
+			refreshTokenService.revoke(refreshToken);
 			throw invalidCredential();
 		}
-		IssuedAccessToken access = accessTokenService.issue(user.getId(), rotated.refreshToken().sessionId());
+		IssuedAccessToken access = accessTokenService.issue(user.getId(), current.sessionId());
+		RotatedRefreshToken rotated = refreshTokenService.rotate(refreshToken);
 		return sessionTokens(access, rotated.refreshToken());
 	}
 

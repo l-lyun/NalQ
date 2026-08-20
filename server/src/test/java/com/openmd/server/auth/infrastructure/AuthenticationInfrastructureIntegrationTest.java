@@ -21,6 +21,11 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -173,6 +178,10 @@ class AuthenticationInfrastructureIntegrationTest {
 		String storedDigest = (String) redisTemplate.opsForHash().get(sessionKey, "currentTokenDigest");
 		assertEquals(firstDigest, storedDigest);
 		assertNotEquals(firstSecret, storedDigest);
+		var inspected = service.inspect(first.token());
+		assertEquals(7L, inspected.userId());
+		assertEquals(first.sessionId(), inspected.sessionId());
+		assertEquals(firstDigest, redisTemplate.opsForHash().get(sessionKey, "currentTokenDigest"));
 
 		var rotated = service.rotate(first.token());
 		String tombstoneKey = RedisRefreshSessionStore.usedKey(first.sessionId(), firstDigest);
@@ -181,10 +190,52 @@ class AuthenticationInfrastructureIntegrationTest {
 		assertNotEquals(firstDigest, redisTemplate.opsForHash().get(sessionKey, "currentTokenDigest"));
 		assertEquals(first.expiresAt(), rotated.refreshToken().expiresAt());
 
-		BusinessException reused = assertThrows(BusinessException.class, () -> service.rotate(first.token()));
+		BusinessException reused = assertThrows(BusinessException.class, () -> service.inspect(first.token()));
 		assertEquals(AuthErrorCode.INVALID_CREDENTIAL, reused.getErrorCode());
 		assertFalse(Boolean.TRUE.equals(redisTemplate.hasKey(sessionKey)));
 		assertTrue(Boolean.TRUE.equals(redisTemplate.hasKey(tombstoneKey)));
+	}
+
+	@Test
+	void allowsOnlyOneConcurrentRotationAndRevokesTheSessionAsStrictReuseDetection() throws Exception {
+		RedisRefreshSessionStore store = new RedisRefreshSessionStore(redisTemplate);
+		RefreshTokenService service = new RefreshTokenService(store, Clock.systemUTC(), Duration.ofSeconds(20));
+		IssuedRefreshToken first = service.issue(8L);
+		String sessionKey = RedisRefreshSessionStore.sessionKey(first.sessionId());
+		CountDownLatch ready = new CountDownLatch(2);
+		CountDownLatch start = new CountDownLatch(1);
+		ExecutorService executor = Executors.newFixedThreadPool(2);
+
+		try {
+			Future<Boolean> firstAttempt = executor.submit(() -> rotateAfterSignal(service, first, ready, start));
+			Future<Boolean> secondAttempt = executor.submit(() -> rotateAfterSignal(service, first, ready, start));
+			assertTrue(ready.await(5, TimeUnit.SECONDS));
+			start.countDown();
+
+			int successes = (firstAttempt.get(5, TimeUnit.SECONDS) ? 1 : 0)
+				+ (secondAttempt.get(5, TimeUnit.SECONDS) ? 1 : 0);
+			assertEquals(1, successes);
+			assertFalse(Boolean.TRUE.equals(redisTemplate.hasKey(sessionKey)));
+		} finally {
+			executor.shutdownNow();
+		}
+	}
+
+	private boolean rotateAfterSignal(
+		RefreshTokenService service,
+		IssuedRefreshToken token,
+		CountDownLatch ready,
+		CountDownLatch start
+	) throws InterruptedException {
+		ready.countDown();
+		start.await();
+		try {
+			service.rotate(token.token());
+			return true;
+		} catch (BusinessException exception) {
+			assertEquals(AuthErrorCode.INVALID_CREDENTIAL, exception.getErrorCode());
+			return false;
+		}
 	}
 
 	private void assertTtlWithin(String key, Duration expectedMaximum) {

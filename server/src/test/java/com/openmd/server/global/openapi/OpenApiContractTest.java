@@ -9,6 +9,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.openmd.server.auth.api.AuthController;
+import com.openmd.server.auth.api.BrowserAuthController;
+import com.openmd.server.auth.api.BrowserRefreshCookie;
 import com.openmd.server.auth.api.UserController;
 import com.openmd.server.auth.application.AuthService;
 import com.openmd.server.auth.config.SecurityConfiguration;
@@ -29,6 +31,7 @@ import org.springframework.test.web.servlet.MockMvc;
 		"springdoc.api-docs.enabled=true",
 		"springdoc.swagger-ui.enabled=true",
 		"springdoc.paths-to-match=/api/v1/**",
+		"openmd.auth.browser.cookie.name=openmd_refresh",
 		"spring.autoconfigure.exclude="
 			+ "org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration,"
 			+ "org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration,"
@@ -42,10 +45,11 @@ class OpenApiContractTest {
 	@Autowired MockMvc mockMvc;
 	@MockitoBean AuthService authService;
 	@MockitoBean AccessTokenService accessTokenService;
+	@MockitoBean BrowserRefreshCookie browserRefreshCookie;
 
 	@SpringBootConfiguration
 	@EnableAutoConfiguration
-	@Import({AuthController.class, UserController.class, SecurityConfiguration.class, OpenApiConfiguration.class})
+	@Import({AuthController.class, BrowserAuthController.class, UserController.class, SecurityConfiguration.class, OpenApiConfiguration.class})
 	static class TestApplication {
 	}
 
@@ -92,6 +96,43 @@ class OpenApiContractTest {
 				.value(128))
 			.andExpect(jsonPath("$.components.schemas.SessionTokens.properties.accessToken.type").value("string"))
 			.andExpect(jsonPath("$.components.schemas.SessionTokens.properties.refreshToken.type").value("string"))
+			.andExpect(jsonPath("$.components.securitySchemes.browserRefreshCookie.type").value("apiKey"))
+			.andExpect(jsonPath("$.components.securitySchemes.browserRefreshCookie.in").value("cookie"))
+			.andExpect(jsonPath("$.components.securitySchemes.browserRefreshCookie.name").value("openmd_refresh"))
+			.andExpect(jsonPath("$.paths['/api/v1/auth/web/sessions'].post.operationId")
+				.value("createBrowserSession"))
+			.andExpect(jsonPath("$.paths['/api/v1/auth/web/sessions'].post.responses['200'].content"
+				+ ".['application/json'].schema.$ref")
+				.value("#/components/schemas/ApiResponseBrowserSessionTokens"))
+			.andExpect(jsonPath("$.paths['/api/v1/auth/web/sessions'].post.security").isEmpty())
+			.andExpect(jsonPath("$.paths['/api/v1/auth/web/sessions'].post.parameters[0].name")
+				.value("X-OpenMD-CSRF"))
+			.andExpect(jsonPath("$.paths['/api/v1/auth/web/sessions'].post.parameters[0].in").value("header"))
+			.andExpect(jsonPath("$.paths['/api/v1/auth/web/sessions'].post.parameters[0].required").value(true))
+			.andExpect(jsonPath("$.paths['/api/v1/auth/web/sessions'].post.parameters[0].example").value("1"))
+			.andExpect(jsonPath("$.paths['/api/v1/auth/web/sessions/refresh'].post.operationId")
+				.value("refreshBrowserSession"))
+			.andExpect(jsonPath("$.paths['/api/v1/auth/web/sessions/refresh'].post.requestBody").doesNotExist())
+			.andExpect(jsonPath("$.paths['/api/v1/auth/web/sessions/refresh'].post.security[0]"
+				+ ".browserRefreshCookie").isArray())
+			.andExpect(jsonPath("$.paths['/api/v1/auth/web/sessions/refresh'].post.parameters[0].name")
+				.value("X-OpenMD-CSRF"))
+			.andExpect(jsonPath("$.paths['/api/v1/auth/web/sessions/refresh'].post.parameters[0].required")
+				.value(true))
+			.andExpect(jsonPath("$.paths['/api/v1/auth/web/sessions/current'].delete.operationId")
+				.value("deleteCurrentBrowserSession"))
+			.andExpect(jsonPath("$.paths['/api/v1/auth/web/sessions/current'].delete.requestBody").doesNotExist())
+			.andExpect(jsonPath("$.paths['/api/v1/auth/web/sessions/current'].delete.security[0]"
+				+ ".browserRefreshCookie").isArray())
+			.andExpect(jsonPath("$.paths['/api/v1/auth/web/sessions/current'].delete.parameters[0].name")
+				.value("X-OpenMD-CSRF"))
+			.andExpect(jsonPath("$.paths['/api/v1/auth/web/sessions/current'].delete.parameters[0].required")
+				.value(true))
+			.andExpect(jsonPath("$.components.schemas.BrowserSessionTokens.properties.accessToken.type")
+				.value("string"))
+			.andExpect(jsonPath("$.components.schemas.BrowserSessionTokens.properties.refreshExpiresAt.type")
+				.value("string"))
+			.andExpect(jsonPath("$.components.schemas.BrowserSessionTokens.properties.refreshToken").doesNotExist())
 			.andExpect(content().string(not(containsString("eyJ"))));
 	}
 
