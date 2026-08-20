@@ -4,6 +4,8 @@ import type {
   EmailVerificationRequest,
   EmailVerified,
   LoginRequest,
+  NicknameAvailability,
+  NicknameAvailabilityRequest,
   SignUpRequest,
   VerificationRequired,
 } from './auth.types'
@@ -37,6 +39,12 @@ export function resendVerificationEmail(email: string) {
 export function confirmEmailVerification(payload: EmailVerificationRequest) {
   return publicRequest<EmailVerified>(() =>
     publicApi.post('/api/v1/auth/email-verifications/confirm', payload),
+  )
+}
+
+export function checkNicknameAvailability(payload: NicknameAvailabilityRequest) {
+  return publicRequest<NicknameAvailability>(() =>
+    publicApi.post('/api/v1/auth/nickname-availability', payload),
   )
 }
 

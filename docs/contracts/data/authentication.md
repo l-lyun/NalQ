@@ -7,24 +7,25 @@
 
 ## 목적과 경계
 
-초기 이메일·비밀번호 인증에 필요한 영속 데이터는 `users` 한 테이블에 둔다. 이메일 인증 코드와 Refresh Token 상태는 Redis에 TTL로 관리하며 DB 테이블을 추가하지 않는다.
+이메일·비밀번호 인증과 가입 완료에 필요한 사용자, 고유 닉네임과 필수 약관 동의 이력의 데이터 의미를 정의한다. 이메일 인증 코드, 가입 계속 자격과 Refresh Token 상태는 Redis에 TTL로 관리한다.
 
-아래 물리 테이블명, 타입, 길이는 현재 서버 구현 계약이다. `Long` 식별자와 `Instant` 감사 시각을 쓰는 서버 기반과 MySQL 설정에 맞췄다.
+현재 서버에는 닉네임·약관 이력과 가입 계속 자격이 없으며 이메일 인증 완료 시 바로 사용자를 활성화한다. 아래 닉네임·약관·2단계 상태는 2026-08-20 승인된 목표 계약으로, 서버 마이그레이션 전에는 구현된 사실로 간주하지 않는다.
 
 ## 확정된 의미 규칙
 
 - `users.id`는 OpenMD 계정과 사용자 소유 데이터를 식별하는 내부 키다. 이메일이나 향후 소셜 식별자를 소유 데이터의 키로 사용하지 않는다.
 - 초기 로그인 아이디는 정규화 이메일이며 전역에서 유일하다.
+- 활성 사용자의 닉네임은 전역에서 유일하며, 표시 값과 영문 대소문자를 구분하지 않는 비교용 정규화 값을 분리한다.
 - 비밀번호 원문, 6자리 인증 코드 원문, Refresh Token 원문은 DB·Redis·로그에 저장하지 않는다.
-- 초기 구현의 DB 테이블은 `users` 하나다.
+- 필수 약관 동의는 동의 시점의 약관 식별자와 버전별 이력으로 남긴다. 법률 검토 전 `MVP_PLACEHOLDER` 버전은 운영 약관 확정본으로 간주하지 않는다.
 - 소셜 제공자가 반환한 이메일이 기존 계정 이메일과 같다는 이유만으로 계정을 자동 연결하거나 병합하지 않는다.
 
 ## 관계 개요
 
 ```text
-현재: users
+목표: users 1 ── N user_term_agreements
 향후 소셜 로그인 승인 시: users 1 ── N social_accounts
-Redis: 이메일 인증 상태 + Refresh Token session/family 상태
+Redis: 이메일 인증 상태 + 가입 계속 자격 + Refresh Token session/family 상태
 ```
 
 ## 물리 구조
@@ -38,7 +39,9 @@ Redis: 이메일 인증 상태 + Refresh Token session/family 상태
 | `id` | `BIGINT` | 아니요 | PK, identity; 현재 `BaseEntity`와 일치 |
 | `email` | `VARCHAR(320)` | 아니요 | 표시·메일 발송용 입력 값 |
 | `normalized_email` | `VARCHAR(320)` | 아니요 | 로그인·중복 비교 값, `UNIQUE` |
-| `password_hash` | `VARCHAR(255)` | 아니요(초기) | Argon2id 우선 제안; BCrypt 선택 시 UTF-8 72바이트 상한 주의 |
+| `password_hash` | `VARCHAR(255)` | 가입 대기 중 예 | 이메일 가입 완료 시 Argon2id 해시 필수; 향후 소셜 전용 사용자는 별도 불변식 필요 |
+| `nickname` | `VARCHAR(10)` 또는 동등한 유니코드 안전 타입 | 가입 대기 중 예 | 활성 사용자 표시 값, 화면상 2~10자 |
+| `normalized_nickname` | 유니코드 안전 문자열 | 가입 대기 중 예 | 한글 표현 정규화와 영문 대소문자 무시 비교 값, `UNIQUE` |
 | `email_verified_at` | `TIMESTAMP(6)` | 예 | null이면 이메일 미인증 |
 | `status` | `VARCHAR(32)` | 아니요 | 제공자 중립 상태 `PENDING_ACTIVATION`, `ACTIVE`, `SUSPENDED`, `WITHDRAWN` |
 | `activated_at` | `TIMESTAMP(6)` | 예 | 최초 활성화 시각 |
@@ -50,9 +53,11 @@ Redis: 이메일 인증 상태 + Refresh Token session/family 상태
 제안 제약·인덱스:
 
 - `UNIQUE(normalized_email)`로 정규화 이메일 중복을 DB에서도 차단한다.
-- 초기 LOCAL 가입에서는 `password_hash NOT NULL`을 JPA와 DB 제약으로 제안한다. 향후 소셜 전용 사용자를 실제 도입할 때 nullable 전환과 `social_accounts` 존재 조건을 함께 마이그레이션하며, 지금부터 null을 허용해 불완전한 로컬 사용자를 만들지 않는다.
+- `UNIQUE(normalized_nickname)`로 동시 최종 제출에서도 닉네임 중복을 차단한다. 사전 중복 확인은 예약이 아니므로 이 제약을 대체하지 않는다.
+- `nickname`은 화면에 보이는 글자 기준 2~10자이고 공백 없이 한글·영문·숫자만 허용한다. 특수문자와 이모지는 허용하지 않는다. 정확한 DB 길이는 문자셋과 grapheme 처리 검증 후 정한다.
+- 목표 2단계 가입에서는 이메일 인증 대기 행을 비밀번호 없이 만들 수 있으므로 `password_hash`는 대기 중 nullable이고, LOCAL 사용자의 `ACTIVE` 전환 시에는 필수다.
 - 비밀번호 제품 정책은 `^(?=.*[A-Za-z])(?=.*\d)(?=\S{8,64}$).+$`이며 특수문자를 강제하지 않는다.
-- `CHECK` 또는 애플리케이션 검증으로 `PENDING_ACTIVATION`은 미인증, `ACTIVE`는 `email_verified_at`과 `activated_at` 보유 조건을 맞춘다.
+- `PENDING_ACTIVATION`은 이메일 인증 전과 인증 후 공통 가입정보 완료 전을 모두 포함할 수 있다. `ACTIVE`는 자체가입 기준 `password_hash`, `email_verified_at`, 닉네임과 필수 동의 이력, `activated_at`을 모두 보유해야 한다.
 - 인증 대기 계정 정리 작업이 정해지면 `(status, created_at)` 인덱스를 추가한다. 단순 상태 조회만을 위한 단일 인덱스는 두지 않는다.
 
 ## Redis: 이메일 인증 상태
@@ -74,7 +79,25 @@ TTL: 10분 제안
 - 검증 실패 횟수 증가는 Lua 또는 동등한 원자 연산으로 수행하고, 5회 실패 시 key를 폐기하는 정책을 제안한다.
 - 재발송은 60초 간격을 제안하며, 허용된 재발송은 새 digest로 원자 교체해 이전 코드를 즉시 무효화한다.
 - 메일 전달이 실패하면 발송하려던 digest가 Redis의 현재 `codeDigest`와 일치할 때만 Lua compare-and-remove로 상태를 삭제한다. 따라서 해당 요청의 cooldown은 해제되어 즉시 재시도할 수 있고, 동시에 더 새 코드가 발급된 경우 그 상태를 잘못 삭제하지 않는다.
-- 코드 일치 시 검증을 단일 처리로 예약하고 DB 사용자를 멱등적으로 활성화한 뒤 key를 소비한다. DB 갱신 실패 시 예약을 해제하거나 짧은 TTL로 복구하고, DB 활성화 뒤 Redis 정리가 실패해도 활성 사용자는 다시 전이하지 않는다.
+- 코드 일치 시 `email_verified_at`을 기록하고 최종 가입에 사용할 짧은 수명의 불투명한 가입 계속 자격을 발급한다. 이 단계에서는 사용자를 활성화하지 않는다.
+- 가입 계속 자격은 정규화 이메일 또는 내부 사용자 ID와 이메일 인증 결과에 묶고 Redis에 TTL로 저장한다. 원문은 DB·로그·분석 사건에 남기지 않으며 가입 완료 후 재사용할 수 없다. 정확한 TTL과 응답 유실 복구 정책은 서버 구현 전에 확정한다.
+
+## `user_term_agreements` 목표 구조
+
+현재 생성·구현 대상은 아니지만 가입 완료 서버 작업에서 함께 도입해야 하는 목표 구조다.
+
+| 필드 | 제안 타입 | null | 규칙 |
+| --- | --- | --- | --- |
+| `id` | `BIGINT` | 아니요 | PK, identity |
+| `user_id` | `BIGINT` | 아니요 | FK → `users.id` |
+| `terms_id` | `VARCHAR(64)` | 아니요 | 약관 종류의 안정적인 식별자 |
+| `terms_version` | `VARCHAR(64)` | 아니요 | 사용자가 동의한 전문의 버전 |
+| `agreed_at` | `TIMESTAMP(6)` | 아니요 | 동의가 확정된 시각 |
+| `created_at` | `TIMESTAMP(6)` | 아니요 | 이력 생성 시각 |
+
+- `UNIQUE(user_id, terms_id, terms_version)`로 같은 버전의 중복 이력을 막는다.
+- 가입 완료 시 필요한 필수 약관의 식별자와 버전이 모두 기록돼야 사용자를 활성화한다.
+- 마케팅 수신 동의는 실제 기능과 목적이 승인되기 전에는 필드나 임시 행을 만들지 않는다.
 
 ## Redis: Refresh Token RTR 상태
 
@@ -104,7 +127,8 @@ auth:refresh-used:{sessionId}:{tokenDigest}
 ### 사용자
 
 ```text
-PENDING_ACTIVATION ── 6자리 이메일 코드 검증 성공 ──> ACTIVE
+PENDING_ACTIVATION ── 6자리 이메일 코드 검증 성공 ──> PENDING_ACTIVATION(email verified)
+PENDING_ACTIVATION(email verified) ── 닉네임·필수 동의 완료 ──> ACTIVE + session
 ACTIVE ── 운영 정책 ──> SUSPENDED ── 해제 ──> ACTIVE
 ACTIVE 또는 SUSPENDED ── 탈퇴 ──> WITHDRAWN
 ```
@@ -128,7 +152,7 @@ ACTIVE 또는 SUSPENDED ── 탈퇴 ──> WITHDRAWN
 - `UNIQUE(provider, provider_subject)`로 한 소셜 주체가 여러 사용자에 연결되는 것을 막는다.
 - `INDEX(user_id)`로 사용자에 연결된 소셜 계정을 조회한다.
 - 소셜 제공 이메일이 기존 `users.normalized_email`과 같아도 자동 병합하지 않는다. 로그인된 사용자의 명시적 연결이나 기존 자체 계정 재인증 같은 별도 증명이 필요하다.
-- 소셜 전용 사용자를 허용할 때 `users.password_hash` nullable 전환과 계정 불변식을 함께 결정한다.
+- 소셜 전용 사용자의 가입 미완료 상태, 재진입, `password_hash` 불변식과 약관 완료 조건은 소셜 로그인 서버 작업에서 함께 결정한다.
 
 ## 삭제와 보존
 
@@ -141,4 +165,6 @@ ACTIVE 또는 SUSPENDED ── 탈퇴 ──> WITHDRAWN
 - 이메일 정규화의 정확한 규칙(유니코드, 국제화 도메인, 로컬 파트 대소문자 처리)
 - 탈퇴 후 같은 정규화 이메일과 같은 소셜 제공자 식별자의 재사용 허용 시점
 - Refresh Token의 최종 절대 수명과 여러 기기 세션 한도 (Access Token은 5분으로 확정)
-- 약관 동의가 확정될 경우 별도 버전 이력 테이블의 필드와 보존 정책
+- 법률 검토가 끝난 약관 식별자·버전과 전문, 동의 철회 및 보존 정책
+- 닉네임 변경 이력·재사용 대기시간과 금칙어 정책
+- 가입 계속 자격의 정확한 TTL과 최종 가입 응답 유실 복구 방식

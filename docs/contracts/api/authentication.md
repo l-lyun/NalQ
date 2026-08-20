@@ -10,7 +10,14 @@
 
 ## 목적
 
-6자리 이메일 인증 코드를 전제로 한 가입, 로그인, 인증 상태 갱신, 현재 세션 로그아웃과 현재 사용자 확인의 클라이언트·서버 경계를 정의한다.
+6자리 이메일 인증 코드를 전제로 한 2단계 가입, 닉네임 확인, 필수 동의, 로그인, 인증 상태 갱신, 현재 세션 로그아웃과 현재 사용자 확인의 클라이언트·서버 경계를 정의한다.
+
+## 회원가입 계약 전환 상태
+
+- 아래의 2단계 회원가입 계약은 2026-08-20 승인된 목표 계약이며 아직 서버에 구현되지 않았다.
+- 현재 서버는 `POST /api/v1/auth/sign-ups`에서 이메일과 비밀번호로 대기 사용자를 만들고, 이메일 인증 완료 시 즉시 `ACTIVE`로 전환한 뒤 `nextAction=LOGIN`을 반환한다.
+- 목표 계약은 이메일 인증 완료를 가입 계속 자격으로 바꾸고, 닉네임·필수 동의의 최종 제출과 세션 발급을 한 작업으로 묶는다. 구현 PR은 기존 소비자 영향과 endpoint 전환 방식을 별도로 검토해야 한다.
+- 향후 소셜 가입의 미완료 상태, 재진입과 `social_accounts` 계약은 소셜 로그인 서버 작업에서 확정하며 이 문서의 현재 구현 범위가 아니다.
 
 ## 공통 규칙
 
@@ -44,9 +51,10 @@
 
 | 기능 | Method / Path | 인증 | 성공 상태 |
 | --- | --- | --- | --- |
-| 가입 요청 | `POST /api/v1/auth/sign-ups` | 불필요 | `202 Accepted` |
-| 인증 메일 재발송 | `POST /api/v1/auth/email-verifications` | 불필요 | `202 Accepted` |
+| 가입용 인증 메일 발송·재발송 | `POST /api/v1/auth/email-verifications` | 불필요 | `202 Accepted` |
 | 이메일 인증 완료 | `POST /api/v1/auth/email-verifications/confirm` | 이메일+6자리 코드 | `200 OK` |
+| 닉네임 사용 가능 확인 | `POST /api/v1/auth/nickname-availability` | 불필요 | `200 OK` |
+| 네이티브 가입 완료·세션 발급 | `POST /api/v1/auth/sign-ups` | 가입 계속 자격 | `201 Created` |
 | 로그인 | `POST /api/v1/auth/sessions` | 불필요 | `200 OK` |
 | 인증 상태 갱신 | `POST /api/v1/auth/sessions/refresh` | Refresh Token | `200 OK` |
 | 현재 세션 로그아웃 | `DELETE /api/v1/auth/sessions/current` | Refresh Token | `200 OK` |
@@ -58,6 +66,7 @@
 
 | 기능 | Method / Path | Refresh Token 전달 | 성공 상태 |
 | --- | --- | --- | --- |
+| 브라우저 가입 완료 | `POST /api/v1/auth/web/sign-ups` | 성공 응답 `Set-Cookie` | `201 Created` |
 | 브라우저 로그인 | `POST /api/v1/auth/web/sessions` | 성공 응답 `Set-Cookie` | `200 OK` |
 | 브라우저 인증 상태 갱신 | `POST /api/v1/auth/web/sessions/refresh` | 요청 Cookie, 성공 응답 `Set-Cookie` | `200 OK` |
 | 브라우저 현재 세션 로그아웃 | `DELETE /api/v1/auth/web/sessions/current` | 요청 Cookie, 응답 만료 `Set-Cookie` | `200 OK` |
@@ -66,38 +75,7 @@
 - 브라우저 endpoint는 Refresh Token body를 허용하지 않고, 기존 body endpoint는 Cookie를 인증 근거로 읽지 않는다.
 - WebView가 원격 웹을 로드하고 웹 JavaScript가 API를 호출하는 경우 브라우저 surface와 WebView cookie jar를 사용한다. React Native 코드가 직접 API를 호출하는 경우 native surface와 OS 보안 저장소를 사용한다. User-Agent가 아니라 호출 실행 경계로 선택한다.
 
-## 가입 요청
-
-`POST /api/v1/auth/sign-ups`
-
-```json
-{
-  "email": "learner@example.com",
-  "password": "<redacted>"
-}
-```
-
-- `email`: 필수, 이메일 형식, 정규화 전 최대 길이 제한 적용.
-- `password`: 필수, 8~64자, 영문자·숫자 각각 1자 이상, 공백 불가, 특수문자 선택. 정규식 제안은 `^(?=.*[A-Za-z])(?=.*\d)(?=\S{8,64}$).+$`.
-- 필수 약관이 확정되면 단순 boolean이 아니라 동의한 약관 식별자·버전을 요청 계약에 추가한다.
-
-제안 응답:
-
-```json
-{
-  "success": true,
-  "data": {
-    "verificationRequired": true
-  },
-  "error": null
-}
-```
-
-- 같은 이메일 요청이 동시에 들어와도 `normalized_email`이 같은 사용자 둘을 만들지 않는다.
-- 이메일 존재 여부 노출을 줄이기 위해 신규·인증 대기·활성 이메일에 가능한 한 같은 `202` 응답을 반환한다.
-- 인증 대기 사용자에는 재발송 제한 내 새 6자리 코드를 보낼 수 있다. 활성 계정에 어떤 보안 안내 메일을 보낼지는 운영 정책으로 남긴다.
-
-## 인증 메일 재발송
+## 가입용 인증 메일 발송·재발송
 
 `POST /api/v1/auth/email-verifications`
 
@@ -107,9 +85,25 @@
 }
 ```
 
-- 존재하지 않거나 이미 활성화된 이메일이어도 같은 접수 응답을 반환한다.
-- 새 코드를 발급하면 Redis에서 이전 코드를 원자적으로 무효화한다.
-- 60초 안의 재발송 요청은 새 메일을 보내지 않되, 계정 열거를 막기 위해 동일한 `202` 접수 응답을 반환한다.
+- `email`: 필수, 이메일 형식, 정규화 전 최대 길이 제한 적용.
+- 이메일 입력 옆의 명시적 발송 행동에서 호출한다. 같은 이메일의 재발송에도 같은 endpoint를 사용한다.
+
+제안 응답:
+
+```json
+{
+  "success": true,
+  "data": {
+    "verificationRequired": true,
+    "resendAvailableAt": "2026-08-20T00:01:00Z"
+  },
+  "error": null
+}
+```
+
+- 같은 이메일 요청이 동시에 들어와도 인증 상태를 중복 생성하거나 서로 다른 현재 코드를 남기지 않는다.
+- 이메일 존재 여부 노출을 줄이기 위해 신규·대기·활성 이메일에 가능한 한 같은 `202` 응답을 반환한다.
+- 새 코드를 발급하면 이전 코드를 원자적으로 무효화한다. 60초 안의 요청은 새 메일을 보내지 않되 같은 접수 모양을 유지한다.
 
 ## 이메일 인증 완료
 
@@ -127,16 +121,68 @@
   "success": true,
   "data": {
     "emailVerified": true,
-    "nextAction": "LOGIN"
+    "signUpToken": "<redacted>",
+    "nextAction": "COMPLETE_PROFILE"
   },
   "error": null
 }
 ```
 
 - `code`는 trim 후 uppercase하고 alphabet `ABCDEFGHJKMNPQRSTUVWXYZ23456789`에 속하는 정확히 6자리인지 확인한다.
-- 서버는 정규화 이메일로 `PENDING_ACTIVATION` 사용자를 찾고 Redis의 keyed digest, TTL, 실패 횟수를 Lua 또는 동등한 원자 연산으로 검증한다.
+- 서버는 이메일 인증 상태의 keyed digest, TTL, 실패 횟수를 원자적으로 검증한다.
 - 잘못된 코드 검증은 실패 횟수를 원자적으로 증가시키고, 5회 실패하면 현재 코드를 무효화한다.
-- `nextAction=LOGIN`은 인증 후 명시적 로그인 제안에 따른 값이며, 자동 로그인 여부가 바뀌면 함께 갱신한다.
+- `signUpToken`은 이메일 인증 결과에 묶인 짧은 수명의 불투명한 가입 계속 자격이다. URL·로그·분석 사건에 넣지 않고 최종 가입 완료 후 재사용할 수 없다.
+- 이메일 가입 클라이언트는 비밀번호 확인 값을 전송하지 않는다. 1단계에서 확인한 비밀번호 하나를 최종 가입 완료 요청에만 전송한다.
+
+## 닉네임 사용 가능 확인
+
+`POST /api/v1/auth/nickname-availability`
+
+```json
+{
+  "nickname": "공부왕7"
+}
+```
+
+```json
+{
+  "success": true,
+  "data": {
+    "available": true,
+    "checkedNickname": "공부왕7"
+  },
+  "error": null
+}
+```
+
+- 닉네임은 화면에 보이는 글자 기준 2~10자이고 공백 없이 한글·영문·숫자만 허용한다.
+- 비교 전에 한글 표현을 일관되게 정규화하고 영문은 대소문자를 구분하지 않는다. 저장용 표시 값과 비교용 정규화 값을 구분한다.
+- `available=true`는 예약이나 소유권 획득이 아니다. 클라이언트는 `checkedNickname`과 현재 입력이 같을 때만 확인 완료로 취급하고, 입력 변경 즉시 결과를 폐기한다.
+
+## 가입 완료와 세션 발급
+
+네이티브: `POST /api/v1/auth/sign-ups`
+
+브라우저: `POST /api/v1/auth/web/sign-ups`
+
+```json
+{
+  "signUpToken": "<redacted>",
+  "password": "<redacted>",
+  "nickname": "공부왕7",
+  "agreements": [
+    { "termsId": "SERVICE_TERMS", "version": "MVP_PLACEHOLDER" },
+    { "termsId": "PRIVACY_COLLECTION", "version": "MVP_PLACEHOLDER" }
+  ]
+}
+```
+
+- `password`: 이메일 가입에만 필수이며 8~64자, 영문자·숫자 각각 1자 이상, 공백 불가, 특수문자 선택이다. 비밀번호 확인 값은 전송하지 않는다.
+- `agreements`는 단순 boolean이 아니라 사용자가 동의한 약관 식별자와 버전의 목록이다. 예시의 `MVP_PLACEHOLDER`는 프론트엔드 임시 전문용 값이며 법률 검토가 끝난 운영 약관 버전으로 간주하지 않는다.
+- 서버는 가입 계속 자격, 닉네임 형식·전역 중복과 필수 약관의 식별자·버전을 최종 요청에서 다시 검증한다.
+- 성공 시 사용자를 `ACTIVE`로 전환하고 네이티브 endpoint는 로그인과 같은 세션 body를, 브라우저 endpoint는 Access Token body와 HttpOnly Refresh Token Cookie를 발급한다.
+- 성공한 클라이언트의 다음 목적지는 `HOME`이다.
+- 닉네임 중복 확인 이후 선점된 경우 `409 AUTH_010`으로 거절하며, 클라이언트는 가입 계속 자격과 다른 입력·동의 상태를 보존하고 닉네임 재확인을 요구한다.
 
 ## 로그인
 
@@ -329,6 +375,7 @@ Origin/CSRF 검증 실패는 `403 AUTH_009`를 사용한다. 클라이언트는 
   "data": {
     "id": 1,
     "email": "learner@example.com",
+    "nickname": "공부왕7",
     "emailVerified": true,
     "status": "ACTIVE"
   },
@@ -336,7 +383,8 @@ Origin/CSRF 검증 실패는 `403 AUTH_009`를 사용한다. 클라이언트는 
 }
 ```
 
-- 향후 프로필·게임화 필드는 별도 기능이 확정될 때 추가한다.
+- `nickname`은 가입이 완료된 활성 사용자의 현재 표시 닉네임이다.
+- 향후 게임화 필드는 별도 기능이 확정될 때 추가한다.
 - 내부 비밀번호·로그인 제공자 subject·세션 정보는 반환하지 않는다.
 
 ## 오류 응답
@@ -358,6 +406,8 @@ Origin/CSRF 검증 실패는 `403 AUTH_009`를 사용한다. 클라이언트는 
 | 필드 형식·비밀번호 정책 위반 | `400` | 기존 `COMMON_001` | 필드 수정 |
 | 이메일 인증 코드 형식·값 오류 또는 사용됨 | `400` | `AUTH_003` | 남은 횟수 내 재입력 또는 새 코드 요청 |
 | 이메일 인증 코드 만료·시도 소진 | `410` | `AUTH_004` | 새 코드 요청 |
+| 닉네임 형식 위반·필수 약관 누락 | `400` | 기존 `COMMON_001` | 표시된 필드 수정 |
+| 닉네임 중복 또는 최종 제출 전 선점 | `409` | `AUTH_010` | 닉네임 변경 후 중복 재확인 |
 | 이메일/비밀번호 불일치 또는 비활성 인증 | `401` | `AUTH_001` | 재입력 |
 | 접근·갱신 자격 없음/잘못됨/만료 | `401` | `AUTH_005` | 갱신 또는 재로그인 |
 | 인증 메일 전달 실패 | `503` | `AUTH_008` | 잠시 후 가입 또는 재발송 재시도 |
@@ -375,12 +425,13 @@ Origin/CSRF 검증 실패는 `403 AUTH_009`를 사용한다. 클라이언트는 
 - 현재 구현의 body surface는 credentialed CORS를 사용하지 않는다. 제안한 브라우저 cookie surface를 도입할 때만 정확한 Origin, credentialed CORS와 CSRF 방어를 함께 적용한다.
 - 네이티브 앱의 Refresh Token은 일반 로컬 저장소가 아니라 OS 보안 저장소에 보관한다.
 - 이메일 인증 코드와 Access/Refresh Token 원문을 로그, 분석 사건, Redis key/value에 남기지 않는다.
+- 가입 계속 자격 원문도 토큰과 동일하게 URL, 영속 클라이언트 저장소, DB, 로그와 분석 사건에 남기지 않는다.
 
 ## 재시도와 중복 요청
 
-- 가입 재시도는 정규화 이메일 unique 제약을 기준으로 사용자를 중복 생성하지 않는다.
+- 인증 메일 요청과 가입 완료 재시도는 정규화 이메일 unique 제약을 기준으로 사용자를 중복 생성하지 않는다.
 - 인증 메일 재발송은 요청 한도 안에서 새 코드를 만들고 Redis의 이전 코드를 무효화한다.
-- 이메일 인증 완료와 로그아웃은 네트워크 응답 유실 뒤 재시도해도 계정·세션 상태를 중복 전이하지 않는다.
+- 이메일 인증 완료와 로그아웃은 네트워크 응답 유실 뒤 재시도해도 계정·세션 상태를 중복 전이하지 않는다. 가입 완료 응답 유실 시 세션 원문을 그대로 재전달할지 로그인으로 복구할지는 구현 전 확정한다.
 - 갱신은 회전 때문에 일반적인 멱등 요청이 아니다. 소비자는 동시에 하나만 호출하고 실패 시 이전 자격을 무한 재시도하지 않는다.
 
 ## 단계적 전환과 호환성 — 제안

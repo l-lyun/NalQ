@@ -51,7 +51,7 @@ public class SecurityConfiguration {
 		);
 		return http
 			.cors(Customizer.withDefaults())
-			.csrf(csrf -> csrf.ignoringRequestMatchers("/api/v1/auth/**"))
+			.csrf(csrf -> csrf.ignoringRequestMatchers("/api/v1/**"))
 			.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 			.authorizeHttpRequests(authorize -> {
 				authorize.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll();
@@ -86,6 +86,9 @@ public class SecurityConfiguration {
 		List<String> allowedOrigins,
 		List<String> browserAllowedOrigins
 	) {
+		if (allowedOrigins.stream().anyMatch("*"::equals)) {
+			throw new IllegalArgumentException("Bearer API CORS requires exact origins");
+		}
 		if (browserAllowedOrigins.stream().anyMatch("*"::equals)) {
 			throw new IllegalArgumentException("Browser credentialed CORS does not allow wildcard origins");
 		}
@@ -99,8 +102,8 @@ public class SecurityConfiguration {
 
 		CorsConfiguration general = new CorsConfiguration();
 		general.setAllowedOrigins(List.copyOf(allowedOrigins));
-		general.setAllowedMethods(List.of("GET", "POST", "DELETE", "OPTIONS"));
-		general.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+		general.setAllowedMethods(List.of("GET", "POST", "PATCH", "DELETE", "OPTIONS"));
+		general.setAllowedHeaders(List.of("Authorization", "Content-Type", "Idempotency-Key"));
 		general.setAllowCredentials(false);
 		general.setMaxAge(3600L);
 

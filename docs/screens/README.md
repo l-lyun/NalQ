@@ -7,6 +7,7 @@
 | 홈 | [home.md](home.md) | `draft` | 지금 할 일을 선택하고 학습을 재개하는 시작 화면 |
 | 학습 | [learning.md](learning.md) | `draft` | 자료 가져오기·문제 만들기·복습을 한곳에서 다루는 화면 |
 | 프로필 | [profile.md](profile.md) | `draft` | 계정과 개인 설정을 관리하는 화면 |
+| 회원가입 | [signup.md](signup.md) | `draft` | 이메일 인증과 가입정보 설정을 2단계로 완료하는 화면 |
 
 ## 상태 의미
 
