@@ -470,6 +470,7 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 - `expectedRevision`: 결과 조회에서 받은 해당 단답형의 `gradingRevision`. 최초 자동 판정은 `0`이며 사용자 수정이 실제로 저장될 때마다 1씩 증가한다.
 - 현재 사용자 소유이며 `COMPLETED`인 attempt의 답을 작성한 `SHORT_ANSWER`에만 적용한다. 객관식·빈칸·서술형, 미응답 단답형과 완료 전 attempt는 `409 ATTEMPT_001`이다.
 - 서버는 최초 `automaticOutcome`과 제출 답안을 바꾸지 않고 최신 `userOverrideOutcome`만 교체한다. 공개 `outcome`은 `userOverrideOutcome`이 있으면 그 값, 없으면 `automaticOutcome`이다.
+- 전체 사용자 수정 이력은 저장하지 않는다. 서버는 최초 `automaticOutcome`과 최신 `userOverrideOutcome`, `gradingRevision`, `correctedAt`만 보존한다.
 - 같은 현재 판정을 같은 revision으로 요청하면 상태와 revision을 바꾸지 않고 현재 결과를 반환한다. 다른 판정이 저장되면 `gradingSource=USER_OVERRIDE`, `gradingRevision`과 `correctedAt`을 갱신한다.
 - 같은 키와 같은 payload 재요청은 해당 문항과 attempt summary에 더 최신 수정이 없는 동안 최초 저장 결과를 반환한다. 그 뒤 더 높은 `gradingRevision` 또는 `summary.revision`이 저장됐다면 과거 응답을 다시 적용하지 않고 `409 ATTEMPT_001`로 결과 재조회를 요구한다. 같은 키에 다른 payload를 보내거나 `expectedRevision`이 최신 값과 달라도 `409 ATTEMPT_001`이다.
 - 서버는 attempt 단위 쓰기 잠금을 먼저 획득해 같은 회차의 서로 다른 단답형 수정도 직렬화한다. 판정, 채점 점수와 원본 회차의 현재 복습 대상 수는 한 트랜잭션에서 계산하며 실제 수정마다 attempt 전체 `summary.revision`을 1 증가시킨다.
@@ -845,5 +846,4 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 
 - 재연결 뒤 페이지 선택 복원 여부는 [학습자료 흐름의 열린 질문](../../flows/content-import.md#열린-질문)이 책임진다.
 - 학습자료 생성을 제외한 비동기 생성·제출·복습 `Idempotency-Key` 결과의 최소 보존 기간. 비동기 생성의 종료 전과 일반적인 네트워크 응답 유실 재시도 동안에는 만료할 수 없다.
-- 단답형 사용자 수정 이력은 전체 감사 로그 대신 최초 자동 판정과 최신 override만 보존하는 안을 권고하며 구현 전 최종 확인이 필요하다.
 - 활성 복습 세션 생성 뒤 단답형 판정 수정은 현재 snapshot을 유지하고 다음 세션부터 반영하는 안을 권고하며 구현 전 최종 확인이 필요하다.
