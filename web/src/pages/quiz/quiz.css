@@ -317,7 +317,16 @@
 }
 
 .quiz-correction-action {
+  flex-shrink: 0;
   min-height: 44px;
+}
+
+.quiz-correction-row {
+  width: 100%;
+}
+
+.quiz-correction-row > p {
+  min-width: 0;
 }
 
 .quiz-reading-section {

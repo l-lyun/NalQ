@@ -68,7 +68,7 @@ function CheckmarkIcon() {
       <path
         d="m5 12.5 4.25 4.25L19 7"
         fill="none"
-        stroke="currentColor"
+        stroke="var(--seed-color-palette-static-white)"
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth="2.4"
@@ -1257,12 +1257,7 @@ function ResultScreen({
           </dl>
 
           {item.editable && correctionAvailable ? (
-            <VStack gap="x2" align="flex-start">
-              <Text as="p" textStyle="t4Regular" color="fg.neutralMuted">
-                {item.edited
-                  ? '현재 채점 결과를 다시 바꿀 수 있어요.'
-                  : '현재 판정이 맞지 않다면 직접 바꿀 수 있어요.'}
-              </Text>
+            <HStack className="quiz-correction-row" align="center" gap="x3">
               <ActionButton
                 className="quiz-correction-action"
                 size="medium"
@@ -1271,7 +1266,10 @@ function ResultScreen({
               >
                 {item.edited ? '채점 다시 수정' : '채점 수정'}
               </ActionButton>
-            </VStack>
+              <Text as="p" textStyle="t4Regular" color="fg.neutralMuted">
+                단답형·서술형은 채점 결과를 직접 수정할 수 있어요.
+              </Text>
+            </HStack>
           ) : item.type === 'MULTIPLE_CHOICE' ? (
             <Box className="quiz-notice" bg="bg.informativeWeak" borderRadius="r3" p="x4">
               <Text as="p" textStyle="t4Regular" color="fg.neutralMuted">
