@@ -36,6 +36,7 @@
 | 학습자료 만들기 흐름 | [content-import.md](flows/content-import.md) | 검토 중 |
 | 퀴즈 생성부터 복습까지의 흐름 | [quiz-solving.md](flows/quiz-solving.md) | 검토 중 |
 | 학습자료·퀴즈·복습 API | [quiz-learning.md](contracts/api/quiz-learning.md) | 검토 중 |
+| 단답형 채점 서버 설계 | [quiz-grading.md](../server/docs/technical/quiz-grading.md) | 초안 |
 | 웹 본 퀴즈 임시 상태·보존 | [quiz-solving.md](../web/docs/technical/quiz-solving.md) | 검토 중 |
 | 앱 본 퀴즈 임시 상태·보존 | [quiz-solving.md](../app/docs/technical/quiz-solving.md) | 검토 중 |
 | 홈 화면 | [home.md](screens/home.md) | 초안 |
