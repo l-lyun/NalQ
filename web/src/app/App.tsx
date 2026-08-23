@@ -7,10 +7,19 @@ import { AuthGate, PublicOnlyGate } from '@/app/router/AuthGate'
 import { AuthenticatedHomePage } from '@/pages/home/AuthenticatedHomePage'
 import { AuthenticatedLearningPage } from '@/pages/learning/AuthenticatedLearningPage'
 import { LoginPage } from '@/pages/login/LoginPage'
+import { QuizFixturePage } from '@/pages/quiz'
 import { SignUpPage } from '@/pages/sign-up/SignUpPage'
 import { VerifyEmailPage } from '@/pages/verify-email/VerifyEmailPage'
 
 export function App() {
+  if (import.meta.env.DEV && window.location.pathname === '/dev/quiz-preview') {
+    return <QuizFixturePage />
+  }
+
+  if (import.meta.env.DEV && window.location.pathname === '/dev/quiz-result-preview') {
+    return <QuizFixturePage initialScene="RESULT" />
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <AuthBootstrap>
