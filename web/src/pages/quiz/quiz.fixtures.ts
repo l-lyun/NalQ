@@ -35,8 +35,8 @@ export const quizFixtureQuestions: QuizQuestion[] = [
     topic: '큐와 스택의 원칙',
     prompt: '큐는 [1] 원칙을 따르며, 스택은 [2] 원칙을 따릅니다.',
     blanks: [
-      { id: 'q2-b1', label: '빈칸 1' },
-      { id: 'q2-b2', label: '빈칸 2' },
+      { id: 'q2-b1', label: '1번' },
+      { id: 'q2-b2', label: '2번' },
     ],
   },
   {
@@ -72,7 +72,7 @@ export const quizFixtureQuestions: QuizQuestion[] = [
     type: 'FILL_BLANK',
     topic: '스택의 순서',
     prompt: '스택은 가장 마지막에 들어온 데이터가 가장 [1] 나옵니다.',
-    blanks: [{ id: 'q6-b1', label: '빈칸 1' }],
+    blanks: [{ id: 'q6-b1', label: '1번' }],
   },
   {
     id: 'q7',

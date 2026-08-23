@@ -1,6 +1,6 @@
 import {
   IconArrowLeftLine,
-  IconCheckmarkCircleFill,
+  IconCheckmarkLine,
   IconExclamationmarkCircleFill,
 } from '@karrotmarket/react-monochrome-icon'
 import {
@@ -120,7 +120,7 @@ function SheetFrame({
   open: boolean
   onOpenChange: (open: boolean) => void
   title: string
-  description?: string
+  description?: ReactNode
   children?: ReactNode
   footer: ReactNode
   dismissible?: boolean
@@ -457,7 +457,13 @@ export function QuizFlowPage({
         open={sheet === 'READY_START'}
         onOpenChange={(open) => setSheet(open ? 'READY_START' : null)}
         title="지금 바로 풀어볼까요?"
-        description={`${questions.length}문제를 한 문제씩 풀고 마지막에 답안을 제출해요. 자동 채점 뒤 서술형은 직접 평가해요.`}
+        description={
+          <>
+            {questions.length}문제를 한 문제씩 풀고 마지막에 답안을 제출해요.
+            <br />
+            자동 채점 뒤 서술형은 직접 평가해요.
+          </>
+        }
         footer={
           <VStack gap="x2" width="full">
             <ActionButton
@@ -644,7 +650,7 @@ function ConditionsScreen({
             value: String(value),
             label: `${value}개`,
           }))}
-          description="학습자료 내용에 따라 만들어지는 문제 수가 더 적을 수 있어요."
+          description="학습자료 내용에 따라 만들어지는 문제 수가 적을 수 있어요."
           onChange={(maxCount) =>
             onChange({ ...conditions, maxCount: Number(maxCount) as QuizMaxCount })
           }
@@ -723,7 +729,9 @@ function GenerationScreen({
           </ProgressCircle.Root>
           <VStack gap="x2" align="center">
             <Text as="h2" className="quiz-center-copy" textStyle="t10Bold" color="fg.neutral">
-              자료를 바탕으로 문제를 만들고 있어요
+              자료를 바탕으로
+              <br />
+              문제를 만들 수 있어요.
             </Text>
             <Text as="p" className="quiz-center-copy" textStyle="t5Regular" color="fg.neutralMuted">
               완료까지 걸리는 시간은 자료마다 달라요.
@@ -787,14 +795,24 @@ function ReadyScreen({
     <VStack className="quiz-screen">
       <ScreenHeader title="문제 준비 완료" backLabel="학습 화면으로 돌아가기" onBack={onBack} />
       <VStack className="quiz-status-content" align="center" gap="x6" aria-live="polite">
-        <Icon svg={<IconCheckmarkCircleFill />} size="x10" color="fg.positive" />
+        <Flex
+          className="quiz-ready-icon"
+          align="center"
+          justify="center"
+          bg="bg.brandSolid"
+          borderRadius="full"
+          aria-hidden
+        >
+          <Icon svg={<IconCheckmarkLine />} size="x6" color="palette.staticWhite" />
+        </Flex>
         <VStack gap="x2" align="center">
           <Text as="h2" className="quiz-center-copy" textStyle="t10Bold" color="fg.neutral">
             {ready.actualCount}문제를 만들었어요
           </Text>
           <Text as="p" className="quiz-center-copy" textStyle="t5Regular" color="fg.neutralMuted">
-            요청한 {ready.requestedCount}개 중 학습자료 내용으로 만들 수 있는 {ready.actualCount}
-            문제를 준비했어요.
+            요청한 {ready.requestedCount}개 중 학습자료로 만들 수 있는
+            <br />
+            {ready.actualCount}문제를 준비했어요.
           </Text>
         </VStack>
         <dl className="quiz-meta-list">
@@ -882,23 +900,25 @@ function SolvingScreen({
           </div>
         </VStack>
 
-        <VStack gap="x3" aria-live="polite">
-          <Text textStyle="t4Bold" color="fg.brand">
-            {typeLabels[question.type]}
-          </Text>
-          <Text
-            as="h2"
-            ref={headingRef}
-            tabIndex={-1}
-            className="quiz-question-heading"
-            textStyle="t8Bold"
-            color="fg.neutral"
-          >
-            {question.prompt}
-          </Text>
-        </VStack>
+        <VStack key={question.id} className="quiz-question-panel" gap="x8">
+          <VStack gap="x3" aria-live="polite">
+            <Text textStyle="t4Bold" color="fg.brand">
+              {typeLabels[question.type]}
+            </Text>
+            <Text
+              as="h2"
+              ref={headingRef}
+              tabIndex={-1}
+              className="quiz-question-heading"
+              textStyle="t8Bold"
+              color="fg.neutral"
+            >
+              {question.number}. {question.prompt}
+            </Text>
+          </VStack>
 
-        <QuestionAnswer question={question} answer={answer} onAnswer={onAnswer} />
+          <QuestionAnswer question={question} answer={answer} onAnswer={onAnswer} />
+        </VStack>
 
         <HStack className="quiz-solving-actions" gap="x3">
           <ActionButton
@@ -933,7 +953,7 @@ function QuestionAnswer({
       <fieldset className="quiz-fieldset quiz-objective-options">
         <legend className="quiz-sr-only">답 선택</legend>
         <VStack gap="x3">
-          {question.choices.map((choice) => (
+          {question.choices.map((choice, index) => (
             <label key={choice.id} data-selected={selected === choice.id ? '' : undefined}>
               <input
                 type="radio"
@@ -942,7 +962,9 @@ function QuestionAnswer({
                 checked={selected === choice.id}
                 onChange={() => onAnswer({ type: 'MULTIPLE_CHOICE', choiceId: choice.id })}
               />
-              <span>{choice.label}</span>
+              <span>
+                {index + 1}. {choice.label}
+              </span>
             </label>
           ))}
         </VStack>
@@ -954,13 +976,13 @@ function QuestionAnswer({
     const values = answer?.type === 'FILL_BLANK' ? answer.values : {}
     return (
       <VStack gap="x4">
-        {question.blanks.map((blank) => (
+        {question.blanks.map((blank, index) => (
           <Field.Root key={blank.id}>
-            <Field.Label>{blank.label}</Field.Label>
+            <Field.Label>{index + 1}번</Field.Label>
             <TextField.Root>
               <TextField.Input
                 value={values[blank.id] ?? ''}
-                placeholder={`${blank.label}의 답을 입력해 주세요`}
+                placeholder={`${index + 1}번 답을 입력해 주세요`}
                 autoComplete="off"
                 onChange={(event) =>
                   onAnswer({
@@ -1011,8 +1033,9 @@ function QuestionAnswer({
       </Field.Root>
       <Box className="quiz-notice" bg="bg.informativeWeak" borderRadius="r3" p="x4">
         <Text as="p" textStyle="t4Regular" color="fg.neutralMuted">
-          서술형은 자동 점수에 포함되지 않아요. 제출한 뒤 모범 답안과 핵심 포인트를 보고
-          직접 평가해요.
+          서술형은 자동 점수에 포함되지 않아요.
+          <br />
+          제출한 뒤 모범 답안과 핵심 포인트를 보고 직접 평가해요.
         </Text>
       </Box>
     </VStack>

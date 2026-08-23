@@ -12,11 +12,11 @@ import { SignUpPage } from '@/pages/sign-up/SignUpPage'
 import { VerifyEmailPage } from '@/pages/verify-email/VerifyEmailPage'
 
 export function App() {
-  if (import.meta.env.DEV && window.location.pathname === '/dev/quiz-preview') {
+  if (import.meta.env.DEV && window.location.pathname === '/quiz-preview') {
     return <QuizFixturePage />
   }
 
-  if (import.meta.env.DEV && window.location.pathname === '/dev/quiz-result-preview') {
+  if (import.meta.env.DEV && window.location.pathname === '/quiz-result-preview') {
     return <QuizFixturePage initialScene="RESULT" />
   }
 
