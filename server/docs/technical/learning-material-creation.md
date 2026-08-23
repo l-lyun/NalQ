@@ -51,12 +51,12 @@
 
 ## 4. 모듈 책임
 
-기존 `auth` 모듈과 같은 `api`·`application`·`domain`·`infrastructure` 구분을 따른다.
+[서버 패키지 구조](package-structure.md)의 도메인 공용 DTO와 `controller`·`service`·`repository` 구분을 따른다.
 
-- API: header와 JSON을 받고 현재 인증 주체를 application 입력으로 변환한다. HTTP status와 공통 응답 봉투만 책임진다.
-- Application: 제목 정리, 본문·출처·멱등 키 검증, fingerprint 생성, 소유자 확인과 트랜잭션 경계를 책임진다.
+- Controller: header와 JSON을 받고 현재 인증 주체를 command로 변환한다. HTTP status와 공통 응답 봉투만 책임진다.
+- Service: 제목 정리, 본문·출처·멱등 키 검증, fingerprint 생성, 소유자 확인과 트랜잭션 조정을 책임진다.
 - Domain: `LearningMaterial`, `SourceType`, `ContentEditStatus`와 생성 불변식을 가진다.
-- Infrastructure: JPA 저장소와 MySQL 고유 제약 충돌을 application 결과로 변환한다.
+- Repository: JPA 저장소와 MySQL 고유 제약 충돌을 서비스 결과로 변환한다.
 
 요청 DTO의 `sourceType`은 먼저 문자열로 받아 허용값을 검증한 뒤 domain enum으로 변환한다. 그러면 알 수 없는 enum은 필드 오류 `COMMON_001`로, JSON 자체를 읽을 수 없는 경우는 `COMMON_002`로 구분할 수 있다.
 

@@ -1,6 +1,6 @@
 package com.openmd.server.auth.security;
 
-import com.openmd.server.auth.domain.BrowserAuthErrorCode;
+import com.openmd.server.auth.error.BrowserAuthErrorCode;
 import com.openmd.server.global.api.ApiError;
 import com.openmd.server.global.api.ApiResponse;
 import jakarta.servlet.FilterChain;

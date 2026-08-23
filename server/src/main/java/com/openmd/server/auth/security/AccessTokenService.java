@@ -7,7 +7,7 @@ import com.nimbusds.jose.crypto.MACSigner;
 import com.nimbusds.jose.crypto.MACVerifier;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
-import com.openmd.server.auth.domain.AuthErrorCode;
+import com.openmd.server.auth.error.AuthErrorCode;
 import com.openmd.server.global.error.BusinessException;
 import java.time.Clock;
 import java.time.Duration;

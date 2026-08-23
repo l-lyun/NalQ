@@ -8,16 +8,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.openmd.server.auth.api.AuthController;
-import com.openmd.server.auth.api.BrowserAuthController;
-import com.openmd.server.auth.api.BrowserRefreshCookie;
-import com.openmd.server.auth.api.UserController;
-import com.openmd.server.auth.application.AuthService;
-import com.openmd.server.auth.application.TwoStepSignUpService;
+import com.openmd.server.auth.controller.AuthController;
+import com.openmd.server.auth.controller.BrowserAuthController;
+import com.openmd.server.auth.controller.support.BrowserRefreshCookie;
+import com.openmd.server.auth.controller.UserController;
+import com.openmd.server.auth.service.AuthService;
+import com.openmd.server.auth.service.TwoStepSignUpService;
 import com.openmd.server.auth.config.SecurityConfiguration;
 import com.openmd.server.auth.security.AccessTokenService;
-import com.openmd.server.learningmaterial.api.LearningMaterialController;
-import com.openmd.server.learningmaterial.application.LearningMaterialService;
+import com.openmd.server.learningmaterial.controller.LearningMaterialController;
+import com.openmd.server.learningmaterial.service.LearningMaterialService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootConfiguration;
