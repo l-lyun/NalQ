@@ -312,6 +312,10 @@
   background: var(--seed-color-bg-neutral-weak);
 }
 
+.quiz-result-summary .quiz-result-essay-summary {
+  grid-column: 1 / -1;
+}
+
 .quiz-outcome {
   flex-shrink: 0;
 }
@@ -331,6 +335,16 @@
 
 .quiz-reading-section {
   overflow-wrap: anywhere;
+}
+
+.quiz-key-points {
+  margin: 0;
+  padding-left: var(--seed-dimension-x5);
+  color: var(--seed-color-fg-neutral-muted);
+}
+
+.quiz-key-points li + li {
+  margin-top: var(--seed-dimension-x1);
 }
 
 .quiz-result-list button {

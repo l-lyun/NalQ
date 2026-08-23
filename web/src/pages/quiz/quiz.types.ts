@@ -81,17 +81,20 @@ export type QuizGenerationState =
   | { status: 'READY'; ready: QuizGenerationReady }
   | { status: 'ERROR'; error: QuizGenerationFailure }
 
-export type QuizResultOutcome = 'CORRECT' | 'INCORRECT'
+export type QuizBinaryOutcome = 'CORRECT' | 'INCORRECT'
+
+export type QuizResultOutcome = QuizBinaryOutcome | 'PARTIAL'
 
 export type QuizResultItem = {
   questionId: string
   number: number
-  type: 'MULTIPLE_CHOICE' | 'FILL_BLANK' | 'SHORT_ANSWER'
+  type: QuizQuestionType
   topic: string
   prompt: string
   answer: string
   correctAnswer: string
-  outcome: QuizResultOutcome
+  outcome?: QuizResultOutcome
+  keyPoints?: string[]
   explanation: string
   sourceExcerpt: string
   editable: boolean
@@ -101,6 +104,9 @@ export type QuizResultItem = {
 export type QuizResultSummary = {
   correctCount: number
   gradedCount: number
+  essayCorrectCount: number
+  essayPartialCount: number
+  essayIncorrectCount: number
   reviewCount: number
 }
 
@@ -114,6 +120,27 @@ export type QuizSubmitPayload = {
   unansweredQuestionIds: string[]
 }
 
+export type QuizAttemptStatus = 'SELF_ASSESSMENT_REQUIRED' | 'COMPLETED'
+
+export type QuizSubmissionResult = {
+  attemptId: string
+  status: QuizAttemptStatus
+  automaticGrading: {
+    correctQuestionCount: number
+    gradedQuestionCount: number
+  }
+  pendingEssayQuestionIds: string[]
+  createdAt: string
+}
+
+export type QuizEssayAssessmentResult = {
+  attemptId: string
+  questionId: string
+  assessment: QuizResultOutcome
+  status: QuizAttemptStatus
+  remainingSelfAssessmentCount: number
+}
+
 export type QuizPresentationCallbacks = {
   onConditionsChange?: (conditions: QuizConditions) => void
   onGenerate?: (conditions: QuizConditions) => void | Promise<QuizGenerationReady | void>
@@ -124,16 +151,28 @@ export type QuizPresentationCallbacks = {
   onDeferQuiz?: () => void
   onAnswersChange?: (answers: QuizAnswers) => void
   onNavigateQuestion?: (questionId: string) => void
-  onSubmit?: (payload: QuizSubmitPayload) => void | Promise<void>
+  onSubmit?: (payload: QuizSubmitPayload) => QuizSubmissionResult | Promise<QuizSubmissionResult>
+  onSaveEssayAssessment?: (input: {
+    attemptId: string
+    questionId: string
+    assessment: QuizResultOutcome
+  }) => QuizEssayAssessmentResult | Promise<QuizEssayAssessmentResult>
   onExitQuiz?: () => void
   onUpdateShortAnswerOutcome?: (input: {
     questionId: string
-    outcome: QuizResultOutcome
-  }) => void | Promise<QuizResultSummary | void>
+    outcome: QuizBinaryOutcome
+  }) => QuizResultSummary | Promise<QuizResultSummary>
   onResultExit?: () => void
 }
 
-export type QuizFlowScene = 'CONDITIONS' | 'GENERATION' | 'READY' | 'SOLVING' | 'RESULT'
+export type QuizFlowScene =
+  | 'CONDITIONS'
+  | 'GENERATION'
+  | 'READY'
+  | 'SOLVING'
+  | 'SUBMIT_ERROR'
+  | 'SELF_ASSESSMENT'
+  | 'RESULT'
 
 export type QuizFlowPageProps = {
   materialTitle: string
