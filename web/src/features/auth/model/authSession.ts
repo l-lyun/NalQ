@@ -30,6 +30,12 @@ export async function completeSignUpAndLoadCurrentUser(payload: CompleteSignUpRe
   return completeCurrentUserSession()
 }
 
+export async function recoverCompletedSignUpSession() {
+  await refreshAccessToken()
+  await clearAuthAndPrivateCaches()
+  return completeCurrentUserSession()
+}
+
 export async function completeCurrentUserSession() {
   try {
     const user = await queryClient.fetchQuery(currentUserQueryOptions)

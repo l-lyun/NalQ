@@ -13,9 +13,8 @@ export type ApiResponse<T> =
   | { success: true; data: T; error: null }
   | { success: false; data: null; error: ApiErrorBody }
 
-export type SignUpRequest = {
+export type EmailVerificationEmailRequest = {
   email: string
-  password: string
 }
 
 export type VerificationRequired = {
@@ -76,6 +75,7 @@ export type SessionTokens = {
 export type CurrentUser = {
   id: number
   email: string
+  nickname: string | null
   emailVerified: boolean
   status: 'PENDING_ACTIVATION' | 'ACTIVE' | 'SUSPENDED' | 'WITHDRAWN'
 }

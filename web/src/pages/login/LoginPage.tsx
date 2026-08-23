@@ -2,11 +2,15 @@ import { ActionButton } from '@seed-design/react'
 import { useState, type FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
-import { safeReturnPath, type AuthReturnState } from '@/app/router/AuthGate'
+import { safeReturnPath } from '@/app/router/AuthGate'
 import {
   useCompleteSessionMutation,
   useLoginMutation,
 } from '@/features/auth/model/auth.mutations'
+import {
+  readLoginRouteState,
+  SIGN_UP_SESSION_RECOVERY_NOTICE,
+} from '@/features/auth/model/loginRouteState'
 import {
   AuthField,
   AuthForm,
@@ -21,8 +25,8 @@ export function LoginPage() {
   const navigate = useNavigate()
   const login = useLoginMutation()
   const completeSession = useCompleteSessionMutation()
-  const state = location.state as (AuthReturnState & { email?: string }) | null
-  const [email, setEmail] = useState(state?.email ?? '')
+  const state = readLoginRouteState(location.state)
+  const [email, setEmail] = useState(state.email ?? '')
   const [password, setPassword] = useState('')
   const canRetryCurrentUser =
     login.error instanceof ApiClientError &&
@@ -47,7 +51,11 @@ export function LoginPage() {
   return (
     <AuthPage
       title="로그인"
-      description="테스트용 인증 화면입니다. 로그인하면 기존 홈 화면으로 이동해요."
+      description={
+        state.notice === SIGN_UP_SESSION_RECOVERY_NOTICE
+          ? '가입은 완료됐지만 로그인 처리에 실패했어요. 잠시 후 다시 로그인해 주세요.'
+          : '테스트용 인증 화면입니다. 로그인하면 기존 홈 화면으로 이동해요.'
+      }
       footer={
         <AuthTextLink to="/sign-up" state={{ from: state?.from }}>
           계정이 없나요? 회원가입

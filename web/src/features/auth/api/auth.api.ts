@@ -1,12 +1,12 @@
 import type {
   ApiResponse,
   CurrentUser,
+  EmailVerificationEmailRequest,
   EmailVerificationRequest,
   EmailVerified,
   LoginRequest,
   NicknameAvailability,
   NicknameAvailabilityRequest,
-  SignUpRequest,
   VerificationRequired,
 } from './auth.types'
 import { protectedApi } from '@/shared/api/protectedApi'
@@ -24,9 +24,9 @@ async function publicRequest<T>(request: () => Promise<{ data: ApiResponse<T> }>
   }
 }
 
-export function requestSignUp(payload: SignUpRequest) {
+export function requestVerificationEmail(payload: EmailVerificationEmailRequest) {
   return publicRequest<VerificationRequired>(() =>
-    publicApi.post('/api/v1/auth/sign-ups', payload),
+    publicApi.post('/api/v1/auth/email-verifications', payload),
   )
 }
 

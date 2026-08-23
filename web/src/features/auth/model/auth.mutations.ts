@@ -3,7 +3,7 @@ import { useMutation } from '@tanstack/react-query'
 import {
   checkNicknameAvailability,
   confirmEmailVerification,
-  requestSignUp,
+  requestVerificationEmail,
   resendVerificationEmail,
 } from '@/features/auth/api/auth.api'
 
@@ -12,6 +12,7 @@ import {
   completeCurrentUserSession,
   loginAndLoadCurrentUser,
   logoutCurrentSession,
+  recoverCompletedSignUpSession,
 } from './authSession'
 
 export function useLoginMutation() {
@@ -22,8 +23,8 @@ export function useCompleteSessionMutation() {
   return useMutation({ mutationFn: completeCurrentUserSession, retry: false })
 }
 
-export function useSignUpMutation() {
-  return useMutation({ mutationFn: requestSignUp, retry: false })
+export function useRequestVerificationEmailMutation() {
+  return useMutation({ mutationFn: requestVerificationEmail, retry: false })
 }
 
 export function useConfirmEmailMutation() {
@@ -40,6 +41,10 @@ export function useNicknameAvailabilityMutation() {
 
 export function useCompleteSignUpMutation() {
   return useMutation({ mutationFn: completeSignUpAndLoadCurrentUser, retry: false })
+}
+
+export function useRecoverCompletedSignUpMutation() {
+  return useMutation({ mutationFn: recoverCompletedSignUpSession, retry: false })
 }
 
 export function useLogoutMutation() {
