@@ -910,7 +910,7 @@ function SolvingScreen({
               ref={headingRef}
               tabIndex={-1}
               className="quiz-question-heading"
-              textStyle="t8Bold"
+              textStyle="t7Bold"
               color="fg.neutral"
             >
               {question.number}. {question.prompt}
@@ -1237,7 +1237,7 @@ function ResultScreen({
             <Text textStyle="t3Medium" color="fg.neutralMuted">
               {item.topic}
             </Text>
-            <Text as="h2" id="quiz-result-question" textStyle="t8Bold" color="fg.neutral">
+            <Text as="h2" id="quiz-result-question" textStyle="t7Bold" color="fg.neutral">
               {item.prompt}
             </Text>
           </VStack>
