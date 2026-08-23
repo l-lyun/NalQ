@@ -38,9 +38,15 @@ public class AuthController {
 	@Operation(
 		operationId = "completeSignUp",
 		summary = "네이티브 회원가입을 완료하고 세션을 발급한다",
-		responses = @io.swagger.v3.oas.annotations.responses.ApiResponse(
-			responseCode = "201", description = "가입 완료", useReturnTypeSchema = true
-		)
+		responses = {
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(
+				responseCode = "201", description = "가입 완료", useReturnTypeSchema = true
+			),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(
+				responseCode = "503", description = "AUTH_011 계정 생성 후 자동 로그인 실패",
+				content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))
+			)
+		}
 	)
 	public ResponseEntity<ApiResponse<SessionTokens>> signUp(@Valid @RequestBody SignUpRequest request) {
 		return ResponseEntity.status(HttpStatus.CREATED)

@@ -77,6 +77,8 @@ class OpenApiContractTest {
 			.andExpect(jsonPath("$.paths['/api/v1/auth/sign-ups'].post.operationId").value("completeSignUp"))
 			.andExpect(jsonPath("$.paths['/api/v1/auth/sign-ups'].post.security").isEmpty())
 			.andExpect(jsonPath("$.paths['/api/v1/auth/sign-ups'].post.responses['201']").exists())
+			.andExpect(jsonPath("$.paths['/api/v1/auth/sign-ups'].post.responses['503'].content"
+				+ ".['application/json'].schema.$ref").value("#/components/schemas/ApiResponse"))
 			.andExpect(jsonPath("$.paths['/api/v1/auth/sign-ups'].post.requestBody.content"
 				+ ".['application/json'].schema.$ref").value("#/components/schemas/SignUpRequest"))
 			.andExpect(jsonPath("$.paths['/api/v1/auth/email-verifications'].post.operationId")
@@ -148,6 +150,8 @@ class OpenApiContractTest {
 			.andExpect(jsonPath("$.paths['/api/v1/auth/web/sign-ups'].post.responses['201'].content"
 				+ ".['application/json'].schema.$ref")
 				.value("#/components/schemas/ApiResponseBrowserSessionTokens"))
+			.andExpect(jsonPath("$.paths['/api/v1/auth/web/sign-ups'].post.responses['503'].content"
+				+ ".['application/json'].schema.$ref").value("#/components/schemas/ApiResponse"))
 			.andExpect(jsonPath("$.paths['/api/v1/auth/web/sessions'].post.responses['200'].content"
 				+ ".['application/json'].schema.$ref")
 				.value("#/components/schemas/ApiResponseBrowserSessionTokens"))

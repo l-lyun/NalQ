@@ -11,6 +11,8 @@ import com.openmd.server.auth.application.AuthService;
 import com.openmd.server.auth.application.IssuedSignUpToken;
 import com.openmd.server.auth.application.SessionTokens;
 import com.openmd.server.auth.application.TwoStepSignUpService;
+import com.openmd.server.auth.domain.AuthErrorCode;
+import com.openmd.server.global.error.BusinessException;
 import com.openmd.server.global.error.GlobalExceptionHandler;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
@@ -83,6 +85,43 @@ class AuthControllerTest {
 	}
 
 	@Test
+	void rejectsNullAgreementElementsAsCommon001BeforeCallingTheService() throws Exception {
+		mockMvc.perform(post("/api/v1/auth/sign-ups")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "signUpToken":"61d67fa8-1a2b-4f35-94fc-16ec63551b15",
+					  "password":"password1",
+					  "nickname":"공부왕7",
+					  "agreements":[
+					    null,
+					    {"termsId":"PRIVACY_COLLECTION","version":"TEMP-2026-08-20"}
+					  ]
+					}
+					"""))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.success").value(false))
+			.andExpect(jsonPath("$.error.code").value("COMMON_001"));
+
+		verifyNoInteractions(signUpService);
+	}
+
+	@Test
+	void returnsAuth011WhenAccountCommittedButAutomaticSessionIssuanceFails() throws Exception {
+		when(signUpService.completeSignUp(org.mockito.ArgumentMatchers.any()))
+			.thenThrow(new BusinessException(AuthErrorCode.SIGN_UP_SESSION_FAILED));
+
+		mockMvc.perform(post("/api/v1/auth/sign-ups")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(validSignUpRequest()))
+			.andExpect(status().isServiceUnavailable())
+			.andExpect(jsonPath("$.success").value(false))
+			.andExpect(jsonPath("$.error.code").value("AUTH_011"))
+			.andExpect(jsonPath("$.error.message")
+				.value("가입은 완료되었지만 자동 로그인에 실패했습니다. 잠시 후 로그인해 주세요."));
+	}
+
+	@Test
 	void emailConfirmationReturnsTheMemoryOnlySignUpToken() throws Exception {
 		when(signUpService.confirmEmail("learner@example.com", "A7K9M2"))
 			.thenReturn(new IssuedSignUpToken("61d67fa8-1a2b-4f35-94fc-16ec63551b15"));
@@ -120,5 +159,19 @@ class AuthControllerTest {
 			.andExpect(jsonPath("$.error.code").value("COMMON_001"));
 
 		verifyNoInteractions(authService, signUpService);
+	}
+
+	private String validSignUpRequest() {
+		return """
+			{
+			  "signUpToken":"61d67fa8-1a2b-4f35-94fc-16ec63551b15",
+			  "password":"password1",
+			  "nickname":"공부왕7",
+			  "agreements":[
+			    {"termsId":"SERVICE_TERMS","version":"TEMP-2026-08-20"},
+			    {"termsId":"PRIVACY_COLLECTION","version":"TEMP-2026-08-20"}
+			  ]
+			}
+			""";
 	}
 }

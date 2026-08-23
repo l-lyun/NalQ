@@ -81,6 +81,19 @@ class BrowserAuthControllerTest {
 	}
 
 	@Test
+	void signUpSessionFailureReturnsAuth011WithoutIssuingACookie() throws Exception {
+		when(signUpService.completeSignUp(org.mockito.ArgumentMatchers.any()))
+			.thenThrow(new BusinessException(AuthErrorCode.SIGN_UP_SESSION_FAILED));
+
+		mockMvc.perform(post("/api/v1/auth/web/sign-ups")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(validSignUpRequest()))
+			.andExpect(status().isServiceUnavailable())
+			.andExpect(jsonPath("$.error.code").value("AUTH_011"))
+			.andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
+	}
+
+	@Test
 	void loginReturnsAccessMetadataAndRefreshTokenOnlyAsHttpOnlyCookie() throws Exception {
 		when(authService.login("learner@example.com", "password1"))
 			.thenReturn(tokens("access-token", "refresh-token"));
@@ -187,5 +200,19 @@ class BrowserAuthControllerTest {
 
 	private SessionTokens tokens(String accessToken, String refreshToken) {
 		return new SessionTokens(accessToken, ACCESS_EXPIRES_AT, refreshToken, REFRESH_EXPIRES_AT);
+	}
+
+	private String validSignUpRequest() {
+		return """
+			{
+			  "signUpToken":"61d67fa8-1a2b-4f35-94fc-16ec63551b15",
+			  "password":"password1",
+			  "nickname":"공부왕7",
+			  "agreements":[
+			    {"termsId":"SERVICE_TERMS","version":"TEMP-2026-08-20"},
+			    {"termsId":"PRIVACY_COLLECTION","version":"TEMP-2026-08-20"}
+			  ]
+			}
+			""";
 	}
 }

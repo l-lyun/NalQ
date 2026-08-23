@@ -13,7 +13,12 @@ public enum AuthErrorCode implements ErrorCode {
 	ACCOUNT_UNAVAILABLE(HttpStatus.FORBIDDEN, "AUTH_006", "이 계정으로 로그인할 수 없습니다."),
 	TOO_MANY_REQUESTS(HttpStatus.TOO_MANY_REQUESTS, "AUTH_007", "잠시 후 다시 시도해 주세요."),
 	EMAIL_DELIVERY_FAILED(HttpStatus.SERVICE_UNAVAILABLE, "AUTH_008", "인증 메일을 보낼 수 없습니다."),
-	NICKNAME_CONFLICT(HttpStatus.CONFLICT, "AUTH_010", "이미 사용 중인 닉네임입니다.");
+	NICKNAME_CONFLICT(HttpStatus.CONFLICT, "AUTH_010", "이미 사용 중인 닉네임입니다."),
+	SIGN_UP_SESSION_FAILED(
+		HttpStatus.SERVICE_UNAVAILABLE,
+		"AUTH_011",
+		"가입은 완료되었지만 자동 로그인에 실패했습니다. 잠시 후 로그인해 주세요."
+	);
 
 	private final HttpStatus status;
 	private final String code;

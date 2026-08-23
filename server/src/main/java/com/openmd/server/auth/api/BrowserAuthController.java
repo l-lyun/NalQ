@@ -11,6 +11,7 @@ import com.openmd.server.global.error.BusinessException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -52,9 +53,15 @@ public class BrowserAuthController {
 	@Operation(
 		operationId = "completeBrowserSignUp",
 		summary = "브라우저 회원가입을 완료하고 세션을 발급한다",
-		responses = @io.swagger.v3.oas.annotations.responses.ApiResponse(
-			responseCode = "201", description = "가입 완료", useReturnTypeSchema = true
-		)
+		responses = {
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(
+				responseCode = "201", description = "가입 완료", useReturnTypeSchema = true
+			),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(
+				responseCode = "503", description = "AUTH_011 계정 생성 후 자동 로그인 실패",
+				content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))
+			)
+		}
 	)
 	@Parameter(
 		name = BrowserSessionRequestGuard.CSRF_HEADER,

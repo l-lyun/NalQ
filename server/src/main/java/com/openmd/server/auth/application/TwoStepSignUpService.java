@@ -182,8 +182,24 @@ public final class TwoStepSignUpService {
 		} catch (RuntimeException ignored) {
 			// The ACTIVE user and DB unique constraints remain authoritative; Redis has a 15-minute TTL.
 		}
-		IssuedRefreshToken refresh = refreshTokenService.issue(user.getId());
-		IssuedAccessToken access = accessTokenService.issue(user.getId(), refresh.sessionId());
+		IssuedRefreshToken refresh;
+		try {
+			refresh = refreshTokenService.issue(user.getId());
+		} catch (RuntimeException exception) {
+			throw signUpSessionFailed(exception);
+		}
+		IssuedAccessToken access;
+		try {
+			access = accessTokenService.issue(user.getId(), refresh.sessionId());
+		} catch (RuntimeException exception) {
+			BusinessException failure = signUpSessionFailed(exception);
+			try {
+				refreshTokenService.revoke(refresh.token());
+			} catch (RuntimeException revokeFailure) {
+				failure.addSuppressed(revokeFailure);
+			}
+			throw failure;
+		}
 		return new SessionTokens(access.token(), access.expiresAt(), refresh.token(), refresh.expiresAt());
 	}
 
@@ -237,6 +253,12 @@ public final class TwoStepSignUpService {
 
 	private BusinessException invalidSignUpCredential() {
 		return new BusinessException(AuthErrorCode.INVALID_CREDENTIAL);
+	}
+
+	private BusinessException signUpSessionFailed(RuntimeException cause) {
+		BusinessException failure = new BusinessException(AuthErrorCode.SIGN_UP_SESSION_FAILED);
+		failure.addSuppressed(cause);
+		return failure;
 	}
 
 	private boolean hasConstraint(Throwable exception, String constraintName) {

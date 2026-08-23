@@ -92,7 +92,7 @@ class AuthenticationInfrastructureIntegrationTest {
 	@Test
 	void appliesFlywayMigrationAndEnforcesHibernateUniqueAndCheckContractsOnMySql84() {
 		Integer migrationSucceeded = jdbcTemplate.queryForObject(
-			"SELECT success FROM flyway_schema_history WHERE version = '3'",
+			"SELECT success FROM flyway_schema_history WHERE version = '4'",
 			Integer.class
 		);
 		assertEquals(1, migrationSucceeded);

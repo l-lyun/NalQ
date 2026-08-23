@@ -6,9 +6,11 @@ import {
   useCompleteSignUpMutation,
   useConfirmEmailMutation,
   useNicknameAvailabilityMutation,
+  useRecoverCompletedSignUpMutation,
   useResendVerificationMutation,
-  useSignUpMutation,
+  useRequestVerificationEmailMutation,
 } from '@/features/auth/model/auth.mutations'
+import { SIGN_UP_SESSION_RECOVERY_NOTICE } from '@/features/auth/model/loginRouteState'
 import { ApiClientError, getApiErrorMessage } from '@/shared/api/apiError'
 
 import {
@@ -55,11 +57,12 @@ export function SignUpPage() {
   const navigate = useNavigate()
   const routeState = location.state as SignUpRouteState | null
 
-  const requestVerification = useSignUpMutation()
+  const requestVerification = useRequestVerificationEmailMutation()
   const resendVerification = useResendVerificationMutation()
   const confirmVerification = useConfirmEmailMutation()
   const checkNickname = useNicknameAvailabilityMutation()
   const completeSignUp = useCompleteSignUpMutation()
+  const recoverCompletedSignUp = useRecoverCompletedSignUpMutation()
 
   const [profileStepUnlocked, setProfileStepUnlocked] = useState(false)
   const [email, setEmail] = useState('')
@@ -159,20 +162,9 @@ export function SignUpPage() {
   function handleSendVerificationCode() {
     if (!canSendVerificationCode) return
 
-    // TODO: 회원가입 이메일 인증 API를 안정적으로 사용할 수 있게 되면 개발 전용 우회를 제거한다.
-    if (import.meta.env.DEV) {
-      setVerificationRequested(true)
-      setVerificationStatus('verified')
-      setVerificationExpiresAt(null)
-      setResendAvailableAt(null)
-      setSignUpToken(null)
-      openProfileStep()
-      return
-    }
-
     setVerificationStatus('sending')
     requestVerification.mutate(
-      { email: normalizedEmail, password },
+      { email: normalizedEmail },
       {
         onSuccess: (response) => applyVerificationRequested(response.resendAvailableAt),
         onError: () => setVerificationStatus('error'),
@@ -243,6 +235,7 @@ export function SignUpPage() {
     setProfileSubmitError(undefined)
     checkNickname.reset()
     completeSignUp.reset()
+    recoverCompletedSignUp.reset()
   }
 
   function handleCheckNickname() {
@@ -266,8 +259,23 @@ export function SignUpPage() {
     )
   }
 
+  function navigateToSignUpRecoveryLogin() {
+    setPassword('')
+    setPasswordConfirmation('')
+    setSignUpToken(null)
+    completeSignUp.reset()
+    navigate('/login', {
+      replace: true,
+      state: {
+        email: normalizedEmail,
+        from: routeState?.from,
+        notice: SIGN_UP_SESSION_RECOVERY_NOTICE,
+      },
+    })
+  }
+
   function handleComplete() {
-    if (!canComplete || completeSignUp.isPending) return
+    if (!canComplete || completeSignUp.isPending || recoverCompletedSignUp.isPending) return
     if (!signUpToken) {
       setProfileSubmitError(
         '현재 서버는 가입정보 설정을 아직 지원하지 않아요. 서버 업데이트 후 다시 시도해 주세요.',
@@ -294,6 +302,25 @@ export function SignUpPage() {
             setProfileSubmitError('그사이 닉네임이 사용되었어요. 다른 닉네임을 확인해 주세요.')
             return
           }
+
+          if (error instanceof ApiClientError && error.code === 'AUTH_011') {
+            navigateToSignUpRecoveryLogin()
+            return
+          }
+
+          const resultIsUnclear =
+            error instanceof ApiClientError &&
+            (error.kind === 'network' ||
+              (error.code === undefined && error.status !== undefined && error.status >= 500))
+
+          if (resultIsUnclear) {
+            recoverCompletedSignUp.mutate(undefined, {
+              onSuccess: () => navigate('/', { replace: true }),
+              onError: navigateToSignUpRecoveryLogin,
+            })
+            return
+          }
+
           setProfileSubmitError(
             getApiErrorMessage(error, '가입을 완료하지 못했어요. 다시 시도해 주세요.'),
           )
@@ -394,7 +421,7 @@ export function SignUpPage() {
         activeTermId,
         canCheckNickname,
         canComplete,
-        isSubmitting: completeSignUp.isPending,
+        isSubmitting: completeSignUp.isPending || recoverCompletedSignUp.isPending,
         submitError: profileSubmitError,
         onNicknameChange: handleNicknameChange,
         onCheckNickname: handleCheckNickname,

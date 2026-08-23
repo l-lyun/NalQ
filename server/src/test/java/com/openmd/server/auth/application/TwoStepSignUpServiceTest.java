@@ -225,6 +225,42 @@ class TwoStepSignUpServiceTest {
 	}
 
 	@Test
+	void refreshSessionFailureReturnsAuth011AfterKeepingCommittedActiveUserAndConsumedCredential() throws Exception {
+		SignUpFixture fixture = signUpFixture("Session7", 73L);
+		when(refreshTokens.issue(73L)).thenThrow(new IllegalStateException("redis unavailable"));
+
+		BusinessException exception = assertThrows(BusinessException.class,
+			() -> service.completeSignUp(command(fixture.token(), "Session7")));
+
+		assertEquals("AUTH_011", exception.getErrorCode().code());
+		assertEquals(503, exception.getErrorCode().status().value());
+		assertEquals(com.openmd.server.auth.domain.UserStatus.ACTIVE, fixture.saved().getStatus());
+		verify(credentials).consume(fixture.digest());
+		verifyNoInteractions(accessTokens);
+	}
+
+	@Test
+	void accessTokenFailureRevokesIssuedRefreshWithoutMaskingAuth011WhenRevokeAlsoFails() throws Exception {
+		SignUpFixture fixture = signUpFixture("Session8", 74L);
+		IssuedRefreshToken issued = new IssuedRefreshToken(
+			"refresh-token", "session-id", NOW.plusSeconds(3600)
+		);
+		when(refreshTokens.issue(74L)).thenReturn(issued);
+		when(accessTokens.issue(74L, "session-id"))
+			.thenThrow(new IllegalStateException("signing unavailable"));
+		org.mockito.Mockito.doThrow(new IllegalStateException("revoke unavailable"))
+			.when(refreshTokens).revoke("refresh-token");
+
+		BusinessException exception = assertThrows(BusinessException.class,
+			() -> service.completeSignUp(command(fixture.token(), "Session8")));
+
+		assertEquals("AUTH_011", exception.getErrorCode().code());
+		assertEquals(com.openmd.server.auth.domain.UserStatus.ACTIVE, fixture.saved().getStatus());
+		verify(credentials).consume(fixture.digest());
+		verify(refreshTokens).revoke("refresh-token");
+	}
+
+	@Test
 	void failedDatabaseInsertPreservesTheSignUpCredential() {
 		String token = UUID.randomUUID().toString();
 		String digest = SignUpTokenDigest.create(token);
@@ -368,6 +404,30 @@ class TwoStepSignUpServiceTest {
 			new TermsAgreement("SERVICE_TERMS", "TEMP-2026-08-20"),
 			new TermsAgreement("PRIVACY_COLLECTION", "TEMP-2026-08-20")
 		));
+	}
+
+	private SignUpFixture signUpFixture(String nickname, long userId) throws Exception {
+		String token = UUID.randomUUID().toString();
+		String digest = SignUpTokenDigest.create(token);
+		when(credentials.find(digest)).thenReturn(Optional.of(new SignUpCredential(
+			"learner@example.com", "learner@example.com", NOW
+		)));
+		when(users.existsByNicknameIgnoreCase(nickname)).thenReturn(false);
+		when(passwords.encode("password1")).thenReturn("argon2-hash");
+		User[] saved = new User[1];
+		when(users.saveAndFlush(any(User.class))).thenAnswer(invocation -> {
+			User user = invocation.getArgument(0);
+			setId(user, userId);
+			saved[0] = user;
+			return user;
+		});
+		return new SignUpFixture(token, digest, saved);
+	}
+
+	private record SignUpFixture(String token, String digest, User[] savedHolder) {
+		User saved() {
+			return savedHolder[0];
+		}
 	}
 
 	private static void setId(User user, long id) throws Exception {
