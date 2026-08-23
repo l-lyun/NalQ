@@ -7,11 +7,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.openmd.server.auth.api.BrowserAuthController;
-import com.openmd.server.auth.api.BrowserRefreshCookie;
-import com.openmd.server.auth.application.AuthService;
-import com.openmd.server.auth.application.SessionTokens;
-import com.openmd.server.auth.application.TwoStepSignUpService;
+import com.openmd.server.auth.controller.BrowserAuthController;
+import com.openmd.server.auth.controller.support.BrowserRefreshCookie;
+import com.openmd.server.auth.service.AuthService;
+import com.openmd.server.auth.dto.response.SessionTokens;
+import com.openmd.server.auth.service.TwoStepSignUpService;
 import com.openmd.server.auth.security.AccessTokenService;
 import com.openmd.server.global.error.GlobalExceptionHandler;
 import java.time.Clock;

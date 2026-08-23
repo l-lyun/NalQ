@@ -1,7 +1,7 @@
 package com.openmd.server.auth.security;
 
 import tools.jackson.databind.ObjectMapper;
-import com.openmd.server.auth.domain.AuthErrorCode;
+import com.openmd.server.auth.error.AuthErrorCode;
 import com.openmd.server.global.api.ApiError;
 import com.openmd.server.global.api.ApiResponse;
 import com.openmd.server.global.error.BusinessException;

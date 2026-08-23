@@ -1,10 +1,21 @@
 package com.openmd.server.auth.config;
 
-import com.openmd.server.auth.application.*;
-import com.openmd.server.auth.api.BrowserRefreshCookie;
-import com.openmd.server.auth.domain.UserRepository;
-import com.openmd.server.auth.infrastructure.*;
+import com.openmd.server.auth.controller.support.BrowserRefreshCookie;
+import com.openmd.server.auth.integration.mail.SpringMailVerificationEmailSender;
+import com.openmd.server.auth.repository.EmailVerificationStore;
+import com.openmd.server.auth.repository.RefreshSessionStore;
+import com.openmd.server.auth.repository.SignUpCredentialStore;
+import com.openmd.server.auth.repository.UserRepository;
+import com.openmd.server.auth.repository.redis.RedisEmailVerificationStore;
+import com.openmd.server.auth.repository.redis.RedisRefreshSessionStore;
+import com.openmd.server.auth.repository.redis.RedisSignUpCredentialStore;
 import com.openmd.server.auth.security.AccessTokenService;
+import com.openmd.server.auth.security.VerificationCodeDigest;
+import com.openmd.server.auth.security.VerificationCodeGenerator;
+import com.openmd.server.auth.service.AuthService;
+import com.openmd.server.auth.service.RefreshTokenService;
+import com.openmd.server.auth.service.TwoStepSignUpService;
+import com.openmd.server.auth.service.VerificationEmailSender;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
