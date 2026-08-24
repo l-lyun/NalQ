@@ -1,9 +1,9 @@
 # 브라우저 Refresh Token HttpOnly Cookie 전환 설계
 
-- 상태: 구현됨 (웹 클라이언트 전환 전)
+- 상태: 구현 동기화 — 서버 Cookie 경계와 웹 클라이언트 전환 완료, 앱·WebView 경계 미확정
 - 적용 영역: `server/`
-- 관련 API 계약: [인증 API](../../../docs/contracts/api/authentication.md)
-- 관련 데이터 계약: [사용자·인증 데이터](../../../docs/contracts/data/authentication.md)
+- 관련 API 계약: [인증 API](../../../docs/contracts/contract-api-authentication.md)
+- 관련 데이터 계약: [사용자·인증 데이터](../../../docs/contracts/contract-data-authentication.md)
 - 관련 웹 TRD: [웹 인증 상태와 토큰 관리](../../../web/docs/technical/authentication.md)
 
 ## 1. 목적
@@ -12,7 +12,7 @@
 
 이 문서는 서버 내부의 컨트롤러, Cookie 발급·삭제, CORS·CSRF, 오류 변환, Redis 연동과 검증 방법을 책임진다. 사용자에게 보이는 흐름은 기능명세와 인증 흐름이, 웹·앱이 공유할 요청·응답 의미는 인증 API 계약이 책임진다.
 
-## 2. 현재 기준
+## 2. 전환 전 기준
 
 - 로그인은 `SessionTokens`에 Access Token과 Refresh Token을 함께 담아 JSON body로 반환한다.
 - refresh와 logout은 `RefreshTokenRequest` JSON body에서 Refresh Token을 읽는다.
@@ -48,7 +48,7 @@
 
 ### 기존 body surface
 
-다음 endpoint는 앱과 마이그레이션 중인 소비자를 위해 현재 계약을 유지한다.
+다음 endpoint는 앱과 네이티브 소비자를 위해 현재 계약을 유지한다. 웹 클라이언트는 브라우저 Cookie surface로 전환을 완료했다.
 
 - `POST /api/v1/auth/sessions`
 - `POST /api/v1/auth/sessions/refresh`
@@ -254,9 +254,11 @@ INVALID     세션 없음·상태 불일치
 - Cookie 인증은 `type: apiKey`, `in: cookie` 보안 scheme으로 문서화할 수 있지만 실제 값을 예제나 Swagger 설정에 넣지 않는다.
 - HttpOnly Cookie는 JavaScript가 읽을 수 없으므로 Swagger 커스텀 스크립트로 추출하지 않는다.
 - 문서 UI에서 browser session endpoint를 시험할 때는 같은 origin과 테스트 계정만 사용한다.
-- 기존 body endpoint의 schema와 경고는 마이그레이션 동안 유지한다.
+- 기존 body endpoint의 schema와 경고는 네이티브 소비자 계약이 유지되는 동안 보존한다.
 
 ## 12. 단계적 전환
+
+아래 1~5단계는 서버와 웹에 반영됐다. 6단계의 앱·WebView 호출 경계와 기존 body surface 폐기 여부만 미확정이다.
 
 1. 공유 API 계약과 운영 topology, Cookie·CSRF 열린 질문을 승인한다.
 2. 기존 body endpoint를 건드리지 않고 browser session endpoint와 계약 테스트를 추가한다.

@@ -1,13 +1,13 @@
 # 웹 인증 상태·토큰·API 통합 설계
 
-- 상태: 초안
+- 상태: 구현 동기화
 - 소유 영역: `web/`
 - 구현 기준: 브라우저 전용 HttpOnly Cookie 세션 계약
 - 관련 원장:
-  - [이메일 기반 자체 인증 기능명세](../../../docs/features/01-local-auth.md)
-  - [인증 흐름](../../../docs/flows/authentication.md)
-  - [인증 API 계약](../../../docs/contracts/api/authentication.md)
-  - [사용자·인증 데이터 계약](../../../docs/contracts/data/authentication.md)
+  - [이메일 기반 자체 인증 PRD](../../../docs/prd/prd-local-authentication.md)
+  - [인증 흐름](../../../docs/ux/flow-authentication.md)
+  - [인증 API 계약](../../../docs/contracts/contract-api-authentication.md)
+  - [사용자·인증 데이터 계약](../../../docs/contracts/contract-data-authentication.md)
   - [OpenMD 디자인 기준](../../../DESIGN.md)
 
 ## 1. 목적

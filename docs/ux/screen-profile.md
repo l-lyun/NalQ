@@ -1,4 +1,10 @@
-# 프로필 화면 명세
+---
+document_type: screen-spec
+status: draft
+scope: ux
+---
+
+# [Screen Spec] 프로필
 
 ## 문서 정보
 

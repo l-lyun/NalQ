@@ -1,6 +1,11 @@
-# 사용자 흐름: {흐름명}
+---
+document_type: flow
+status: draft
+scope: ux
+---
 
-- 상태: 초안
+# [Flow] {흐름명}
+
 - 관련 기능:
 - 관련 화면:
 

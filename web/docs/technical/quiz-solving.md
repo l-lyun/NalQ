@@ -3,9 +3,9 @@
 - 상태: 검토 중
 - 소유 영역: `web/`
 - 관련 원장:
-  - [퀴즈 기능명세](../../../docs/features/03-quiz-generation.md)
-  - [퀴즈 생성부터 복습까지의 흐름](../../../docs/flows/quiz-solving.md)
-  - [학습자료·퀴즈·복습 API 계약](../../../docs/contracts/api/quiz-learning.md)
+  - [퀴즈 PRD](../../../docs/prd/prd-quiz-learning.md)
+  - [퀴즈 생성부터 복습까지의 흐름](../../../docs/ux/flow-quiz-solving.md)
+  - [학습자료·퀴즈·복습 API 계약](../../../docs/contracts/contract-api-quiz-learning.md)
 
 ## 문서 책임
 
@@ -18,7 +18,7 @@
 - 브라우저 실행 환경의 미제출 답안과 현재 문항은 `localStorage`에 보존한다.
 - 저장 키의 논리 범위는 `userId + quizSetId`다. 다른 계정이나 문제 세트의 기록을 합치지 않는다.
 - 저장 레코드는 최소한 schema version, `userId`, `quizSetId`, 현재 문항, 유형별 답안, 마지막 저장 시각, 만료 시각, `submissionStatus`, `submissionIdempotencyKey`, 제출 payload snapshot을 가진다.
-- 최종 제출 직렬화는 [API 계약의 응답 모양](../../../docs/contracts/api/quiz-learning.md#최종-제출)을 따른다. 각 항목에는 `questionId`와 유형별 답안 필드만 보내고 `type`은 보내지 않는다. 빈칸은 작성된 값만 `blankAnswers: [{ blankId, answer }]`로 만들며 누락 빈칸을 빈 문자열로 채우지 않는다.
+- 최종 제출 직렬화는 [API 계약의 응답 모양](../../../docs/contracts/contract-api-quiz-learning.md#최종-제출)을 따른다. 각 항목에는 `questionId`와 유형별 답안 필드만 보내고 `type`은 보내지 않는다. 빈칸은 작성된 값만 `blankAnswers: [{ blankId, answer }]`로 만들며 누락 빈칸을 빈 문자열로 채우지 않는다.
 - 편집 중 `submissionStatus`는 `EDITING`이다. 사용자가 제출을 확정하면 HTTP 요청 전에 `submissionStatus=SUBMITTING`, 새 `submissionIdempotencyKey` 하나와 당시 제출 payload snapshot을 한 번 생성해 같은 레코드에 저장한다.
 - 제출 응답이 유실되거나 브라우저가 재시작돼 `SUBMITTING` 레코드를 복원하면 새 키나 현재 편집 상태로 요청하지 않고 저장된 같은 키와 payload snapshot을 재사용한다.
 - 만료 시각은 마지막 저장부터 7일이다. 읽을 때 만료된 레코드를 삭제하고 처음부터 시작한다.
