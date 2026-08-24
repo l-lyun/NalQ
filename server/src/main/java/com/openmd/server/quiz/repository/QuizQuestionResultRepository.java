@@ -1,0 +1,70 @@
+package com.openmd.server.quiz.repository;
+
+import com.openmd.server.quiz.domain.GradingOutcome;
+import com.openmd.server.quiz.domain.QuizQuestionResult;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+public interface QuizQuestionResultRepository extends JpaRepository<QuizQuestionResult, Long> {
+
+	Optional<QuizQuestionResult> findByAttemptIdAndQuestionId(long attemptId, long questionId);
+
+	List<QuizQuestionResult> findAllByAttemptId(long attemptId);
+
+	@Modifying(flushAutomatically = true, clearAutomatically = true)
+	@Query("""
+		update QuizQuestionResult r
+		set r.userOverrideOutcome = :outcome,
+			r.gradingRevision = r.gradingRevision + 1,
+			r.correctedAt = :correctedAt
+		where r.id = :resultId and r.gradingRevision = :expectedRevision
+		""")
+	int updateOverrideIfRevision(
+		@Param("resultId") long resultId,
+		@Param("expectedRevision") long expectedRevision,
+		@Param("outcome") GradingOutcome outcome,
+		@Param("correctedAt") Instant correctedAt
+	);
+
+	@Query("""
+		select count(r) from QuizQuestionResult r
+		join QuizQuestion q on q.id = r.questionId
+		where r.attemptId = :attemptId
+		and q.type in (com.openmd.server.quiz.domain.QuestionType.MULTIPLE_CHOICE,
+			com.openmd.server.quiz.domain.QuestionType.FILL_IN_THE_BLANK,
+			com.openmd.server.quiz.domain.QuestionType.SHORT_ANSWER)
+		and coalesce(r.userOverrideOutcome, r.automaticOutcome) = com.openmd.server.quiz.domain.GradingOutcome.CORRECT
+		""")
+	long countCurrentCorrect(@Param("attemptId") long attemptId);
+
+	@Query("""
+		select count(r) from QuizQuestionResult r
+		join QuizQuestion q on q.id = r.questionId
+		where r.attemptId = :attemptId
+		and q.type in (com.openmd.server.quiz.domain.QuestionType.MULTIPLE_CHOICE,
+			com.openmd.server.quiz.domain.QuestionType.FILL_IN_THE_BLANK,
+			com.openmd.server.quiz.domain.QuestionType.SHORT_ANSWER)
+		""")
+	long countGraded(@Param("attemptId") long attemptId);
+
+	@Query("""
+		select count(r) from QuizQuestionResult r
+		where r.attemptId = :attemptId and r.reviewResolved = false
+		and coalesce(r.userOverrideOutcome, r.automaticOutcome) = com.openmd.server.quiz.domain.GradingOutcome.INCORRECT
+		""")
+	long countReviewRequired(@Param("attemptId") long attemptId);
+
+	@Query("""
+		select r.questionId from QuizQuestionResult r
+		join QuizQuestion q on q.id = r.questionId
+		where r.attemptId = :attemptId and r.reviewResolved = false
+		and coalesce(r.userOverrideOutcome, r.automaticOutcome) = com.openmd.server.quiz.domain.GradingOutcome.INCORRECT
+		order by q.number
+		""")
+	List<Long> findReviewCandidateQuestionIds(@Param("attemptId") long attemptId);
+}

@@ -54,6 +54,26 @@ class SecurityConfigurationTest {
 	}
 
 	@Test
+	void quizGradingPreflightAllowsPut() throws Exception {
+		CorsFilter filter = new CorsFilter(SecurityConfiguration.buildCorsConfigurationSource(
+			List.of("http://localhost:5173"),
+			List.of("http://localhost:5173")
+		));
+		MockHttpServletRequest request = new MockHttpServletRequest(
+			"OPTIONS", "/api/v1/quiz-attempts/attempt_1/short-answer-gradings/question_1"
+		);
+		request.addHeader("Origin", "http://localhost:5173");
+		request.addHeader("Access-Control-Request-Method", "PUT");
+		request.addHeader("Access-Control-Request-Headers", "authorization,content-type,idempotency-key");
+		MockHttpServletResponse response = new MockHttpServletResponse();
+
+		filter.doFilter(request, response, new MockFilterChain());
+
+		assertEquals(200, response.getStatus());
+		assertTrue(response.getHeader("Access-Control-Allow-Methods").contains("PUT"));
+	}
+
+	@Test
 	void browserSessionCorsAllowsCredentialsAndTheCsrfHeaderOnlyForExactOrigin() throws Exception {
 		CorsFilter filter = new CorsFilter(SecurityConfiguration.buildCorsConfigurationSource(
 			List.of("http://localhost:5173"),

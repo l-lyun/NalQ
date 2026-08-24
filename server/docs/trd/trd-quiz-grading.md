@@ -1,12 +1,12 @@
 ---
 document_type: trd
-status: draft
+status: implemented
 scope: server
 ---
 
 # [TRD · Server] 퀴즈 채점 서버 설계
 
-- 상태: 초안 — 서버 설계 구체화, 미구현
+- 상태: 구현 동기화 — 단답형 제출·결과·판정 수정과 복습 snapshot 저장 경계
 - 제품 정책: [퀴즈 생성·풀이·결과·복습 PRD](../../../docs/prd/prd-quiz-learning.md#채점-수정과-서술형-자기평가)
 - 사용자 흐름: [퀴즈 생성부터 복습까지](../../../docs/ux/flow-quiz-solving.md#d-결과)
 - API 계약: [학습자료·퀴즈·복습 API 계약](../../../docs/contracts/contract-api-quiz-learning.md#단답형-현재-판정-수정)
@@ -16,7 +16,7 @@ scope: server
 
 이 문서는 단답형의 서버 자동 판정과 사용자 판정 수정에 필요한 서버 내부 모델, 트랜잭션, 동시성·멱등성 경계와 검증 기준을 정의한다. 수정 가능한 문제 유형은 기능명세가, 공개 HTTP 요청·응답과 오류 의미는 API 계약이 원장이다.
 
-이번 변경은 설계 문서만 확정한다. 퀴즈 서버 도메인은 아직 구현돼 있지 않으므로 DB migration, Java 코드와 운영 프론트 연동은 후속 작업이다.
+현재 서버에는 `quiz` 도메인의 DB migration과 단답형 문제 세트를 실제로 제출·조회·수정하는 최소 API가 구현돼 있다. 문제 세트 생성 작업, 객관식·빈칸·서술형 제출과 복습 풀이 API는 이 구현과 독립적인 후속 범위이며, 현재 단답형 경계가 이를 지원하는 것처럼 응답하지 않는다.
 
 ## 2. 채점 원칙
 
@@ -50,7 +50,7 @@ scope: server
 
 ## 3. 논리 상태 모델
 
-정확한 테이블명은 퀴즈 도메인 구현 시 정하되 다음 의미는 분리해 저장한다.
+`V5__create_quiz_grading.sql`은 `quiz_sets`, `quiz_questions`, `quiz_short_answer_accepted_answers`, `quiz_attempts`, `quiz_question_results`에 다음 의미를 분리해 저장한다. 제출과 판정 수정의 멱등 결과는 각각 `quiz_attempt_submissions`, `quiz_short_answer_grading_idempotencies`에 attempt 생명주기로 보존한다.
 
 ### 문제 쪽
 
@@ -83,7 +83,7 @@ JPA 낙관 잠금용 entity version과 공개 `gradingRevision`은 같은 의미
 
 ## 4. 서버 구성 경계
 
-향후 `quiz` 도메인은 다음 책임으로 나눈다.
+현재 `quiz` 도메인은 다음 책임으로 나눈다.
 
 - Controller: 결과 조회와 단답형 판정 수정 HTTP 변환, 인증 사용자 전달
 - Service: 소유권·attempt 상태·문항 유형·미응답 검증, 트랜잭션과 멱등·동시성 조정
@@ -189,14 +189,23 @@ JPA 낙관 잠금용 entity version과 공개 `gradingRevision`은 같은 의미
 - 저장 실패와 summary 집계 실패는 변경 전 판정·revision·요약을 유지한다.
 - 활성 복습 세션은 판정 수정 뒤에도 snapshot이 변하지 않고 다음 세션만 최신 대상을 사용한다.
 
-실제 구현에서는 도메인 단위 테스트, Service 트랜잭션 테스트, MVC 계약 테스트와 MySQL 조건부 갱신 통합 테스트를 최소 범위로 작성한다. 구현은 `server/AGENTS.md`의 테스트 우선 순서를 따른다.
+구현은 도메인 단위 테스트, MVC 계약 테스트와 MySQL migration·트랜잭션 통합 테스트로 검증한다. 구현은 `server/AGENTS.md`의 테스트 우선 순서를 따른다.
 
-## 11. 후속 구현 범위
+## 11. 구현 범위와 후속 범위
 
-- 퀴즈·문항·attempt·문항 결과·복습 세션 DB 모델과 Flyway migration
-- 최종 제출 자동 채점과 결과 조회
-- 단답형 판정 수정 Controller·Service·Repository와 멱등 저장소
-- OpenAPI와 공개 오류 계약 테스트
-- 프론트의 fixture callback을 실제 API 호출과 revision 기반 충돌 복구로 교체
+이번 서버 구현에 포함된 범위는 다음과 같다.
+
+- 퀴즈·단답형 문항·attempt·문항 결과·복습 세션 snapshot DB 모델과 Flyway migration
+- 단답형 문제 세트의 최종 제출 자동 채점과 결과 화면 projection
+- 단답형 판정 수정 Controller·Service·Repository, attempt 잠금, 조건부 revision 갱신과 멱등 저장
+- 활성 복습 세션의 문항 목록을 별도 행으로 고정하는 내부 snapshot 생성 경계
+- 도메인·MVC·CORS·MySQL migration 및 트랜잭션 테스트
+
+다음은 승인된 전체 계약에는 존재하지만 이 단답형 구현과 독립적인 후속 범위다.
+
+- 문제 세트 생성 작업과 생성 상태 조회 API
+- 객관식·빈칸·서술형 제출 projection과 서술형 자기평가 API
+- 최신 attempt를 선택하는 공개 복습 세션 생성·조회·응답 API
+- OpenAPI 상세 annotation과 프론트의 실제 API 연동
 
 최초 자동 판정과 최신 override만 보존하고 전체 수정 이력을 만들지 않는 선택, 활성 복습 세션 snapshot을 유지하고 수정 결과를 다음 세션부터 반영하는 선택은 사용자 확정 사항이다. 변경이 필요하면 제품 정책과 공유 계약을 먼저 수정한다.
