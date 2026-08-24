@@ -60,19 +60,19 @@ Flow는 여러 화면의 순서와 분기를, Screen Spec은 한 화면의 구�
 
 ## 애플리케이션 TRD
 
-TRD 경로와 파일명 표준화는 후속 문서 구조 작업에서 다룬다. 현재는 아래 경로가 원장이다.
+TRD는 각 애플리케이션의 `docs/trd/trd-*.md`에 두며, 파일명과 제목에서 문서 유형과 소유 애플리케이션을 식별할 수 있어야 한다.
 
 | 애플리케이션 | 관심사 | 원장 | 상태 |
 | --- | --- | --- | --- |
-| Server | 2단계 이메일 회원가입 | [서버 회원가입 설계](../server/docs/technical/two-step-signup.md) | 구현됨 |
-| Server | 브라우저 Refresh Token Cookie | [서버 Cookie 전환 설계](../server/docs/technical/browser-refresh-cookie.md) | 구현 동기화, 웹 전환 완료 |
-| Server | OpenAPI와 Swagger UI | [서버 OpenAPI 운영 설계](../server/docs/technical/openapi-documentation.md) | 초안 |
-| Server | 패키지 구조 | [서버 패키지 구조](../server/docs/technical/package-structure.md) | 구현 동기화 |
-| Server | 학습자료 생성 | [학습자료 생성 설계](../server/docs/technical/learning-material-creation.md) | 검토 중 |
-| Server | 퀴즈 채점 | [퀴즈 채점 설계](../server/docs/technical/quiz-grading.md) | 초안 |
-| Web | 인증 상태·토큰·API 통합 | [웹 인증 설계](../web/docs/technical/authentication.md) | 구현 동기화 |
-| Web | 본 퀴즈 임시 상태·보존 | [웹 퀴즈 설계](../web/docs/technical/quiz-solving.md) | 검토 중 |
-| App | WebView 본 퀴즈 임시 상태·보존 | [앱 퀴즈 설계](../app/docs/technical/quiz-solving.md) | 검토 중 |
+| Server | 2단계 이메일 회원가입 | [서버 회원가입 TRD](../server/docs/trd/trd-two-step-signup.md) | 구현됨 |
+| Server | 브라우저 Refresh Token Cookie | [서버 Cookie 전환 TRD](../server/docs/trd/trd-browser-refresh-cookie.md) | 구현 동기화, 웹 전환 완료 |
+| Server | OpenAPI와 Swagger UI | [서버 OpenAPI 운영 TRD](../server/docs/trd/trd-openapi-documentation.md) | 초안 |
+| Server | 패키지 구조 | [서버 패키지 구조 TRD](../server/docs/trd/trd-package-structure.md) | 구현 동기화 |
+| Server | 학습자료 생성 | [학습자료 생성 TRD](../server/docs/trd/trd-learning-material-creation.md) | 검토 중 |
+| Server | 퀴즈 채점 | [퀴즈 채점 TRD](../server/docs/trd/trd-quiz-grading.md) | 초안 |
+| Web | 인증 상태·토큰·API 통합 | [웹 인증 TRD](../web/docs/trd/trd-authentication.md) | 구현 동기화 |
+| Web | 본 퀴즈 임시 상태·보존 | [웹 퀴즈 TRD](../web/docs/trd/trd-quiz-solving.md) | 검토 중 |
+| App | WebView 본 퀴즈 임시 상태·보존 | [앱 퀴즈 TRD](../app/docs/trd/trd-quiz-solving.md) | 검토 중 |
 
 ## 문서 템플릿
 

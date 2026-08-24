@@ -1,4 +1,10 @@
-# 퀴즈 채점 서버 설계
+---
+document_type: trd
+status: draft
+scope: server
+---
+
+# [TRD · Server] 퀴즈 채점 서버 설계
 
 - 상태: 초안 — 프론트 UX 선행, 서버 미구현
 - 제품 정책: [퀴즈 생성·풀이·결과·복습 PRD](../../../docs/prd/prd-quiz-learning.md#채점-수정과-서술형-자기평가)

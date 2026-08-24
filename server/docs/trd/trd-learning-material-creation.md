@@ -1,10 +1,16 @@
-# 학습자료 생성 서버 설계
+---
+document_type: trd
+status: review
+scope: server
+---
+
+# [TRD · Server] 학습자료 생성 서버 설계
 
 - 상태: 검토 중
 - 대상: `POST /api/v1/learning-materials`
 - 제품 정책: [학습자료 만들기 PRD](../../../docs/prd/prd-content-import.md)
 - 공유 계약: [학습자료·퀴즈 API 계약](../../../docs/contracts/contract-api-quiz-learning.md#저장)
-- 인증 경계: [브라우저 Refresh Token Cookie 설계](browser-refresh-cookie.md)
+- 인증 경계: [브라우저 Refresh Token Cookie 설계](trd-browser-refresh-cookie.md)
 
 ## 1. 문서 책임
 
@@ -51,7 +57,7 @@
 
 ## 4. 모듈 책임
 
-[서버 패키지 구조](package-structure.md)의 도메인 공용 DTO와 `controller`·`service`·`repository` 구분을 따른다.
+[서버 패키지 구조](trd-package-structure.md)의 도메인 공용 DTO와 `controller`·`service`·`repository` 구분을 따른다.
 
 - Controller: header와 JSON을 받고 현재 인증 주체를 command로 변환한다. HTTP status와 공통 응답 봉투만 책임진다.
 - Service: 제목 정리, 본문·출처·멱등 키 검증, fingerprint 생성, 소유자 확인과 트랜잭션 조정을 책임진다.

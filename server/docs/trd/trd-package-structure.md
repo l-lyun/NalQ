@@ -1,4 +1,10 @@
-# 서버 패키지 구조
+---
+document_type: trd
+status: implemented
+scope: server
+---
+
+# [TRD · Server] 서버 패키지 구조
 
 - 상태: 구현 동기화
 - 적용 영역: `server/src/main/java/com/openmd/server`, `server/src/test/java/com/openmd/server`
