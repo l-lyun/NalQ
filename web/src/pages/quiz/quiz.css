@@ -291,8 +291,11 @@
   background: var(--seed-color-bg-layer-default);
   color: var(--seed-color-fg-neutral);
   font: inherit;
-  font-weight: 700;
   cursor: pointer;
+}
+
+.quiz-question-map button {
+  font-weight: var(--seed-font-weight-bold);
 }
 
 .quiz-question-map button[data-answered] {
@@ -358,11 +361,13 @@
   gap: var(--seed-dimension-x3);
   width: 100%;
   padding: var(--seed-dimension-x3) var(--seed-dimension-x4);
+  font-weight: var(--seed-font-weight-regular);
   text-align: left;
 }
 
-.quiz-result-list button strong {
+.quiz-result-list-outcome {
   flex-shrink: 0;
+  font-weight: var(--seed-font-weight-regular);
 }
 
 .quiz-sr-only {

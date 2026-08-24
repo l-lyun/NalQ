@@ -1661,7 +1661,7 @@ function ResultListSheet({
       description="확인할 문제를 선택해 주세요."
       footer={
         <ActionButton size="large" variant="neutralWeak" onClick={() => onOpenChange(false)}>
-          닫기
+          <Text textStyle="t5Regular">닫기</Text>
         </ActionButton>
       }
     >
@@ -1676,7 +1676,7 @@ function ResultListSheet({
             <span>
               {item.number}번 · {typeLabels[item.type]}
             </span>
-            <strong>{outcomeLabel(item.outcome)}</strong>
+            <span className="quiz-result-list-outcome">{outcomeLabel(item.outcome)}</span>
           </button>
         ))}
       </VStack>
