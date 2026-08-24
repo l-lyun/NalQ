@@ -46,7 +46,7 @@ scope: web
 - 단답형 채점 수정은 마지막 저장 확인 판정과 요약을 화면의 기준으로 둔다. 저장 중에는 기존 결과를 유지하고, 성공 응답 뒤에만 현재 판정·점수·복습 수를 한 번에 교체하며 실패하면 이전 상태와 재시도 행동을 유지한다.
 - 최종 제출 표현 경계는 제출 성공 응답의 `status`를 그대로 사용한다. `COMPLETED`는 결과로, `SELF_ASSESSMENT_REQUIRED`는 `pendingEssayQuestionIds` 순서의 자기평가로 이동하며, 제출 실패는 미응답 확인 시트로 되돌리지 않고 답안을 보존한 별도 재시도 상태로 이동한다.
 - 서술형 자기평가는 결과 조회 모양의 내 답·모범 답안·핵심 포인트·해설·원문 근거를 읽고 문항별 `CORRECT`·`PARTIAL`·`INCORRECT`를 저장한다. 저장 응답의 `status`와 `remainingSelfAssessmentCount`를 확인한 뒤에만 다음 문항 또는 완료 결과로 이동한다.
-- 표현 callback은 실제 API adapter가 연결될 때 서버 성공 응답을 잃지 않도록 최종 제출 결과, 서술형 저장 결과, 단답형 수정 뒤 전체 결과 요약을 필수 반환한다. 단답형 수정 성공 시 로컬 delta로 요약을 추정하지 않는다.
+- 표현 callback은 실제 API adapter가 연결될 때 서버 성공 응답을 잃지 않도록 최종 제출 결과, 서술형 저장 결과와 단답형 수정 결과를 필수 반환한다. 단답형 수정 결과에서는 서버가 확정한 `questionId`, `outcome`, `gradingRevision`과 최소 summary projection의 `revision`, `scoredGrading`, `reviewQuestionCount`만 교체하고 로컬 delta로 요약을 추정하지 않는다. 기존 문항 본문·답안·해설과 바뀌지 않는 서술형 집계는 현재 결과 상태를 유지한다.
 
 ## 구현 전 확인
 

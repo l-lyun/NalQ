@@ -112,7 +112,7 @@ JPA 낙관 잠금용 entity version과 공개 `gradingRevision`은 같은 의미
 5. 같은 현재 outcome 요청도 잠금 안에서 최신 상태를 다시 확인한 뒤 no-op 응답을 반환하고 두 revision을 올리지 않는다.
 6. 다른 outcome이면 `WHERE grading_revision = :expectedRevision` 조건부 갱신으로 최신 override, 문항 revision과 수정 시각을 저장한다. 갱신 행이 0개면 `409 ATTEMPT_001`이다.
 7. attempt의 `summaryRevision`을 1 증가시키고, 잠금 이후의 현재 read로 모든 문항 결과를 집계해 채점 점수와 원본 attempt의 `reviewQuestionCount`를 계산한다.
-8. 변경된 문항 결과, 같은 `summaryRevision`의 summary와 멱등 결과를 저장하고 커밋한다.
+8. 현재 화면이 교체할 `questionId`, `outcome`, `gradingRevision`, 같은 `summaryRevision`의 채점 점수·복습 수 projection과 멱등 결과를 저장하고 커밋한다. 답안·대표 답안·최초 자동 판정·서술형 집계처럼 수정으로 바뀌지 않는 결과 상세는 반복하지 않는다.
 
 클라이언트는 성공 응답 전까지 기존 판정과 summary를 유지한다. `409 ATTEMPT_001`이면 결과를 다시 조회한 뒤 최신 revision으로 새 요청을 만든다.
 
@@ -124,7 +124,7 @@ JPA 낙관 잠금용 entity version과 공개 `gradingRevision`은 같은 의미
 - `scoredGrading.gradedQuestionCount`는 객관식·빈칸·단답형 수이며 사용자 수정으로 바뀌지 않는다.
 - `reviewQuestionCount`는 원본 attempt의 현재 판정과 복습 해결 상태를 기준으로 계산한다.
 - 저장이나 집계 중 하나라도 실패하면 override, 문항 revision, summary revision, summary와 멱등 결과를 모두 rollback한다.
-- 응답에는 공개 `summary.revision`을 포함한다. 클라이언트는 더 큰 revision을 이미 반영했다면 늦게 도착한 과거 summary를 화면에 적용하지 않고 결과를 다시 조회한다.
+- 수정 응답의 최소 summary projection에는 공개 `summary.revision`, `scoredGrading`, `reviewQuestionCount`만 포함한다. 클라이언트는 더 큰 revision을 이미 반영했다면 늦게 도착한 과거 summary를 화면에 적용하지 않고 전체 결과를 다시 조회한다.
 - 서술형 자기평가와 복습 판정도 summary 값에 영향을 주므로 source attempt 쓰기 잠금을 같은 순서로 먼저 획득한다. 복습 저장은 immutable한 `sourceAttemptId`를 조회한 뒤 `source attempt → review session` 순서로 잠가 교착 순서를 고정한다.
 - `summaryRevision`은 summary 구성 값이 실제로 달라질 때만 증가한다. 복습 `UNRESOLVED`처럼 원본 `reviewQuestionCount`가 그대로인 저장은 증가시키지 않지만 응답에는 현재 revision을 반환한다.
 

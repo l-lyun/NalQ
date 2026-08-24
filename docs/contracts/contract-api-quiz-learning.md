@@ -478,7 +478,8 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 - 최초 자동 판정, 현재 판정과 revision의 공유 의미·생명주기는 [데이터 계약의 본 퀴즈 회차와 채점 결과](contract-data-quiz-learning.md#본-퀴즈-회차와-채점-결과)를 따른다.
 - 같은 현재 판정을 같은 revision으로 요청하면 상태와 revision을 바꾸지 않고 현재 결과를 반환한다. 다른 판정이 저장되면 `gradingSource=USER_OVERRIDE`, `gradingRevision`과 `correctedAt`을 갱신한다.
 - 같은 키와 같은 payload 재요청은 해당 문항과 attempt summary에 더 최신 수정이 없는 동안 최초 저장 결과를 반환한다. 그 뒤 더 높은 `gradingRevision` 또는 `summary.revision`이 저장됐다면 과거 응답을 다시 적용하지 않고 `409 ATTEMPT_001`로 결과 재조회를 요구한다. 같은 키에 다른 payload를 보내거나 `expectedRevision`이 최신 값과 달라도 `409 ATTEMPT_001`이다.
-- 응답에는 원자적으로 확정된 변경 문항 결과와 결과 조회와 같은 전체 `summary`를 함께 반환한다. 클라이언트는 마지막으로 반영한 `summary.revision`보다 작은 응답을 적용하지 않고 결과를 다시 조회한다.
+- 응답은 현재 결과 화면이 저장 성공 뒤 교체할 값만 반환한다. 서버가 확정한 `questionId`, `outcome`, 다음 수정에 사용할 `gradingRevision`, 채점 점수와 복습 수를 포함한 최소 `summary` projection이다. 클라이언트는 마지막으로 반영한 `summary.revision`보다 작은 응답을 적용하지 않고 결과를 다시 조회한다.
+- 문제 유형, 제출 답안, 대표 답안, 최초 자동 판정, 수정 시각, 문항별 복습 여부와 서술형 집계는 이 응답에서 반복하지 않는다. 화면 최초 진입·새로고침·충돌 복구에 필요한 완전한 문항 결과는 `GET /api/v1/quiz-attempts/{attemptId}/result`를 사용한다.
 - 이미 활성 복습 세션이 있으면 그 세션의 snapshot을 추가·삭제하지 않는다. 응답의 `summary.reviewQuestionCount`는 원본 회차의 현재 후보 수이고 활성 세션의 남은 문항 수와 다른 의미이며, 수정된 대상 여부는 다음 복습 세션부터 반영한다.
 - 사용자 수정은 해당 attempt 문항에만 적용하며 문제의 허용 답안 목록이나 다른 attempt의 자동 판정에 전파하지 않는다.
 
@@ -486,29 +487,14 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 {
   "success": true,
   "data": {
-    "attemptId": "attempt_123",
-    "questionResult": {
-      "questionId": "question_2",
-      "type": "SHORT_ANSWER",
-      "response": { "answer": "선입선출" },
-      "representativeAnswer": { "answer": "fifo" },
-      "automaticOutcome": "INCORRECT",
-      "outcome": "CORRECT",
-      "gradingSource": "USER_OVERRIDE",
-      "gradingRevision": 1,
-      "correctedAt": "2026-08-23T14:30:00Z",
-      "reviewRequired": false
-    },
+    "questionId": "question_2",
+    "outcome": "CORRECT",
+    "gradingRevision": 1,
     "summary": {
       "revision": 1,
       "scoredGrading": {
         "correctQuestionCount": 3,
         "gradedQuestionCount": 3
-      },
-      "essaySelfAssessment": {
-        "correctCount": 0,
-        "partialCount": 1,
-        "incorrectCount": 0
       },
       "reviewQuestionCount": 1
     }
