@@ -10,7 +10,7 @@ scope: shared
 - 소비 영역: 웹·앱 클라이언트
 - 관련 기능명세: [이메일 기반 자체 인증](../prd/prd-local-authentication.md)
 - 관련 데이터: [사용자·인증 데이터](contract-data-authentication.md)
-- 관련 웹 설계: [웹 인증 상태·토큰·API 통합 설계](../../web/docs/technical/authentication.md)
+- 관련 웹 설계: [웹 인증 상태·토큰·API 통합 TRD](../../web/docs/trd/trd-authentication.md)
 - 전환 상태: 브라우저 HttpOnly Cookie, 2단계 회원가입 서버와 웹 호출 전환 구현 완료
 
 ## 목적

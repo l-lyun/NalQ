@@ -29,7 +29,7 @@
 
 ## 패키지 규칙
 
-- 상세 기준은 [서버 패키지 구조](docs/technical/package-structure.md)를 따른다.
+- 상세 기준은 [서버 패키지 구조 TRD](docs/trd/trd-package-structure.md)를 따른다.
 - 최상위 기능 도메인은 `auth`, `learningmaterial`이고, 각 도메인은 기본적으로 `controller`, `service`, `repository`, 공용 `dto`, `domain`, `error`로 나눈다.
 - DTO는 도메인 공용 `dto/request`, `dto/response`, `dto/command`, `dto/model`에 역할별로 두고 Entity·도메인 enum·정책을 DTO로 분류하지 않는다.
 - 기본 참조 방향은 `Controller -> Service -> Repository`다. 서비스의 다른 도메인 Repository 직접 호출은 허용하지만 Repository가 Service나 Controller를 참조하면 안 된다.

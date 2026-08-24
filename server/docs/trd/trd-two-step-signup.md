@@ -1,4 +1,10 @@
-# 2단계 이메일 회원가입 서버 설계
+---
+document_type: trd
+status: implemented
+scope: server
+---
+
+# [TRD · Server] 2단계 이메일 회원가입 서버 설계
 
 - 상태: 구현됨
 - 적용 영역: `server/`

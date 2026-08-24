@@ -1,4 +1,10 @@
-# 웹 인증 상태·토큰·API 통합 설계
+---
+document_type: trd
+status: implemented
+scope: web
+---
+
+# [TRD · Web] 웹 인증 상태·토큰·API 통합 설계
 
 - 상태: 구현 동기화
 - 소유 영역: `web/`

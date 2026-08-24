@@ -8,7 +8,7 @@ scope: ux
 
 - 관련 기능: [퀴즈 생성·풀이·결과·복습](../prd/prd-quiz-learning.md)
 - 공유 계약: [학습자료·퀴즈 API 계약](../contracts/contract-api-quiz-learning.md)
-- 클라이언트 구현 원장: [웹 임시 상태·보존](../../web/docs/technical/quiz-solving.md), [앱 임시 상태·보존](../../app/docs/technical/quiz-solving.md)
+- 클라이언트 구현 원장: [웹 임시 상태·보존 TRD](../../web/docs/trd/trd-quiz-solving.md), [앱 임시 상태·보존 TRD](../../app/docs/trd/trd-quiz-solving.md)
 
 ## 문서 책임
 

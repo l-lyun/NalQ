@@ -1,10 +1,16 @@
-# 브라우저 Refresh Token HttpOnly Cookie 전환 설계
+---
+document_type: trd
+status: implemented
+scope: server
+---
+
+# [TRD · Server] 브라우저 Refresh Token HttpOnly Cookie 전환 설계
 
 - 상태: 구현 동기화 — 서버 Cookie 경계와 웹 클라이언트 전환 완료, 앱·WebView 경계 미확정
 - 적용 영역: `server/`
 - 관련 API 계약: [인증 API](../../../docs/contracts/contract-api-authentication.md)
 - 관련 데이터 계약: [사용자·인증 데이터](../../../docs/contracts/contract-data-authentication.md)
-- 관련 웹 TRD: [웹 인증 상태와 토큰 관리](../../../web/docs/technical/authentication.md)
+- 관련 웹 TRD: [웹 인증 상태와 토큰 관리](../../../web/docs/trd/trd-authentication.md)
 
 ## 1. 목적
 

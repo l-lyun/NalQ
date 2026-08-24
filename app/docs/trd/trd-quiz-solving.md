@@ -1,4 +1,10 @@
-# 앱 WebView 본 퀴즈 임시 보존 설계
+---
+document_type: trd
+status: review
+scope: app
+---
+
+# [TRD · App] 앱 WebView 본 퀴즈 임시 보존 설계
 
 - 상태: 검토 중
 - 소유 영역: `app/`
@@ -6,7 +12,7 @@
   - [퀴즈 PRD](../../../docs/prd/prd-quiz-learning.md)
   - [퀴즈 생성부터 복습까지의 흐름](../../../docs/ux/flow-quiz-solving.md)
   - [학습자료·퀴즈·복습 API 계약](../../../docs/contracts/contract-api-quiz-learning.md)
-  - [웹 본 퀴즈 상태·기기 임시 보존 설계](../../../web/docs/technical/quiz-solving.md)
+  - [웹 본 퀴즈 상태·기기 임시 보존 설계](../../../web/docs/trd/trd-quiz-solving.md)
 
 ## 문서 책임
 
@@ -15,7 +21,7 @@
 ## 확정 구현 매핑
 
 - MVP에서는 웹 브라우저와 앱 WebView 모두 WebView 내부 `localStorage`를 사용한다.
-- 저장 키의 논리 범위는 `userId + quizSetId`이며, 레코드 필드와 7일 만료 규칙은 [웹 임시 보존 원장](../../../web/docs/technical/quiz-solving.md#확정-구현-매핑)과 같은 의미를 사용한다. 여기에는 `submissionStatus`, `submissionIdempotencyKey`, 제출 payload snapshot이 포함된다.
+- 저장 키의 논리 범위는 `userId + quizSetId`이며, 레코드 필드와 7일 만료 규칙은 [웹 임시 보존 원장](../../../web/docs/trd/trd-quiz-solving.md#확정-구현-매핑)과 같은 의미를 사용한다. 여기에는 `submissionStatus`, `submissionIdempotencyKey`, 제출 payload snapshot이 포함된다.
 - 제출 시작 전에 WebView 저장 레코드에 멱등 키와 payload snapshot을 한 번 기록하고, 응답 유실·앱 재시작 뒤 같은 값으로 재요청한다.
 - 기록은 처음부터 시작 또는 attempt 상태·결과 확인 뒤 삭제한다. 로그아웃 시에는 현재 사용자의 미제출 기록을 문제 세트와 관계없이 모두 삭제한다.
 - WebView가 최종 제출 payload를 만들 때도 웹 원장의 `questionId` 중심 응답과 `blankAnswers` 매핑을 사용한다. HTTP 계약에 없는 `type`이나 누락 빈칸의 빈 문자열을 추가하지 않는다.

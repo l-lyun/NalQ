@@ -1,4 +1,10 @@
-# 웹 본 퀴즈 상태·기기 임시 보존 설계
+---
+document_type: trd
+status: review
+scope: web
+---
+
+# [TRD · Web] 웹 본 퀴즈 상태·기기 임시 보존 설계
 
 - 상태: 검토 중
 - 소유 영역: `web/`

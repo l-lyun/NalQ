@@ -1,10 +1,16 @@
-# OpenAPI와 Swagger UI 운영 설계
+---
+document_type: trd
+status: draft
+scope: server
+---
+
+# [TRD · Server] OpenAPI와 Swagger UI 운영 설계
 
 - 상태: 초안
 - 적용 영역: `server/`
 - 관련 API 계약: [이메일 기반 자체 인증](../../../docs/contracts/contract-api-authentication.md)
 - 관련 데이터 계약: [사용자·인증 데이터](../../../docs/contracts/contract-data-authentication.md)
-- 관련 서버 설계: [브라우저 Refresh Token HttpOnly Cookie 전환](browser-refresh-cookie.md)
+- 관련 서버 설계: [브라우저 Refresh Token HttpOnly Cookie 전환](trd-browser-refresh-cookie.md)
 
 ## 목적
 
@@ -79,7 +85,7 @@ Swagger UI 설명에는 다음 경고를 표시한다.
 - 토큰을 URL, query, 정적 예제, 문서 설정에 넣지 않는다.
 - `persistAuthorization`은 `false`로 유지한다.
 
-현재 UI는 서버와 같은 origin에서 제공되므로 Swagger UI 자체를 위해 CORS origin을 추가하지 않는다. Refresh Token을 HttpOnly Cookie로 전환할 때는 [브라우저 Cookie 서버 설계](browser-refresh-cookie.md)와 API 계약에 따라 cookie security scheme, CSRF와 credentialed CORS를 함께 변경한다.
+현재 UI는 서버와 같은 origin에서 제공되므로 Swagger UI 자체를 위해 CORS origin을 추가하지 않는다. Refresh Token을 HttpOnly Cookie로 전환할 때는 [브라우저 Cookie 서버 설계](trd-browser-refresh-cookie.md)와 API 계약에 따라 cookie security scheme, CSRF와 credentialed CORS를 함께 변경한다.
 
 ## 환경별 노출 정책
 
