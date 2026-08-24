@@ -222,6 +222,10 @@
   overflow-wrap: anywhere;
 }
 
+.quiz-result-answer-list dd {
+  text-align: start;
+}
+
 .quiz-progress-track {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
