@@ -12,7 +12,7 @@
 
 서버 프로덕션 코드를 변경하는 모든 기능·버그 수정은 사용자가 따로 요청하지 않아도 다음 순서를 따른다.
 
-1. `docs/README.md`에서 관련 기능 명세, 흐름, API 계약을 찾고 인수 조건을 정리한다.
+1. `docs/README.md`에서 관련 PRD, UX, API Contract를 찾고 인수 조건을 정리한다.
 2. 인수 조건을 재현하는 테스트를 먼저 작성하거나 수정한다.
 3. 해당 테스트가 의도한 이유로 실패하는지 실행해 확인한다.
 4. 테스트를 통과시키는 최소 구현을 작성한다.
@@ -29,7 +29,7 @@
 
 ## 패키지 규칙
 
-- 상세 기준은 [서버 패키지 구조](docs/technical/package-structure.md)를 따른다.
+- 상세 기준은 [서버 패키지 구조 TRD](docs/trd/trd-package-structure.md)를 따른다.
 - 최상위 기능 도메인은 `auth`, `learningmaterial`이고, 각 도메인은 기본적으로 `controller`, `service`, `repository`, 공용 `dto`, `domain`, `error`로 나눈다.
 - DTO는 도메인 공용 `dto/request`, `dto/response`, `dto/command`, `dto/model`에 역할별로 두고 Entity·도메인 enum·정책을 DTO로 분류하지 않는다.
 - 기본 참조 방향은 `Controller -> Service -> Repository`다. 서비스의 다른 도메인 Repository 직접 호출은 허용하지만 Repository가 Service나 Controller를 참조하면 안 된다.

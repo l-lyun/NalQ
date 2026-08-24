@@ -47,12 +47,13 @@ If the requested outcome spans multiple stages, complete only the stage the user
 - Start documentation work from `docs/README.md`; it routes agents to the smallest relevant set of documents.
 - For work that designs, implements, or reviews user-visible UI, read the root `DESIGN.md` as the source of truth for global visual atmosphere, information hierarchy, layout, and responsive principles.
 - Keep requirement and implementation documents separated by responsibility:
-  - PRD `docs/features/`: user problem, product behavior and policy, scope, and observable acceptance criteria
-  - Flow `docs/flows/`: cross-screen order, branches, interruption, and recovery
-  - UX screen specification `docs/screens/`: information structure, content and action hierarchy, entry and exit, and user-visible states
+  - Product foundation `docs/product.md`: product purpose, principles, global navigation, and shared terminology
+  - PRD `docs/prd/`: user problem, product behavior and policy, scope, and observable acceptance criteria
+  - Flow `docs/ux/flow-*.md`: cross-screen order, branches, interruption, and recovery
+  - UX screen specification `docs/ux/screen-*.md`: information structure, content and action hierarchy, entry and exit, and user-visible states
   - Contract `docs/contracts/`: inputs, outputs, errors, permissions, idempotency, and data meaning shared across `web`, `app`, and `server`
-  - TRD `<application>/docs/technical/`: application-local architecture, state model, component mapping, integration decisions, and technical verification criteria
-- These document types are not a mandatory checklist. Follow `docs/documentation-guide.md`: start a user feature with one focused PRD, add at most the companion document justified by real UX, flow, or technical complexity, and separate a Contract only for a shared application boundary. Add further documents only when their distinct responsibility is actually needed.
+  - TRD `<application>/docs/trd/trd-*.md`: application-local architecture, state model, component mapping, integration decisions, and technical verification criteria
+- These document types are not a mandatory checklist. Follow `docs/guide.md`: start a user feature with one focused PRD, add at most the companion document justified by real UX, flow, or technical complexity, and separate a Contract only for a shared application boundary. Add further documents only when their distinct responsibility is actually needed.
 - PRD, flow, screen specification, contract, and TRD are separate authority axes. A TRD may explain how an approved requirement is implemented, but it must not redefine product policy, user-visible behavior, or a cross-application contract.
 - Treat current SEED Docs and Rootage as the source of truth for exact components, props, and tokens; `DESIGN.md` and a TRD must not override or freeze outdated SEED APIs.
 - If `DESIGN.md`, an approved specification, and current SEED documentation conflict, do not silently choose one. Report the conflict and its impact before changing the agreed behavior or visual direction.

@@ -363,7 +363,7 @@ foundation primitives, then document the custom exception and its accessibility 
 
 ### Agent verification order
 
-1. Read `docs/README.md`, then the smallest relevant product, feature, flow, and screen documents.
+1. Read `docs/README.md`, then the smallest relevant product foundation, PRD, and UX documents.
 2. Confirm which requirements are approved, assumed, or still open.
 3. Use SEED Docs `discover_seed_docs`, `list_docs`, and `get_doc` for current component behavior.
 4. Use SEED Docs `get_rootage` for semantic color, typography, spacing, radius, shadow, and recipe state definitions.
