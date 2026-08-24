@@ -23,14 +23,17 @@ scope: web
 - 한 화면 한 문항, 이전·다음, 제출 경고와 자기평가 단계 전환은 `useFunnel` 기반 단계 모델로 구성한다.
 - 브라우저 실행 환경의 미제출 답안과 현재 문항은 `localStorage`에 보존한다.
 - 저장 키의 논리 범위는 `userId + quizSetId`다. 다른 계정이나 문제 세트의 기록을 합치지 않는다.
-- 저장 레코드는 최소한 schema version, `userId`, `quizSetId`, 현재 문항, 유형별 답안, 마지막 저장 시각, 만료 시각, `submissionStatus`, `submissionIdempotencyKey`, 제출 payload snapshot을 가진다.
+- 저장 레코드는 최소한 schema version, `userId`, `quizSetId`, 현재 문항, 유형별 답안, 마지막 저장 시각, 만료 시각과 제출을 시작한 경우의 `attemptId`, 최종 제출 payload snapshot을 가진다.
 - 최종 제출 직렬화는 [API 계약의 응답 모양](../../../docs/contracts/contract-api-quiz-learning.md#최종-제출)을 따른다. 각 항목에는 `questionId`와 유형별 답안 필드만 보내고 `type`은 보내지 않는다. 빈칸은 작성된 값만 `blankAnswers: [{ blankId, answer }]`로 만들며 누락 빈칸을 빈 문자열로 채우지 않는다.
-- 편집 중 `submissionStatus`는 `EDITING`이다. 사용자가 제출을 확정하면 HTTP 요청 전에 `submissionStatus=SUBMITTING`, 새 `submissionIdempotencyKey` 하나와 당시 제출 payload snapshot을 한 번 생성해 같은 레코드에 저장한다.
-- 제출 응답이 유실되거나 브라우저가 재시작돼 `SUBMITTING` 레코드를 복원하면 새 키나 현재 편집 상태로 요청하지 않고 저장된 같은 키와 payload snapshot을 재사용한다.
+- 사용자가 제출을 확정하면 HTTP 요청 전에 `crypto.randomUUID()`로 UUID v4 `attemptId` 하나를 만들고 당시 제출 payload snapshot과 함께 저장한다. `randomUUID`를 제공하지 않는 지원 WebView에서는 `crypto.getRandomValues` 기반 UUID v4 helper까지만 호환 fallback으로 허용하며 `Math.random`은 사용하지 않는다.
+- 제출 응답을 받지 못하거나 브라우저가 재시작돼 `attemptId`가 있는 레코드를 복원하면 새 ID나 편집 중인 값으로 요청하지 않고 저장된 같은 attempt ID와 payload로 `PUT`을 재시도한다. 서버가 이미 처리했다면 기존 attempt를 반환한다.
+- 프론트는 attempt ID, 답안 또는 payload의 hash·fingerprint를 만들지 않는다. UUID와 최종 payload 원문만 관리한다.
 - 만료 시각은 마지막 저장부터 7일이다. 읽을 때 만료된 레코드를 삭제하고 처음부터 시작한다.
-- `처음부터`를 명시적으로 선택하면 해당 레코드를 삭제한다. 제출 뒤에는 같은 멱등 키 재요청으로 `attemptId`를 확인하고 attempt 상태 또는 결과 조회가 성공한 뒤 삭제한다. 제출 응답 유실 상태에서는 그 확인 전에 삭제하지 않는다.
+- `처음부터`를 명시적으로 선택하면 해당 레코드를 삭제한다. 제출 뒤에는 같은 attempt ID의 상태 또는 결과 조회가 성공한 뒤 삭제한다. 제출 결과를 확인하기 전에는 먼저 삭제하지 않는다.
 - 로그아웃하면 현재 인증 사용자의 `userId`에 속한 미제출 로컬 퀴즈 레코드를 모두 삭제한다.
 - 이 기록은 서버로 동기화하지 않으며 다른 브라우저·기기로 복원하지 않는다.
+- 틀린 문제 다시 풀기는 같은 풀이 store와 답안 serializer를 재사용하되 저장 키를 `userId + reviewSessionId`로 분리한다. 현재 문항과 미제출 답안은 기기에 보존하고, 서버 review session에는 전체 제출 전 중간 답안을 만들지 않는다.
+- 다시 풀기 최종 제출은 이미 존재하는 `reviewSessionId`를 대상으로 `PUT /submission`을 사용한다. 응답을 받지 못하면 같은 세션 ID와 보존한 전체 payload로 재시도하며 UUID·hash·fingerprint를 추가로 만들지 않는다.
 
 ## 상태 경계
 
@@ -41,6 +44,7 @@ scope: web
 ## 표현 컴포넌트 경계
 
 - `web/src/pages/quiz/`는 API가 준비되기 전에도 검토할 수 있는 표현 전용 화면과 fixture를 제공한다. fixture의 지연·요약 갱신은 개발 미리보기용이며 공개 API 계약으로 해석하지 않는다.
+- 틀린 문제 다시 풀기는 본 퀴즈의 `QuizFlowPage`와 문항 입력·이동·전체 제출·서술형 자기평가·결과 표현을 그대로 재사용한다. 풀이 화면의 사용자 노출 차이는 상단 헤더에서 학습자료 제목 뒤에 ` · 복습`을 덧붙이는 것뿐이며, 복습용 풀이 화면이나 문항별 즉시 채점 UI를 따로 만들지 않는다.
 - 개발 서버에서만 `/quiz-preview`와 `/quiz-result-preview`를 열어 전체 흐름과 결과 수정을 검토한다. 프로덕션 라우트에는 등록하지 않는다.
 - 좁은 문제 진행 막대는 현재 위치를 읽는 `progressbar`로만 제공하고 직접 조작하지 않는다. 문항 이동은 `BottomSheet` 안의 44px 이상 번호 버튼으로 분리해 키보드·터치 목표를 보장한다.
 - 단답형 채점 수정은 마지막 저장 확인 판정과 요약을 화면의 기준으로 둔다. 저장 중에는 기존 결과를 유지하고, 성공 응답 뒤에만 현재 판정·점수·복습 수를 한 번에 교체하며 실패하면 이전 상태와 재시도 행동을 유지한다.
@@ -59,7 +63,9 @@ scope: web
 - 같은 `userId + quizSetId`는 7일 안에 현재 문항과 유형별 답안을 복원한다.
 - 다른 사용자·문제 세트, 만료·손상된 레코드는 복원하지 않는다.
 - 처음부터 시작, attempt 상태·결과 확인, 제출 응답 유실에서 삭제 시점이 흐름 문서와 일치한다.
-- 제출 요청 전에 멱등 키와 payload snapshot이 한 번 저장되고, 응답 유실·재시작 뒤에도 같은 키와 byte-equivalent payload 의미로 재요청한다.
+- 제출 요청 전에 UUID v4 attempt ID와 payload snapshot이 한 번 저장되고, 응답을 받지 못하거나 재시작한 뒤에도 같은 ID와 payload로 재요청한다.
+- UUID 형식 오류나 다른 리소스와의 식별자 충돌은 자동 hash 비교로 복구하지 않는다. 서버가 `attemptId` 충돌을 명시한 경우에만 새 UUID를 한 번 생성해 동일 payload로 재시도하며, 반복되면 일반 제출 오류로 멈춘다.
 - attempt 상태 또는 결과 확인 뒤 레코드를 제거하며, 로그아웃 시 현재 사용자의 미제출 레코드가 모두 제거된다.
 - 서버 요청에는 중간 위치나 미제출 답안이 포함되지 않는다.
 - 최종 제출, 서술형 자기평가와 복습 요청 경로·필드는 API 계약과 일치하며 TRD에서 별도 별칭을 만들지 않는다.
+- 틀린 문제 다시 풀기 세 문제는 세 답을 모두 작성한 뒤 한 번 제출하며 문항 이동 중 서버 채점 요청이 발생하지 않는다.

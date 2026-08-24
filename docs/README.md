@@ -44,6 +44,8 @@ scope: repository
 | 퀴즈 생성부터 복습까지 | [퀴즈 흐름](ux/flow-quiz-solving.md) | Flow | 검토 중 |
 | 홈 | [홈 화면](ux/screen-home.md) | Screen Spec | 초안 |
 | 학습 | [학습 화면](ux/screen-learning.md) | Screen Spec | 초안 |
+| 본 퀴즈 재진입 | [본 퀴즈 재진입 화면](ux/screen-quiz-resume.md) | Screen Spec | 초안 |
+| 틀린 문제 다시 풀기 | [틀린 문제 다시 풀기 화면](ux/screen-review.md) | Screen Spec | 초안 |
 | 프로필 | [프로필 화면](ux/screen-profile.md) | Screen Spec | 초안 |
 | 회원가입 | [회원가입 화면](ux/screen-signup.md) | Screen Spec | 초안 |
 

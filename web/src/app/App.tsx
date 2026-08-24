@@ -20,6 +20,10 @@ export function App() {
     return <QuizFixturePage initialScene="RESULT" />
   }
 
+  if (import.meta.env.DEV && window.location.pathname === '/quiz-review-preview') {
+    return <QuizFixturePage flowKind="REVIEW" />
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <AuthBootstrap>

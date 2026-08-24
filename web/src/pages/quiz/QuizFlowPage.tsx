@@ -193,6 +193,7 @@ export function QuizFlowPage({
   materialTitle,
   questions,
   result,
+  flowKind = 'QUIZ',
   initialScene = 'CONDITIONS',
   initialConditions = { questionTypes: ['MULTIPLE_CHOICE'], difficulty: 'NORMAL', maxCount: 10 },
   initialAnswers = {},
@@ -523,7 +524,7 @@ export function QuizFlowPage({
         ) : null}
         {scene === 'SOLVING' && currentQuestion ? (
           <SolvingScreen
-            materialTitle={materialTitle}
+            materialTitle={flowKind === 'REVIEW' ? `${materialTitle} · 복습` : materialTitle}
             question={currentQuestion}
             questionIndex={questionIndex}
             questionCount={questions.length}
