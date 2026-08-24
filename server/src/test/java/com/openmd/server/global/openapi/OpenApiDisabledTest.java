@@ -3,11 +3,11 @@ package com.openmd.server.global.openapi;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.openmd.server.auth.application.AuthService;
-import com.openmd.server.auth.application.TwoStepSignUpService;
-import com.openmd.server.auth.api.BrowserRefreshCookie;
+import com.openmd.server.auth.service.AuthService;
+import com.openmd.server.auth.service.TwoStepSignUpService;
+import com.openmd.server.auth.controller.support.BrowserRefreshCookie;
 import com.openmd.server.auth.security.AccessTokenService;
-import com.openmd.server.learningmaterial.application.LearningMaterialService;
+import com.openmd.server.learningmaterial.service.LearningMaterialService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

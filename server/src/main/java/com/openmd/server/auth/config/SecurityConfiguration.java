@@ -1,7 +1,7 @@
 package com.openmd.server.auth.config;
 
 import tools.jackson.databind.ObjectMapper;
-import com.openmd.server.auth.domain.AuthErrorCode;
+import com.openmd.server.auth.error.AuthErrorCode;
 import com.openmd.server.auth.security.AccessTokenService;
 import com.openmd.server.auth.security.BearerAccessTokenFilter;
 import com.openmd.server.auth.security.BrowserSessionRequestGuard;

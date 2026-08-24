@@ -27,6 +27,15 @@
 - 명세와 기존 코드가 충돌하거나 공개 계약의 핵심 결정이 비어 있으면 임의로 고정하지 말고 중단해 보고한다.
 - 관련 없는 `web/` 또는 `app/` 파일을 수정하지 않는다.
 
+## 패키지 규칙
+
+- 상세 기준은 [서버 패키지 구조](docs/technical/package-structure.md)를 따른다.
+- 최상위 기능 도메인은 `auth`, `learningmaterial`이고, 각 도메인은 기본적으로 `controller`, `service`, `repository`, 공용 `dto`, `domain`, `error`로 나눈다.
+- DTO는 도메인 공용 `dto/request`, `dto/response`, `dto/command`, `dto/model`에 역할별로 두고 Entity·도메인 enum·정책을 DTO로 분류하지 않는다.
+- 기본 참조 방향은 `Controller -> Service -> Repository`다. 서비스의 다른 도메인 Repository 직접 호출은 허용하지만 Repository가 Service나 Controller를 참조하면 안 된다.
+- 상태나 주입 의존성이 없는 좁은 순수 함수만 `util`에 두고, 서로 다른 책임을 모은 포괄 `Utils` 클래스를 만들지 않는다.
+- 새 패키지도 `com.openmd.server` 아래에 두어 component, entity, repository scanning 범위를 유지한다.
+
 ## 검증
 
 - Windows: `server/gradlew.bat test`

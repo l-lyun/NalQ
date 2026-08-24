@@ -29,6 +29,7 @@
 | 2단계 이메일 회원가입 서버 설계 | [two-step-signup.md](../server/docs/technical/two-step-signup.md) | 구현됨 |
 | 브라우저 Refresh Token Cookie 서버 설계 | [browser-refresh-cookie.md](../server/docs/technical/browser-refresh-cookie.md) | 초안 |
 | 서버 OpenAPI와 Swagger UI 운영 | [openapi-documentation.md](../server/docs/technical/openapi-documentation.md) | 초안 |
+| 서버 패키지 구조 | [package-structure.md](../server/docs/technical/package-structure.md) | 구현 동기화 |
 | 학습자료 만들기 | [02-content-import.md](features/02-content-import.md) | 검토 중 |
 | 학습자료 생성 서버 설계 | [learning-material-creation.md](../server/docs/technical/learning-material-creation.md) | 검토 중 |
 | 퀴즈 생성·풀이·결과·복습 | [03-quiz-generation.md](features/03-quiz-generation.md) | 검토 중 |
