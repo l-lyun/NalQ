@@ -46,24 +46,24 @@ public class QuizAttemptController {
 	}
 
 	@GetMapping("/quiz-attempts/{attemptId}/result")
-	public ApiResponse<QuizAttemptResult> result(
+	public ResponseEntity<ApiResponse<QuizAttemptResult>> result(
 		@AuthenticationPrincipal AccessPrincipal principal,
 		@PathVariable String attemptId
 	) {
-		return ApiResponse.success(service.result(principal.userId(), attemptId));
+		return ResponseEntity.ok(ApiResponse.success(service.result(principal.userId(), attemptId)));
 	}
 
 	@PutMapping("/quiz-attempts/{attemptId}/short-answer-gradings/{questionId}")
-	public ApiResponse<UpdatedShortAnswerGrading> updateShortAnswerGrading(
+	public ResponseEntity<ApiResponse<UpdatedShortAnswerGrading>> updateShortAnswerGrading(
 		@AuthenticationPrincipal AccessPrincipal principal,
 		@PathVariable String attemptId,
 		@PathVariable String questionId,
 		@RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey,
 		@RequestBody ShortAnswerGradingRequest request
 	) {
-		return ApiResponse.success(service.updateShortAnswerGrading(
+		return ResponseEntity.ok(ApiResponse.success(service.updateShortAnswerGrading(
 			principal.userId(), attemptId, questionId, idempotencyKey,
 			request.outcome(), request.expectedRevision()
-		));
+		)));
 	}
 }

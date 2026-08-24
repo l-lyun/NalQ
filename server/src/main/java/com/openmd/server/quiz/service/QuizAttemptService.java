@@ -34,13 +34,14 @@ import com.openmd.server.quiz.repository.ShortAnswerGradingIdempotencyRepository
 import com.openmd.server.quiz.util.QuizRequestDigest;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
-import jakarta.persistence.EntityManager;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,7 +56,6 @@ public class QuizAttemptService {
 	private final QuizQuestionResultRepository results;
 	private final QuizAttemptSubmissionRepository submissions;
 	private final ShortAnswerGradingIdempotencyRepository gradingIdempotencies;
-	private final EntityManager entityManager;
 	private final Clock clock;
 
 	public QuizAttemptService(
@@ -64,8 +64,7 @@ public class QuizAttemptService {
 		QuizAttemptRepository attempts,
 		QuizQuestionResultRepository results,
 		QuizAttemptSubmissionRepository submissions,
-		ShortAnswerGradingIdempotencyRepository gradingIdempotencies,
-		EntityManager entityManager
+		ShortAnswerGradingIdempotencyRepository gradingIdempotencies
 	) {
 		this.quizSets = quizSets;
 		this.questions = questions;
@@ -73,7 +72,6 @@ public class QuizAttemptService {
 		this.results = results;
 		this.submissions = submissions;
 		this.gradingIdempotencies = gradingIdempotencies;
-		this.entityManager = entityManager;
 		this.clock = Clock.systemUTC();
 	}
 
@@ -85,63 +83,38 @@ public class QuizAttemptService {
 		List<QuizResponseRequest> submittedResponses
 	) {
 		byte[] keyHash = QuizRequestDigest.idempotencyKey(idempotencyKey);
-		if (submittedResponses == null) {
-			throw invalid("responses", "responses가 필요합니다.");
-		}
-		QuizSet quizSet = quizSets.findOwnedForUpdate(quizSetPublicId, userId).orElseThrow(this::notFound);
-		if (quizSet.getStatus() != QuizSetStatus.READY) {
-			throw conflict();
-		}
+		requireResponses(submittedResponses);
+		QuizSet quizSet = readyQuizSet(userId, quizSetPublicId);
 		byte[] fingerprint = submissionFingerprint(submittedResponses);
-		var replay = submissions.findByUserIdAndQuizSetIdAndIdempotencyKeyHash(
-			userId, quizSet.getId(), keyHash
-		);
+		Optional<SubmittedQuizAttempt> replay = replaySubmission(userId, quizSet, keyHash, fingerprint);
 		if (replay.isPresent()) {
-			if (!Arrays.equals(fingerprint, replay.get().getRequestFingerprint())) {
-				throw conflict();
-			}
-			QuizAttempt existing = attempts.findById(replay.get().getAttemptId()).orElseThrow(this::notFound);
-			return submittedResponse(existing);
+			return replay.get();
 		}
 
 		List<QuizQuestion> quizQuestions = questions.findAllByQuizSetIdOrderByNumber(quizSet.getId());
 		Map<String, QuizResponseRequest> byQuestion = validateAndIndexResponses(submittedResponses, quizQuestions);
-		List<PendingResult> pending = quizQuestions.stream().map(question -> {
-			if (question.getType() != QuestionType.SHORT_ANSWER) {
-				throw invalid("responses", "현재 제출 경계는 단답형 문제만 지원합니다.");
-			}
-			QuizResponseRequest response = byQuestion.get(question.getPublicId());
-			String answer = response == null ? null : writtenText(response.text());
-			GradingOutcome outcome = ShortAnswerGrader.grade(answer, question.acceptedAnswerValues());
-			return new PendingResult(question, answer, outcome);
-		}).toList();
-		int correct = (int) pending.stream().filter(value -> value.outcome() == GradingOutcome.CORRECT).count();
-		QuizAttempt attempt = attempts.saveAndFlush(
-			QuizAttempt.completed(quizSet.getId(), userId, correct, pending.size())
-		);
-		entityManager.refresh(attempt);
-		for (PendingResult pendingResult : pending) {
-			results.save(QuizQuestionResult.automatic(
-				attempt.getId(), pendingResult.question().getId(), pendingResult.answer(), pendingResult.outcome()
-			));
-		}
-		results.flush();
-		submissions.save(QuizAttemptSubmission.of(
-			userId, quizSet.getId(), keyHash, fingerprint, attempt.getId()
-		));
+		GradedSubmission graded = gradeSubmission(quizQuestions, byQuestion);
+		QuizAttempt attempt = saveSubmission(userId, quizSet, keyHash, fingerprint, graded);
 		return submittedResponse(attempt);
 	}
 
 	@Transactional(readOnly = true)
 	public QuizAttemptResult result(long userId, String attemptPublicId) {
-		QuizAttempt attempt = attempts.findByPublicIdAndUserId(attemptPublicId, userId).orElseThrow(this::notFound);
-		QuizSet quizSet = quizSets.findById(attempt.getQuizSetId()).orElseThrow(this::notFound);
+		QuizAttempt attempt = ownedAttempt(userId, attemptPublicId);
+		QuizSet quizSet = quizSetFor(attempt);
+		List<ShortAnswerQuestionResult> questionResults = projectQuestionResults(attempt);
+		return new QuizAttemptResult(
+			attempt.getPublicId(), quizSet.getPublicId(), attempt.getStatus(), summary(attempt), questionResults
+		);
+	}
+
+	private List<ShortAnswerQuestionResult> projectQuestionResults(QuizAttempt attempt) {
 		List<QuizQuestion> quizQuestions = questions.findAllByQuizSetIdOrderByNumber(attempt.getQuizSetId());
 		Map<Long, QuizQuestionResult> byQuestion = new HashMap<>();
 		for (QuizQuestionResult result : results.findAllByAttemptId(attempt.getId())) {
 			byQuestion.put(result.getQuestionId(), result);
 		}
-		List<ShortAnswerQuestionResult> projection = quizQuestions.stream().map(question -> {
+		return quizQuestions.stream().map(question -> {
 			if (question.getType() != QuestionType.SHORT_ANSWER) {
 				throw new IllegalStateException("Non-short-answer projection belongs to its dedicated implementation");
 			}
@@ -156,9 +129,6 @@ public class QuizAttemptService {
 				questionResult.getGradingRevision(), question.getExplanation(), question.getSourceExcerpt()
 			);
 		}).toList();
-		return new QuizAttemptResult(
-			attempt.getPublicId(), quizSet.getPublicId(), attempt.getStatus(), summary(attempt), projection
-		);
 	}
 
 	@Transactional
@@ -170,53 +140,181 @@ public class QuizAttemptService {
 		String requestedOutcome,
 		Long expectedRevision
 	) {
+		GradingUpdateRequest request = gradingUpdateRequest(idempotencyKey, requestedOutcome, expectedRevision);
+		GradingTarget target = gradingTarget(userId, attemptPublicId, questionPublicId);
+		Optional<UpdatedShortAnswerGrading> replay = replayGrading(userId, questionPublicId, target, request);
+		if (replay.isPresent()) {
+			return replay.get();
+		}
+		validateGradingTarget(target, request.expectedRevision());
+		GradingTarget updated = applyGradingChange(userId, attemptPublicId, target, request);
+		return storeGradingResult(userId, questionPublicId, updated, request);
+	}
+
+	private void requireResponses(List<QuizResponseRequest> submittedResponses) {
+		if (submittedResponses == null) {
+			throw invalid("responses", "responses가 필요합니다.");
+		}
+	}
+
+	private QuizSet readyQuizSet(long userId, String quizSetPublicId) {
+		QuizSet quizSet = quizSets.findOwnedForUpdate(quizSetPublicId, userId).orElseThrow(this::notFound);
+		if (quizSet.getStatus() != QuizSetStatus.READY) {
+			throw conflict();
+		}
+		return quizSet;
+	}
+
+	private Optional<SubmittedQuizAttempt> replaySubmission(
+		long userId,
+		QuizSet quizSet,
+		byte[] keyHash,
+		byte[] fingerprint
+	) {
+		return submissions.findByUserIdAndQuizSetIdAndIdempotencyKeyHash(
+			userId, quizSet.getId(), keyHash
+		).map(stored -> {
+			if (!Arrays.equals(fingerprint, stored.getRequestFingerprint())) {
+				throw conflict();
+			}
+			QuizAttempt existing = attempts.findById(stored.getAttemptId()).orElseThrow(this::notFound);
+			return submittedResponse(existing);
+		});
+	}
+
+	private GradedSubmission gradeSubmission(
+		List<QuizQuestion> quizQuestions,
+		Map<String, QuizResponseRequest> byQuestion
+	) {
+		List<PendingResult> pending = quizQuestions.stream().map(question -> {
+			if (question.getType() != QuestionType.SHORT_ANSWER) {
+				throw invalid("responses", "현재 제출 경계는 단답형 문제만 지원합니다.");
+			}
+			QuizResponseRequest response = byQuestion.get(question.getPublicId());
+			String answer = response == null ? null : writtenText(response.text());
+			GradingOutcome outcome = ShortAnswerGrader.grade(answer, question.acceptedAnswerValues());
+			return new PendingResult(question, answer, outcome);
+		}).toList();
+		int correctCount = (int) pending.stream()
+			.filter(value -> value.outcome() == GradingOutcome.CORRECT)
+			.count();
+		return new GradedSubmission(pending, correctCount);
+	}
+
+	private QuizAttempt saveSubmission(
+		long userId,
+		QuizSet quizSet,
+		byte[] keyHash,
+		byte[] fingerprint,
+		GradedSubmission graded
+	) {
+		// IDENTITY inserts on persist, so the generated id is available without an explicit flush.
+		QuizAttempt attempt = attempts.save(QuizAttempt.completed(
+			quizSet.getId(), userId, graded.correctCount(), graded.results().size()
+		));
+		List<QuizQuestionResult> questionResults = graded.results().stream()
+			.map(pending -> QuizQuestionResult.automatic(
+				attempt.getId(), pending.question().getId(), pending.answer(), pending.outcome()
+			))
+			.toList();
+		results.saveAll(questionResults);
+		submissions.save(QuizAttemptSubmission.of(
+			userId, quizSet.getId(), keyHash, fingerprint, attempt.getId()
+		));
+		return attempt;
+	}
+
+	private QuizAttempt ownedAttempt(long userId, String attemptPublicId) {
+		return attempts.findByPublicIdAndUserId(attemptPublicId, userId).orElseThrow(this::notFound);
+	}
+
+	private QuizSet quizSetFor(QuizAttempt attempt) {
+		return quizSets.findById(attempt.getQuizSetId()).orElseThrow(this::notFound);
+	}
+
+	private GradingUpdateRequest gradingUpdateRequest(
+		String idempotencyKey,
+		String requestedOutcome,
+		Long expectedRevision
+	) {
 		byte[] keyHash = QuizRequestDigest.idempotencyKey(idempotencyKey);
 		GradingOutcome outcome = parseOutcome(requestedOutcome);
 		if (expectedRevision == null || expectedRevision < 0) {
 			throw invalid("expectedRevision", "expectedRevision은 0 이상의 정수여야 합니다.");
 		}
+		byte[] fingerprint = QuizRequestDigest.framed(outcome.name(), Long.toString(expectedRevision));
+		return new GradingUpdateRequest(outcome, expectedRevision, keyHash, fingerprint);
+	}
+
+	private GradingTarget gradingTarget(long userId, String attemptPublicId, String questionPublicId) {
 		QuizAttempt attempt = attempts.findOwnedForUpdate(attemptPublicId, userId).orElseThrow(this::notFound);
 		QuizQuestion question = questions.findByPublicIdAndQuizSetId(questionPublicId, attempt.getQuizSetId())
 			.orElseThrow(this::notFound);
-		QuizQuestionResult questionResult = results.findByAttemptIdAndQuestionId(attempt.getId(), question.getId())
+		QuizQuestionResult result = results.findByAttemptIdAndQuestionId(attempt.getId(), question.getId())
 			.orElseThrow(this::notFound);
-		byte[] fingerprint = QuizRequestDigest.framed(outcome.name(), Long.toString(expectedRevision));
-		var replay = gradingIdempotencies.findByUserIdAndAttemptIdAndQuestionIdAndIdempotencyKeyHash(
-			userId, attempt.getId(), question.getId(), keyHash
-		);
-		if (replay.isPresent()) {
-			ShortAnswerGradingIdempotency stored = replay.get();
-			if (!Arrays.equals(stored.getRequestFingerprint(), fingerprint)
-				|| questionResult.getGradingRevision() != stored.getGradingRevision()
-				|| attempt.getSummaryRevision() != stored.getSummaryRevision()) {
+		return new GradingTarget(attempt, question, result);
+	}
+
+	private Optional<UpdatedShortAnswerGrading> replayGrading(
+		long userId,
+		String questionPublicId,
+		GradingTarget target,
+		GradingUpdateRequest request
+	) {
+		return gradingIdempotencies.findByUserIdAndAttemptIdAndQuestionIdAndIdempotencyKeyHash(
+			userId, target.attempt().getId(), target.question().getId(), request.keyHash()
+		).map(stored -> {
+			if (!Arrays.equals(stored.getRequestFingerprint(), request.fingerprint())
+				|| target.result().getGradingRevision() != stored.getGradingRevision()
+				|| target.attempt().getSummaryRevision() != stored.getSummaryRevision()) {
 				throw conflict();
 			}
 			return fromStored(questionPublicId, stored);
-		}
-		if (attempt.getStatus() != QuizAttemptStatus.COMPLETED
-			|| question.getType() != QuestionType.SHORT_ANSWER
-			|| !questionResult.isAnswered()
-			|| questionResult.getGradingRevision() != expectedRevision) {
+		});
+	}
+
+	private void validateGradingTarget(GradingTarget target, long expectedRevision) {
+		if (target.attempt().getStatus() != QuizAttemptStatus.COMPLETED
+			|| target.question().getType() != QuestionType.SHORT_ANSWER
+			|| !target.result().isAnswered()
+			|| target.result().getGradingRevision() != expectedRevision) {
 			throw conflict();
 		}
+	}
 
-		if (questionResult.currentOutcome() != outcome) {
-			int updated = results.updateOverrideIfRevision(
-				questionResult.getId(), expectedRevision, outcome, Instant.now(clock)
-			);
-			if (updated != 1) {
-				throw conflict();
-			}
-			attempt = attempts.findOwnedForUpdate(attemptPublicId, userId).orElseThrow(this::notFound);
-			attempt.incrementSummaryRevision();
-			attempts.saveAndFlush(attempt);
-			questionResult = results.findByAttemptIdAndQuestionId(attempt.getId(), question.getId())
-				.orElseThrow(this::notFound);
+	private GradingTarget applyGradingChange(
+		long userId,
+		String attemptPublicId,
+		GradingTarget target,
+		GradingUpdateRequest request
+	) {
+		if (target.result().currentOutcome() == request.outcome()) {
+			return target;
 		}
-		ShortAnswerGradingSummary summary = compactSummary(attempt);
+		int updated = results.updateOverrideIfRevision(
+			target.result().getId(), request.expectedRevision(), request.outcome(), Instant.now(clock)
+		);
+		if (updated != 1) {
+			throw conflict();
+		}
+		QuizAttempt attempt = attempts.findOwnedForUpdate(attemptPublicId, userId).orElseThrow(this::notFound);
+		attempt.incrementSummaryRevision();
+		QuizQuestionResult result = results.findByAttemptIdAndQuestionId(
+			attempt.getId(), target.question().getId()
+		).orElseThrow(this::notFound);
+		return new GradingTarget(attempt, target.question(), result);
+	}
+
+	private UpdatedShortAnswerGrading storeGradingResult(
+		long userId,
+		String questionPublicId,
+		GradingTarget target,
+		GradingUpdateRequest request
+	) {
+		ShortAnswerGradingSummary summary = compactSummary(target.attempt());
 		ShortAnswerGradingIdempotency stored = gradingIdempotencies.save(ShortAnswerGradingIdempotency.of(
-			userId, attempt.getId(), question.getId(), keyHash, fingerprint,
-			questionResult.currentOutcome(), questionResult.getGradingRevision(), summary.revision(),
+			userId, target.attempt().getId(), target.question().getId(), request.keyHash(), request.fingerprint(),
+			target.result().currentOutcome(), target.result().getGradingRevision(), summary.revision(),
 			summary.scoredGrading().correctQuestionCount(), summary.scoredGrading().gradedQuestionCount(),
 			summary.reviewQuestionCount()
 		));
@@ -227,8 +325,13 @@ public class QuizAttemptService {
 		return new SubmittedQuizAttempt(
 			attempt.getPublicId(), attempt.getStatus(),
 			new GradingCount(attempt.getAutomaticCorrectCount(), attempt.getAutomaticGradedCount()),
-			List.of(), attempt.getCreatedAt()
+			List.of(), databaseTimestamp(attempt.getCreatedAt())
 		);
+	}
+
+	private Instant databaseTimestamp(Instant value) {
+		// MySQL TIMESTAMP(6) rounds to microseconds; replay reads that rounded value.
+		return value == null ? null : value.plusNanos(500).truncatedTo(ChronoUnit.MICROS);
 	}
 
 	private QuizAttemptSummary summary(QuizAttempt attempt) {
@@ -326,5 +429,23 @@ public class QuizAttemptService {
 	}
 
 	private record PendingResult(QuizQuestion question, String answer, GradingOutcome outcome) {
+	}
+
+	private record GradedSubmission(List<PendingResult> results, int correctCount) {
+	}
+
+	private record GradingUpdateRequest(
+		GradingOutcome outcome,
+		long expectedRevision,
+		byte[] keyHash,
+		byte[] fingerprint
+	) {
+	}
+
+	private record GradingTarget(
+		QuizAttempt attempt,
+		QuizQuestion question,
+		QuizQuestionResult result
+	) {
 	}
 }
