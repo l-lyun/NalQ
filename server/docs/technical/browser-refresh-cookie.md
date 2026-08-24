@@ -2,8 +2,8 @@
 
 - 상태: 구현됨 (웹 클라이언트 전환 전)
 - 적용 영역: `server/`
-- 관련 API 계약: [인증 API](../../../docs/contracts/api/authentication.md)
-- 관련 데이터 계약: [사용자·인증 데이터](../../../docs/contracts/data/authentication.md)
+- 관련 API 계약: [인증 API](../../../docs/contracts/contract-api-authentication.md)
+- 관련 데이터 계약: [사용자·인증 데이터](../../../docs/contracts/contract-data-authentication.md)
 - 관련 웹 TRD: [웹 인증 상태와 토큰 관리](../../../web/docs/technical/authentication.md)
 
 ## 1. 목적

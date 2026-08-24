@@ -2,8 +2,8 @@
 
 - 상태: 초안
 - 적용 영역: `server/`
-- 관련 API 계약: [이메일 기반 자체 인증](../../../docs/contracts/api/authentication.md)
-- 관련 데이터 계약: [사용자·인증 데이터](../../../docs/contracts/data/authentication.md)
+- 관련 API 계약: [이메일 기반 자체 인증](../../../docs/contracts/contract-api-authentication.md)
+- 관련 데이터 계약: [사용자·인증 데이터](../../../docs/contracts/contract-data-authentication.md)
 - 관련 서버 설계: [브라우저 Refresh Token HttpOnly Cookie 전환](browser-refresh-cookie.md)
 
 ## 목적
@@ -61,7 +61,7 @@ Spring MVC 컨트롤러에서 OpenAPI 설명을 생성하고 Swagger UI로 로�
 - 비밀번호, 인증 코드, Access/Refresh Token의 `default` 값은 두지 않는다. 예제는 `<redacted>` 또는 명백한 placeholder만 사용한다.
 - 공통 `{ success, data, error }` envelope와 `ApiResponse<T>`의 구체 응답 schema가 올바르게 풀리는지 테스트한다.
 
-긴 오류 정책, Refresh Token 원자 회전과 클라이언트 직렬화 규칙은 [인증 API 계약](../../../docs/contracts/api/authentication.md)이 계속 소유한다. OpenAPI 설명에는 해당 동작을 안전하게 사용하는 데 필요한 짧은 경고와 안정 오류 코드만 둔다.
+긴 오류 정책, Refresh Token 원자 회전과 클라이언트 직렬화 규칙은 [인증 API 계약](../../../docs/contracts/contract-api-authentication.md)이 계속 소유한다. OpenAPI 설명에는 해당 동작을 안전하게 사용하는 데 필요한 짧은 경고와 안정 오류 코드만 둔다.
 
 ## 인증 API의 Swagger UI 사용 흐름
 

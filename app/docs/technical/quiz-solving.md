@@ -3,9 +3,9 @@
 - 상태: 검토 중
 - 소유 영역: `app/`
 - 관련 원장:
-  - [퀴즈 기능명세](../../../docs/features/03-quiz-generation.md)
-  - [퀴즈 생성부터 복습까지의 흐름](../../../docs/flows/quiz-solving.md)
-  - [학습자료·퀴즈·복습 API 계약](../../../docs/contracts/api/quiz-learning.md)
+  - [퀴즈 PRD](../../../docs/prd/prd-quiz-learning.md)
+  - [퀴즈 생성부터 복습까지의 흐름](../../../docs/ux/flow-quiz-solving.md)
+  - [학습자료·퀴즈·복습 API 계약](../../../docs/contracts/contract-api-quiz-learning.md)
   - [웹 본 퀴즈 상태·기기 임시 보존 설계](../../../web/docs/technical/quiz-solving.md)
 
 ## 문서 책임

@@ -1,9 +1,9 @@
 # 퀴즈 채점 서버 설계
 
 - 상태: 초안 — 프론트 UX 선행, 서버 미구현
-- 제품 정책: [퀴즈 생성·풀이·결과·복습 기능명세](../../../docs/features/03-quiz-generation.md#채점-수정과-서술형-자기평가)
-- 사용자 흐름: [퀴즈 생성부터 복습까지](../../../docs/flows/quiz-solving.md#d-결과)
-- 현재 공유 계약: [학습자료·퀴즈·복습 API 계약](../../../docs/contracts/api/quiz-learning.md#본-퀴즈-제출과-자기평가)
+- 제품 정책: [퀴즈 생성·풀이·결과·복습 PRD](../../../docs/prd/prd-quiz-learning.md#채점-수정과-서술형-자기평가)
+- 사용자 흐름: [퀴즈 생성부터 복습까지](../../../docs/ux/flow-quiz-solving.md#d-결과)
+- 현재 공유 계약: [학습자료·퀴즈·복습 API 계약](../../../docs/contracts/contract-api-quiz-learning.md#본-퀴즈-제출과-자기평가)
 
 ## 1. 문서 책임
 

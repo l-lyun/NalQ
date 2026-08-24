@@ -1,4 +1,10 @@
-# 화면 명세 템플릿
+---
+document_type: screen-spec
+status: draft
+scope: ux
+---
+
+# [Screen Spec] {화면명}
 
 > 이 템플릿은 화면의 UX 기준을 검토·승인하기 위한 원장이다. 기능 요구사항과 API 계약을 복제하지 말고 링크로 연결한다.
 

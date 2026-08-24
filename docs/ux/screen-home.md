@@ -1,16 +1,22 @@
-# 홈 화면 명세
+---
+document_type: screen-spec
+status: draft
+scope: ux
+---
+
+# [Screen Spec] 홈
 
 ## 문서 정보
 
 - 문서 상태: `draft`
 - 요구사항 상태: 핵심 역할과 하단 탭은 확인됨, 다음 행동 우선순위·동률 처리·오늘의 지표는 UX 초안
 - 대상 플랫폼: 반응형 웹과 앱 WebView, 모바일 우선
-- 관련 기능: [홈 기능명세](../features/00-home.md)
-- 관련 내비게이션: [전역 내비게이션](../product/navigation.md)
-- 관련 흐름: [문제 생성과 풀이](../flows/quiz-solving.md), [학습자료 가져오기](../flows/content-import.md)
-- 공통 용어: [용어집](../product/glossary.md)
+- 관련 기능: [홈 PRD](../prd/prd-home.md)
+- 관련 내비게이션: [제품 기반의 전역 내비게이션](../product.md#전역-내비게이션)
+- 관련 흐름: [문제 생성과 풀이](flow-quiz-solving.md), [학습자료 가져오기](flow-content-import.md)
+- 공통 용어: [제품 기반의 용어](../product.md#용어)
 
-> 동기화 주의: 이 화면 초안의 새 학습 입력 방식, 제출 전 풀이 세션, 복습 범위 관련 내용은 최신 [학습자료 기능명세](../features/02-content-import.md), [퀴즈 기능명세](../features/03-quiz-generation.md), [학습자료 흐름](../flows/content-import.md), [퀴즈 흐름](../flows/quiz-solving.md)과 아직 동기화되지 않았다. 해당 부분은 구현 기준으로 사용하지 않으며 후속 화면 명세 개정이 필요하다.
+> 동기화 주의: 이 화면 초안의 새 학습 입력 방식, 제출 전 풀이 세션, 복습 범위 관련 내용은 최신 [학습자료 PRD](../prd/prd-content-import.md), [퀴즈 PRD](../prd/prd-quiz-learning.md), [학습자료 흐름](flow-content-import.md), [퀴즈 흐름](flow-quiz-solving.md)과 아직 동기화되지 않았다. 해당 부분은 구현 기준으로 사용하지 않으며 후속 화면 명세 개정이 필요하다.
 
 ## 목표와 범위
 
@@ -265,7 +271,7 @@
 | 4 | 완료했거나 열어본 최근 학습자료가 있음 | `최근 학습 보기` |
 | 5 | 위 조건이 모두 없음 | `첫 학습 시작` |
 
-이 순서는 [전역 내비게이션의 UX 초안](../product/navigation.md#홈의-다음-행동-우선순위-제안)을 화면으로 구체화한 것이며 제품 결정으로 확정되지 않았다.
+이 순서는 [제품 기반의 전역 내비게이션 UX 초안](../product.md#홈의-다음-행동-우선순위-제안)을 화면으로 구체화한 것이며 제품 결정으로 확정되지 않았다.
 
 ### 임시 동률 처리
 

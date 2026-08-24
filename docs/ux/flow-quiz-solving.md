@@ -1,8 +1,13 @@
-# 사용자 흐름: 퀴즈 생성부터 복습까지
+---
+document_type: flow
+status: review
+scope: ux
+---
 
-- 상태: 검토 중
-- 관련 기능: [퀴즈 생성·풀이·결과·복습](../features/03-quiz-generation.md)
-- 공유 계약: [학습자료·퀴즈 API 계약](../contracts/api/quiz-learning.md)
+# [Flow] 퀴즈 생성부터 복습까지
+
+- 관련 기능: [퀴즈 생성·풀이·결과·복습](../prd/prd-quiz-learning.md)
+- 공유 계약: [학습자료·퀴즈 API 계약](../contracts/contract-api-quiz-learning.md)
 - 클라이언트 구현 원장: [웹 임시 상태·보존](../../web/docs/technical/quiz-solving.md), [앱 임시 상태·보존](../../app/docs/technical/quiz-solving.md)
 
 ## 문서 책임
@@ -17,7 +22,7 @@
 
 - 로그인한 사용자가 자신이 소유한 유효한 학습자료를 선택했다.
 - 학습자료 본문이 비어 있지 않고 20,000자를 넘지 않는다.
-- 생성·평가 규칙은 [기능명세의 확정 정책](../features/03-quiz-generation.md#확정-정책)을 따른다.
+- 생성·평가 규칙은 [퀴즈 PRD의 확정 정책](../prd/prd-quiz-learning.md#확정-정책)을 따른다.
 
 ## 완료 조건
 
@@ -80,7 +85,7 @@
 1. 사용자가 생성 중 뒤로가기를 하면 시스템은 생성이 서버에서 계속됨을 알리는 이탈 확인을 연다.
 2. 머물기를 선택하면 오버레이로 돌아간다.
 3. 나가기를 선택하면 이전 화면으로 이동하고 서버 생성은 계속된다.
-4. 같은 자료에 다시 진입하면 [자료의 활성 생성 조회](../contracts/api/quiz-learning.md#자료의-활성-생성-조회)로 `GENERATING` QuizSet을 재발견한다.
+4. 같은 자료에 다시 진입하면 [자료의 활성 생성 조회](../contracts/contract-api-quiz-learning.md#자료의-활성-생성-조회)로 `GENERATING` QuizSet을 재발견한다.
 5. 활성 QuizSet이 있으면 그 `quizSetId`의 상태 조회를 재개하고, 없을 때만 새 생성 가능 상태를 보여준다.
 
 ### 본 퀴즈 재진입
@@ -92,7 +97,7 @@
 
 ### 서술형 자기평가 재진입
 
-1. 최종 제출 뒤 자기평가를 끝내기 전에 이탈했다면 [미완료 서술형 자기평가 회차 조회](../contracts/api/quiz-learning.md#미완료-서술형-자기평가-회차-조회)로 이미 생성된 `attemptId`와 남은 서술형 문항을 찾는다.
+1. 최종 제출 뒤 자기평가를 끝내기 전에 이탈했다면 [미완료 서술형 자기평가 회차 조회](../contracts/contract-api-quiz-learning.md#미완료-서술형-자기평가-회차-조회)로 이미 생성된 `attemptId`와 남은 서술형 문항을 찾는다.
 2. 복원 대상이 있으면 문제 번호가 가장 낮은 미평가 서술형부터 자기평가 화면을 복원한다.
 3. 복원 대상이 없으면 현재 attempt와 결과 상태 또는 본 퀴즈 시작 가능 상태를 다시 확인한다.
 

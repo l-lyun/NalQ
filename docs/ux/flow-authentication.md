@@ -1,8 +1,13 @@
-# 사용자 흐름: 이메일 기반 자체 인증
+---
+document_type: flow
+status: draft
+scope: ux
+---
 
-- 상태: 초안
-- 관련 기능: [이메일 기반 자체 인증](../features/01-local-auth.md)
-- 관련 계약: [인증 API](../contracts/api/authentication.md)
+# [Flow] 이메일 기반 자체 인증
+
+- 관련 기능: [이메일 기반 자체 인증](../prd/prd-local-authentication.md)
+- 관련 계약: [인증 API](../contracts/contract-api-authentication.md)
 
 ## 사용자 목표
 

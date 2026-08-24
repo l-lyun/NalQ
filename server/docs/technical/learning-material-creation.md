@@ -2,8 +2,8 @@
 
 - 상태: 검토 중
 - 대상: `POST /api/v1/learning-materials`
-- 제품 정책: [학습자료 만들기 기능명세](../../../docs/features/02-content-import.md)
-- 공유 계약: [학습자료·퀴즈 API 계약](../../../docs/contracts/api/quiz-learning.md#저장)
+- 제품 정책: [학습자료 만들기 PRD](../../../docs/prd/prd-content-import.md)
+- 공유 계약: [학습자료·퀴즈 API 계약](../../../docs/contracts/contract-api-quiz-learning.md#저장)
 - 인증 경계: [브라우저 Refresh Token Cookie 설계](browser-refresh-cookie.md)
 
 ## 1. 문서 책임

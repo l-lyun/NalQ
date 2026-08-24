@@ -1,8 +1,13 @@
-# 사용자 흐름: 학습자료 만들기
+---
+document_type: flow
+status: review
+scope: ux
+---
 
-- 상태: 검토 중
-- 관련 기능: [학습자료 만들기](../features/02-content-import.md)
-- 공유 계약: [학습자료·퀴즈 API 계약](../contracts/api/quiz-learning.md)
+# [Flow] 학습자료 만들기
+
+- 관련 기능: [학습자료 만들기](../prd/prd-content-import.md)
+- 공유 계약: [학습자료·퀴즈 API 계약](../contracts/contract-api-quiz-learning.md)
 
 ## 문서 책임
 
@@ -58,7 +63,7 @@
 
 - 붙여넣기와 Notion 복사 결과는 저장 전 프론트 편집 상태다. MVP는 서버 초안이나 만료 후 복구를 제공하지 않는다.
 - 앱·웹 종료 뒤 미저장 편집을 복원한다고 약속하지 않는다.
-- 저장 성공 뒤 본문은 퀴즈 생성 요청 전까지 편집 가능하다. 생성 접수 이후 흐름은 [퀴즈 생성부터 복습까지](quiz-solving.md)가 책임진다.
+- 저장 성공 뒤 본문은 퀴즈 생성 요청 전까지 편집 가능하다. 생성 접수 이후 흐름은 [퀴즈 생성부터 복습까지](flow-quiz-solving.md)가 책임진다.
 
 ## 폐기된 흐름
 

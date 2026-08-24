@@ -1,6 +1,11 @@
-# API 계약: {기능 또는 리소스}
+---
+document_type: api-contract
+status: draft
+scope: shared
+---
 
-- 상태: 초안
+# [API Contract] {기능 또는 리소스}
+
 - 소유 영역:
 - 소비 영역:
 - 관련 기능명세:

@@ -1,9 +1,14 @@
-# 데이터 계약: 사용자와 인증
+---
+document_type: data-contract
+status: draft
+scope: shared
+---
 
-- 상태: 초안
+# [Data Contract] 사용자와 인증
+
 - 소유 영역: 서버 사용자·인증 도메인
-- 관련 기능명세: [이메일 기반 자체 인증](../../features/01-local-auth.md)
-- 관련 API: [인증 API](../api/authentication.md)
+- 관련 기능명세: [이메일 기반 자체 인증](../prd/prd-local-authentication.md)
+- 관련 API: [인증 API](contract-api-authentication.md)
 
 ## 목적과 경계
 

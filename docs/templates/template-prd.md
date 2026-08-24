@@ -1,6 +1,11 @@
-# 기능명세: {기능명}
+---
+document_type: prd
+status: draft
+scope: product
+---
 
-- 상태: 초안
+# [PRD] {기능명}
+
 - 담당/검토자:
 - 관련 제품 원장:
 - 관련 흐름/화면/계약:

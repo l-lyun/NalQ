@@ -1,8 +1,13 @@
-# 기능명세: 이메일 기반 자체 인증
+---
+document_type: prd
+status: draft
+scope: product
+---
 
-- 상태: 초안
-- 관련 흐름: [인증 흐름](../flows/authentication.md)
-- 관련 계약: [인증 API](../contracts/api/authentication.md), [사용자·인증 데이터](../contracts/data/authentication.md)
+# [PRD] 이메일 기반 자체 인증
+
+- 관련 흐름: [인증 흐름](../ux/flow-authentication.md)
+- 관련 계약: [인증 API](../contracts/contract-api-authentication.md), [사용자·인증 데이터](../contracts/contract-data-authentication.md)
 
 ## 사용자 문제
 

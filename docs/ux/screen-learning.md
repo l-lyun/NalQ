@@ -1,14 +1,20 @@
-# 학습 메인과 새 문제 만들기 진입 화면 명세
+---
+document_type: screen-spec
+status: draft
+scope: ux
+---
+
+# [Screen Spec] 학습 메인과 새 문제 만들기 진입
 
 ## 문서 정보
 
 - 화면명: 학습 메인, 새 문제 만들기 진입, 학습자료 선택·편집
 - 문서 상태: `draft`
 - 대상 플랫폼: 모바일 WebView 우선, 반응형 웹
-- 관련 제품 구조: [전역 내비게이션](../product/navigation.md)
-- 관련 기능: [학습자료 만들기](../features/02-content-import.md), [퀴즈 생성·풀이·결과·복습](../features/03-quiz-generation.md)
-- 관련 흐름: [학습자료 만들기](../flows/content-import.md), [퀴즈 생성부터 복습까지](../flows/quiz-solving.md)
-- 공유 계약: [학습자료·퀴즈·복습 API](../contracts/api/quiz-learning.md)
+- 관련 제품 구조: [제품 기반의 전역 내비게이션](../product.md#전역-내비게이션)
+- 관련 기능: [학습자료 만들기](../prd/prd-content-import.md), [퀴즈 생성·풀이·결과·복습](../prd/prd-quiz-learning.md)
+- 관련 흐름: [학습자료 만들기](flow-content-import.md), [퀴즈 생성부터 복습까지](flow-quiz-solving.md)
+- 공유 계약: [학습자료·퀴즈·복습 API](../contracts/contract-api-quiz-learning.md)
 - 시각 기준: [OpenMD Design System](../../DESIGN.md)
 - 최종 수정일: 2026-08-20
 
@@ -482,7 +488,7 @@
 - 생성 중 제목만 수정하는 요청과 상태 경합 처리
 - QuizSet이 생성 당시 참조한 학습자료 근거의 불변 보존 방식
 - Notion 연결·권한, 페이지 목록과 WebView 복귀 계약
-- 이 화면은 [학습자료 기능명세의 임시 잠금 정책](../features/02-content-import.md#후속-계약구현-동기화-주의)을 목표 UX로 표현한다. 현재 공유 API 계약과 서버 상태 모델은 아직 동기화되지 않았으므로, 실제 수정 API를 연결하기 전에 후속 계약·서버 작업의 완료 여부를 확인한다.
+- 이 화면은 [학습자료 PRD의 임시 잠금 정책](../prd/prd-content-import.md#후속-계약구현-동기화-주의)을 목표 UX로 표현한다. 현재 공유 API 계약과 서버 상태 모델은 아직 동기화되지 않았으므로, 실제 수정 API를 연결하기 전에 후속 계약·서버 작업의 완료 여부를 확인한다.
 
 위 항목은 화면 명세에서 임의의 API, 상태 enum 또는 클라이언트 저장 구조로 확정하지 않는다. 관련 기능명세·공유 계약과 애플리케이션 TRD에서 검증한다.
 

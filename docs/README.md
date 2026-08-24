@@ -1,62 +1,89 @@
-# Product Design Index
+---
+document_type: index
+status: draft
+scope: repository
+---
 
-이 디렉터리는 OpenMD의 제품 설계 원장과 구현 계약을 찾기 위한 시작점이다. 모든 문서를 한꺼번에 읽지 말고 아래 표에서 현재 작업에 필요한 문서만 선택한다.
+# [Index] OpenMD 문서 지도
 
-## 문서 운영 방식
-
-문서를 새로 만들거나 분리할지 판단할 때는 [문서 운영 가이드](documentation-guide.md)를 확인한다. OpenMD의 기본은 사용자 기능당 하나의 집중된 PRD이며, 실제 복잡성이 있을 때만 UX 화면 명세·Flow·TRD 중 필요한 동반 문서를 추가한다. 둘 이상의 애플리케이션이 합의할 입력·출력은 Contract로 분리한다.
+이 파일은 OpenMD의 제품·UX·공유 계약·기술 원장을 찾기 위한 유일한 문서 인덱스다. 모든 문서를 한꺼번에 읽지 말고 현재 작업에 필요한 원장만 선택한다. 문서를 만들거나 분리할 때는 [문서 운영 가이드](guide.md)를 따른다.
 
 ## 읽기 순서
 
-1. 제품의 목적이나 범위를 판단할 때는 [제품 개요](product/overview.md)와 [제품 원칙](product/principles.md)을 읽는다.
-2. 사용자에게 보이는 동작을 만들 때는 관련 [기능명세](features/)와 [사용자 흐름](flows/)을 읽는다.
-3. 화면을 설계하거나 구현할 때는 관련 `docs/screens/` 문서를 읽는다.
-4. 클라이언트와 서버의 경계를 바꿀 때는 [API 계약](contracts/api/)과 [데이터 계약](contracts/data/)을 읽는다.
-5. 과거 판단의 이유가 필요할 때는 [결정 기록](decisions/)을 읽는다.
+1. 제품의 목적, 범위, 원칙, 전역 내비게이션이나 용어를 판단할 때는 [제품 기반](product.md)을 읽는다.
+2. 사용자 행동과 성공 조건을 만들거나 바꿀 때는 관련 [PRD](#제품-기반과-prd)를 읽는다.
+3. 여러 화면의 분기·복구 또는 한 화면의 사용자 가시 상태가 중요할 때는 관련 [UX 문서](#ux)를 읽는다.
+4. 웹·앱·서버가 공유하는 입출력이나 데이터 의미를 바꿀 때는 관련 [Contract](#공유-contract)를 읽는다.
+5. 한 애플리케이션의 비자명한 구현 구조가 필요할 때만 해당 애플리케이션의 TRD를 읽는다.
+6. 복잡한 현재 작업의 순서와 진행 상태는 필요한 경우 `docs/plans/`, 오래 남을 결정 이유는 필요한 경우 `docs/adr/`에 둔다. 두 폴더는 첫 실제 문서가 생길 때 만든다.
 
-## 현재 원장
+## 최소 문서 운영 방식
+
+- 새 사용자 기능은 집중된 PRD 한 개로 시작한다.
+- Flow, Screen Spec, Contract, Execution Plan, TRD, ADR은 각각의 복잡성이 실제로 있을 때만 추가한다.
+- 한 정보에는 원장 하나만 두고 다른 문서는 해당 절을 링크한다.
+- 확정, 제안, 열린 질문을 구분하며 미결정 사항을 구현 가정으로 승격하지 않는다.
+- 문서 유형별 책임과 상태 의미는 [문서 운영 가이드](guide.md)를 기준으로 한다.
+
+## 제품 기반과 PRD
 
 | 관심사 | 원장 | 상태 |
 | --- | --- | --- |
-| 제품 목표와 단계별 범위 | [overview.md](product/overview.md) | 초안 |
-| 제품 판단 원칙 | [principles.md](product/principles.md) | 초안 |
-| 하단 탭과 전역 이동 | [navigation.md](product/navigation.md) | 초안 |
-| 공통 용어 | [glossary.md](product/glossary.md) | 초안 |
-| 홈 | [00-home.md](features/00-home.md) | 초안 |
-| 자체 로그인 | [01-local-auth.md](features/01-local-auth.md) | 초안 |
-| 사용자·인증 데이터 | [authentication.md](contracts/data/authentication.md) | 초안 |
-| 인증 API | [authentication.md](contracts/api/authentication.md) | 초안 |
-| 2단계 이메일 회원가입 서버 설계 | [two-step-signup.md](../server/docs/technical/two-step-signup.md) | 구현됨 |
-| 브라우저 Refresh Token Cookie 서버 설계 | [browser-refresh-cookie.md](../server/docs/technical/browser-refresh-cookie.md) | 초안 |
-| 서버 OpenAPI와 Swagger UI 운영 | [openapi-documentation.md](../server/docs/technical/openapi-documentation.md) | 초안 |
-| 서버 패키지 구조 | [package-structure.md](../server/docs/technical/package-structure.md) | 구현 동기화 |
-| 학습자료 만들기 | [02-content-import.md](features/02-content-import.md) | 검토 중 |
-| 학습자료 생성 서버 설계 | [learning-material-creation.md](../server/docs/technical/learning-material-creation.md) | 검토 중 |
-| 퀴즈 생성·풀이·결과·복습 | [03-quiz-generation.md](features/03-quiz-generation.md) | 검토 중 |
-| 인증 흐름 | [authentication.md](flows/authentication.md) | 초안 |
-| 학습자료 만들기 흐름 | [content-import.md](flows/content-import.md) | 검토 중 |
-| 퀴즈 생성부터 복습까지의 흐름 | [quiz-solving.md](flows/quiz-solving.md) | 검토 중 |
-| 학습자료·퀴즈·복습 API | [quiz-learning.md](contracts/api/quiz-learning.md) | 검토 중 |
-| 웹 본 퀴즈 임시 상태·보존 | [quiz-solving.md](../web/docs/technical/quiz-solving.md) | 검토 중 |
-| 앱 본 퀴즈 임시 상태·보존 | [quiz-solving.md](../app/docs/technical/quiz-solving.md) | 검토 중 |
-| 홈 화면 | [home.md](screens/home.md) | 초안 |
-| 학습 화면 | [learning.md](screens/learning.md) | 초안 |
-| 프로필 화면 | [profile.md](screens/profile.md) | 초안 |
-| 회원가입 화면 | [signup.md](screens/signup.md) | 초안 |
+| 제품 목표·범위·원칙·내비게이션·용어 | [OpenMD 제품 기반](product.md) | 초안 |
+| 홈 | [홈 PRD](prd/prd-home.md) | 초안 |
+| 이메일 기반 자체 인증 | [자체 인증 PRD](prd/prd-local-authentication.md) | 초안 |
+| 학습자료 만들기 | [학습자료 만들기 PRD](prd/prd-content-import.md) | 검토 중 |
+| 퀴즈 생성·풀이·결과·복습 | [퀴즈 PRD](prd/prd-quiz-learning.md) | 검토 중 |
 
-화면 문서는 기능명세의 규칙을 복제하지 않고 관련 원장을 링크한다.
+## UX
 
-## 문서 생성 기준
+| 관심사 | 원장 | 유형 | 상태 |
+| --- | --- | --- | --- |
+| 이메일 기반 자체 인증 | [인증 흐름](ux/flow-authentication.md) | Flow | 초안 |
+| 학습자료 만들기 | [학습자료 만들기 흐름](ux/flow-content-import.md) | Flow | 검토 중 |
+| 퀴즈 생성부터 복습까지 | [퀴즈 흐름](ux/flow-quiz-solving.md) | Flow | 검토 중 |
+| 홈 | [홈 화면](ux/screen-home.md) | Screen Spec | 초안 |
+| 학습 | [학습 화면](ux/screen-learning.md) | Screen Spec | 초안 |
+| 프로필 | [프로필 화면](ux/screen-profile.md) | Screen Spec | 초안 |
+| 회원가입 | [회원가입 화면](ux/screen-signup.md) | Screen Spec | 초안 |
 
-- 새 사용자 가치를 정의할 때: [기능명세 템플릿](templates/feature-spec.md)
-- 화면의 구조·상태·행동을 정의할 때: [화면 명세 템플릿](templates/screen-spec.md)
-- 여러 상태와 분기를 정의할 때: [흐름 템플릿](templates/flow-spec.md)
-- 클라이언트와 서버의 합의를 정의할 때: [API 계약 템플릿](templates/api-contract.md)
-- 작은 문구 수정이나 구현 내부 결정은 별도 제품 문서를 만들지 않는다.
+Flow는 여러 화면의 순서와 분기를, Screen Spec은 한 화면의 구조와 사용자 가시 상태를 책임진다. 둘 다 PRD의 제품 정책을 복제하지 않는다.
 
-## 현재 열린 제품 질문
+## 공유 Contract
 
-- 첫 배포 대상이 Expo 앱, 모바일 웹뷰, 웹 중 어디까지인지
-- Refresh Token의 최종 수명과 앱/WebView별 전달·보관 방식 (브라우저 HttpOnly Cookie 서버 계약과 Access Token 5분은 확정)
-- Notion 인증 방식과 사용자가 페이지를 선택할 수 있는 권한 범위 (일회성 복사와 비동기화는 확정)
-- 경험치·랭킹·친구·꾸미기 기능의 출시 순서와 운영 정책
+| 관심사 | 원장 | 유형 | 상태 |
+| --- | --- | --- | --- |
+| 이메일 기반 자체 인증 | [인증 API](contracts/contract-api-authentication.md) | API Contract | 초안 |
+| 사용자와 인증 | [사용자·인증 데이터](contracts/contract-data-authentication.md) | Data Contract | 초안 |
+| 학습자료·퀴즈·복습 | [학습·퀴즈 API](contracts/contract-api-quiz-learning.md) | API Contract | 검토 중 |
+
+## 애플리케이션 TRD
+
+TRD 경로와 파일명 표준화는 후속 문서 구조 작업에서 다룬다. 현재는 아래 경로가 원장이다.
+
+| 애플리케이션 | 관심사 | 원장 | 상태 |
+| --- | --- | --- | --- |
+| Server | 2단계 이메일 회원가입 | [서버 회원가입 설계](../server/docs/technical/two-step-signup.md) | 구현됨 |
+| Server | 브라우저 Refresh Token Cookie | [서버 Cookie 전환 설계](../server/docs/technical/browser-refresh-cookie.md) | 구현됨, 웹 전환 전 |
+| Server | OpenAPI와 Swagger UI | [서버 OpenAPI 운영 설계](../server/docs/technical/openapi-documentation.md) | 초안 |
+| Server | 패키지 구조 | [서버 패키지 구조](../server/docs/technical/package-structure.md) | 구현 동기화 |
+| Server | 학습자료 생성 | [학습자료 생성 설계](../server/docs/technical/learning-material-creation.md) | 검토 중 |
+| Server | 퀴즈 채점 | [퀴즈 채점 설계](../server/docs/technical/quiz-grading.md) | 초안 |
+| Web | 인증 상태·토큰·API 통합 | [웹 인증 설계](../web/docs/technical/authentication.md) | 초안 |
+| Web | 본 퀴즈 임시 상태·보존 | [웹 퀴즈 설계](../web/docs/technical/quiz-solving.md) | 검토 중 |
+| App | WebView 본 퀴즈 임시 상태·보존 | [앱 퀴즈 설계](../app/docs/technical/quiz-solving.md) | 검토 중 |
+
+## 문서 템플릿
+
+| 만들 문서 | 템플릿 |
+| --- | --- |
+| PRD | [PRD 템플릿](templates/template-prd.md) |
+| Flow | [Flow 템플릿](templates/template-flow.md) |
+| Screen Spec | [Screen Spec 템플릿](templates/template-screen-spec.md) |
+| API Contract | [API Contract 템플릿](templates/template-api-contract.md) |
+| Data Contract | [Data Contract 템플릿](templates/template-data-contract.md) |
+| Execution Plan | [Execution Plan 템플릿](templates/template-execution-plan.md) |
+| TRD | [TRD 템플릿](templates/template-trd.md) |
+| ADR | [ADR 템플릿](templates/template-adr.md) |
+
+작은 문구 수정, 명백한 버그 복원, 국소 리팩터링, 일회성 회의 메모에는 별도 제품 문서를 만들지 않는다.

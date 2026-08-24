@@ -1,10 +1,15 @@
-# API 계약: 학습자료·퀴즈·복습
+---
+document_type: api-contract
+status: review
+scope: shared
+---
 
-- 상태: 검토 중
+# [API Contract] 학습자료·퀴즈·복습
+
 - 소유 영역: 학습자료, 퀴즈 생성·채점, 복습
 - 소비 영역: 웹·앱 클라이언트
-- 관련 기능명세: [학습자료 만들기](../../features/02-content-import.md), [퀴즈 생성·풀이·결과·복습](../../features/03-quiz-generation.md)
-- 관련 흐름: [학습자료 만들기](../../flows/content-import.md), [퀴즈 생성부터 복습까지](../../flows/quiz-solving.md)
+- 관련 기능명세: [학습자료 만들기](../prd/prd-content-import.md), [퀴즈 생성·풀이·결과·복습](../prd/prd-quiz-learning.md)
+- 관련 흐름: [학습자료 만들기](../ux/flow-content-import.md), [퀴즈 생성부터 복습까지](../ux/flow-quiz-solving.md)
 
 ## 문서 책임
 
@@ -22,7 +27,7 @@
 
 - stateless Bearer API는 브라우저가 자격 증명을 자동 첨부하는 Cookie API가 아니므로 CSRF token을 요구하지 않는다. 유효한 Access Token과 엔드포인트별 권한 검사는 그대로 적용한다.
 - 일반 API CORS는 설정된 정확한 origin에만 허용하며 wildcard origin을 사용하지 않는다. 허용 method는 `GET`, `POST`, `PATCH`, `DELETE`, `OPTIONS`이고 허용 header는 `Authorization`, `Content-Type`, `Idempotency-Key`다.
-- 브라우저 Refresh Cookie endpoint는 이 예외에 포함하지 않는다. 해당 endpoint의 credentialed CORS와 정확한 `Origin` + `X-OpenMD-CSRF` guard는 [인증 API 계약](authentication.md#cors와-csrf)을 유지한다.
+- 브라우저 Refresh Cookie endpoint는 이 예외에 포함하지 않는다. 해당 endpoint의 credentialed CORS와 정확한 `Origin` + `X-OpenMD-CSRF` guard는 [인증 API 계약](contract-api-authentication.md#cors와-csrf)을 유지한다.
 
 ### 응답 봉투
 
@@ -748,5 +753,5 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 
 ## 열린 질문
 
-- 재연결 뒤 페이지 선택 복원 여부는 [학습자료 흐름의 열린 질문](../../flows/content-import.md#열린-질문)이 책임진다.
+- 재연결 뒤 페이지 선택 복원 여부는 [학습자료 흐름의 열린 질문](../ux/flow-content-import.md#열린-질문)이 책임진다.
 - 학습자료 생성을 제외한 비동기 생성·제출·복습 `Idempotency-Key` 결과의 최소 보존 기간. 비동기 생성의 종료 전과 일반적인 네트워크 응답 유실 재시도 동안에는 만료할 수 없다.
