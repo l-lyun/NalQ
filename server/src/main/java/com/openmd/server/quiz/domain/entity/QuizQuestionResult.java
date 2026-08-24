@@ -7,7 +7,6 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
-import java.time.Instant;
 
 @Entity
 @Table(name = "quiz_question_results")
@@ -30,12 +29,6 @@ public class QuizQuestionResult extends BaseEntity {
 	@Column(name = "user_override_outcome", length = 16)
 	private GradingOutcome userOverrideOutcome;
 
-	@Column(name = "grading_revision", nullable = false)
-	private long gradingRevision;
-
-	@Column(name = "corrected_at")
-	private Instant correctedAt;
-
 	@Column(name = "review_resolved", nullable = false)
 	private boolean reviewResolved;
 
@@ -53,9 +46,16 @@ public class QuizQuestionResult extends BaseEntity {
 		result.questionId = questionId;
 		result.submittedAnswer = submittedAnswer;
 		result.automaticOutcome = automaticOutcome;
-		result.gradingRevision = 0;
 		result.reviewResolved = false;
 		return result;
+	}
+
+	public boolean overrideWith(GradingOutcome outcome) {
+		if (currentOutcome() == outcome) {
+			return false;
+		}
+		this.userOverrideOutcome = outcome;
+		return true;
 	}
 
 	public GradingOutcome currentOutcome() {
@@ -71,7 +71,5 @@ public class QuizQuestionResult extends BaseEntity {
 	public String getSubmittedAnswer() { return submittedAnswer; }
 	public GradingOutcome getAutomaticOutcome() { return automaticOutcome; }
 	public GradingOutcome getUserOverrideOutcome() { return userOverrideOutcome; }
-	public long getGradingRevision() { return gradingRevision; }
-	public Instant getCorrectedAt() { return correctedAt; }
 	public boolean isReviewResolved() { return reviewResolved; }
 }

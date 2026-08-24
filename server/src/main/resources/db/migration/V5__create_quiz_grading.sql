@@ -54,7 +54,6 @@ CREATE TABLE quiz_attempts (
     status VARCHAR(32) NOT NULL,
     automatic_correct_count INT NOT NULL,
     automatic_graded_count INT NOT NULL,
-    summary_revision BIGINT NOT NULL DEFAULT 0,
     created_at TIMESTAMP(6) NOT NULL,
     updated_at TIMESTAMP(6) NOT NULL,
     PRIMARY KEY (id),
@@ -63,7 +62,7 @@ CREATE TABLE quiz_attempts (
     CONSTRAINT fk_quiz_attempts_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE RESTRICT,
     CONSTRAINT chk_quiz_attempts_status CHECK (status IN ('SELF_ASSESSMENT_REQUIRED', 'COMPLETED')),
     CONSTRAINT chk_quiz_attempts_counts CHECK (
-        automatic_correct_count >= 0 AND automatic_graded_count >= automatic_correct_count AND summary_revision >= 0
+        automatic_correct_count >= 0 AND automatic_graded_count >= automatic_correct_count
     )
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
@@ -74,8 +73,6 @@ CREATE TABLE quiz_question_results (
     submitted_answer TEXT NULL,
     automatic_outcome VARCHAR(16) NOT NULL,
     user_override_outcome VARCHAR(16) NULL,
-    grading_revision BIGINT NOT NULL DEFAULT 0,
-    corrected_at TIMESTAMP(6) NULL,
     review_resolved BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP(6) NOT NULL,
     updated_at TIMESTAMP(6) NOT NULL,
@@ -84,51 +81,7 @@ CREATE TABLE quiz_question_results (
     CONSTRAINT fk_quiz_question_results_attempt FOREIGN KEY (attempt_id) REFERENCES quiz_attempts (id) ON DELETE CASCADE,
     CONSTRAINT fk_quiz_question_results_question FOREIGN KEY (question_id) REFERENCES quiz_questions (id) ON DELETE RESTRICT,
     CONSTRAINT chk_quiz_question_results_automatic CHECK (automatic_outcome IN ('CORRECT', 'INCORRECT')),
-    CONSTRAINT chk_quiz_question_results_override CHECK (user_override_outcome IS NULL OR user_override_outcome IN ('CORRECT', 'INCORRECT')),
-    CONSTRAINT chk_quiz_question_results_revision CHECK (grading_revision >= 0)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
-CREATE TABLE quiz_attempt_submissions (
-    id BIGINT NOT NULL AUTO_INCREMENT,
-    user_id BIGINT NOT NULL,
-    quiz_set_id BIGINT NOT NULL,
-    idempotency_key_hash BINARY(32) NOT NULL,
-    request_fingerprint BINARY(32) NOT NULL,
-    attempt_id BIGINT NOT NULL,
-    created_at TIMESTAMP(6) NOT NULL,
-    updated_at TIMESTAMP(6) NOT NULL,
-    PRIMARY KEY (id),
-    CONSTRAINT uk_quiz_attempt_submissions_key UNIQUE (user_id, quiz_set_id, idempotency_key_hash),
-    CONSTRAINT fk_quiz_attempt_submissions_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE RESTRICT,
-    CONSTRAINT fk_quiz_attempt_submissions_set FOREIGN KEY (quiz_set_id) REFERENCES quiz_sets (id) ON DELETE CASCADE,
-    CONSTRAINT fk_quiz_attempt_submissions_attempt FOREIGN KEY (attempt_id) REFERENCES quiz_attempts (id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
-CREATE TABLE quiz_short_answer_grading_idempotencies (
-    id BIGINT NOT NULL AUTO_INCREMENT,
-    user_id BIGINT NOT NULL,
-    attempt_id BIGINT NOT NULL,
-    question_id BIGINT NOT NULL,
-    idempotency_key_hash BINARY(32) NOT NULL,
-    request_fingerprint BINARY(32) NOT NULL,
-    outcome VARCHAR(16) NOT NULL,
-    grading_revision BIGINT NOT NULL,
-    summary_revision BIGINT NOT NULL,
-    correct_question_count INT NOT NULL,
-    graded_question_count INT NOT NULL,
-    review_question_count INT NOT NULL,
-    created_at TIMESTAMP(6) NOT NULL,
-    updated_at TIMESTAMP(6) NOT NULL,
-    PRIMARY KEY (id),
-    CONSTRAINT uk_quiz_short_answer_grading_key UNIQUE (user_id, attempt_id, question_id, idempotency_key_hash),
-    CONSTRAINT fk_quiz_short_answer_grading_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE RESTRICT,
-    CONSTRAINT fk_quiz_short_answer_grading_attempt FOREIGN KEY (attempt_id) REFERENCES quiz_attempts (id) ON DELETE CASCADE,
-    CONSTRAINT fk_quiz_short_answer_grading_question FOREIGN KEY (question_id) REFERENCES quiz_questions (id) ON DELETE RESTRICT,
-    CONSTRAINT chk_quiz_short_answer_grading_outcome CHECK (outcome IN ('CORRECT', 'INCORRECT')),
-    CONSTRAINT chk_quiz_short_answer_grading_counts CHECK (
-        grading_revision >= 0 AND summary_revision >= 0 AND correct_question_count >= 0
-        AND graded_question_count >= correct_question_count AND review_question_count >= 0
-    )
+    CONSTRAINT chk_quiz_question_results_override CHECK (user_override_outcome IS NULL OR user_override_outcome IN ('CORRECT', 'INCORRECT'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE quiz_review_sessions (
@@ -136,7 +89,6 @@ CREATE TABLE quiz_review_sessions (
     public_id VARCHAR(36) NOT NULL,
     user_id BIGINT NOT NULL,
     source_attempt_id BIGINT NOT NULL,
-    source_summary_revision BIGINT NOT NULL,
     status VARCHAR(16) NOT NULL,
     created_at TIMESTAMP(6) NOT NULL,
     updated_at TIMESTAMP(6) NOT NULL,
@@ -144,8 +96,7 @@ CREATE TABLE quiz_review_sessions (
     CONSTRAINT uk_quiz_review_sessions_public_id UNIQUE (public_id),
     CONSTRAINT fk_quiz_review_sessions_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE RESTRICT,
     CONSTRAINT fk_quiz_review_sessions_attempt FOREIGN KEY (source_attempt_id) REFERENCES quiz_attempts (id) ON DELETE CASCADE,
-    CONSTRAINT chk_quiz_review_sessions_status CHECK (status IN ('ACTIVE', 'COMPLETED')),
-    CONSTRAINT chk_quiz_review_sessions_revision CHECK (source_summary_revision >= 0)
+    CONSTRAINT chk_quiz_review_sessions_status CHECK (status IN ('ACTIVE', 'COMPLETED'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE quiz_review_session_questions (

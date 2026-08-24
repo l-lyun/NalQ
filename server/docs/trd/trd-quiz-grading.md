@@ -4,211 +4,262 @@ status: review
 scope: server
 ---
 
-# [TRD · Server] 퀴즈 채점 서버 설계
+# [TRD · Server] 최소 UUID 기반 퀴즈 제출·채점 설계
 
-- 상태: 설계 전환 검토 중 — UUID attempt와 전체 복습 제출 계약 반영, 현재 구현 리팩터링 필요
-- 제품 정책: [퀴즈 생성·풀이·결과·복습 PRD](../../../docs/prd/prd-quiz-learning.md#채점-수정과-서술형-자기평가)
-- 사용자 흐름: [퀴즈 생성부터 복습까지](../../../docs/ux/flow-quiz-solving.md#d-결과)
-- API 계약: [학습자료·퀴즈·복습 API 계약](../../../docs/contracts/contract-api-quiz-learning.md#단답형-현재-판정-수정)
+- 상태: 구현 완료, 서버 테스트 통과
+- 제품 정책: [퀴즈 생성·풀이·결과·복습 PRD](../../../docs/prd/prd-quiz-learning.md#본-퀴즈-풀이와-제출)
+- 사용자 흐름: [퀴즈 생성부터 복습까지](../../../docs/ux/flow-quiz-solving.md#b-본-퀴즈-풀이와-제출)
+- API 계약: [학습자료·퀴즈·복습 API 계약](../../../docs/contracts/contract-api-quiz-learning.md#본-퀴즈-제출과-자기평가)
 - 데이터 계약: [학습자료와 퀴즈 데이터 계약](../../../docs/contracts/contract-data-quiz-learning.md#본-퀴즈-회차와-채점-결과)
 
-## 1. 문서 책임
+## 1. 목적과 결정
 
-이 문서는 단답형의 서버 자동 판정과 사용자 판정 수정에 필요한 서버 내부 모델, 트랜잭션, 요청 재시도 경계와 검증 기준을 정의한다. 수정 가능한 문제 유형은 기능명세가, 공개 HTTP 요청·응답과 오류 의미는 API 계약이 원장이다.
+이 설계는 본 퀴즈 제출·결과 조회·단답형 판정 수정에서 중복 방지와 동시성 복구를 과하게 구현하지 않고 MVP에 필요한 최소 불변식만 남긴다.
 
-현재 서버에는 `Idempotency-Key` hash와 payload fingerprint를 사용하는 단답형 제출·수정 구현이 있다. 이 구현은 새 공유 계약보다 복잡한 이전 설계이므로 구현 동기화 상태로 보지 않는다. 후속 리팩터링에서 클라이언트 생성 attempt UUID, revision 기반 수정과 review session 단일 제출 경계로 교체한다.
+확정한 방향은 다음과 같다.
 
-## 2. 채점 원칙
+- 본 퀴즈 제출은 클라이언트가 만든 UUID를 attempt 리소스 식별자로 사용한다.
+- UUID를 유지한 같은 실행 안에서는 같은 ID로 재요청할 수 있지만, 새로고침·앱 종료 뒤 미제출 답안과 요청 복구를 보장하지 않는다.
+- 서로 다른 UUID의 동일 답안을 서버가 추정해 합치지 않는다. 다시 풀어 새 UUID로 제출하면 별도 attempt가 될 수 있다.
+- 단답형 판정 수정은 원하는 현재 `outcome`을 저장하는 멱등 `PUT`이다. 별도 멱등 키와 공개 revision 없이 마지막 커밋을 현재 값으로 사용한다.
+- 쓰기 성공 응답은 부분 delta가 아니라 전체 결과 projection을 반환한다. 클라이언트는 성공 결과를 통째로 교체한다.
 
-### 2.1 자동 판정
+이전 구현의 `Idempotency-Key`, request fingerprint, replay entity/table과 공개 grading·summary revision은 제거했다.
 
-단답형 문제는 대표 답안과 하나 이상의 허용 답안을 서버에 가진다. 제출 시 사용자 답과 허용 답안 각각을 다음 순서로 정규화한 뒤 완전 일치 여부를 비교한다.
+## 2. 범위
 
-1. Unicode NFC 정규화
-2. Java `Character.isWhitespace(codePoint)` 또는 `Character.isSpaceChar(codePoint)` 중 하나라도 참인 Unicode 공백을 ASCII 공백으로 바꾸고 연속 공백을 하나로 축약한 뒤 앞뒤 공백 제거
-3. `toLowerCase(Locale.ROOT)` 소문자 변환
+### 포함
 
-구두점 제거, 띄어쓰기 전체 제거, 번역, 약어 확장, 형태소 분석, 편집 거리와 임베딩·LLM 의미 유사도는 사용하지 않는다. 자동 채점은 같은 입력에 항상 같은 결과를 내고 외부 서비스 장애에 영향을 받지 않아야 한다.
+- 단답형 문제 세트의 최종 제출과 규칙 기반 자동 채점
+- attempt 결과 조회
+- 답을 작성한 단답형의 현재 판정 수정
+- 같은 client-generated UUID의 attempt 중복 생성 방지
+- 최신 판정으로 점수와 복습 대상 수 재계산
+- 관련 DB migration, MVC·도메인·MySQL 통합 테스트
 
-| 허용 답안 | 사용자 답 | 자동 판정 | 이유 |
-| --- | --- | --- | --- |
-| `fifo` | `FIFO` | `CORRECT` | 대소문자만 다름 |
-| `fifo` | ` fifo ` | `CORRECT` | 앞뒤 공백만 다름 |
-| `fifo` | `선입선출` | `INCORRECT` | 번역·동의어 확장을 하지 않음 |
-| `fifo` | `first in first out` | `INCORRECT` | 약어 확장을 하지 않음 |
-| `fifo`, `선입선출`, `first in first out` | 세 표현 중 하나 | `CORRECT` | 생성 시 각각 허용 답안으로 저장됨 |
+### 후속 범위
 
-정규화한 허용 답안끼리 중복되면 문제 저장 시 하나로 축약한다. 빈 문자열이 되는 허용 답안은 문제 생성 검증 실패다. 채점 시 사용자 답 원문은 수정하지 않는다.
+- 객관식·빈칸·서술형 제출과 결과 projection
+- 서술형 자기평가와 미완료 자기평가 재진입
+- 공개 복습 세션 생성·조회·전체 제출·결과 API
+- 문제 세트 생성 작업과 상태 조회
+- Web/App 실제 API 연결과 현재 화면의 미제출 상태 처리
 
-### 2.2 사용자 판정 수정
+후속 기능도 이 문서의 최소 원칙을 따른다. 자연스러운 리소스 ID가 있으면 그 ID를 사용하고 별도 replay/fingerprint 테이블을 추가하지 않는다.
 
-- 답을 작성한 `SHORT_ANSWER`만 `CORRECT|INCORRECT`로 수정할 수 있다.
-- 객관식·빈칸·서술형과 미응답 단답형은 수정할 수 없다.
-- 사용자 수정은 해당 사용자·attempt·question 결과에만 적용한다. 문제의 허용 답안과 다른 attempt에는 전파하지 않는다.
-- 사용자는 최신 판정을 다시 수정할 수 있다. 최초 자동 판정으로 되돌아온 값도 사용자 수정 이력의 최신 값으로 취급한다.
-- 전체 변경 이력 테이블은 MVP에 만들지 않는다. 최초 자동 판정과 최신 사용자 판정·수정 시각·revision만 보존한다.
+## 3. 남기는 불변식
 
-## 3. 논리 상태 모델
+복구 편의 기능을 제거하더라도 다음은 데이터 정합성과 권한을 위해 유지한다.
 
-목표 모델은 `quiz_sets`, `quiz_questions`, `quiz_short_answer_accepted_answers`, `quiz_attempts`, `quiz_question_results`에 다음 의미를 분리해 저장한다. `quiz_attempts.public_id`는 클라이언트가 생성한 UUID v4이며 unique하다. 제출 replay와 판정 수정 replay를 위한 별도 hash·fingerprint 테이블은 두지 않는다.
+- Access Token의 `userId`로 QuizSet과 attempt 소유권을 확인한다.
+- `quiz_attempts.public_id`는 parse 가능한 UUID 문자열이며 전역 unique다.
+- QuizSet은 현재 사용자 소유이고 `READY`여야 제출할 수 있다.
+- 알 수 없거나 중복된 question ID와 문제 유형에 맞지 않는 답안 모양은 거절한다.
+- 빠진 응답은 입력 오류가 아니라 미응답 오답으로 확정한다.
+- attempt와 모든 문항 결과는 한 트랜잭션에서 함께 저장한다.
+- `(attempt_id, question_id)`는 unique이며 FK로 원본 attempt와 question을 보장한다.
+- 제출 답안과 최초 `automaticOutcome`은 불변이다.
+- 사용자 수정은 최신 `userOverrideOutcome`만 바꾸며 다른 attempt나 문제의 허용 답안에 전파하지 않는다.
+- `COMPLETED` attempt의 답을 작성한 `SHORT_ANSWER`만 수정할 수 있다.
+- 답안, 허용 답안과 학습자료 본문을 일반 로그에 기록하지 않는다.
 
-### 문제 쪽
+보안 token, 인증번호와 Refresh Token digest는 이 단순화 대상이 아니다.
 
-| 값 | 규칙 |
+## 4. 데이터 모델
+
+### `quiz_attempts`
+
+| 값 | 의미 |
 | --- | --- |
-| 대표 답안 | 결과 설명에 노출할 한 개의 답안 |
-| 허용 답안 목록 | 자동 판정에만 사용하는 1개 이상의 원문. 풀이 전과 결과 응답에서 전체 목록을 공개하지 않음 |
+| `public_id` | 클라이언트가 생성한 UUID. `VARCHAR(36)` unique 유지 |
+| `quiz_set_id`, `user_id` | 소유권과 원본 문제 세트 |
+| `status` | `SELF_ASSESSMENT_REQUIRED` 또는 `COMPLETED` |
+| `automatic_correct_count`, `automatic_graded_count` | 제출 시 자동 판정 요약. 이후 override로 다시 쓰지 않음 |
 
-### attempt 문항 결과 쪽
+`summary_revision`은 두지 않는다. 현재 채점 점수와 복습 수는 문항 결과에서 조회 시 계산한다.
 
-| 값 | 규칙 |
+### `quiz_question_results`
+
+| 값 | 의미 |
 | --- | --- |
-| 제출 답안 | 최초 제출 원문을 불변 보존 |
-| `automaticOutcome` | 제출 시 계산한 `CORRECT|INCORRECT`, 불변 |
-| `userOverrideOutcome` | 사용자가 마지막으로 저장한 `CORRECT|INCORRECT`, 수정 전에는 `null` |
-| 현재 `outcome` | `userOverrideOutcome != null`이면 그 값, 아니면 `automaticOutcome` |
-| `gradingSource` | override가 없으면 `AUTOMATIC`, 있으면 `USER_OVERRIDE` |
-| `gradingRevision` | 자동 판정 직후 `0`, 실제 사용자 수정 저장마다 1 증가 |
-| `correctedAt` | 최신 사용자 수정 저장 시각, 수정 전에는 `null` |
+| `submitted_answer` | 최종 제출 원문, 불변 |
+| `automatic_outcome` | 제출 시 자동 판정, 불변 |
+| `user_override_outcome` | 최신 사용자 판정. 수정 전에는 `null` |
+| `review_resolved` | 복습으로 해결됐는지 여부 |
 
-JPA 낙관 잠금용 entity version과 공개 `gradingRevision`은 같은 의미로 재사용하지 않는다. entity version은 다른 필드 변경에도 증가할 수 있지만 공개 revision은 단답형 판정 수정의 동시성만 표현해야 한다.
+현재 판정은 `user_override_outcome != null`이면 override, 아니면 `automatic_outcome`이다. `grading_revision`, `corrected_at`과 수정 이력 테이블은 두지 않는다.
 
-### attempt 요약 쪽
+### 복습 snapshot
 
-| 값 | 규칙 |
+복습 세션을 구현할 때는 snapshot 문항 행 자체가 생성 시점의 대상 목록을 보존한다. `source_summary_revision`은 두지 않는다.
+
+## 5. 공개 HTTP 경계
+
+### 5.1 본 퀴즈 제출
+
+`PUT /api/v1/quiz-sets/{quizSetId}/attempts/{attemptId}`
+
+- Headers: `Authorization`, `Content-Type: application/json`
+- 처음 보는 UUID: attempt와 결과를 생성하고 `201 Created`
+- 같은 사용자·같은 QuizSet의 기존 UUID: body를 다시 검증·비교·적용하지 않고 기존 attempt를 `200 OK`
+- 다른 사용자 또는 QuizSet이 사용한 UUID: `409 ATTEMPT_001`
+- 별도 `Idempotency-Key`, key hash, payload fingerprint와 replay response를 사용하지 않음
+
+클라이언트는 UUID v4를 만들지만 서버는 UUID로 parse 가능한지만 확인한다. UUID version을 서버 보안 조건으로 사용하지 않고 문자열은 canonical lowercase 형태로 저장한다.
+
+### 5.2 결과 조회
+
+`GET /api/v1/quiz-attempts/{attemptId}/result`
+
+- 현재 사용자 소유 attempt만 조회한다.
+- 단답형은 현재 `outcome`만 공개한다.
+- `gradingRevision`, `summary.revision`, `automaticOutcome`, 내부 override 필드를 노출하지 않는다.
+- summary는 현재 문항 결과에서 계산한다.
+
+### 5.3 단답형 판정 수정
+
+`PUT /api/v1/quiz-attempts/{attemptId}/short-answer-gradings/{questionId}`
+
+```json
+{
+  "outcome": "CORRECT"
+}
+```
+
+- 같은 현재 outcome이면 아무 값도 바꾸지 않고 `200 OK`
+- 다른 outcome이면 `userOverrideOutcome`을 교체하고 `200 OK`
+- `expectedRevision`과 `Idempotency-Key`를 받지 않음
+- 성공 `data`는 결과 조회와 같은 전체 `QuizAttemptResult`
+- 동시에 다른 값이 요청되면 마지막으로 커밋된 요청이 현재 값
+
+웹은 한 화면에서 수정 요청을 하나씩 보내고 성공 결과를 통째로 적용한다. 다중 탭의 오래된 화면까지 서버가 병합하지 않으며 결과 재조회로 최종 상태에 수렴한다.
+
+## 6. 처리 흐름과 트랜잭션
+
+### 6.1 제출
+
+1. `attemptId`를 UUID로 parse하고 canonical 문자열로 바꾼다.
+2. 현재 사용자 소유 QuizSet을 쓰기 잠금으로 조회하고 `READY`인지 확인한다.
+3. 같은 UUID attempt가 있으면 소유자와 QuizSet을 비교한다.
+4. 같은 리소스면 최초 attempt를 반환한다. 다른 리소스면 `ATTEMPT_001`이다.
+5. 새 UUID면 payload와 question ID·답안 모양을 검증한다.
+6. 단답형을 `ShortAnswerGrader`로 판정한다.
+7. attempt와 모든 question result를 한 트랜잭션으로 저장하고 flush한다.
+8. 제출 응답을 반환한다.
+
+같은 QuizSet의 동시 제출은 QuizSet 행 잠금으로 직렬화한다. 서로 다른 QuizSet이 같은 UUID를 동시에 사용한 비정상 경합은 DB unique 제약이 막고 `ATTEMPT_001`로 매핑한다. 이 드문 경합을 복구하기 위한 별도 replay transaction이나 advisory lock은 추가하지 않는다.
+
+### 6.2 단답형 판정 수정
+
+1. 현재 사용자 소유 attempt를 쓰기 잠금으로 조회한다.
+2. attempt 상태, question 소속·유형, 미응답 여부를 검증한다.
+3. 현재 outcome과 요청 outcome이 같으면 변경하지 않는다.
+4. 다르면 최신 `userOverrideOutcome`을 저장한다.
+5. 같은 트랜잭션 안에서 현재 점수와 복습 대상 수를 다시 계산한다.
+6. 전체 결과 projection을 반환하고 커밋한다.
+
+attempt 행 잠금은 revision 충돌을 만들기 위한 것이 아니라 override 저장과 결과 집계를 한 트랜잭션 결과로 맞추기 위한 최소 직렬화다. 별도 조건부 revision update는 사용하지 않는다.
+
+### 6.3 네트워크 실패
+
+| 상황 | 처리 |
 | --- | --- |
-| `summaryRevision` | attempt 생성 시 `0`, 단답형 판정·서술형 자기평가·복습 해결 상태처럼 공개 summary 값이 실제로 바뀔 때마다 1 증가 |
+| 서버 commit 전 연결 실패 | 같은 화면이 남아 있으면 같은 UUID로 제출 재시도 |
+| 서버 commit 후 응답 유실 | 같은 UUID 재요청이 기존 attempt를 반환 |
+| 새로고침·종료로 UUID와 답안 유실 | 복구하지 않고 다시 풀어 새 UUID로 제출 |
+| 단답형 수정 응답 유실 | 같은 outcome을 다시 `PUT`하거나 결과 조회 |
 
-문항별 `gradingRevision`은 같은 문항의 수정 충돌을 감지하고, attempt의 `summaryRevision`은 서로 다른 단답형, 서술형 자기평가와 복습 해결까지 포함한 전체 요약 순서를 표현한다.
+서로 다른 UUID로 생긴 동일 답안 attempt와 다중 탭의 일시적인 stale UI는 MVP에서 수용한다.
 
-## 4. 서버 구성 경계
+## 7. 코드 책임 분리
 
-현재 `quiz` 도메인은 다음 책임으로 나눈다.
+기존 451줄의 `QuizAttemptService`는 다음 사용 사례 단위로 분리했다.
 
-- Controller: 결과 조회와 단답형 판정 수정 HTTP 변환, 인증 사용자 전달
-- Service: 소유권·attempt 상태·문항 유형·미응답 검증, 트랜잭션과 동시성 조정
-- Repository: attempt 식별자 unique 처리, 문항 결과 조건부 갱신과 결과 요약 조회
-- Domain: `domain.entity`의 영속 모델, `domain.type`의 상태·종류 enum, `domain` 루트의 채점 정책
+| 클래스 | 책임 |
+| --- | --- |
+| `QuizAttemptSubmissionService` | UUID 제출, 소유권·상태·payload 검증, 자동 채점과 저장 |
+| `QuizAttemptResultService` | 소유권 확인과 전체 결과 projection |
+| `ShortAnswerGradingService` | 최신 override 저장 후 전체 결과 반환 |
+| `QuizAttemptResultProjector` | 현재 문항 결과에서 공통 result·summary 조립 |
+| `ShortAnswerGrader` | 외부 의존성 없는 정규화와 완전 일치 판정 |
 
-자동 채점은 별도 외부 의존성이 없는 `ShortAnswerGrader`의 순수 동작으로 둔다. Java의 단순 정규화 함수만을 위해 주입 가능한 클래스를 추가하지 않고, grader 내부 package-private 함수로 정규화한다. 입력과 허용 답안 목록을 받아 판정하는 도메인 동작은 독립 단위 테스트 대상으로 유지한다.
+Controller는 HTTP method/path, 인증 principal, 입력 DTO와 `201/200` 선택만 담당한다. 서비스는 `Controller → Service → Repository` 방향을 유지한다.
 
-## 5. 처리 흐름
+## 8. 제거·변경 대상
 
-### 5.1 최종 제출 자동 채점
+### 삭제
 
-1. 현재 사용자 소유 QuizSet과 모든 question을 조회한다.
-2. URL의 클라이언트 생성 UUID v4 `attemptId`가 이미 존재하면 소유자와 QuizSet을 확인하고 현재 attempt를 반환한다. request body를 다시 적용하거나 fingerprint로 비교하지 않는다.
-3. 처음 보는 attempt ID이면 제출 payload를 문제 유형별로 검증하고 누락은 미응답으로 확정한다.
-4. 답을 작성한 단답형을 `ShortAnswerGrader`로 판정한다.
-5. 제출 답안, `automaticOutcome`, `gradingRevision=0`을 attempt 문항 결과에 저장한다.
-6. 객관식·빈칸·단답형의 최초 자동 판정으로 제출 응답의 `automaticGrading`을 계산한다.
-7. attempt와 모든 문항 결과를 한 트랜잭션에서 확정한다. 동일 UUID 동시 요청은 DB unique 제약에서 하나만 생성하고 다른 요청은 생성된 attempt를 재조회한다.
+- `QuizAttemptSubmission`
+- `QuizAttemptSubmissionRepository`
+- `ShortAnswerGradingIdempotency`
+- `ShortAnswerGradingIdempotencyRepository`
+- `QuizRequestDigest`
 
-### 5.2 단답형 판정 수정
+### 변경
 
-1. Access Token 사용자 기준으로 attempt를 찾고 `SELECT ... FOR UPDATE` 성격의 쓰기 잠금을 획득한다. 없거나 타인 소유이면 동일하게 `404 COMMON_003`이다.
-2. 잠금 안에서 현재 문항 `gradingRevision`과 attempt `summaryRevision`을 확인한다.
-3. question 소유권, attempt `COMPLETED`, 답을 작성한 `SHORT_ANSWER` 조건을 검증한다.
-4. 요청 `expectedRevision`과 저장된 문항 `gradingRevision`을 비교한다.
-5. 같은 현재 outcome 요청도 잠금 안에서 최신 상태를 다시 확인한 뒤 no-op 응답을 반환하고 두 revision을 올리지 않는다.
-6. 다른 outcome이면 `WHERE grading_revision = :expectedRevision` 조건부 갱신으로 최신 override, 문항 revision과 수정 시각을 저장한다. 갱신 행이 0개면 `409 ATTEMPT_001`이다.
-7. attempt의 `summaryRevision`을 1 증가시키고, 잠금 이후의 현재 read로 모든 문항 결과를 집계해 채점 점수와 원본 attempt의 `reviewQuestionCount`를 계산한다.
-8. 현재 화면이 교체할 `questionId`, `outcome`, `gradingRevision`, 같은 `summaryRevision`의 채점 점수·복습 수 projection을 반환하고 커밋한다. 답안·대표 답안·최초 자동 판정·서술형 집계처럼 수정으로 바뀌지 않는 결과 상세는 반복하지 않는다.
+- `QuizAttemptController`: 제출 `POST`를 UUID path `PUT`으로 변경하고 두 쓰기 API의 `Idempotency-Key` 제거
+- `QuizAttempt`: 서버 UUID 생성 대신 client public ID를 받는 factory, `summaryRevision` 제거
+- `QuizQuestionResult`: `gradingRevision`, `correctedAt`과 조건부 revision update 제거
+- `QuizAttemptRepository`: 전역 public ID 조회와 사용자 소유 쓰기 잠금 조회
+- 요청·응답 DTO: `expectedRevision`, `gradingRevision`, summary revision 제거
+- `V5__create_quiz_grading.sql`: replay 두 테이블과 revision 컬럼 제거
+- 복습 내부 모델: `sourceSummaryRevision` 제거
 
-클라이언트는 성공 응답 전까지 기존 판정과 summary를 유지한다. `409 ATTEMPT_001`이면 결과를 다시 조회한 뒤 최신 revision으로 새 요청을 만든다.
+V5는 아직 `dev`에 병합되지 않은 신규 migration이므로 V6 보정 migration을 만들지 않고 V5 자체를 수정한다. 이미 V5를 적용한 개인 로컬 DB는 개발 데이터 초기화 후 다시 적용하며 운영 migration 이력으로 취급하지 않는다.
 
-## 6. 트랜잭션과 계산
+학습자료 생성과 QuizSet 비동기 생성에 쓰는 기존 `Idempotency-Key` 계약은 별개다. 전역 CORS 허용 header와 다른 도메인의 digest 구현은 제거하지 않는다.
 
-- 사용자 override 갱신과 summary 계산은 attempt 쓰기 잠금을 보유한 하나의 DB 트랜잭션에서 수행한다. 같은 attempt의 서로 다른 문항 수정도 이 잠금으로 직렬화한다.
-- summary를 attempt 행에 캐시한다면 조건부 갱신과 같은 트랜잭션에서 함께 수정한다. MVP에서는 우선 문항 결과에서 집계해 중복 상태를 줄이는 방안을 권장한다.
-- `scoredGrading.correctQuestionCount`는 객관식·빈칸의 자동 판정과 단답형 현재 outcome의 `CORRECT` 수다.
-- `scoredGrading.gradedQuestionCount`는 객관식·빈칸·단답형 수이며 사용자 수정으로 바뀌지 않는다.
-- `reviewQuestionCount`는 원본 attempt의 현재 판정과 복습 해결 상태를 기준으로 계산한다.
-- 저장이나 집계 중 하나라도 실패하면 override, 문항 revision과 summary revision을 모두 rollback한다.
-- 수정 응답의 최소 summary projection에는 공개 `summary.revision`, `scoredGrading`, `reviewQuestionCount`만 포함한다. 클라이언트는 더 큰 revision을 이미 반영했다면 늦게 도착한 과거 summary를 화면에 적용하지 않고 전체 결과를 다시 조회한다.
-- 서술형 자기평가와 복습 판정도 summary 값에 영향을 주므로 source attempt 쓰기 잠금을 같은 순서로 먼저 획득한다. 복습 저장은 immutable한 `sourceAttemptId`를 조회한 뒤 `source attempt → review session` 순서로 잠가 교착 순서를 고정한다.
-- `summaryRevision`은 summary 구성 값이 실제로 달라질 때만 증가한다. 복습 `UNRESOLVED`처럼 원본 `reviewQuestionCount`가 그대로인 저장은 증가시키지 않지만 응답에는 현재 revision을 반환한다.
-
-## 7. 요청 식별과 과하지 않은 재시도
-
-- 본 퀴즈 최종 제출은 클라이언트가 생성한 UUID v4 `attemptId` 자체가 요청과 결과 리소스의 식별자다. UUID는 비밀이 아니므로 hash하지 않는다.
-- 같은 attempt ID가 이미 존재하면 최초 제출 우선으로 현재 attempt를 반환한다. payload를 다시 적용하거나 비교하기 위한 fingerprint와 replay snapshot을 만들지 않는다.
-- 동일 UUID 동시 생성은 DB unique 제약으로 직렬화한다. 다른 사용자 또는 QuizSet의 ID를 재사용한 경우에만 `409 ATTEMPT_001`이다.
-- 단답형 수정은 `expectedRevision`과 현재 outcome만 사용한다. 응답을 받지 못해 같은 요청을 보냈고 현재 outcome이 이미 요청값이면 no-op 성공을 반환한다. 현재 값이 다르고 revision도 바뀌었으면 충돌로 결과 재조회를 요구한다.
-- 보안 token, 인증번호처럼 노출 시 위험한 값의 digest 정책은 이 단순화 대상이 아니다.
-
-## 8. 복습 세션 경계
-
-원본 attempt의 현재 `reviewQuestionCount`와 활성 복습 세션의 queue는 다른 상태다.
-
-- 복습 세션 생성 시 당시 `reviewRequired=true` 문항을 snapshot한다.
-- 생성된 활성 세션은 원본 단답형 판정이 이후 바뀌어도 문항을 중간 추가·삭제하지 않는다.
-- 단답형 수정 응답과 최신 복습 현황의 `reviewQuestionCount`는 원본 attempt의 현재 후보 수를 반환한다.
-- 활성 세션은 모든 snapshot 문항을 문제 세트와 같은 공개 모양으로 반환하고, 제출 전 답안과 현재 위치는 서버에 저장하지 않는다.
-- 사용자는 모든 문항을 푼 뒤 `reviewSessionId` 하나에 전체 답안을 한 번 제출한다. 같은 세션 재요청은 최초 제출 결과를 반환하며 별도 요청 키나 fingerprint를 만들지 않는다.
-- 자동 채점과 필요한 서술형 자기평가가 끝나면 문항별 해결 상태와 source attempt summary를 확정한다.
-- 수정된 판정의 복습 대상 여부는 다음 복습 세션 생성부터 반영한다.
-
-이 선택은 진행 중인 세션에서 현재 문항이 갑자기 사라지거나 새 문항이 끼어드는 문제를 막는다. 두 수가 일시적으로 다를 수 있으므로 클라이언트가 합치거나 같은 값으로 가정하지 않는다.
-
-## 9. 공개 오류 매핑
+## 9. 오류 매핑
 
 | 조건 | 응답 |
 | --- | --- |
-| attempt UUID·outcome enum·revision 형식 오류 | `400 COMMON_001` |
+| UUID·outcome·답안 형식 오류 | `400 COMMON_001` |
 | JSON 파싱 실패 | `400 COMMON_002` |
-| attempt/question 없음 또는 타인 소유 | `404 COMMON_003` |
-| 완료 전 attempt, 수정 불가 유형, 미응답 단답형 | `409 ATTEMPT_001` |
-| revision 충돌, 다른 소유자·QuizSet의 attempt UUID 재사용 | `409 ATTEMPT_001` |
-| 예상하지 못한 저장·집계 실패 | `500 COMMON_999` |
+| attempt/question/QuizSet 없음 또는 타인 소유 | `404 COMMON_003` |
+| `READY`가 아닌 세트, 완료 전 attempt, 수정 불가 유형, 미응답 단답형 | `409 ATTEMPT_001` |
+| 다른 사용자·QuizSet의 UUID 재사용 | `409 ATTEMPT_001` |
+| 예상하지 못한 DB·집계 실패 | `500 COMMON_999` |
 
-오류 응답은 사용자의 답, 허용 답안과 다른 사용자의 리소스 존재 여부를 노출하지 않는다.
+다른 사용자 리소스의 존재 여부와 제출 답안은 오류에 포함하지 않는다.
 
-## 10. 기술 검증 기준
+## 10. 테스트 우선 구현·검증 기록
 
-### 자동 판정
+### 1단계: 실패 재현
 
-- `fifo`, `FIFO`, 앞뒤 공백과 연속 공백 차이는 정의한 정규화 뒤 동일하게 판정된다.
-- `fifo`만 허용 답안일 때 `선입선출`, `first in first out`은 자동 오답이다.
-- 각 표현을 허용 답안으로 저장하면 각각 자동 정답이다.
-- Unicode 조합형 차이는 NFC 뒤 동일하고 구두점·번역·약어는 임의로 같아지지 않는다.
-- LLM, 네트워크와 시스템 기본 Locale 없이 같은 입력에 같은 결과를 낸다.
+- MVC: 새 제출 `PUT`이 현재 매핑되지 않음을 확인
+- MVC: body-only 단답형 수정이 현재 멱등 header·revision 계약 때문에 실패함을 확인
+- MVC: 새 결과 JSON에 revision 필드가 없어야 한다는 테스트의 실패 확인
+- MySQL: client attempt ID 대신 서버 UUID와 replay 행이 생성되는 현재 동작 확인
 
-### 판정 수정
+### 2단계: 최소 구현
 
-- 답을 작성한 단답형만 수정되고 제출 답안과 `automaticOutcome`은 변하지 않는다.
-- 수정 성공 시 현재 outcome, revision, 채점 점수와 복습 수가 같은 트랜잭션 결과다.
-- 다시 수정하면 최신 override가 현재 outcome이 되고 revision이 1 증가한다.
-- 같은 현재 outcome 요청은 revision과 수정 시각을 바꾸지 않는다.
-- 객관식·빈칸·서술형·미응답 단답형과 타인 리소스는 저장되지 않는다.
+- 신규 UUID 제출 `201`, attempt와 question result 한 세트 저장
+- 같은 사용자·QuizSet·UUID 재요청 `200`, 행 증가 없음, 최초 답안 유지
+- 다른 사용자 또는 QuizSet의 UUID 재사용 `409`
+- 잘못된 UUID `400`, 타인 QuizSet `404`, `READY`가 아닌 세트 `409`
+- 단답형 자동 판정과 결과 projection
+- body-only 판정 수정, 같은 outcome no-op, 다른 outcome last-write-wins
+- 수정 뒤 제출 답안·최초 자동 판정 불변, 점수·복습 수 재계산
+- 결과 JSON에 grading·summary revision이 없음
 
-### 동시성·장애
+### 3단계: 통합 검증
 
-- 같은 revision의 두 요청 중 하나만 조건부 갱신에 성공하고 다른 요청은 `ATTEMPT_001`이다.
-- 같은 attempt의 서로 다른 단답형을 동시에 수정해도 attempt 잠금으로 직렬화되고, 두 번째 성공 응답의 `summaryRevision`과 집계에는 첫 번째 수정이 포함된다.
-- 단답형 수정과 서술형 자기평가·복습 해결이 경합해도 source attempt 잠금으로 직렬화되고 모든 summary 변경이 단조 증가하는 `summaryRevision`에 반영된다.
-- 응답 전달 순서가 뒤집혀도 낮은 `summary.revision`의 응답으로 최신 점수와 복습 수를 되돌리지 않는다.
-- 같은 attempt UUID 재제출과 같은 outcome·revision 수정 재시도는 중복 attempt나 revision을 만들지 않는다.
-- 저장 실패와 summary 집계 실패는 변경 전 판정·revision·요약을 유지한다.
-- 활성 복습 세션은 판정 수정 뒤에도 snapshot이 변하지 않고 다음 세션만 최신 대상을 사용한다.
+- 같은 QuizSet의 동시 동일 UUID 제출은 attempt 한 개만 생성
+- 동시에 상반된 단답형 수정이 모두 정상 종료되고 최종 결과와 summary가 DB 현재값과 일치
+- 활성 복습 snapshot 문항 목록은 원본 단답형 판정 수정 뒤에도 바뀌지 않음
+- `ShortAnswerGraderTest`의 Unicode 정규화·완전 일치 규칙 유지
+- 집중 MVC·도메인·MySQL Testcontainers 테스트 후 `server/gradlew test`
+- `git diff --check`
 
-구현은 도메인 단위 테스트, MVC 계약 테스트와 MySQL migration·트랜잭션 통합 테스트로 검증한다. 구현은 `server/AGENTS.md`의 테스트 우선 순서를 따른다.
+동시 요청의 정확한 승자 순서, 새로고침 뒤 답안 복원, 서로 다른 UUID의 동일 payload dedupe는 테스트하거나 보장하지 않는다.
 
-## 11. 구현 범위와 후속 범위
+## 11. 소비자 동기화
 
-이번 서버 구현에 포함된 범위는 다음과 같다.
+서버 구현은 공유 API·데이터 계약을 기준으로 완료했다. Web/App은 후속 단계에서 다음을 제거해야 한다.
 
-- 퀴즈·단답형 문항·attempt·문항 결과·복습 세션 snapshot DB 모델과 Flyway migration
-- 단답형 문제 세트의 최종 제출 자동 채점과 결과 화면 projection
-- 단답형 판정 수정 Controller·Service·Repository, attempt 잠금과 조건부 revision 갱신
-- 활성 복습 세션의 문항 목록을 별도 행으로 고정하는 내부 snapshot 생성 경계
-- 도메인·MVC·CORS·MySQL migration 및 트랜잭션 테스트
+- 7일 미제출 답안 복구를 필수로 보는 상태·저장 규칙
+- attempt UUID와 payload snapshot의 지속 저장 의무
+- `expectedRevision`, `gradingRevision`, `summary.revision` 기반 병합·충돌 UI
+- 단답형 수정의 부분 summary delta 적용
 
-다음은 승인된 전체 계약에는 존재하지만 이 단답형 구현과 독립적인 후속 범위다.
-
-- 문제 세트 생성 작업과 생성 상태 조회 API
-- 객관식·빈칸·서술형 제출 projection과 서술형 자기평가 API
-- 최신 attempt를 선택하는 공개 복습 세션 생성·조회·응답 API
-- OpenAPI 상세 annotation과 프론트의 실제 API 연동
-
-현재 코드의 `quiz_attempt_submissions`, `quiz_short_answer_grading_idempotencies`, `QuizRequestDigest`와 관련 replay 분기는 이전 설계 잔여물이며 후속 서버 구현에서 제거 대상이다. 최초 자동 판정과 최신 override만 보존하고 전체 수정 이력을 만들지 않는 선택, 활성 복습 세션 snapshot을 유지하고 수정 결과를 다음 세션부터 반영하는 선택은 사용자 확정 사항이다.
+Web/App 코드는 이번 서버 설계 단계에서 수정하지 않는다. 실제 연동 전 각 애플리케이션 TRD와 adapter를 이 계약에 맞춰 갱신한다.

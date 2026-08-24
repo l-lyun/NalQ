@@ -13,15 +13,18 @@ import com.openmd.server.global.error.GlobalExceptionHandler;
 import com.openmd.server.quiz.domain.type.GradingOutcome;
 import com.openmd.server.quiz.domain.type.QuestionType;
 import com.openmd.server.quiz.domain.type.QuizAttemptStatus;
+import com.openmd.server.quiz.dto.model.QuizAttemptSubmissionResult;
 import com.openmd.server.quiz.dto.response.AnswerValue;
 import com.openmd.server.quiz.dto.response.EssaySelfAssessmentSummary;
 import com.openmd.server.quiz.dto.response.GradingCount;
 import com.openmd.server.quiz.dto.response.QuizAttemptResult;
 import com.openmd.server.quiz.dto.response.QuizAttemptSummary;
-import com.openmd.server.quiz.dto.response.ShortAnswerGradingSummary;
 import com.openmd.server.quiz.dto.response.ShortAnswerQuestionResult;
-import com.openmd.server.quiz.dto.response.UpdatedShortAnswerGrading;
-import com.openmd.server.quiz.service.QuizAttemptService;
+import com.openmd.server.quiz.dto.response.SubmittedQuizAttempt;
+import com.openmd.server.quiz.service.QuizAttemptResultService;
+import com.openmd.server.quiz.service.QuizAttemptSubmissionService;
+import com.openmd.server.quiz.service.ShortAnswerGradingService;
+import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,60 +38,85 @@ import org.springframework.web.method.support.ModelAndViewContainer;
 
 class QuizAttemptControllerTest {
 
-	private final QuizAttemptService service = mock(QuizAttemptService.class);
+	private final QuizAttemptSubmissionService submissions = mock(QuizAttemptSubmissionService.class);
+	private final QuizAttemptResultService results = mock(QuizAttemptResultService.class);
+	private final ShortAnswerGradingService gradings = mock(ShortAnswerGradingService.class);
 	private MockMvc mockMvc;
 
 	@BeforeEach
 	void setUp() {
-		mockMvc = MockMvcBuilders.standaloneSetup(new QuizAttemptController(service))
+		mockMvc = MockMvcBuilders.standaloneSetup(new QuizAttemptController(submissions, results, gradings))
 			.setControllerAdvice(new GlobalExceptionHandler())
 			.setCustomArgumentResolvers(accessPrincipalResolver())
 			.build();
 	}
 
 	@Test
-	void returnsOnlyTheFieldsNeededToReplaceTheChangedGradingAndSummary() throws Exception {
-		when(service.updateShortAnswerGrading(7L, "attempt_1", "question_2", "key-1", "CORRECT", 0L))
-			.thenReturn(new UpdatedShortAnswerGrading(
-				"question_2", GradingOutcome.CORRECT, 1,
-				new ShortAnswerGradingSummary(1, new GradingCount(3, 3), 1)
-			));
+	void submitsWithClientAttemptIdUsingPutWithoutAnIdempotencyHeader() throws Exception {
+		String attemptId = "550e8400-e29b-41d4-a716-446655440000";
+		SubmittedQuizAttempt submitted = new SubmittedQuizAttempt(
+			attemptId, QuizAttemptStatus.COMPLETED, new GradingCount(0, 1), List.of(),
+			Instant.parse("2026-08-20T01:20:00Z")
+		);
+		when(submissions.submit(7L, "set_1", attemptId, List.of()))
+			.thenReturn(new QuizAttemptSubmissionResult(true, submitted));
 
-		mockMvc.perform(put("/api/v1/quiz-attempts/attempt_1/short-answer-gradings/question_2")
-				.header("Idempotency-Key", "key-1")
+		mockMvc.perform(put("/api/v1/quiz-sets/set_1/attempts/{attemptId}", attemptId)
 				.contentType(MediaType.APPLICATION_JSON)
-				.content("{\"outcome\":\"CORRECT\",\"expectedRevision\":0}"))
-			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.questionId").value("question_2"))
-			.andExpect(jsonPath("$.data.outcome").value("CORRECT"))
-			.andExpect(jsonPath("$.data.gradingRevision").value(1))
-			.andExpect(jsonPath("$.data.summary.revision").value(1))
-			.andExpect(jsonPath("$.data.summary.scoredGrading.correctQuestionCount").value(3))
-			.andExpect(jsonPath("$.data.summary.reviewQuestionCount").value(1))
-			.andExpect(jsonPath("$.data.automaticOutcome").doesNotExist())
-			.andExpect(jsonPath("$.data.response").doesNotExist())
-			.andExpect(jsonPath("$.data.correctedAt").doesNotExist());
+				.content("{\"responses\":[]}"))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.data.attemptId").value(attemptId));
 
-		verify(service).updateShortAnswerGrading(7L, "attempt_1", "question_2", "key-1", "CORRECT", 0L);
+		verify(submissions).submit(7L, "set_1", attemptId, List.of());
 	}
 
 	@Test
-	void resultProjectionKeepsOnlyCurrentShortAnswerOutcomeAndRevision() throws Exception {
-		when(service.result(7L, "attempt_1")).thenReturn(new QuizAttemptResult(
-			"attempt_1", "set_1", QuizAttemptStatus.COMPLETED,
-			new QuizAttemptSummary(1, new GradingCount(1, 1), new EssaySelfAssessmentSummary(0, 0, 0), 0),
-			List.of(new ShortAnswerQuestionResult(
-				"question_2", 2, QuestionType.SHORT_ANSWER, "큐", "처리 순서는?",
-				new AnswerValue("선입선출"), new AnswerValue("fifo"), GradingOutcome.CORRECT, 1,
-				"FIFO 구조", "FIFO 원칙"
-			))
-		));
+	void returnsOkWhenTheAttemptIdAlreadyExistsForTheSameQuizSet() throws Exception {
+		String attemptId = "550e8400-e29b-41d4-a716-446655440000";
+		SubmittedQuizAttempt submitted = new SubmittedQuizAttempt(
+			attemptId, QuizAttemptStatus.COMPLETED, new GradingCount(0, 1), List.of(),
+			Instant.parse("2026-08-20T01:20:00Z")
+		);
+		when(submissions.submit(7L, "set_1", attemptId, List.of()))
+			.thenReturn(new QuizAttemptSubmissionResult(false, submitted));
+
+		mockMvc.perform(put("/api/v1/quiz-sets/set_1/attempts/{attemptId}", attemptId)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"responses\":[]}"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.attemptId").value(attemptId));
+	}
+
+	@Test
+	void acceptsAnOutcomeOnlyGradingUpdateAndReturnsTheWholeResult() throws Exception {
+		QuizAttemptResult result = result(GradingOutcome.CORRECT, false);
+		when(gradings.update(7L, "attempt_1", "question_2", "CORRECT"))
+			.thenReturn(result);
+
+		mockMvc.perform(put("/api/v1/quiz-attempts/attempt_1/short-answer-gradings/question_2")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"outcome\":\"CORRECT\"}"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.attemptId").value("attempt_1"))
+			.andExpect(jsonPath("$.data.questionResults[0].outcome").value("CORRECT"))
+			.andExpect(jsonPath("$.data.summary.scoredGrading.correctQuestionCount").value(1))
+			.andExpect(jsonPath("$.data.summary.reviewQuestionCount").value(0))
+			.andExpect(jsonPath("$.data.gradingRevision").doesNotExist())
+			.andExpect(jsonPath("$.data.summary.revision").doesNotExist());
+
+		verify(gradings).update(7L, "attempt_1", "question_2", "CORRECT");
+	}
+
+	@Test
+	void resultProjectionKeepsOnlyTheCurrentShortAnswerOutcome() throws Exception {
+		when(results.result(7L, "attempt_1")).thenReturn(result(GradingOutcome.CORRECT, false));
 
 		mockMvc.perform(get("/api/v1/quiz-attempts/attempt_1/result"))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.questionResults[0].response.answer").value("선입선출"))
 			.andExpect(jsonPath("$.data.questionResults[0].outcome").value("CORRECT"))
-			.andExpect(jsonPath("$.data.questionResults[0].gradingRevision").value(1))
+			.andExpect(jsonPath("$.data.summary.revision").doesNotExist())
+			.andExpect(jsonPath("$.data.questionResults[0].gradingRevision").doesNotExist())
 			.andExpect(jsonPath("$.data.questionResults[0].automaticOutcome").doesNotExist())
 			.andExpect(jsonPath("$.data.questionResults[0].correctedAt").doesNotExist())
 			.andExpect(jsonPath("$.data.questionResults[0].unanswered").doesNotExist());
@@ -96,19 +124,27 @@ class QuizAttemptControllerTest {
 
 	@Test
 	void unansweredShortAnswerKeepsAnExplicitNullResponse() throws Exception {
-		when(service.result(7L, "attempt_1")).thenReturn(new QuizAttemptResult(
-			"attempt_1", "set_1", QuizAttemptStatus.COMPLETED,
-			new QuizAttemptSummary(0, new GradingCount(0, 1), new EssaySelfAssessmentSummary(0, 0, 0), 1),
-			List.of(new ShortAnswerQuestionResult(
-				"question_2", 2, QuestionType.SHORT_ANSWER, "큐", "처리 순서는?",
-				null, new AnswerValue("fifo"), GradingOutcome.INCORRECT, 0,
-				"FIFO 구조", "FIFO 원칙"
-			))
-		));
+		when(results.result(7L, "attempt_1")).thenReturn(result(GradingOutcome.INCORRECT, true));
 
 		mockMvc.perform(get("/api/v1/quiz-attempts/attempt_1/result"))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.questionResults[0].response").value((Object) null));
+	}
+
+	private QuizAttemptResult result(GradingOutcome outcome, boolean unanswered) {
+		return new QuizAttemptResult(
+			"attempt_1", "set_1", QuizAttemptStatus.COMPLETED,
+			new QuizAttemptSummary(
+				new GradingCount(outcome == GradingOutcome.CORRECT ? 1 : 0, 1),
+				new EssaySelfAssessmentSummary(0, 0, 0),
+				outcome == GradingOutcome.INCORRECT ? 1 : 0
+			),
+			List.of(new ShortAnswerQuestionResult(
+				"question_2", 2, QuestionType.SHORT_ANSWER, "큐", "처리 순서는?",
+				unanswered ? null : new AnswerValue("선입선출"), new AnswerValue("fifo"), outcome,
+				"FIFO 구조", "FIFO 원칙"
+			))
+		);
 	}
 
 	private HandlerMethodArgumentResolver accessPrincipalResolver() {

@@ -153,9 +153,9 @@ DTO는 계층마다 별도 `dto`를 만들지 않고 도메인 공용 `dto` 아�
 
 ### 퀴즈 도메인 적용
 
-퀴즈는 채점·멱등성·복습 snapshot을 포함해 영속 Entity와 상태 enum이 밀집되어 있으므로 선택적 하위 패키지를 적용한다.
+퀴즈는 채점·UUID 중복 제약·복습 snapshot을 포함해 영속 Entity와 상태 enum이 밀집되어 있으므로 선택적 하위 패키지를 적용한다.
 
-- `quiz.domain.entity`: `QuizSet`, `QuizQuestion`, `ShortAnswerAcceptedAnswer`, `QuizAttempt`, `QuizQuestionResult`, `QuizAttemptSubmission`, `ShortAnswerGradingIdempotency`, `ReviewSession`, `ReviewSessionQuestion`
+- `quiz.domain.entity`: `QuizSet`, `QuizQuestion`, `ShortAnswerAcceptedAnswer`, `QuizAttempt`, `QuizQuestionResult`, `ReviewSession`, `ReviewSessionQuestion`
 - `quiz.domain.type`: `GradingOutcome`, `QuestionType`, `QuizSetStatus`, `QuizAttemptStatus`, `ReviewSessionStatus`, `ReviewQuestionStatus`
 - `quiz.domain`: 순수 채점 정책 `ShortAnswerGrader`
 

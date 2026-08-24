@@ -46,11 +46,11 @@ public class ReviewSessionSnapshotService {
 		}
 		var candidates = results.findReviewCandidateQuestionIds(attempt.getId());
 		ReviewSession session = sessions.saveAndFlush(
-			ReviewSession.active(userId, attempt.getId(), attempt.getSummaryRevision())
+			ReviewSession.active(userId, attempt.getId())
 		);
 		for (int index = 0; index < candidates.size(); index++) {
 			sessionQuestions.save(ReviewSessionQuestion.pending(session.getId(), candidates.get(index), index + 1));
 		}
-		return new CreatedReviewSnapshot(session.getPublicId(), session.getSourceSummaryRevision(), candidates.size());
+		return new CreatedReviewSnapshot(session.getPublicId(), candidates.size());
 	}
 }

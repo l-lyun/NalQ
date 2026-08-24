@@ -10,6 +10,8 @@ import org.springframework.data.repository.query.Param;
 
 public interface QuizAttemptRepository extends JpaRepository<QuizAttempt, Long> {
 
+	Optional<QuizAttempt> findByPublicId(String publicId);
+
 	Optional<QuizAttempt> findByPublicIdAndUserId(String publicId, long userId);
 
 	@Lock(LockModeType.PESSIMISTIC_WRITE)

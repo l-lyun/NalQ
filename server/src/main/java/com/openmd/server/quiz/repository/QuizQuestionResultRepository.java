@@ -1,12 +1,9 @@
 package com.openmd.server.quiz.repository;
 
 import com.openmd.server.quiz.domain.entity.QuizQuestionResult;
-import com.openmd.server.quiz.domain.type.GradingOutcome;
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -15,21 +12,6 @@ public interface QuizQuestionResultRepository extends JpaRepository<QuizQuestion
 	Optional<QuizQuestionResult> findByAttemptIdAndQuestionId(long attemptId, long questionId);
 
 	List<QuizQuestionResult> findAllByAttemptId(long attemptId);
-
-	@Modifying(flushAutomatically = true, clearAutomatically = true)
-	@Query("""
-		update QuizQuestionResult r
-		set r.userOverrideOutcome = :outcome,
-			r.gradingRevision = r.gradingRevision + 1,
-			r.correctedAt = :correctedAt
-		where r.id = :resultId and r.gradingRevision = :expectedRevision
-		""")
-	int updateOverrideIfRevision(
-		@Param("resultId") long resultId,
-		@Param("expectedRevision") long expectedRevision,
-		@Param("outcome") GradingOutcome outcome,
-		@Param("correctedAt") Instant correctedAt
-	);
 
 	@Query("""
 		select count(r) from QuizQuestionResult r

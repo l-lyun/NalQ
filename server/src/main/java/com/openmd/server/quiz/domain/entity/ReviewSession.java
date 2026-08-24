@@ -19,8 +19,6 @@ public class ReviewSession extends BaseEntity {
 	private long userId;
 	@Column(name = "source_attempt_id", nullable = false, updatable = false)
 	private long sourceAttemptId;
-	@Column(name = "source_summary_revision", nullable = false, updatable = false)
-	private long sourceSummaryRevision;
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 16)
 	private ReviewSessionStatus status;
@@ -28,12 +26,11 @@ public class ReviewSession extends BaseEntity {
 	protected ReviewSession() {
 	}
 
-	public static ReviewSession active(long userId, long sourceAttemptId, long sourceSummaryRevision) {
+	public static ReviewSession active(long userId, long sourceAttemptId) {
 		ReviewSession session = new ReviewSession();
 		session.publicId = UUID.randomUUID().toString();
 		session.userId = userId;
 		session.sourceAttemptId = sourceAttemptId;
-		session.sourceSummaryRevision = sourceSummaryRevision;
 		session.status = ReviewSessionStatus.ACTIVE;
 		return session;
 	}
@@ -41,6 +38,5 @@ public class ReviewSession extends BaseEntity {
 	public String getPublicId() { return publicId; }
 	public long getUserId() { return userId; }
 	public long getSourceAttemptId() { return sourceAttemptId; }
-	public long getSourceSummaryRevision() { return sourceSummaryRevision; }
 	public ReviewSessionStatus getStatus() { return status; }
 }

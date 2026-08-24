@@ -2,22 +2,22 @@ package com.openmd.server.quiz.controller;
 
 import com.openmd.server.auth.security.AccessPrincipal;
 import com.openmd.server.global.api.ApiResponse;
+import com.openmd.server.quiz.dto.model.QuizAttemptSubmissionResult;
 import com.openmd.server.quiz.dto.request.ShortAnswerGradingRequest;
 import com.openmd.server.quiz.dto.request.SubmitQuizAttemptRequest;
 import com.openmd.server.quiz.dto.response.QuizAttemptResult;
 import com.openmd.server.quiz.dto.response.SubmittedQuizAttempt;
-import com.openmd.server.quiz.dto.response.UpdatedShortAnswerGrading;
-import com.openmd.server.quiz.service.QuizAttemptService;
+import com.openmd.server.quiz.service.QuizAttemptResultService;
+import com.openmd.server.quiz.service.QuizAttemptSubmissionService;
+import com.openmd.server.quiz.service.ShortAnswerGradingService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -26,23 +26,32 @@ import org.springframework.web.bind.annotation.RestController;
 @ConditionalOnProperty(name = "openmd.quiz.enabled", havingValue = "true", matchIfMissing = true)
 public class QuizAttemptController {
 
-	private final QuizAttemptService service;
+	private final QuizAttemptSubmissionService submissions;
+	private final QuizAttemptResultService results;
+	private final ShortAnswerGradingService gradings;
 
-	public QuizAttemptController(QuizAttemptService service) {
-		this.service = service;
+	public QuizAttemptController(
+		QuizAttemptSubmissionService submissions,
+		QuizAttemptResultService results,
+		ShortAnswerGradingService gradings
+	) {
+		this.submissions = submissions;
+		this.results = results;
+		this.gradings = gradings;
 	}
 
-	@PostMapping("/quiz-sets/{quizSetId}/attempts")
+	@PutMapping("/quiz-sets/{quizSetId}/attempts/{attemptId}")
 	public ResponseEntity<ApiResponse<SubmittedQuizAttempt>> submit(
 		@AuthenticationPrincipal AccessPrincipal principal,
 		@PathVariable String quizSetId,
-		@RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey,
+		@PathVariable String attemptId,
 		@RequestBody SubmitQuizAttemptRequest request
 	) {
-		SubmittedQuizAttempt submitted = service.submit(
-			principal.userId(), quizSetId, idempotencyKey, request.responses()
+		QuizAttemptSubmissionResult submitted = submissions.submit(
+			principal.userId(), quizSetId, attemptId, request.responses()
 		);
-		return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(submitted));
+		HttpStatus status = submitted.created() ? HttpStatus.CREATED : HttpStatus.OK;
+		return ResponseEntity.status(status).body(ApiResponse.success(submitted.attempt()));
 	}
 
 	@GetMapping("/quiz-attempts/{attemptId}/result")
@@ -50,20 +59,18 @@ public class QuizAttemptController {
 		@AuthenticationPrincipal AccessPrincipal principal,
 		@PathVariable String attemptId
 	) {
-		return ResponseEntity.ok(ApiResponse.success(service.result(principal.userId(), attemptId)));
+		return ResponseEntity.ok(ApiResponse.success(results.result(principal.userId(), attemptId)));
 	}
 
 	@PutMapping("/quiz-attempts/{attemptId}/short-answer-gradings/{questionId}")
-	public ResponseEntity<ApiResponse<UpdatedShortAnswerGrading>> updateShortAnswerGrading(
+	public ResponseEntity<ApiResponse<QuizAttemptResult>> updateShortAnswerGrading(
 		@AuthenticationPrincipal AccessPrincipal principal,
 		@PathVariable String attemptId,
 		@PathVariable String questionId,
-		@RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey,
 		@RequestBody ShortAnswerGradingRequest request
 	) {
-		return ResponseEntity.ok(ApiResponse.success(service.updateShortAnswerGrading(
-			principal.userId(), attemptId, questionId, idempotencyKey,
-			request.outcome(), request.expectedRevision()
+		return ResponseEntity.ok(ApiResponse.success(gradings.update(
+			principal.userId(), attemptId, questionId, request.outcome()
 		)));
 	}
 }

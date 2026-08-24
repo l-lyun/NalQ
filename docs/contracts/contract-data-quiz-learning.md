@@ -37,21 +37,18 @@ scope: shared
 
 - `userOverrideOutcome`: 사용자가 마지막으로 저장한 `CORRECT|INCORRECT`다. 수정 전에는 없다.
 - 현재 `outcome`: `userOverrideOutcome`이 있으면 그 값이고, 없으면 `automaticOutcome`이다.
-- `gradingSource`: 현재 판정이 최초 자동 판정이면 `AUTOMATIC`, 사용자 판정이면 `USER_OVERRIDE`다.
-- `gradingRevision`: 최초 자동 판정 직후 `0`이며, 현재 판정이 실제로 바뀌는 사용자 수정마다 1 증가한다. 같은 현재 판정의 no-op 저장은 증가시키지 않는다.
-- `correctedAt`: 최신 사용자 판정이 실제로 저장된 시각이며 수정 전에는 없다. no-op 저장으로 갱신하지 않는다.
+- `gradingSource`: 현재 판정이 최초 자동 판정이면 `AUTOMATIC`, 사용자 판정이면 `USER_OVERRIDE`다. 이 값은 저장 필드가 아니라 override 존재 여부에서 계산해도 된다.
 
-MVP에서는 전체 사용자 수정 이력을 보존하지 않는다. 제출 시 불변 값과 최신 `userOverrideOutcome`, `gradingRevision`, `correctedAt`만 보존한다. 사용자 판정은 해당 사용자·attempt·question 결과에만 적용하며 문제의 허용 답안이나 다른 attempt에 전파하지 않는다.
+MVP에서는 전체 사용자 수정 이력, 수정 revision과 과거 응답 snapshot을 보존하지 않는다. 제출 시 불변 값과 최신 `userOverrideOutcome`만 보존한다. 사용자 판정은 해당 사용자·attempt·question 결과에만 적용하며 문제의 허용 답안이나 다른 attempt에 전파하지 않는다.
 
 ### 현재 요약
 
 - `summary.scoredGrading`: 객관식·빈칸의 자동 판정과 단답형의 현재 `outcome`을 집계한 조회 시점 채점 점수다. 제출 시점의 `automaticGrading`과 의미가 다르다.
-- `summary.revision`: attempt 전체 요약의 순서를 나타낸다. attempt 생성 시 `0`이며 단답형 현재 판정, 서술형 자기평가 집계 또는 복습 해결 상태처럼 공개 요약 값이 실제로 바뀔 때 증가한다.
-- 문항별 `gradingRevision`은 한 단답형 판정의 동시성을, `summary.revision`은 attempt 전체 요약의 최신성을 나타낸다. 두 revision은 서로 대신할 수 없다.
+- 요약은 문항별 현재 결과와 복습 해결 상태에서 조회 시 계산한다. 공개 summary revision이나 별도 요약 replay 상태를 저장하지 않는다.
 
 ## 복습 snapshot
 
-- 복습 세션은 생성 시 source attempt의 복습 대상 문항과 당시 `summary.revision`을 snapshot한다.
+- 복습 세션은 생성 시 source attempt의 복습 대상 문항 ID를 snapshot한다. snapshot 행 자체가 생성 시점의 대상 목록을 보존하므로 source summary revision을 별도로 저장하지 않는다.
 - 활성 세션의 문항 목록은 생성 뒤 고정된다. source attempt의 단답형 현재 판정이 바뀌어도 진행 중 문항을 추가하거나 제거하지 않는다.
 - 복습 세션은 `SOLVING`에서 서버 중간 답안을 만들지 않는다. 클라이언트가 모든 대상 문항을 푼 뒤 세션 하나에 최종 제출을 한 번 확정한다.
 - 복습 제출 답안과 자동 판정은 해당 review session의 불변 결과다. 같은 세션 재요청은 먼저 확정된 결과를 가리키며 별도 멱등 키나 payload fingerprint를 보존하지 않는다.
@@ -60,8 +57,8 @@ MVP에서는 전체 사용자 수정 이력을 보존하지 않는다. 제출 �
 
 ## 생명주기
 
-- 제출 답안, 최초 자동 판정, 최신 사용자 판정과 revision은 해당 attempt의 일부로 같은 생명주기를 갖는다.
-- 본 퀴즈 제출 재시도는 attempt 자체, 단답형 판정 수정 재시도는 현재 outcome과 revision, 복습 제출 재시도는 review session 자체가 원장이다. 별도 재시도 결과 레코드는 보존하지 않는다.
+- 제출 답안, 최초 자동 판정과 최신 사용자 판정은 해당 attempt의 일부로 같은 생명주기를 갖는다.
+- 본 퀴즈 제출 재시도는 attempt 자체, 단답형 판정 수정은 현재 `userOverrideOutcome`, 복습 제출 재시도는 review session 자체가 원장이다. 별도 재시도 결과 레코드는 보존하지 않는다.
 - 향후 attempt 삭제·익명화 정책을 정하면 단답형 최신 판정과 복습 결과도 같은 정책으로 처리한다. 현재 문서는 attempt 자체의 보존 기간을 새로 확정하지 않는다.
 
 ## 열린 질문

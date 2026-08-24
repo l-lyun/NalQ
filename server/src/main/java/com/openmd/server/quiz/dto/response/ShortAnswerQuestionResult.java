@@ -12,7 +12,6 @@ public record ShortAnswerQuestionResult(
 	AnswerValue response,
 	AnswerValue representativeAnswer,
 	GradingOutcome outcome,
-	long gradingRevision,
 	String explanation,
 	String sourceExcerpt
 ) {

@@ -7,7 +7,6 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
-import java.util.UUID;
 
 @Entity
 @Table(name = "quiz_attempts")
@@ -32,26 +31,24 @@ public class QuizAttempt extends BaseEntity {
 	@Column(name = "automatic_graded_count", nullable = false)
 	private int automaticGradedCount;
 
-	@Column(name = "summary_revision", nullable = false)
-	private long summaryRevision;
-
 	protected QuizAttempt() {
 	}
 
-	public static QuizAttempt completed(long quizSetId, long userId, int correctCount, int gradedCount) {
+	public static QuizAttempt completed(
+		String publicId,
+		long quizSetId,
+		long userId,
+		int correctCount,
+		int gradedCount
+	) {
 		QuizAttempt attempt = new QuizAttempt();
-		attempt.publicId = UUID.randomUUID().toString();
+		attempt.publicId = publicId;
 		attempt.quizSetId = quizSetId;
 		attempt.userId = userId;
 		attempt.status = QuizAttemptStatus.COMPLETED;
 		attempt.automaticCorrectCount = correctCount;
 		attempt.automaticGradedCount = gradedCount;
-		attempt.summaryRevision = 0;
 		return attempt;
-	}
-
-	public void incrementSummaryRevision() {
-		summaryRevision++;
 	}
 
 	public String getPublicId() { return publicId; }
@@ -60,5 +57,4 @@ public class QuizAttempt extends BaseEntity {
 	public QuizAttemptStatus getStatus() { return status; }
 	public int getAutomaticCorrectCount() { return automaticCorrectCount; }
 	public int getAutomaticGradedCount() { return automaticGradedCount; }
-	public long getSummaryRevision() { return summaryRevision; }
 }
