@@ -547,10 +547,8 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
         "response": { "selectedChoiceId": "choice_2" },
         "representativeAnswer": { "selectedChoiceId": "choice_3" },
         "outcome": "INCORRECT",
-        "unanswered": false,
         "explanation": "학습을 위한 해설",
-        "sourceExcerpt": "근거가 되는 원문 일부",
-        "reviewRequired": true
+        "sourceExcerpt": "근거가 되는 원문 일부"
       },
       {
         "questionId": "question_2",
@@ -560,15 +558,10 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
         "prompt": "큐의 pop 순서를 무엇이라고 하나요?",
         "response": { "answer": "선입선출" },
         "representativeAnswer": { "answer": "fifo" },
-        "automaticOutcome": "INCORRECT",
         "outcome": "CORRECT",
-        "gradingSource": "USER_OVERRIDE",
         "gradingRevision": 1,
-        "correctedAt": "2026-08-23T14:30:00Z",
-        "unanswered": false,
         "explanation": "큐는 먼저 들어온 데이터가 먼저 나오는 FIFO 구조입니다.",
-        "sourceExcerpt": "큐는 FIFO 원칙으로 데이터를 처리한다.",
-        "reviewRequired": false
+        "sourceExcerpt": "큐는 FIFO 원칙으로 데이터를 처리한다."
       }
     ]
   },
@@ -577,16 +570,16 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 ```
 
 - 객관식·빈칸의 자동 채점 `outcome`: `CORRECT`, `INCORRECT`.
-- 답을 작성한 단답형은 불변 `automaticOutcome`, 현재 유효 `outcome`, `gradingSource=AUTOMATIC|USER_OVERRIDE`, 0부터 시작하는 `gradingRevision`을 제공한다. 자동 판정만 사용 중이면 `outcome=automaticOutcome`, `gradingSource=AUTOMATIC`, `correctedAt=null`이다.
+- 답을 작성한 단답형은 화면에 표시할 현재 유효 `outcome`과 다음 수정의 `expectedRevision`으로 사용할 `gradingRevision`을 제공한다. 최초 자동 판정 상태는 `gradingRevision=0`이고 실제 사용자 수정이 저장된 뒤에는 1 이상이다. 서버가 보존하는 `automaticOutcome`, `userOverrideOutcome`, `correctedAt`은 현재 결과 화면에서 사용하지 않으므로 이 조회 projection에 반복하지 않는다.
 - 서술형 `outcome`: `CORRECT`, `PARTIAL`, `INCORRECT`.
 - 각 `questionResults` 항목은 다른 문제 조회 없이 렌더링할 수 있어야 한다. 객관식은 `choices: [{ choiceId, text }]`, 빈칸은 풀이 때와 같은 순서의 `segments`를 포함한다.
 - 객관식 `response.selectedChoiceId`와 `representativeAnswer.selectedChoiceId`, 빈칸 `response.blankAnswers[].blankId`와 `representativeAnswer.blankAnswers[].blankId`는 각각 함께 반환된 보기·segment 식별자를 그대로 참조한다.
-- 미응답은 `response=null`, `unanswered=true`, `outcome=INCORRECT`, `reviewRequired=true`로 포함한다. 별도 미응답 집계를 반환하지 않는다.
+- 미응답은 `response=null`, `outcome=INCORRECT`로 포함한다. 별도 `unanswered` 필드나 미응답 집계를 반환하지 않으며 클라이언트는 `response=null`로 답하지 않음을 표시하고 단답형 수정 행동을 제공하지 않는다.
 - `representativeAnswer`는 결과 설명에 필요한 대표 정답만 공개한다. 빈칸·단답형의 허용 정답 전체를 반환하지 않는다. 서술형은 `modelAnswer`와 `keyPoints`를 제공한다.
 - `summary.scoredGrading`의 분자·분모는 객관식·빈칸·단답형이며, 단답형은 최신 `outcome`을 분자 계산에 사용한다. 최초 제출 응답의 `automaticGrading`은 제출 시점 자동 판정 요약이므로 별도 의미를 유지한다.
 - `summary.revision`은 attempt 전체 채점·자기평가·복습 요약 revision이다. attempt 생성 시 `0`이며, 단답형 현재 판정, 서술형 자기평가 집계 또는 복습 해결 상태처럼 `summary` 구성 값이 실제로 바뀔 때마다 1 증가한다. 문항별 `gradingRevision`을 대신하지 않는다.
 - summary에 영향을 주는 각 쓰기 응답은 `summaryRevision` 또는 전체 `summary.revision`을 반환한다. 클라이언트는 더 낮은 revision의 늦은 응답을 적용하지 않는다.
-- 객관식·빈칸과 단답형의 `automaticOutcome`은 복습 뒤에도 바뀌지 않는다. 단답형 `outcome`만 사용자 수정으로 바뀔 수 있고 복습 자체는 이를 변경하지 않는다. `reviewRequired`는 현재 판정과 복습 해결 상태를 기준으로 조회 시점에 계산한다.
+- 서버가 보존하는 객관식·빈칸과 단답형의 `automaticOutcome`은 복습 뒤에도 바뀌지 않는다. 조회 projection의 단답형 `outcome`만 사용자 수정으로 바뀔 수 있고 복습 자체는 이를 변경하지 않는다. 복습 대상 여부는 서버가 현재 판정과 복습 해결 상태로 계산하며 결과 화면은 `summary.reviewQuestionCount`를 사용한다.
 
 ## 복습 세션
 
