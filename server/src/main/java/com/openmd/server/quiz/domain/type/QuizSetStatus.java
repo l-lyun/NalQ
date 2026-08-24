@@ -1,4 +1,4 @@
-package com.openmd.server.quiz.domain;
+package com.openmd.server.quiz.domain.type;
 
 public enum QuizSetStatus {
 	GENERATING,

@@ -1,4 +1,4 @@
-package com.openmd.server.quiz.domain;
+package com.openmd.server.quiz.domain.entity;
 
 import com.openmd.server.global.entity.BaseEntity;
 import jakarta.persistence.Column;

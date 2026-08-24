@@ -1,6 +1,6 @@
 package com.openmd.server.quiz.repository;
 
-import com.openmd.server.quiz.domain.QuizAttemptSubmission;
+import com.openmd.server.quiz.domain.entity.QuizAttemptSubmission;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 

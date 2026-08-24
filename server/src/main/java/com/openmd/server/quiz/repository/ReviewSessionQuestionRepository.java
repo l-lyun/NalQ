@@ -1,6 +1,6 @@
 package com.openmd.server.quiz.repository;
 
-import com.openmd.server.quiz.domain.ReviewSessionQuestion;
+import com.openmd.server.quiz.domain.entity.ReviewSessionQuestion;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 

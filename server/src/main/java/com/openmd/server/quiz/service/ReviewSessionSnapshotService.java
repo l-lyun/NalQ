@@ -2,10 +2,10 @@ package com.openmd.server.quiz.service;
 
 import com.openmd.server.global.error.BusinessException;
 import com.openmd.server.global.error.CommonErrorCode;
-import com.openmd.server.quiz.domain.QuizAttempt;
-import com.openmd.server.quiz.domain.QuizAttemptStatus;
-import com.openmd.server.quiz.domain.ReviewSession;
-import com.openmd.server.quiz.domain.ReviewSessionQuestion;
+import com.openmd.server.quiz.domain.entity.QuizAttempt;
+import com.openmd.server.quiz.domain.entity.ReviewSession;
+import com.openmd.server.quiz.domain.entity.ReviewSessionQuestion;
+import com.openmd.server.quiz.domain.type.QuizAttemptStatus;
 import com.openmd.server.quiz.dto.response.CreatedReviewSnapshot;
 import com.openmd.server.quiz.error.QuizErrorCode;
 import com.openmd.server.quiz.repository.QuizAttemptRepository;

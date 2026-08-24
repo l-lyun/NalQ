@@ -49,6 +49,18 @@ com.openmd.server
 │   │   └── model
 │   ├── domain
 │   └── error
+├── quiz
+│   ├── controller
+│   ├── service
+│   ├── repository
+│   ├── dto
+│   │   ├── request
+│   │   └── response
+│   ├── domain
+│   │   ├── entity
+│   │   └── type
+│   ├── error
+│   └── util
 └── global
 ```
 
@@ -66,7 +78,9 @@ com.openmd.server
 | `dto.response` | 외부 응답 또는 컨트롤러가 반환하는 서비스 결과 |
 | `dto.command` | 컨트롤러 등 호출자가 서비스 작업에 전달하는 입력 |
 | `dto.model` | 계층 사이에서 전달하는 내부 데이터 모델. Entity와 정책은 포함하지 않음 |
-| `domain` | JPA Entity, 도메인 enum, 값 검증과 비즈니스 정책 |
+| `domain` | 값 검증과 비즈니스 정책. 규모가 작은 도메인은 JPA Entity와 도메인 enum도 함께 배치 |
+| `domain.entity` | Entity가 많아 한 패키지의 탐색성이 낮아진 도메인의 JPA Entity |
+| `domain.type` | 위와 같은 도메인의 Entity 상태·종류를 표현하는 enum |
 | `error` | 도메인별 공개·내부 오류 코드 |
 | `security` | 토큰, 인증 주체, 인증 필터, 보안 난수·digest 같은 보안 기능 |
 | `config` | Spring Bean과 보안 설정 조립 |
@@ -74,6 +88,8 @@ com.openmd.server
 | `util` | 상태와 주입 의존성이 없는 좁은 순수 변환 함수 |
 
 DTO는 계층마다 별도 `dto`를 만들지 않고 도메인 공용 `dto` 아래에서 역할로 분류한다. 모든 DTO 이름에 `Dto` 접미사를 강제하지 않으며 기존 `Request`, `Response`, `Command`와 의미 있는 모델 이름을 유지한다.
+
+`domain.entity`와 `domain.type`은 모든 도메인에 강제하지 않는다. Entity와 enum이 적어 한눈에 탐색되는 동안에는 `domain`에 함께 두고, 영속 모델이 밀집되어 정책·타입과의 구분이 어려울 때만 선택적으로 분리한다. 값 객체가 실제로 생기기 전에는 빈 `domain.vo` 패키지를 만들지 않는다. 정책은 Entity 수와 관계없이 `domain`에 유지해 도메인 동작의 진입점을 드러낸다.
 
 ## 4. 참조 규칙
 
@@ -135,6 +151,16 @@ DTO는 계층마다 별도 `dto`를 만들지 않고 도메인 공용 `dto` 아�
 - Flyway 자체 동작을 검증하는 `PendingActivationCleanupMigrationTest`는 `auth.migration`에 둘 수 있다.
 - Flyway SQL 파일명, 순서와 내용은 이 리팩터링에서 변경하지 않는다.
 
+### 퀴즈 도메인 적용
+
+퀴즈는 채점·멱등성·복습 snapshot을 포함해 영속 Entity와 상태 enum이 밀집되어 있으므로 선택적 하위 패키지를 적용한다.
+
+- `quiz.domain.entity`: `QuizSet`, `QuizQuestion`, `ShortAnswerAcceptedAnswer`, `QuizAttempt`, `QuizQuestionResult`, `QuizAttemptSubmission`, `ShortAnswerGradingIdempotency`, `ReviewSession`, `ReviewSessionQuestion`
+- `quiz.domain.type`: `GradingOutcome`, `QuestionType`, `QuizSetStatus`, `QuizAttemptStatus`, `ReviewSessionStatus`, `ReviewQuestionStatus`
+- `quiz.domain`: 순수 채점 정책 `ShortAnswerGrader`
+
+이 분리는 Java 내부 탐색 구조만 바꾸며 Entity 이름, JPA 테이블 매핑, enum 저장 문자열과 공개 응답 직렬화는 유지한다.
+
 ## 8. 호환성과 검증 기준
 
 이 구조 변경은 클래스명, HTTP method·path·status, JSON 필드, DB schema, Flyway migration, Redis key와 TTL, 비즈니스 규칙을 변경하지 않는다.
@@ -153,4 +179,5 @@ DTO는 계층마다 별도 `dto`를 만들지 않고 도메인 공용 `dto` 아�
 
 | 날짜 | 변경 | 결정자 |
 | --- | --- | --- |
+| 2026-08-24 | 밀집된 도메인의 선택적 `entity`·`type` 하위 패키지 기준과 퀴즈 적용 확정 | 사용자 확정 |
 | 2026-08-23 | 도메인 공용 DTO, 실용적 Controller-Service-Repository 구조와 보조 기능 분류 확정 | 사용자 확정 |

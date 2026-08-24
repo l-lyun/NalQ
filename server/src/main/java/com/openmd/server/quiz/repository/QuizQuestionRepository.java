@@ -1,6 +1,6 @@
 package com.openmd.server.quiz.repository;
 
-import com.openmd.server.quiz.domain.QuizQuestion;
+import com.openmd.server.quiz.domain.entity.QuizQuestion;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;

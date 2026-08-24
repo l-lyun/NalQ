@@ -1,6 +1,6 @@
 package com.openmd.server.quiz.repository;
 
-import com.openmd.server.quiz.domain.QuizAttempt;
+import com.openmd.server.quiz.domain.entity.QuizAttempt;
 import jakarta.persistence.LockModeType;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;

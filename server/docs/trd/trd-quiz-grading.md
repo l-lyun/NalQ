@@ -88,7 +88,7 @@ JPA 낙관 잠금용 entity version과 공개 `gradingRevision`은 같은 의미
 - Controller: 결과 조회와 단답형 판정 수정 HTTP 변환, 인증 사용자 전달
 - Service: 소유권·attempt 상태·문항 유형·미응답 검증, 트랜잭션과 멱등·동시성 조정
 - Repository: attempt 문항 결과 조건부 갱신, 결과 요약 조회와 멱등 결과 저장
-- Domain: 현재 판정 계산, 수정 가능 여부와 revision 전이
+- Domain: `domain.entity`의 영속 모델, `domain.type`의 상태·종류 enum, `domain` 루트의 채점 정책
 
 자동 채점은 별도 외부 의존성이 없는 `ShortAnswerGrader`의 순수 동작으로 둔다. Java의 단순 정규화 함수만을 위해 주입 가능한 클래스를 추가하지 않고, grader 내부 package-private 함수로 정규화한다. 입력과 허용 답안 목록을 받아 판정하는 도메인 동작은 독립 단위 테스트 대상으로 유지한다.
 

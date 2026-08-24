@@ -1,5 +1,6 @@
 package com.openmd.server.quiz.domain;
 
+import com.openmd.server.quiz.domain.type.GradingOutcome;
 import java.text.Normalizer;
 import java.util.List;
 import java.util.Locale;
@@ -24,7 +25,7 @@ public final class ShortAnswerGrader {
 			: GradingOutcome.INCORRECT;
 	}
 
-	static String normalize(String value) {
+	public static String normalize(String value) {
 		String nfc = Normalizer.normalize(value, Normalizer.Form.NFC);
 		StringBuilder collapsed = new StringBuilder(nfc.length());
 		boolean pendingSpace = false;

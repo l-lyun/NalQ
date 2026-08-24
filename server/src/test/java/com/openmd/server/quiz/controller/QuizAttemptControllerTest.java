@@ -10,9 +10,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.openmd.server.auth.security.AccessPrincipal;
 import com.openmd.server.global.error.GlobalExceptionHandler;
-import com.openmd.server.quiz.domain.GradingOutcome;
-import com.openmd.server.quiz.domain.QuestionType;
-import com.openmd.server.quiz.domain.QuizAttemptStatus;
+import com.openmd.server.quiz.domain.type.GradingOutcome;
+import com.openmd.server.quiz.domain.type.QuestionType;
+import com.openmd.server.quiz.domain.type.QuizAttemptStatus;
 import com.openmd.server.quiz.dto.response.AnswerValue;
 import com.openmd.server.quiz.dto.response.EssaySelfAssessmentSummary;
 import com.openmd.server.quiz.dto.response.GradingCount;

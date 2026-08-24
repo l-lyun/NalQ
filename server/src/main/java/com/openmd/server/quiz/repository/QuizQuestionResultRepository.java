@@ -1,7 +1,7 @@
 package com.openmd.server.quiz.repository;
 
-import com.openmd.server.quiz.domain.GradingOutcome;
-import com.openmd.server.quiz.domain.QuizQuestionResult;
+import com.openmd.server.quiz.domain.entity.QuizQuestionResult;
+import com.openmd.server.quiz.domain.type.GradingOutcome;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -35,10 +35,10 @@ public interface QuizQuestionResultRepository extends JpaRepository<QuizQuestion
 		select count(r) from QuizQuestionResult r
 		join QuizQuestion q on q.id = r.questionId
 		where r.attemptId = :attemptId
-		and q.type in (com.openmd.server.quiz.domain.QuestionType.MULTIPLE_CHOICE,
-			com.openmd.server.quiz.domain.QuestionType.FILL_IN_THE_BLANK,
-			com.openmd.server.quiz.domain.QuestionType.SHORT_ANSWER)
-		and coalesce(r.userOverrideOutcome, r.automaticOutcome) = com.openmd.server.quiz.domain.GradingOutcome.CORRECT
+		and q.type in (com.openmd.server.quiz.domain.type.QuestionType.MULTIPLE_CHOICE,
+			com.openmd.server.quiz.domain.type.QuestionType.FILL_IN_THE_BLANK,
+			com.openmd.server.quiz.domain.type.QuestionType.SHORT_ANSWER)
+		and coalesce(r.userOverrideOutcome, r.automaticOutcome) = com.openmd.server.quiz.domain.type.GradingOutcome.CORRECT
 		""")
 	long countCurrentCorrect(@Param("attemptId") long attemptId);
 
@@ -46,16 +46,16 @@ public interface QuizQuestionResultRepository extends JpaRepository<QuizQuestion
 		select count(r) from QuizQuestionResult r
 		join QuizQuestion q on q.id = r.questionId
 		where r.attemptId = :attemptId
-		and q.type in (com.openmd.server.quiz.domain.QuestionType.MULTIPLE_CHOICE,
-			com.openmd.server.quiz.domain.QuestionType.FILL_IN_THE_BLANK,
-			com.openmd.server.quiz.domain.QuestionType.SHORT_ANSWER)
+		and q.type in (com.openmd.server.quiz.domain.type.QuestionType.MULTIPLE_CHOICE,
+			com.openmd.server.quiz.domain.type.QuestionType.FILL_IN_THE_BLANK,
+			com.openmd.server.quiz.domain.type.QuestionType.SHORT_ANSWER)
 		""")
 	long countGraded(@Param("attemptId") long attemptId);
 
 	@Query("""
 		select count(r) from QuizQuestionResult r
 		where r.attemptId = :attemptId and r.reviewResolved = false
-		and coalesce(r.userOverrideOutcome, r.automaticOutcome) = com.openmd.server.quiz.domain.GradingOutcome.INCORRECT
+		and coalesce(r.userOverrideOutcome, r.automaticOutcome) = com.openmd.server.quiz.domain.type.GradingOutcome.INCORRECT
 		""")
 	long countReviewRequired(@Param("attemptId") long attemptId);
 
@@ -63,7 +63,7 @@ public interface QuizQuestionResultRepository extends JpaRepository<QuizQuestion
 		select r.questionId from QuizQuestionResult r
 		join QuizQuestion q on q.id = r.questionId
 		where r.attemptId = :attemptId and r.reviewResolved = false
-		and coalesce(r.userOverrideOutcome, r.automaticOutcome) = com.openmd.server.quiz.domain.GradingOutcome.INCORRECT
+		and coalesce(r.userOverrideOutcome, r.automaticOutcome) = com.openmd.server.quiz.domain.type.GradingOutcome.INCORRECT
 		order by q.number
 		""")
 	List<Long> findReviewCandidateQuestionIds(@Param("attemptId") long attemptId);

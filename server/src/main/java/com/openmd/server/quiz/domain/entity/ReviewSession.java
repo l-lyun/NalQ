@@ -1,6 +1,7 @@
-package com.openmd.server.quiz.domain;
+package com.openmd.server.quiz.domain.entity;
 
 import com.openmd.server.global.entity.BaseEntity;
+import com.openmd.server.quiz.domain.type.ReviewSessionStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

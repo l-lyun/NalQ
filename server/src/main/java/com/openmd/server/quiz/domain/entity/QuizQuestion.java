@@ -1,6 +1,8 @@
-package com.openmd.server.quiz.domain;
+package com.openmd.server.quiz.domain.entity;
 
 import com.openmd.server.global.entity.BaseEntity;
+import com.openmd.server.quiz.domain.ShortAnswerGrader;
+import com.openmd.server.quiz.domain.type.QuestionType;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

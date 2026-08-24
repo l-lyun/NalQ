@@ -1,7 +1,7 @@
 package com.openmd.server.quiz.dto.response;
 
-import com.openmd.server.quiz.domain.GradingOutcome;
-import com.openmd.server.quiz.domain.QuestionType;
+import com.openmd.server.quiz.domain.type.GradingOutcome;
+import com.openmd.server.quiz.domain.type.QuestionType;
 
 public record ShortAnswerQuestionResult(
 	String questionId,

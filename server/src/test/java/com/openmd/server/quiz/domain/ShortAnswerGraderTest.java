@@ -1,5 +1,6 @@
 package com.openmd.server.quiz.domain;
 
+import com.openmd.server.quiz.domain.type.GradingOutcome;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.List;
