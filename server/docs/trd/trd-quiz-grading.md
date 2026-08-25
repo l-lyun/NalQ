@@ -6,7 +6,7 @@ scope: server
 
 # [TRD · Server] 퀴즈·복습 통합 저장 모델
 
-- 상태: 목표 설계 확정, SQL·Java 구현 동기화 전
+- 상태: 목표 설계 확정, V5 SQL 반영·Java 구현 동기화 전
 - 제품 정책: [퀴즈 생성·풀이·결과·복습 PRD](../../../docs/prd/prd-quiz-learning.md)
 - 사용자 흐름: [퀴즈 생성부터 복습까지](../../../docs/ux/flow-quiz-solving.md)
 - API 계약: [학습자료·퀴즈·복습 API 계약](../../../docs/contracts/contract-api-quiz-learning.md)
@@ -34,6 +34,8 @@ scope: server
 - `grading_method`는 최종 판정의 출처이며 조회 시 항상 `final_grading_result`를 사용한다.
 - 복습 성공은 원본 `MAIN` 문항의 `review_resolved_at`으로 기록하고 원래 오답 판정은 바꾸지 않는다.
 - UUID attempt 자체를 재시도 원장으로 사용하며 hash·fingerprint·replay 테이블은 만들지 않는다.
+- 생성 요청의 `requestedConfig`는 서버 DB에 저장하지 않는다. 생성 접수 성공 응답에서만 요청값을 echo하고 이후 상태 조회는 서버 상태와 실제 확정 문제 정보만 반환한다.
+- MVP에는 worker lease·별도 생성 잠금 테이블, 교차 문제 참조를 막는 복합 FK, 유형별 제출 테이블을 추가하지 않는다. 일반 트랜잭션과 기존 unique/check 제약, 제출 서비스의 문제 소속 검증을 사용한다.
 - 성능 개선용 보조 인덱스는 이번 migration에 추가하지 않는다.
 
 ## 3. 물리 데이터 모델
@@ -257,7 +259,7 @@ DB는 PK, FK, public ID unique, 회차 안의 문항·순서 unique와 enum 범�
 
 ## 9. migration과 구현 전환
 
-`V5`가 아직 대상 기준 브랜치에 병합되지 않은 동안에는 보정 migration을 만들지 않고 V5를 직접 갱신한다. 이미 이전 V5를 적용한 개인 개발 DB는 개발 데이터를 초기화한 뒤 다시 적용한다. 병합 여부가 달라졌다면 새 migration을 사용해야 한다.
+이번 PR은 아직 병합되지 않았으므로 보정 migration을 만들지 않고 `V5`를 목표 구조로 직접 갱신한다. 이미 이전 V5를 적용한 개인 개발 DB는 개발 데이터를 초기화한 뒤 다시 적용한다.
 
 후속 Java 구현에서는 다음 기존 모델을 새 SQL에 맞춰 제거·교체해야 한다.
 
@@ -281,6 +283,5 @@ DB는 PK, FK, public ID unique, 회차 안의 문항·순서 unique와 enum 범�
 
 ## 10. 남은 범위
 
-- 현재 API의 `requestedConfig`를 프로세스 재시작과 화면 재진입 뒤에도 반환할지, 반환한다면 어떤 작업 원장에 저장할지는 공유 계약의 열린 질문이다. 이 값은 생성 성공 판정과 분리한다.
 - Java entity·repository·service·테스트와 migration을 이 목표 모델에 동기화해야 한다.
 - 실제 조회 패턴을 측정한 뒤 필요한 성능 인덱스를 검토한다.

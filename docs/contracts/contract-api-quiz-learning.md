@@ -217,6 +217,8 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 - 요청을 접수하면 새 불변 `quizSetId`를 만들고 학습자료 본문을 원자적으로 잠근다.
 - 같은 학습자료에 `GENERATING` 세트가 있으면 새 요청을 받지 않는다.
 - 서버가 생성 작업 자체를 접수할 수 없으면 `503 QUIZ_002`를 반환하고 QuizSet을 만들거나 본문 잠금 상태를 바꾸지 않는다.
+- 성공 응답의 `requestedConfig`는 이 요청의 입력값을 그대로 echo하는 값이다. 서버는 이를 DB에 영속화하지 않으며 이후 GET 응답에서는 반환하지 않는다.
+- 클라이언트는 성공 응답의 `quizSetId`와 `requestedConfig`를 현재 사용자 범위의 기기 로컬 상태에 연결할 수 있다. 이 값은 생성 중·성공 화면의 요청 조건 표시용이며 서버 상태나 성공 판정의 근거가 아니다.
 
 ```json
 {
@@ -244,6 +246,7 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 - 현재 인증 사용자가 소유한 학습자료에서 `GENERATING` 상태인 QuizSet 하나를 찾는다.
 - 활성 생성이 없으면 정상 빈 상태이므로 새 오류 코드를 만들지 않고 `200 OK`, `data=null`을 반환한다.
 - 활성 생성이 있으면 반환한 `quizSetId`로 [상태·풀이 데이터 조회](#상태풀이-데이터-조회)를 계속한다.
+- 클라이언트는 반환된 `quizSetId`로 같은 사용자·기기의 로컬 `requestedConfig`를 조회할 수 있다. 로컬 값이 없어도 활성 생성 조회와 polling은 동일하게 진행한다.
 
 ```json
 {
@@ -252,11 +255,6 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
     "quizSetId": "qset_123",
     "materialId": "123",
     "status": "GENERATING",
-    "requestedConfig": {
-      "selectedTypes": ["MULTIPLE_CHOICE", "ESSAY"],
-      "difficulty": "NORMAL",
-      "maxQuestionCount": 10
-    },
     "pollAfterSeconds": 3
   },
   "error": null
@@ -277,11 +275,10 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 
 `GET /api/v1/quiz-sets/{quizSetId}`
 
-- `GENERATING`, `READY`, `FAILED` 모두 `quizSetId`, `materialId`, `status`, `requestedConfig`를 반환한다.
-- `requestedConfig`는 생성 요청을 다시 보여주기 위한 값이지 `READY|FAILED` 판정 기준이 아니다. QuizSet 물리 컬럼 추가 여부는 이 API 계약이 정하지 않으며, 실제 문제 수와 포함 유형은 확정된 `questions`에서 계산한다.
-- `GENERATING`은 다음 조회 권고값 `pollAfterSeconds`도 반환한다.
-- `READY`는 유효 문제가 1개 이상이라는 뜻이다. 실제 수가 최대 문제 수보다 적거나 요청한 유형 일부가 포함되지 않아도 된다.
-- `FAILED`에는 문제를 포함하지 않는다. 사용자에게는 재시도 가능한 일반 안내만 제공하고 외부 생성 서비스 상세는 노출하지 않는다.
+- 모든 상태는 `quizSetId`, `materialId`, `status`를 반환하며 `requestedConfig`는 반환하지 않는다.
+- `GENERATING`은 공통 필드와 다음 조회 권고값 `pollAfterSeconds`만 반환한다. 로컬 요청 조건이 없으면 클라이언트는 일반 생성 진행 상태를 표시한다.
+- `READY`는 공통 필드와 `questions`를 반환한다. 유효 문제가 1개 이상이라는 뜻이며 클라이언트는 로컬 요청 조건 유무와 관계없이 `questions`에서 실제 문제 수와 포함 유형을 계산한다. 실제 수가 최대 문제 수보다 적거나 요청한 유형 일부가 포함되지 않아도 된다.
+- `FAILED`는 공통 필드와 `failure`만 반환하고 문제를 포함하지 않는다. 로컬 요청 조건이 없으면 일반 실패 안내와 새 조건 선택 행동을 제공하며, 외부 생성 서비스 상세는 노출하지 않는다.
 - 외부 생성 후보의 문제 번호는 공개 계약에 사용하지 않는다. 서버는 유형별 검증을 통과한 후보의 원래 배열 순서에 따라 `number=1..N`을 새로 부여한다.
 - 검증에서 제외된 후보는 `questions`에 포함하지 않으며 문제는 빈 번호 없이 `number` 오름차순으로 반환한다.
 
@@ -294,26 +291,28 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
     "quizSetId": "qset_123",
     "materialId": "123",
     "status": "GENERATING",
-    "requestedConfig": {
-      "selectedTypes": ["MULTIPLE_CHOICE", "ESSAY"],
-      "difficulty": "NORMAL",
-      "maxQuestionCount": 10
-    },
-    "pollAfterSeconds": 3,
-    "questions": [],
-    "failure": null
+    "pollAfterSeconds": 3
   },
   "error": null
 }
 ```
 
-`FAILED`의 `failure` 예시:
+`FAILED` 예시:
 
 ```json
 {
-  "code": "SOURCE_INSUFFICIENT",
-  "message": "학습자료에서 문제를 만들지 못했어요. 자료나 조건을 확인해 주세요.",
-  "retryable": false
+  "success": true,
+  "data": {
+    "quizSetId": "qset_123",
+    "materialId": "123",
+    "status": "FAILED",
+    "failure": {
+      "code": "SOURCE_INSUFFICIENT",
+      "message": "학습자료에서 문제를 만들지 못했어요. 자료나 조건을 확인해 주세요.",
+      "retryable": false
+    }
+  },
+  "error": null
 }
 ```
 
@@ -602,7 +601,7 @@ API의 `reviewSession`은 클라이언트가 복습 실행을 식별하는 공�
 
 `GET /api/v1/quiz-reviews/latest`
 
-- 현재 사용자의 가장 최근 `COMPLETED` 본 퀴즈 회차 하나만 조회한다.
+- 현재 사용자의 가장 최근 `COMPLETED` 본 퀴즈 회차 하나만 조회한다. 그 회차에서 현재 최종 판정이 `INCORRECT|PARTIAL`이고 `reviewResolvedAt=null`인 문항이 복습 대상이다.
 - `attemptNumber`는 해당 `quizSetId` 안에서 현재 사용자가 완료한 본 퀴즈 회차의 1부터 시작하는 순번이다.
 - `reviewQuestionCount`는 그 회차의 현재 미해결 문항 수다.
 - 그 회차를 원본으로 한 활성 복습 세션이 있으면 `activeReviewSessionId`를 반환한다.
@@ -652,11 +651,11 @@ Headers: `Authorization`, `Content-Type: application/json`
 ```
 
 - `sourceAttemptId`는 [최신 복습 현황](#최신-복습-현황)에서 받은 가장 최근 완료 회차여야 한다.
-- 해당 회차의 `reviewRequired=true` 문항을 번호 오름차순으로 snapshot해 서버 복습 세션을 만든다.
+- 해당 회차에서 현재 최종 판정이 `INCORRECT|PARTIAL`이고 아직 해결되지 않은 문항을 번호 오름차순으로 snapshot해 서버 복습 세션을 만든다. 별도 저장 `reviewRequired` 플래그는 두지 않는다.
 - 생성된 활성 세션의 snapshot은 원본 회차 단답형 판정 수정 뒤에도 중간 변경하지 않는다. 원본 회차의 최신 `reviewQuestionCount`와 활성 세션의 남은 문항 수는 별도 값이며, 수정된 대상 여부는 다음 세션 생성부터 반영한다.
 - 과거 회차를 임의 선택하거나 여러 회차를 합치지 않는다. 최신 회차가 바뀌었거나 대상이 없으면 `REVIEW_001`이다.
 - 새 세션을 만들면 `201 Created`, 같은 `sourceAttemptId`의 활성 세션이 이미 있으면 새로 만들지 않고 `200 OK`로 기존 세션을 반환한다.
-- source attempt 하나에 활성 세션을 하나만 허용하는 unique 제약이 중복 생성을 막는다. 별도 멱등 키나 payload fingerprint를 만들지 않는다.
+- source MAIN을 짧게 잠근 서비스 트랜잭션에서 기존 활성 세션을 먼저 확인해 같은 원본의 활성 세션을 하나만 유지한다. 별도 멱등 키나 payload fingerprint를 만들지 않는다.
 - 더 오래된 회차의 미완료 복습 세션은 최신 회차의 새 복습을 막지 않으며 복습 탭 대상에 합치지 않는다.
 - snapshot에 저장된 문항 목록 자체가 생성 시점의 복습 대상을 보존하며 별도 source summary revision을 저장하지 않는다.
 
@@ -683,7 +682,7 @@ Headers: `Authorization`, `Content-Type: application/json`
 - `status`: `SOLVING`, `SELF_ASSESSMENT_REQUIRED`, `COMPLETED`.
 - 문항은 원래 `number` 오름차순이고 한 세션에 각 문항이 한 번만 존재한다.
 - `SOLVING`에서는 본 퀴즈의 `READY` 문제와 동일한 풀이 전 공개 모양만 반환한다. 정답·모범 답안·해설·원문 근거와 서버 중간 답안은 포함하지 않는다.
-- 제출 전 현재 문항과 답안은 클라이언트가 같은 기기에 임시 보존한다. 세션 조회는 서버 draft 답안이나 `nextQuestionId`를 제공하지 않는다.
+- 제출 전 현재 문항과 답안은 열린 클라이언트 화면의 메모리에만 둔다. 화면을 이탈한 뒤 세션을 다시 조회하면 고정된 문제 목록만 받고 첫 문항부터 다시 풀며, 서버 draft 답안이나 `nextQuestionId`는 제공하지 않는다.
 - `SELF_ASSESSMENT_REQUIRED`에서는 결과 조회를 통해 제출된 서술형의 자기평가 상세와 남은 문항을 확인한다.
 
 ```json

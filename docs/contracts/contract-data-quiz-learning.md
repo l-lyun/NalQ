@@ -9,12 +9,13 @@ scope: shared
 - 소유 영역: 서버 학습자료·퀴즈·복습 도메인
 - 관련 기능명세: [학습자료 만들기](../prd/prd-content-import.md), [퀴즈 생성·풀이·결과·복습](../prd/prd-quiz-learning.md)
 - 관련 API: [학습자료·퀴즈·복습 API](contract-api-quiz-learning.md)
+- 물리 구조 그림: [퀴즈·복습 ERD](../assets/quiz-erd.svg)
 
 ## 목적과 경계
 
 학습자료와 원문 출처, 문제 유형별 정의·정답 원장, 본 퀴즈와 복습 회차, 사용자 제출 답안과 채점 결과가 웹·앱·서버에서 같은 의미로 사용되도록 소유권과 생명주기를 정의한다. 물리 테이블과 컬럼의 최종 구현은 서버 TRD와 migration이 책임지며 이 계약의 의미를 위반할 수 없다.
 
-이 문서의 snake_case 이름은 현재 서버의 `quiz_*`, `question_id`, `answer_value`, `normalized_value` 관례에 맞춘 구현 기준 이름이다. 아직 migration에 반영되지 않은 이름은 목표 구조이며, 현재 구현 상태를 뜻하지 않는다.
+이 문서의 snake_case 이름은 현재 서버의 `quiz_*`, `question_id`, `answer_value`, `normalized_value` 관례에 맞춘 구현 기준 이름이다. V5 migration은 이 목표 물리 구조를 반영했으며 Java 구현은 후속 동기화 대상이다.
 
 ## 공유 개념
 
@@ -123,8 +124,9 @@ HTTP 필드 모양과 공개 오류는 [학습자료·퀴즈·복습 API](contra
 - 유효 문제가 0개면 `FAILED`이며 빈 문제 세트를 풀이 대상으로 공개하지 않는다.
 - 실패 뒤 재조회에서도 원인을 구분해야 하므로 `quiz_sets.failure_code`를 nullable 값으로 둔다. `FAILED`에서는 `SOURCE_INSUFFICIENT` 또는 `GENERATION_FAILED`, 그 외 상태에서는 `null`이다.
 - 공개 `message`와 `retryable`은 `failure_code`에 대한 서버 정책으로 계산하며 별도 컬럼으로 복제하지 않는다.
-- 선택 유형·난이도·최대 문제 수는 생성 요청 입력이며 성공 판정용 QuizSet 컬럼이 아니다. 실제 문제 수와 실제 포함 유형은 `quiz_questions`에서 계산한다.
-- 현재 API의 `requestedConfig`를 화면 재진입 뒤에도 반환하려면 작업 원장이나 별도 저장소가 필요하다. 이 요구는 성공 판정과 분리하며, 이 문서에서는 `quiz_sets`에 요청 설정 컬럼을 추가하지 않는다.
+- 선택 유형·난이도·최대 문제 수는 생성 요청 입력이며 서버 DB에 영속화하지 않는다. `requestedConfig`는 생성 접수 성공 응답에서 요청값을 echo할 때만 사용하고 이후 상태 조회에서는 반환하지 않는다.
+- 프론트는 `userId + quizSetId` 범위로 `selectedTypes`, `difficulty`, `maxQuestionCount`를 기기 로컬 상태에 보존할 수 있다. 이 값은 손실 가능한 화면 표시용 캐시이며 QuizSet 상태·문제 유효성·채점의 원장이 아니다.
+- 로컬 값이 없으면 `GENERATING`은 서버 상태만으로 표시하고, `READY`의 실제 문제 수와 포함 유형은 확정된 `quiz_questions`에서 계산하며, `FAILED`는 저장된 `failure_code`에 따른 일반 안내를 사용한다.
 
 문제 하나를 유효하다고 확정하는 최소 조건은 다음과 같다.
 
@@ -190,6 +192,8 @@ DB는 `selected_choice_id`와 `answer_value`가 동시에 존재하지 않는 �
 - 빈칸형은 같은 `blank_id`가 중복되지 않는지
 - 요청 DTO는 서버의 기존 이름인 `selectedChoiceId`, `blankAnswers: [{ blankId, answer }]`, `text`를 사용하는지
 
+MVP는 이 다형 제출 원장을 유지한다. cross-question choice·blank 제출과 객관식·단답형 중복 제출은 기존 제출 트랜잭션 안에서 문제 범위 조회와 입력 검증으로 거절한다. 이를 위해 복합 FK, 유형별 제출 테이블, 전용 추가 락이나 별도 중복 방지 원장을 새로 도입하지 않는다. 이미 정의된 PK·FK·CHECK·unique 제약과 일반 트랜잭션 경계는 그대로 사용한다.
+
 ## 채점 결과
 
 회차 문항은 다음 채점 값을 가진다.
@@ -226,6 +230,7 @@ MVP에서는 전체 사용자 수정 이력을 별도 테이블로 보존하지 
 - 같은 UUID 재요청은 먼저 확정된 attempt를 반환하고 request hash·fingerprint·replay 테이블을 만들지 않는다.
 - 문제 생성은 외부 후보의 공통 정보와 해당 유형의 상세 구조를 먼저 검증하고, 유효 후보에 서버가 연속 `question_number`를 부여한 뒤 공통·상세 원장을 함께 저장한다. 무효 후보와 유형 상세 저장이 실패한 문제는 부분 문제로 남기지 않는다.
 - 유효 문제가 하나 이상이면 해당 문제들과 `quiz_sets.status=READY`, `failure_code=null`을 확정한다. 유효 문제가 없으면 문제 행을 공개 가능한 상태로 남기지 않고 `status=FAILED`와 `failure_code`를 확정한다.
+- 동일 QuizSet에 생성 worker가 중복 실행되는 상황을 위해 별도 worker lease, 전용 추가 락이나 새 원장을 MVP에 도입하지 않는다. 생성 저장은 기존 상태 확인과 일반 트랜잭션·unique 제약을 사용하며 이 결정이 생성 성공 판정 규칙을 바꾸지는 않는다.
 - 한 번 attempt가 연결된 문제 세트·문제·보기·빈칸·정답 가이드는 수정하거나 물리 삭제하지 않는다.
 
 ## 생명주기
@@ -252,6 +257,8 @@ MVP에서는 전체 사용자 수정 이력을 별도 테이블로 보존하지 
 
 migration, Java entity·repository·service와 테스트는 같은 목표 구조를 사용해야 한다. 기존 서버 TRD나 migration에 `quiz_question_answers`가 정답 원장으로 남아 있다면 이 계약과 충돌하므로 구현 전에 함께 동기화한다. 공개 API의 `FILL_BLANK` 소비자는 계약 변경 뒤 `FILL_IN_THE_BLANK`로 전환한다.
 
+이번 PR은 아직 병합되지 않았으므로 `V5__create_quiz_grading.sql`을 목표 구조에 맞게 직접 수정한다. 이전 V5를 적용한 개인 개발 DB는 개발 데이터를 초기화한 뒤 다시 적용한다.
+
 ## 확정·제안·열린 질문
 
 ### 확정
@@ -264,6 +271,8 @@ migration, Java entity·repository·service와 테스트는 같은 목표 구조
 - 외부 후보의 문제 번호는 버리고 유효 후보의 원래 배열 순서에 따라 서버가 `question_number=1..N`을 부여한다.
 - 무효 후보는 `quiz_questions`와 유형별 하위 행을 모두 남기지 않는다.
 - 유효 문제 1개 이상은 `READY`, 0개는 `FAILED`다.
+- `requestedConfig`는 서버 DB에 저장하지 않고 생성 접수 성공 응답에서만 echo하며, 프론트가 `userId + quizSetId` 범위의 기기 로컬 상태로 보존한다.
+- MVP는 별도 worker lease·전용 추가 락·복합 FK·유형별 제출 테이블을 추가하지 않는다.
 
 ### 제안
 
@@ -273,8 +282,7 @@ migration, Java entity·repository·service와 테스트는 같은 목표 구조
 
 ### 열린 질문
 
-- 현재 API가 모든 생성 상태에서 요구하는 `requestedConfig`를 재진입·프로세스 재시작 뒤에도 제공하기 위해 어떤 작업 원장 또는 저장소를 사용할지
 - 사용자 계정이나 학습자료를 삭제할 때 파생 문제 세트와 풀이 이력을 삭제·익명화·기간 보존 중 어떻게 처리할지
 - 생성·채점 모델과 평가 근거를 어느 수준까지 추적해야 결과를 재현하고 감사할 수 있는지
 
-위 열린 질문은 요청 설정의 재조회와 데이터 보존 범위를 바꾸므로 구현에서 임의로 확정하지 않는다.
+위 열린 질문은 데이터 보존 범위를 바꾸므로 구현에서 임의로 확정하지 않는다.
