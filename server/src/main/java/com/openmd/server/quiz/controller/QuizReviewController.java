@@ -42,7 +42,8 @@ public class QuizReviewController {
   public ResponseEntity<ApiResponse<ReviewSessionEnvelope>> start(
       @AuthenticationPrincipal AccessPrincipal principal,
       @RequestBody StartReviewSessionRequest request) {
-    ReviewSessionStart started = reviews.start(principal.userId(), request.sourceAttemptId());
+    ReviewSessionStart started =
+        reviews.start(principal.userId(), request.requiredSourceAttemptId());
     return ResponseEntity.status(started.created() ? 201 : 200)
         .body(ApiResponse.success(new ReviewSessionEnvelope(started.reviewSession())));
   }
@@ -75,7 +76,7 @@ public class QuizReviewController {
       @PathVariable String questionId,
       @RequestBody EssayAssessmentRequest request) {
     EssayAssessmentResult assessed =
-        essays.assess(p.userId(), id, questionId, request.assessment());
+        essays.assessReview(p.userId(), id, questionId, request.assessment());
     return ResponseEntity.ok(
         ApiResponse.success(
             new ReviewEssayAssessment(

@@ -15,30 +15,29 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @ConditionalOnProperty(name = "openmd.quiz.enabled", havingValue = "true", matchIfMissing = true)
 public class ShortAnswerGradingService {
-  private final QuizAttemptRepository attempts;
   private final QuizQuestionRepository questions;
   private final QuizAttemptQuestionRepository aqs;
   private final QuizSubmittedAnswerRepository answers;
   private final QuizAttemptResultProjector projector;
+  private final QuizAttemptLockService locks;
 
   public ShortAnswerGradingService(
-      QuizAttemptRepository attempts,
       QuizQuestionRepository questions,
       QuizAttemptQuestionRepository aqs,
       QuizSubmittedAnswerRepository answers,
-      QuizAttemptResultProjector projector) {
-    this.attempts = attempts;
+      QuizAttemptResultProjector projector,
+      QuizAttemptLockService locks) {
     this.questions = questions;
     this.aqs = aqs;
     this.answers = answers;
     this.projector = projector;
+    this.locks = locks;
   }
 
   @Transactional
   public QuizAttemptResult update(long userId, String attemptId, String questionId, String value) {
     GradingOutcome outcome = parse(value);
-    QuizAttempt attempt =
-        attempts.findOwnedForUpdate(attemptId, userId).orElseThrow(this::notFound);
+    QuizAttempt attempt = locks.lockMain(userId, attemptId);
     QuizQuestion q =
         questions
             .findByPublicIdAndQuizSetId(questionId, attempt.getQuizSetId())

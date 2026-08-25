@@ -1,5 +1,6 @@
 package com.openmd.server.quiz.service;
 
+import com.openmd.server.global.api.FieldError;
 import com.openmd.server.global.error.BusinessException;
 import com.openmd.server.global.error.CommonErrorCode;
 import com.openmd.server.quiz.domain.entity.QuizAttempt;
@@ -82,12 +83,17 @@ public class QuizReviewService {
 
   @Transactional
   public ReviewSessionStart start(long userId, String requestedSourceAttemptId) {
+    if (requestedSourceAttemptId == null || requestedSourceAttemptId.isBlank()) {
+      throw new BusinessException(
+          CommonErrorCode.INVALID_INPUT,
+          List.of(new FieldError("sourceAttemptId", "sourceAttemptId가 필요합니다.")));
+    }
     QuizAttempt main =
         attempts
             .findTopByUserIdAndTypeAndStatusOrderByCompletedAtDesc(
                 userId, QuizAttemptType.MAIN, QuizAttemptStatus.COMPLETED)
             .orElseThrow(() -> new BusinessException(QuizErrorCode.REVIEW_UNAVAILABLE));
-    if (requestedSourceAttemptId == null || !requestedSourceAttemptId.equals(main.getPublicId())) {
+    if (!requestedSourceAttemptId.equals(main.getPublicId())) {
       throw new BusinessException(QuizErrorCode.REVIEW_UNAVAILABLE);
     }
     QuizAttempt active =

@@ -12,7 +12,6 @@ import com.openmd.server.quiz.domain.type.QuizAttemptType;
 import com.openmd.server.quiz.dto.response.EssayAssessmentResult;
 import com.openmd.server.quiz.error.QuizErrorCode;
 import com.openmd.server.quiz.repository.QuizAttemptQuestionRepository;
-import com.openmd.server.quiz.repository.QuizAttemptRepository;
 import com.openmd.server.quiz.repository.QuizQuestionRepository;
 import com.openmd.server.quiz.repository.QuizSubmittedAnswerRepository;
 import java.time.Instant;
@@ -23,28 +22,45 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @ConditionalOnProperty(name = "openmd.quiz.enabled", havingValue = "true", matchIfMissing = true)
 public class EssayAssessmentService {
-  private final QuizAttemptRepository attempts;
   private final QuizQuestionRepository questions;
   private final QuizAttemptQuestionRepository attemptQuestions;
   private final QuizSubmittedAnswerRepository answers;
+  private final QuizAttemptLockService locks;
 
   public EssayAssessmentService(
-      QuizAttemptRepository attempts,
       QuizQuestionRepository questions,
       QuizAttemptQuestionRepository attemptQuestions,
-      QuizSubmittedAnswerRepository answers) {
-    this.attempts = attempts;
+      QuizSubmittedAnswerRepository answers,
+      QuizAttemptLockService locks) {
     this.questions = questions;
     this.attemptQuestions = attemptQuestions;
     this.answers = answers;
+    this.locks = locks;
   }
 
   @Transactional
-  public EssayAssessmentResult assess(
+  public EssayAssessmentResult assessMain(
       long userId, String attemptId, String questionId, String requestedAssessment) {
+    return assess(userId, attemptId, questionId, requestedAssessment, QuizAttemptType.MAIN);
+  }
+
+  @Transactional
+  public EssayAssessmentResult assessReview(
+      long userId, String attemptId, String questionId, String requestedAssessment) {
+    return assess(userId, attemptId, questionId, requestedAssessment, QuizAttemptType.REVIEW);
+  }
+
+  private EssayAssessmentResult assess(
+      long userId,
+      String attemptId,
+      String questionId,
+      String requestedAssessment,
+      QuizAttemptType expectedType) {
     GradingOutcome outcome = parse(requestedAssessment);
     QuizAttempt attempt =
-        attempts.findOwnedForUpdate(attemptId, userId).orElseThrow(this::notFound);
+        expectedType == QuizAttemptType.MAIN
+            ? locks.lockMain(userId, attemptId)
+            : locks.lockReviewAfterSourceMain(userId, attemptId);
     QuizQuestion question =
         questions
             .findByPublicIdAndQuizSetId(questionId, attempt.getQuizSetId())

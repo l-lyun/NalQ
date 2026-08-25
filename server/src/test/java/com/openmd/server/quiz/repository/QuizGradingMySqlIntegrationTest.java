@@ -3,6 +3,7 @@ package com.openmd.server.quiz.repository;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -194,7 +195,8 @@ class QuizGradingMySqlIntegrationTest {
         generation.complete(
             fixture.userId(),
             set.getPublicId(),
-            List.of(multipleChoice(2), multipleChoice(3), fillBlank(), shortAnswer(), essay())));
+            List.of(multipleChoice(2), multipleChoice(3), fillBlank(), shortAnswer(), essay()),
+            15));
 
     List<QuizQuestion> stored = questions.findAllByQuizSetIdOrderByNumber(set.getId());
     assertEquals(List.of(1, 2, 3, 4), stored.stream().map(QuizQuestion::getNumber).toList());
@@ -232,17 +234,17 @@ class QuizGradingMySqlIntegrationTest {
     assertEquals(
         0,
         essayAssessments
-            .assess(fixture.userId(), uuid(1), essayQuestion.getPublicId(), "PARTIAL")
+            .assessMain(fixture.userId(), uuid(1), essayQuestion.getPublicId(), "PARTIAL")
             .remainingSelfAssessmentCount());
     assertEquals(
         QuizAttemptStatus.COMPLETED,
         essayAssessments
-            .assess(fixture.userId(), uuid(1), essayQuestion.getPublicId(), "PARTIAL")
+            .assessMain(fixture.userId(), uuid(1), essayQuestion.getPublicId(), "PARTIAL")
             .status());
     assertThrows(
         BusinessException.class,
         () ->
-            essayAssessments.assess(
+            essayAssessments.assessMain(
                 fixture.userId(), uuid(1), essayQuestion.getPublicId(), "CORRECT"));
     assertEquals(
         3,
@@ -278,6 +280,26 @@ class QuizGradingMySqlIntegrationTest {
             () -> submissions.submit(otherOwner.userId(), second.setId(), uuid(2), List.of()));
     assertEquals(QuizErrorCode.ATTEMPT_CONFLICT, reused.getErrorCode());
     assertEquals(1L, jdbc.queryForObject("SELECT COUNT(*) FROM quiz_attempts", Long.class));
+  }
+
+  @Test
+  void generationPersistsOnlyTheFirstValidCandidatesUpToTheRequestedMaximum() {
+    Fixture fixture = fixture();
+    QuizSet set = sets.saveAndFlush(QuizSet.generating(fixture.userId(), fixture.materialId()));
+
+    int count =
+        generation.complete(
+            fixture.userId(),
+            set.getPublicId(),
+            List.of(multipleChoice(2), shortAnswer(), essay(), fillBlank()),
+            2);
+
+    assertEquals(2, count);
+    assertEquals(
+        List.of(QuestionType.SHORT_ANSWER, QuestionType.ESSAY),
+        questions.findAllByQuizSetIdOrderByNumber(set.getId()).stream()
+            .map(QuizQuestion::getType)
+            .toList());
   }
 
   @Test
@@ -405,6 +427,45 @@ class QuizGradingMySqlIntegrationTest {
   }
 
   @Test
+  void solvingReviewResultsAndReviewAttemptsAreExcludedFromMainBoundaries() {
+    ReadyQuiz quiz = ready(fixture(), essay());
+    submissions.submit(
+        quiz.userId(),
+        quiz.setId(),
+        uuid(9),
+        List.of(new QuizResponseRequest(quiz.questionId(), null, null, "내 설명")));
+    essayAssessments.assessMain(quiz.userId(), uuid(9), quiz.questionId(), "INCORRECT");
+    String reviewId = reviews.start(quiz.userId(), uuid(9)).reviewSession().reviewSessionId();
+
+    BusinessException solving =
+        assertThrows(BusinessException.class, () -> results.reviewResult(quiz.userId(), reviewId));
+    assertEquals(QuizErrorCode.ATTEMPT_CONFLICT, solving.getErrorCode());
+    assertEquals(
+        CommonErrorCode.RESOURCE_NOT_FOUND,
+        assertThrows(BusinessException.class, () -> results.result(quiz.userId(), reviewId))
+            .getErrorCode());
+
+    submissions.submitReview(
+        quiz.userId(),
+        reviewId,
+        List.of(new QuizResponseRequest(quiz.questionId(), null, null, "복습 설명")));
+    assertNull(results.pending(quiz.userId(), quiz.setId()));
+    assertEquals(
+        QuizErrorCode.ATTEMPT_CONFLICT,
+        assertThrows(
+                BusinessException.class,
+                () ->
+                    essayAssessments.assessMain(
+                        quiz.userId(), reviewId, quiz.questionId(), "CORRECT"))
+            .getErrorCode());
+    assertEquals(
+        QuizAttemptStatus.COMPLETED,
+        essayAssessments
+            .assessReview(quiz.userId(), reviewId, quiz.questionId(), "CORRECT")
+            .status());
+  }
+
+  @Test
   void rollsBackTheWholeAttemptWhenSubmittedAnswerPersistenceFails() {
     ReadyQuiz quiz = readyShortAnswer(fixture());
     jdbc.execute(
@@ -441,7 +502,7 @@ class QuizGradingMySqlIntegrationTest {
 
   private ReadyQuiz ready(Fixture fixture, QuizGenerationCandidate candidate) {
     QuizSet set = sets.saveAndFlush(QuizSet.generating(fixture.userId(), fixture.materialId()));
-    generation.complete(fixture.userId(), set.getPublicId(), List.of(candidate));
+    generation.complete(fixture.userId(), set.getPublicId(), List.of(candidate), 15);
     return new ReadyQuiz(
         fixture.userId(),
         set.getPublicId(),

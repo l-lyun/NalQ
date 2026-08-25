@@ -83,7 +83,7 @@ public class QuizAttemptController {
       @RequestBody EssayAssessmentRequest request) {
     return ResponseEntity.ok(
         ApiResponse.success(
-            essayAssessments.assess(
+            essayAssessments.assessMain(
                 principal.userId(), attemptId, questionId, request.assessment())));
   }
 

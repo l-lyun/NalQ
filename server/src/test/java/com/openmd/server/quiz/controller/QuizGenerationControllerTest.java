@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.openmd.server.auth.security.AccessPrincipal;
+import com.openmd.server.global.error.GlobalExceptionHandler;
 import com.openmd.server.quiz.domain.type.QuestionType;
 import com.openmd.server.quiz.domain.type.QuizDifficulty;
 import com.openmd.server.quiz.domain.type.QuizSetStatus;
@@ -37,6 +38,7 @@ class QuizGenerationControllerTest {
   void setUp() {
     mvc =
         MockMvcBuilders.standaloneSetup(new QuizGenerationController(service))
+            .setControllerAdvice(new GlobalExceptionHandler())
             .setCustomArgumentResolvers(principal())
             .build();
   }
@@ -89,6 +91,21 @@ class QuizGenerationControllerTest {
     mvc.perform(get("/api/v1/learning-materials/123/quiz-sets/active"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data").value((Object) null));
+  }
+
+  @Test
+  void reportsUnknownGenerationEnumsAsInvalidFields() throws Exception {
+    mvc.perform(
+            post("/api/v1/learning-materials/123/quiz-sets")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"selectedTypes":["UNKNOWN"],"difficulty":"IMPOSSIBLE","maxQuestionCount":10}
+                    """))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("COMMON_001"))
+        .andExpect(jsonPath("$.error.fields[0].field").value("selectedTypes"))
+        .andExpect(jsonPath("$.error.fields[1].field").value("difficulty"));
   }
 
   private HandlerMethodArgumentResolver principal() {

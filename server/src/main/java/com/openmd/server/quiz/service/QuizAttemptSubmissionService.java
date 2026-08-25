@@ -14,6 +14,7 @@ import java.time.*;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +30,7 @@ public class QuizAttemptSubmissionService {
   private final QuizShortAnswerAnswerRepository shortAnswers;
   private final QuizFillInTheBlankRepository blanks;
   private final QuizFillInTheBlankAnswerRepository blankAnswers;
+  private final QuizAttemptLockService locks;
 
   public QuizAttemptSubmissionService(
       QuizSetRepository sets,
@@ -39,7 +41,8 @@ public class QuizAttemptSubmissionService {
       QuizQuestionChoiceRepository choices,
       QuizShortAnswerAnswerRepository shortAnswers,
       QuizFillInTheBlankRepository blanks,
-      QuizFillInTheBlankAnswerRepository blankAnswers) {
+      QuizFillInTheBlankAnswerRepository blankAnswers,
+      QuizAttemptLockService locks) {
     this.sets = sets;
     this.questions = questions;
     this.attempts = attempts;
@@ -49,6 +52,7 @@ public class QuizAttemptSubmissionService {
     this.shortAnswers = shortAnswers;
     this.blanks = blanks;
     this.blankAnswers = blankAnswers;
+    this.locks = locks;
   }
 
   @Transactional
@@ -71,7 +75,12 @@ public class QuizAttemptSubmissionService {
     if (responses == null) throw invalid("responses", "responses가 필요합니다.");
     List<QuizQuestion> all = questions.findAllByQuizSetIdOrderByNumber(set.getId());
     Map<String, QuizResponseRequest> indexed = index(responses, all);
-    QuizAttempt attempt = attempts.saveAndFlush(QuizAttempt.main(attemptId, set.getId(), userId));
+    QuizAttempt attempt;
+    try {
+      attempt = attempts.saveAndFlush(QuizAttempt.main(attemptId, set.getId(), userId));
+    } catch (DataIntegrityViolationException exception) {
+      throw conflictId();
+    }
     boolean pendingEssay = false;
     Instant now = Instant.now();
     for (QuizQuestion q : all) {
@@ -89,9 +98,7 @@ public class QuizAttemptSubmissionService {
   @Transactional
   public ReviewSubmission submitReview(
       long userId, String reviewId, List<QuizResponseRequest> responses) {
-    QuizAttempt attempt = attempts.findOwnedForUpdate(reviewId, userId).orElseThrow(this::notFound);
-    if (attempt.getType() != QuizAttemptType.REVIEW)
-      throw new BusinessException(QuizErrorCode.ATTEMPT_CONFLICT);
+    QuizAttempt attempt = locks.lockReviewAfterSourceMain(userId, reviewId);
     if (attempt.getStatus() != QuizAttemptStatus.IN_PROGRESS) return reviewResponse(attempt);
     if (responses == null) throw invalid("responses", "responses가 필요합니다.");
     List<QuizAttemptQuestion> snapshot =

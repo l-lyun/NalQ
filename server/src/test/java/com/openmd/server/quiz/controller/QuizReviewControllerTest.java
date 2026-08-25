@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.openmd.server.auth.security.AccessPrincipal;
+import com.openmd.server.global.error.GlobalExceptionHandler;
 import com.openmd.server.quiz.domain.type.QuizAttemptStatus;
 import com.openmd.server.quiz.dto.response.EssaySelfAssessmentSummary;
 import com.openmd.server.quiz.dto.response.GradingCount;
@@ -47,6 +48,7 @@ class QuizReviewControllerTest {
         MockMvcBuilders.standaloneSetup(
                 new QuizReviewController(reviews, submissions, results, essays))
             .setCustomArgumentResolvers(principal())
+            .setControllerAdvice(new GlobalExceptionHandler())
             .build();
   }
 
@@ -110,6 +112,15 @@ class QuizReviewControllerTest {
         .andExpect(jsonPath("$.data.summary.resolvedQuestionCount").value(1))
         .andExpect(jsonPath("$.data.summary.unresolvedQuestionCount").value(2))
         .andExpect(jsonPath("$.data.summary.reviewQuestionCount").doesNotExist());
+  }
+
+  @Test
+  void missingSourceAttemptIdIsReportedAsAnInvalidField() throws Exception {
+    mvc.perform(
+            post("/api/v1/review-sessions").contentType(MediaType.APPLICATION_JSON).content("{}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("COMMON_001"))
+        .andExpect(jsonPath("$.error.fields[0].field").value("sourceAttemptId"));
   }
 
   private HandlerMethodArgumentResolver principal() {

@@ -42,13 +42,23 @@ public class QuizGenerationPersistenceService {
   }
 
   @Transactional
-  public int complete(long userId, String quizSetId, List<QuizGenerationCandidate> candidates) {
+  public int complete(
+      long userId,
+      String quizSetId,
+      List<QuizGenerationCandidate> candidates,
+      int maxQuestionCount) {
     QuizSet set =
         sets.findOwnedForUpdate(quizSetId, userId)
             .orElseThrow(() -> new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND));
     if (set.getStatus() != QuizSetStatus.GENERATING)
       throw new IllegalStateException("Quiz set is already finalized");
-    List<ValidatedQuizQuestion> valid = validator.validateAll(candidates);
+    if (maxQuestionCount < 1) {
+      throw new BusinessException(
+          CommonErrorCode.INVALID_INPUT,
+          List.of(new com.openmd.server.global.api.FieldError("maxQuestionCount", "1 이상이어야 합니다.")));
+    }
+    List<ValidatedQuizQuestion> valid =
+        validator.validateAll(candidates).stream().limit(maxQuestionCount).toList();
     if (valid.isEmpty()) {
       set.fail(QuizSetFailureCode.SOURCE_INSUFFICIENT);
       return 0;

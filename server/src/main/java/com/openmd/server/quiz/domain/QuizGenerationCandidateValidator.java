@@ -25,6 +25,7 @@ public final class QuizGenerationCandidateValidator {
     if (value == null
         || value.type() == null
         || blank(value.topic())
+        || value.topic().codePointCount(0, value.topic().length()) > 255
         || blank(value.prompt())
         || blank(value.explanation())
         || blank(value.sourceExcerpt())) return null;
@@ -32,8 +33,7 @@ public final class QuizGenerationCandidateValidator {
       case MULTIPLE_CHOICE -> validChoices(value) ? value : null;
       case SHORT_ANSWER -> withAcceptedAnswers(value);
       case FILL_IN_THE_BLANK -> validBlanks(value) ? withBlankAnswers(value) : null;
-      case ESSAY ->
-          !blank(value.modelAnswer()) && nonBlank(value.keyPoints()).size() > 0 ? value : null;
+      case ESSAY -> !blank(value.modelAnswer()) && validKeyPoints(value.keyPoints()) ? value : null;
     };
   }
 
@@ -70,7 +70,13 @@ public final class QuizGenerationCandidateValidator {
     }
     List<Integer> markers = new ArrayList<>();
     Matcher matcher = BLANK_MARKER.matcher(value.prompt());
-    while (matcher.find()) markers.add(Integer.parseInt(matcher.group(1)));
+    while (matcher.find()) {
+      try {
+        markers.add(Integer.parseInt(matcher.group(1)));
+      } catch (NumberFormatException exception) {
+        return false;
+      }
+    }
     return markers.equals(
         java.util.stream.IntStream.rangeClosed(1, blanks.size()).boxed().toList());
   }
@@ -85,8 +91,8 @@ public final class QuizGenerationCandidateValidator {
     return List.copyOf(unique.values());
   }
 
-  private List<String> nonBlank(List<String> values) {
-    return values == null ? List.of() : values.stream().filter(value -> !blank(value)).toList();
+  private boolean validKeyPoints(List<String> values) {
+    return values != null && !values.isEmpty() && values.stream().allMatch(value -> !blank(value));
   }
 
   private boolean blank(String value) {

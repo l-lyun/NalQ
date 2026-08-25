@@ -5,11 +5,13 @@ import com.openmd.server.global.error.CommonErrorCode;
 import com.openmd.server.quiz.domain.type.GradingOutcome;
 import com.openmd.server.quiz.domain.type.QuestionType;
 import com.openmd.server.quiz.domain.type.QuizAttemptStatus;
+import com.openmd.server.quiz.domain.type.QuizAttemptType;
 import com.openmd.server.quiz.dto.response.GradingCount;
 import com.openmd.server.quiz.dto.response.PendingSelfAssessment;
 import com.openmd.server.quiz.dto.response.QuizAttemptResult;
 import com.openmd.server.quiz.dto.response.ReviewAttemptResult;
 import com.openmd.server.quiz.dto.response.ReviewAttemptSummary;
+import com.openmd.server.quiz.error.QuizErrorCode;
 import com.openmd.server.quiz.repository.QuizAttemptQuestionRepository;
 import com.openmd.server.quiz.repository.QuizAttemptRepository;
 import com.openmd.server.quiz.repository.QuizQuestionRepository;
@@ -46,6 +48,7 @@ public class QuizAttemptResultService {
     var attempt =
         attempts
             .findByPublicIdAndUserId(attemptPublicId, userId)
+            .filter(value -> value.getType() == QuizAttemptType.MAIN)
             .orElseThrow(() -> new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND));
     return projector.project(attempt);
   }
@@ -57,6 +60,9 @@ public class QuizAttemptResultService {
             .findByPublicIdAndUserId(reviewId, userId)
             .filter(a -> a.getType() == com.openmd.server.quiz.domain.type.QuizAttemptType.REVIEW)
             .orElseThrow(() -> new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND));
+    if (review.getStatus() == QuizAttemptStatus.IN_PROGRESS) {
+      throw new BusinessException(QuizErrorCode.ATTEMPT_CONFLICT);
+    }
     var source =
         attempts
             .findById(review.getSourceAttemptId())
@@ -105,8 +111,12 @@ public class QuizAttemptResultService {
             .orElseThrow(() -> new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND));
     var attempt =
         attempts
-            .findFirstByQuizSetIdAndUserIdAndStatus(
-                set.getId(), userId, QuizAttemptStatus.SELF_ASSESSMENT_REQUIRED)
+            .findFirstByQuizSetIdAndUserIdAndTypeAndStatus(
+                set.getId(),
+                userId,
+                QuizAttemptType.MAIN,
+                QuizAttemptStatus.SELF_ASSESSMENT_REQUIRED)
+            .filter(value -> value.getType() == QuizAttemptType.MAIN)
             .orElse(null);
     if (attempt == null) return null;
     var ids =

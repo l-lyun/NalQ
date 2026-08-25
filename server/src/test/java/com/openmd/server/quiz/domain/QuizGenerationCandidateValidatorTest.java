@@ -1,5 +1,6 @@
 package com.openmd.server.quiz.domain;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.openmd.server.quiz.domain.QuizGenerationCandidate.BlankCandidate;
@@ -91,6 +92,62 @@ class QuizGenerationCandidateValidatorTest {
                         null,
                         List.of())))
             .size());
+  }
+
+  @Test
+  void rejectsOverflowingBlankMarkersWithoutThrowing() {
+    QuizGenerationCandidate candidate =
+        new QuizGenerationCandidate(
+            1,
+            QuestionType.FILL_IN_THE_BLANK,
+            "빈칸",
+            "값은 [999999999999999999999999999999]이다.",
+            "해설",
+            "근거",
+            List.of(),
+            List.of(),
+            List.of(new BlankCandidate(1, List.of("값"))),
+            null,
+            List.of());
+
+    List<ValidatedQuizQuestion> result =
+        assertDoesNotThrow(() -> validator.validateAll(List.of(candidate)));
+
+    assertEquals(0, result.size());
+  }
+
+  @Test
+  void rejectsAnEssayWhenAnyKeyPointIsNullOrBlank() {
+    QuizGenerationCandidate candidate =
+        candidate(
+            QuestionType.ESSAY,
+            List.of(),
+            List.of(),
+            List.of(),
+            "모범 답안",
+            java.util.Arrays.asList("핵심", null, "  "));
+
+    assertEquals(0, validator.validateAll(List.of(candidate)).size());
+  }
+
+  @Test
+  void rejectsTopicsLongerThan255UnicodeCodePoints() {
+    String topic = "😀".repeat(256);
+    QuizGenerationCandidate candidate =
+        new QuizGenerationCandidate(
+            1,
+            QuestionType.SHORT_ANSWER,
+            topic,
+            "문제",
+            "해설",
+            "근거",
+            List.of(),
+            List.of("답"),
+            List.of(),
+            null,
+            List.of());
+
+    assertEquals(0, validator.validateAll(List.of(candidate)).size());
   }
 
   private QuizGenerationCandidate candidate(
