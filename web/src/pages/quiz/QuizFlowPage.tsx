@@ -193,6 +193,7 @@ export function QuizFlowPage({
   materialTitle,
   questions,
   result,
+  flowKind = 'QUIZ',
   initialScene = 'CONDITIONS',
   initialConditions = { questionTypes: ['MULTIPLE_CHOICE'], difficulty: 'NORMAL', maxCount: 10 },
   initialAnswers = {},
@@ -523,7 +524,7 @@ export function QuizFlowPage({
         ) : null}
         {scene === 'SOLVING' && currentQuestion ? (
           <SolvingScreen
-            materialTitle={materialTitle}
+            materialTitle={flowKind === 'REVIEW' ? `${materialTitle} · 복습` : materialTitle}
             question={currentQuestion}
             questionIndex={questionIndex}
             questionCount={questions.length}
@@ -1660,7 +1661,7 @@ function ResultListSheet({
       description="확인할 문제를 선택해 주세요."
       footer={
         <ActionButton size="large" variant="neutralWeak" onClick={() => onOpenChange(false)}>
-          닫기
+          <Text textStyle="t5Regular">닫기</Text>
         </ActionButton>
       }
     >
@@ -1675,7 +1676,7 @@ function ResultListSheet({
             <span>
               {item.number}번 · {typeLabels[item.type]}
             </span>
-            <strong>{outcomeLabel(item.outcome)}</strong>
+            <span className="quiz-result-list-outcome">{outcomeLabel(item.outcome)}</span>
           </button>
         ))}
       </VStack>

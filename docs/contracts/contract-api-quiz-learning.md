@@ -10,6 +10,7 @@ scope: shared
 - 소비 영역: 웹·앱 클라이언트
 - 관련 기능명세: [학습자료 만들기](../prd/prd-content-import.md), [퀴즈 생성·풀이·결과·복습](../prd/prd-quiz-learning.md)
 - 관련 흐름: [학습자료 만들기](../ux/flow-content-import.md), [퀴즈 생성부터 복습까지](../ux/flow-quiz-solving.md)
+- 공유 데이터 의미: [학습자료와 퀴즈 데이터 계약](contract-data-quiz-learning.md)
 
 ## 문서 책임
 
@@ -21,12 +22,21 @@ scope: shared
 
 - 모든 엔드포인트는 유효한 Access Token이 필요하다.
 - 서버는 Access Token에서 얻은 `userId`로 학습자료, 문제 세트, 본 퀴즈 회차와 복습 세션의 소유권을 판단한다. 요청 body의 `userId`는 받지 않는다.
+- attempt, 문항 결과와 복습 리소스는 요청 경로의 개별 ID 존재 여부만 확인하지 않는다. 현재 사용자의 학습자료 → 문제 세트 → attempt → attempt 문항 연결 전체가 일치하는지 검증하며, 복습은 원본 MAIN attempt와 원본 attempt 문항까지 같은 소유권 연결 안에 있는지 검증한다.
+- `quizSetId`, `attemptId`, 복습 ID와 문항 ID는 리소스 식별자일 뿐 권한 증명이 아니다. 클라이언트가 알고 있는 ID만으로 소유권 검증을 생략하지 않는다.
 - 존재하지 않거나 현재 사용자 소유가 아닌 리소스는 모두 `404 COMMON_003`으로 응답해 타인의 리소스 존재를 노출하지 않는다.
+
+### 풀이 전 정답 비노출 경계
+
+- 문제 세트 상태 조회와 본 퀴즈·복습의 풀이 전 응답은 각 절에 명시된 공개 필드만 허용하는 allowlist다. 서버의 정답 기준, 허용 답안, 예시·모범 답안, 해설, 원문 근거와 내부 생성 메타데이터는 도메인 모델에 존재하더라도 추가로 직렬화하지 않는다.
+- 본 퀴즈와 복습은 같은 풀이 전 공개 모양을 사용한다. 복습 대상이라는 이유로 이전 정답, 이전 제출 답안이나 채점 결과를 풀이 응답에 포함하지 않는다.
+- 제출·채점 이후에도 결과 계약이 명시한 대표 정답과 예시·모범 답안만 공개한다. 자동 채점에 사용하는 전체 허용 답안 목록과 내부 정규화 값은 반환하지 않는다.
+- 정답 기준은 제출·채점 서비스 내부에서만 읽는다. 풀이 조회 DTO와 결과 DTO는 분리된 응답 경계를 유지한다.
 
 ### 브라우저 전송 경계
 
 - stateless Bearer API는 브라우저가 자격 증명을 자동 첨부하는 Cookie API가 아니므로 CSRF token을 요구하지 않는다. 유효한 Access Token과 엔드포인트별 권한 검사는 그대로 적용한다.
-- 일반 API CORS는 설정된 정확한 origin에만 허용하며 wildcard origin을 사용하지 않는다. 허용 method는 `GET`, `POST`, `PATCH`, `DELETE`, `OPTIONS`이고 허용 header는 `Authorization`, `Content-Type`, `Idempotency-Key`다.
+- 일반 API CORS는 설정된 정확한 origin에만 허용하며 wildcard origin을 사용하지 않는다. 허용 method는 `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`이고 허용 header는 `Authorization`, `Content-Type`, `Idempotency-Key`다.
 - 브라우저 Refresh Cookie endpoint는 이 예외에 포함하지 않는다. 해당 endpoint의 credentialed CORS와 정확한 `Origin` + `X-OpenMD-CSRF` guard는 [인증 API 계약](contract-api-authentication.md#cors와-csrf)을 유지한다.
 
 ### 응답 봉투
@@ -60,14 +70,15 @@ scope: shared
 - `materialId`의 wire 형식은 서버 `BIGINT` 식별자의 10진 문자열이다. 클라이언트는 이를 숫자로 변환하거나 산술에 사용하지 않고 opaque 문자열로 보존한다.
 - 외부 생성 서비스와 Notion의 원본 응답, 모델명, 프롬프트, 내부 검증 상세와 stack trace는 공개 응답·오류에 포함하지 않는다.
 
-### 멱등 키
+### 쓰기 요청 식별과 재시도
 
-- 명시된 쓰기 요청은 `Idempotency-Key` 헤더가 필수다.
-- 키는 대소문자를 구분하는 공백 없는 출력 가능 ASCII 1~128자다. 누락, 빈 값, 공백 포함, 범위 밖 문자와 128자 초과는 `400 COMMON_001`이며 `fields.field`는 `Idempotency-Key`다. 클라이언트는 충돌 가능성이 낮은 UUID 사용을 권장하되 UUID 형식만 강제하지 않는다.
-- 키 범위는 `현재 사용자 + HTTP method + 정규화 path`다.
-- 같은 키와 같은 의미의 payload 재요청은 최초 처리 결과와 같은 리소스 식별자를 반환한다.
-- 같은 키에 다른 payload를 보내면 새 오류 코드를 만들지 않는다. 일반 payload 불일치는 `COMMON_001`, 이미 전이된 attempt·복습 상태와의 충돌은 각각 `ATTEMPT_001`, `REVIEW_001`로 처리한다. 생성 중인 같은 자료에 대한 충돌은 `QUIZ_001`이다.
-- 멱등 결과를 확정하기 전에 클라이언트가 키를 바꾸면 중복 리소스가 생길 수 있으므로, 응답 유실 재시도에는 반드시 같은 키를 사용한다.
+- 학습자료 생성과 비동기 QuizSet 생성 접수처럼 아직 자연스러운 리소스 식별자가 없는 생성 요청만 `Idempotency-Key` 헤더를 사용한다. 기존 키 형식과 재시도 규칙은 해당 엔드포인트 절에서 정의한다.
+- 본 퀴즈 최종 제출은 클라이언트가 `crypto.randomUUID()` 수준의 안전한 난수원으로 만든 UUID v4를 `attemptId`로 사용한다. 서버는 parse 가능한 UUID 형식과 DB unique 제약만 확인하며 hash·fingerprint 충돌 방지 체계를 추가하지 않는다.
+- attempt UUID는 비밀 정보가 아니므로 서버에서 hash하지 않는다. 서버는 `attemptId`의 전역 unique 제약과 소유권·QuizSet 일치 검증만 수행한다.
+- 같은 `attemptId`의 재요청은 payload fingerprint를 계산하거나 비교하지 않고 최초로 확정된 attempt를 반환한다. 클라이언트 버그로 같은 UUID에 다른 답안을 보낸 경우에도 최초 제출 우선이며 새 회차를 만들지 않는다.
+- 다른 사용자 또는 QuizSet이 이미 사용한 UUID이면 `409 ATTEMPT_001`과 `fields.field=attemptId`를 반환한다. 자동으로 새 UUID를 만들어 재전송하지 않는다.
+- 복습 최종 제출은 이미 존재하는 `reviewSessionId` 하나에 한 번만 확정되므로 별도 요청 키를 만들지 않는다. 같은 세션 재요청은 최초 제출 결과를 반환한다.
+- 서술형 자기평가와 단답형 판정 수정처럼 특정 리소스에 원하는 현재 값을 저장하는 `PUT`은 저장된 현재 값 자체로 반복 요청을 처리한다. 별도 멱등 키, payload fingerprint와 공개 revision을 두지 않는다.
 
 ## 엔드포인트 목록
 
@@ -79,14 +90,16 @@ scope: shared
 | 문제 세트 생성 접수 | `POST /api/v1/learning-materials/{materialId}/quiz-sets` | `202 Accepted` |
 | 자료의 활성 생성 조회 | `GET /api/v1/learning-materials/{materialId}/quiz-sets/active` | `200 OK` |
 | 문제 세트 상태·풀이 데이터 조회 | `GET /api/v1/quiz-sets/{quizSetId}` | `200 OK` |
-| 본 퀴즈 최종 제출 | `POST /api/v1/quiz-sets/{quizSetId}/attempts` | `201 Created` |
+| 본 퀴즈 최종 제출 | `PUT /api/v1/quiz-sets/{quizSetId}/attempts/{attemptId}` | `201 Created` 또는 `200 OK` |
 | 미완료 서술형 자기평가 회차 조회 | `GET /api/v1/quiz-sets/{quizSetId}/attempts/pending-self-assessment` | `200 OK` |
 | 서술형 자기평가 저장 | `PUT /api/v1/quiz-attempts/{attemptId}/essay-assessments/{questionId}` | `200 OK` |
 | 결과 조회 | `GET /api/v1/quiz-attempts/{attemptId}/result` | `200 OK` |
+| 단답형 현재 판정 수정 | `PUT /api/v1/quiz-attempts/{attemptId}/short-answer-gradings/{questionId}` | `200 OK` |
 | 최신 복습 현황 조회 | `GET /api/v1/quiz-reviews/latest` | `200 OK` |
 | 최신 대상 복습 세션 생성 | `POST /api/v1/review-sessions` | `201 Created` 또는 `200 OK` |
 | 복습 세션 조회·재개 | `GET /api/v1/review-sessions/{reviewSessionId}` | `200 OK` |
-| 복습 문항 답안 저장 | `POST /api/v1/review-sessions/{reviewSessionId}/responses` | `200 OK` |
+| 복습 전체 답안 제출 | `PUT /api/v1/review-sessions/{reviewSessionId}/submission` | `200 OK` |
+| 복습 결과 조회 | `GET /api/v1/review-sessions/{reviewSessionId}/result` | `200 OK` |
 | 복습 서술형 자기평가 저장 | `PUT /api/v1/review-sessions/{reviewSessionId}/essay-assessments/{questionId}` | `200 OK` |
 
 ## 학습자료
@@ -192,18 +205,20 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 
 ```json
 {
-  "selectedTypes": ["MULTIPLE_CHOICE", "FILL_BLANK", "SHORT_ANSWER", "ESSAY"],
+  "selectedTypes": ["MULTIPLE_CHOICE", "FILL_IN_THE_BLANK", "SHORT_ANSWER", "ESSAY"],
   "difficulty": "NORMAL",
   "maxQuestionCount": 10
 }
 ```
 
-- `selectedTypes`: 중복 없는 1개 이상. 값은 `MULTIPLE_CHOICE`, `FILL_BLANK`, `SHORT_ANSWER`, `ESSAY`.
+- `selectedTypes`: 중복 없는 1개 이상. 값은 서버 `QuestionType`과 같은 `MULTIPLE_CHOICE`, `FILL_IN_THE_BLANK`, `SHORT_ANSWER`, `ESSAY`.
 - `difficulty`: `EASY`, `NORMAL`, `HARD`.
 - `maxQuestionCount`: 필수, `5`, `10`, `15` 중 하나.
 - 요청을 접수하면 새 불변 `quizSetId`를 만들고 학습자료 본문을 원자적으로 잠근다.
 - 같은 학습자료에 `GENERATING` 세트가 있으면 새 요청을 받지 않는다.
 - 서버가 생성 작업 자체를 접수할 수 없으면 `503 QUIZ_002`를 반환하고 QuizSet을 만들거나 본문 잠금 상태를 바꾸지 않는다.
+- 성공 응답의 `requestedConfig`는 이 요청의 입력값을 그대로 echo하는 값이다. 서버는 이를 DB에 영속화하지 않으며 이후 GET 응답에서는 반환하지 않는다.
+- 클라이언트는 성공 응답의 `quizSetId`와 `requestedConfig`를 현재 사용자 범위의 기기 로컬 상태에 연결할 수 있다. 이 값은 생성 중·성공 화면의 요청 조건 표시용이며 서버 상태나 성공 판정의 근거가 아니다.
 
 ```json
 {
@@ -214,7 +229,7 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
     "status": "GENERATING",
     "pollAfterSeconds": 3,
     "requestedConfig": {
-      "selectedTypes": ["MULTIPLE_CHOICE", "FILL_BLANK", "SHORT_ANSWER", "ESSAY"],
+      "selectedTypes": ["MULTIPLE_CHOICE", "FILL_IN_THE_BLANK", "SHORT_ANSWER", "ESSAY"],
       "difficulty": "NORMAL",
       "maxQuestionCount": 10
     },
@@ -231,6 +246,7 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 - 현재 인증 사용자가 소유한 학습자료에서 `GENERATING` 상태인 QuizSet 하나를 찾는다.
 - 활성 생성이 없으면 정상 빈 상태이므로 새 오류 코드를 만들지 않고 `200 OK`, `data=null`을 반환한다.
 - 활성 생성이 있으면 반환한 `quizSetId`로 [상태·풀이 데이터 조회](#상태풀이-데이터-조회)를 계속한다.
+- 클라이언트는 반환된 `quizSetId`로 같은 사용자·기기의 로컬 `requestedConfig`를 조회할 수 있다. 로컬 값이 없어도 활성 생성 조회와 polling은 동일하게 진행한다.
 
 ```json
 {
@@ -239,11 +255,6 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
     "quizSetId": "qset_123",
     "materialId": "123",
     "status": "GENERATING",
-    "requestedConfig": {
-      "selectedTypes": ["MULTIPLE_CHOICE", "ESSAY"],
-      "difficulty": "NORMAL",
-      "maxQuestionCount": 10
-    },
     "pollAfterSeconds": 3
   },
   "error": null
@@ -264,11 +275,12 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 
 `GET /api/v1/quiz-sets/{quizSetId}`
 
-- `GENERATING`, `READY`, `FAILED` 모두 `quizSetId`, `materialId`, `status`, `requestedConfig`를 반환한다.
-- `GENERATING`은 다음 조회 권고값 `pollAfterSeconds`도 반환한다.
-- `READY`는 유효 문제가 1개 이상이고 요청한 유형이 각각 최소 1문제 포함됐다는 뜻이다. 실제 수가 최대 문제 수보다 적을 수 있다.
-- `FAILED`에는 문제를 포함하지 않는다. 사용자에게는 재시도 가능한 일반 안내만 제공하고 외부 생성 서비스 상세는 노출하지 않는다.
-- 문제는 `number` 오름차순이다.
+- 모든 상태는 `quizSetId`, `materialId`, `status`를 반환하며 `requestedConfig`는 반환하지 않는다.
+- `GENERATING`은 공통 필드와 다음 조회 권고값 `pollAfterSeconds`만 반환한다. 로컬 요청 조건이 없으면 클라이언트는 일반 생성 진행 상태를 표시한다.
+- `READY`는 공통 필드와 `questions`를 반환한다. 유효 문제가 1개 이상이라는 뜻이며 클라이언트는 로컬 요청 조건 유무와 관계없이 `questions`에서 실제 문제 수와 포함 유형을 계산한다. 실제 수가 최대 문제 수보다 적거나 요청한 유형 일부가 포함되지 않아도 된다.
+- `FAILED`는 공통 필드와 `failure`만 반환하고 문제를 포함하지 않는다. 로컬 요청 조건이 없으면 일반 실패 안내와 새 조건 선택 행동을 제공하며, 외부 생성 서비스 상세는 노출하지 않는다.
+- 외부 생성 후보의 문제 번호는 공개 계약에 사용하지 않는다. 서버는 유형별 검증을 통과한 후보의 원래 배열 순서에 따라 `number=1..N`을 새로 부여한다.
+- 검증에서 제외된 후보는 `questions`에 포함하지 않으며 문제는 빈 번호 없이 `number` 오름차순으로 반환한다.
 
 `GENERATING` 예시:
 
@@ -279,32 +291,35 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
     "quizSetId": "qset_123",
     "materialId": "123",
     "status": "GENERATING",
-    "requestedConfig": {
-      "selectedTypes": ["MULTIPLE_CHOICE", "ESSAY"],
-      "difficulty": "NORMAL",
-      "maxQuestionCount": 10
-    },
-    "pollAfterSeconds": 3,
-    "questions": [],
-    "failure": null
+    "pollAfterSeconds": 3
   },
   "error": null
 }
 ```
 
-`FAILED`의 `failure` 예시:
+`FAILED` 예시:
 
 ```json
 {
-  "code": "SOURCE_INSUFFICIENT",
-  "message": "선택한 조건으로 충분한 문제를 만들지 못했어요. 자료나 문제 유형을 확인해 주세요.",
-  "retryable": false
+  "success": true,
+  "data": {
+    "quizSetId": "qset_123",
+    "materialId": "123",
+    "status": "FAILED",
+    "failure": {
+      "code": "SOURCE_INSUFFICIENT",
+      "message": "학습자료에서 문제를 만들지 못했어요. 자료나 조건을 확인해 주세요.",
+      "retryable": false
+    }
+  },
+  "error": null
 }
 ```
 
 - `failure.code`는 `SOURCE_INSUFFICIENT` 또는 `GENERATION_FAILED`다.
-- `SOURCE_INSUFFICIENT`: 유효 문제가 0개이거나 선택 유형을 각각 최소 한 문제 충족하지 못했다. 같은 입력의 즉시 반복보다 자료·유형 확인을 안내하며 기본 `retryable=false`다.
-- `GENERATION_FAILED`: 접수 뒤 내부 생성 작업을 완료하지 못했다. 내부·LLM 상세는 숨기고 재시도가 가능하면 `retryable=true`다.
+- `SOURCE_INSUFFICIENT`: 품질 기준을 충족한 유효 문제가 0개다. 같은 입력의 즉시 반복보다 자료·조건 확인을 안내하며 기본 `retryable=false`다.
+- `GENERATION_FAILED`: 접수 뒤 내부 생성 작업에서 최종 확정할 유효 문제를 하나도 남기지 못했다. 검증과 저장을 마친 유효 문제가 1개 이상이면 일부 결과를 사용할 수 없어도 `READY`다. 내부·LLM 상세는 숨기고 재시도가 가능하면 `retryable=true`다.
+- 상태 재조회에서도 같은 실패 의미를 반환할 수 있도록 서버는 QuizSet의 `failure_code`를 보존한다. `message`와 `retryable`은 저장된 코드에 대한 공개 정책으로 계산한다.
 - 두 값은 비동기 QuizSet 작업 결과이지 HTTP `ApiError.code`가 아니다. 네트워크 실패를 `FAILED`로 추정해서는 안 된다.
 
 `READY`의 각 문제 공통 필드:
@@ -323,20 +338,38 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 
 | 유형 | 추가 필드 | 규칙 |
 | --- | --- | --- |
-| `MULTIPLE_CHOICE` | `choices: [{ choiceId, text }]` | 4개 또는 5개. 정답 표시 없음 |
-| `FILL_BLANK` | `segments: [{ kind: "TEXT", text } 또는 { kind: "BLANK", blankId }]` | 순서 보존, `BLANK` 1개 또는 2개 |
+| `MULTIPLE_CHOICE` | `choices: [{ choiceId, text }]` | 가변 길이 3~5개. 정답 표시 없음 |
+| `FILL_IN_THE_BLANK` | `blanks: [{ blankId, number }]` | 공통 `prompt`의 `[1]`, `[2]` 마커와 `number`로 연결. 1개 또는 2개 |
 | `SHORT_ANSWER` | 없음 | 일반 텍스트 입력 |
 | `ESSAY` | 없음 | 일반 텍스트 입력 |
 
+빈칸형 예시:
+
+```json
+{
+  "questionId": "question_2",
+  "number": 2,
+  "type": "FILL_IN_THE_BLANK",
+  "topic": "자료구조 처리 순서",
+  "prompt": "큐는 [1] 방식이고 스택은 [2] 방식이다.",
+  "blanks": [
+    { "blankId": "blank_1", "number": 1 },
+    { "blankId": "blank_2", "number": 2 }
+  ]
+}
+```
+
 정답, 허용 답안, 모범 답안, 핵심 포인트, 해설, 원문 근거와 내부 생성 메타데이터는 `READY` 풀이 데이터에 포함하지 않는다.
+
+클라이언트는 객관식 `choices` 길이를 4개로 가정하지 않고 3개, 4개, 5개를 모두 렌더링·선택·제출할 수 있어야 한다. 배열 순서는 서버가 확정한 보기 순서를 그대로 사용한다.
 
 ## 본 퀴즈 제출과 자기평가
 
 ### 최종 제출
 
-`POST /api/v1/quiz-sets/{quizSetId}/attempts`
+`PUT /api/v1/quiz-sets/{quizSetId}/attempts/{attemptId}`
 
-Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
+Headers: `Authorization`, `Content-Type: application/json`
 
 ```json
 {
@@ -367,14 +400,20 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 - 한 문제는 최대 한 번 포함하고 `type`은 보내지 않는다. 서버가 `questionId`의 실제 유형에 맞는 답안 필드를 검증한다.
 - 빈칸 응답은 작성한 항목만 `blankAnswers: [{ blankId, answer }]`로 보낸다. 2개 중 1개처럼 일부 빈칸만 보내는 것을 허용하되 빠진 빈칸은 미응답으로 보고 문항 전체를 오답 처리한다.
 - 누락한 `blankId`를 빈 문자열 답안으로 채우지 않는다. 알 수 없거나 중복된 `blankId`와 실제 유형에 맞지 않는 답안 모양은 `COMMON_001`이다.
-- 단답형은 허용 답안에 대해 공백·대소문자 수준의 규칙 정규화만 적용하며 LLM을 호출하지 않는다.
+- 단답형은 문제에 저장된 허용 답안 각각과 사용자 답에 Unicode NFC, Unicode whitespace의 ASCII 공백 변환·연속 축약과 앞뒤 제거, `toLowerCase(Locale.ROOT)`를 순서대로 적용한 뒤 완전 일치만 비교한다. 서버에서 Unicode whitespace는 Java `Character.isWhitespace` 또는 `Character.isSpaceChar` 중 하나라도 참인 code point를 뜻한다. 구두점 제거, 띄어쓰기 전체 제거, 번역, 약어 확장, 오타 보정, 형태소·의미 유사도 판정과 LLM 호출은 하지 않는다.
+- 예를 들어 허용 답안이 `fifo` 하나면 `FIFO`는 자동 정답이지만 `선입선출`, `first in first out`은 자동 오답이다. 자동 정답으로 인정할 표현은 문제 생성 시 별도 허용 답안으로 저장돼 있어야 한다.
 - 제출 시에만 새 불변 본 퀴즈 회차를 만든다. 중간 위치·답안 저장 엔드포인트는 없다.
+- `attemptId`는 클라이언트가 최종 제출 직전에 생성한 UUID v4다. 현재 제출 화면이 살아 있는 동안에는 같은 ID와 `responses`로 명시적 재요청을 할 수 있다.
+- 처음 보는 `attemptId`이면 `201 Created`로 attempt와 채점 결과를 원자적으로 만든다.
+- 같은 사용자·같은 QuizSet의 이미 존재하는 `attemptId`이면 request body를 다시 적용하지 않고 최초 attempt의 현재 상태를 `200 OK`로 반환한다. 서버는 별도 payload fingerprint나 replay 테이블을 만들지 않는다.
+- 같은 `attemptId`가 다른 사용자 또는 다른 QuizSet에 이미 존재하면 기존 리소스를 노출하지 않고 `409 ATTEMPT_001`로 처리한다. 이는 난수 충돌보다 잘못된 식별자 재사용을 막기 위한 방어다.
+- 클라이언트가 새로고침·종료로 답안과 attempt ID를 잃으면 서버는 미제출 상태나 동일 payload를 탐색하지 않는다. 사용자는 다시 풀어 새 UUID로 제출할 수 있고 서로 다른 UUID의 attempt는 별도 회차로 보존한다.
 
 ```json
 {
   "success": true,
   "data": {
-    "attemptId": "attempt_123",
+    "attemptId": "550e8400-e29b-41d4-a716-446655440000",
     "status": "SELF_ASSESSMENT_REQUIRED",
     "automaticGrading": {
       "correctQuestionCount": 2,
@@ -405,7 +444,7 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 {
   "success": true,
   "data": {
-    "attemptId": "attempt_123",
+    "attemptId": "550e8400-e29b-41d4-a716-446655440000",
     "quizSetId": "qset_123",
     "status": "SELF_ASSESSMENT_REQUIRED",
     "pendingEssayQuestionIds": ["question_4", "question_7"]
@@ -428,7 +467,7 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 
 `PUT /api/v1/quiz-attempts/{attemptId}/essay-assessments/{questionId}`
 
-Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
+Headers: `Authorization`, `Content-Type: application/json`
 
 ```json
 {
@@ -438,14 +477,14 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 
 - `assessment`: `CORRECT`, `PARTIAL`, `INCORRECT`.
 - 작성된 서술형이며 아직 자기평가 전인 문항에만 적용한다.
-- 같은 키 재요청은 같은 결과를 반환한다. 이미 저장된 문항을 다른 평가로 바꾸려는 요청은 `ATTEMPT_001`이다.
+- 이미 같은 평가가 저장된 재요청은 현재 결과를 반환한다. 이미 저장된 문항을 다른 평가로 바꾸려는 요청은 `ATTEMPT_001`이다.
 - 마지막 대기 문항을 저장하면 attempt `status`가 원자적으로 `COMPLETED`가 된다.
 
 ```json
 {
   "success": true,
   "data": {
-    "attemptId": "attempt_123",
+    "attemptId": "550e8400-e29b-41d4-a716-446655440000",
     "questionId": "question_4",
     "assessment": "PARTIAL",
     "status": "COMPLETED",
@@ -454,6 +493,28 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
   "error": null
 }
 ```
+
+### 단답형 현재 판정 수정
+
+`PUT /api/v1/quiz-attempts/{attemptId}/short-answer-gradings/{questionId}`
+
+Headers: `Authorization`, `Content-Type: application/json`
+
+```json
+{
+  "outcome": "CORRECT"
+}
+```
+
+- `outcome`: `CORRECT` 또는 `INCORRECT`. 사용자가 확인한 현재 판정으로 교체할 값이다.
+- 현재 사용자 소유이며 `COMPLETED`인 attempt의 답을 작성한 `SHORT_ANSWER`에만 적용한다. 객관식·빈칸·서술형, 미응답 단답형과 완료 전 attempt는 `409 ATTEMPT_001`이다.
+- 최초 자동 판정과 현재 판정의 공유 의미·생명주기는 [데이터 계약의 본 퀴즈 회차와 채점 결과](contract-data-quiz-learning.md#본-퀴즈-회차와-채점-결과)를 따른다.
+- 같은 현재 판정을 반복 요청하면 값을 바꾸지 않는 no-op 성공이다. 다른 판정을 요청하면 최신 `userOverrideOutcome`을 교체하고 마지막으로 커밋된 요청을 현재 판정으로 사용한다.
+- 별도 `Idempotency-Key`, payload fingerprint, 과거 응답 snapshot, `expectedRevision`, `gradingRevision`과 `summary.revision`을 저장하거나 노출하지 않는다.
+- 성공 응답의 `data`는 바로 아래 `GET /api/v1/quiz-attempts/{attemptId}/result`와 같은 전체 결과 projection이다. 클라이언트는 부분 점수 delta를 합치지 않고 성공한 전체 결과로 화면 상태를 교체한다.
+- 한 화면에서는 수정 요청을 하나씩 보낸다. 다른 화면이나 탭의 요청과 경합하면 마지막 커밋이 현재 값이며 결과 재조회로 수렴한다.
+- 이미 활성 복습 세션이 있으면 그 세션의 snapshot을 추가·삭제하지 않는다. 결과의 `summary.reviewQuestionCount`는 원본 회차의 현재 후보 수이고 활성 세션의 남은 문항 수와 다른 의미이며, 수정된 대상 여부는 다음 복습 세션부터 반영한다.
+- 사용자 수정은 해당 attempt 문항에만 적용하며 문제의 허용 답안 목록이나 다른 attempt의 자동 판정에 전파하지 않는다.
 
 ## 결과
 
@@ -467,11 +528,11 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 {
   "success": true,
   "data": {
-    "attemptId": "attempt_123",
+    "attemptId": "550e8400-e29b-41d4-a716-446655440000",
     "quizSetId": "qset_123",
     "status": "COMPLETED",
     "summary": {
-      "autoGrading": {
+      "scoredGrading": {
         "correctQuestionCount": 2,
         "gradedQuestionCount": 3
       },
@@ -498,10 +559,20 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
         "response": { "selectedChoiceId": "choice_2" },
         "representativeAnswer": { "selectedChoiceId": "choice_3" },
         "outcome": "INCORRECT",
-        "unanswered": false,
         "explanation": "학습을 위한 해설",
-        "sourceExcerpt": "근거가 되는 원문 일부",
-        "reviewRequired": true
+        "sourceExcerpt": "근거가 되는 원문 일부"
+      },
+      {
+        "questionId": "question_2",
+        "number": 2,
+        "type": "SHORT_ANSWER",
+        "topic": "큐의 처리 순서",
+        "prompt": "큐의 pop 순서를 무엇이라고 하나요?",
+        "response": { "answer": "선입선출" },
+        "representativeAnswer": { "answer": "fifo" },
+        "outcome": "CORRECT",
+        "explanation": "큐는 먼저 들어온 데이터가 먼저 나오는 FIFO 구조입니다.",
+        "sourceExcerpt": "큐는 FIFO 원칙으로 데이터를 처리한다."
       }
     ]
   },
@@ -509,21 +580,28 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 }
 ```
 
-- 자동 채점 `outcome`: `CORRECT`, `INCORRECT`.
+- 객관식·빈칸의 자동 채점 `outcome`: `CORRECT`, `INCORRECT`.
+- 답을 작성한 단답형은 화면에 표시할 현재 유효 `outcome`을 제공한다. 서버가 보존하는 `automaticOutcome`과 `userOverrideOutcome`은 현재 결과 화면에서 직접 사용하지 않으므로 이 조회 projection에 반복하지 않는다.
 - 서술형 `outcome`: `CORRECT`, `PARTIAL`, `INCORRECT`.
-- 각 `questionResults` 항목은 다른 문제 조회 없이 렌더링할 수 있어야 한다. 객관식은 `choices: [{ choiceId, text }]`, 빈칸은 풀이 때와 같은 순서의 `segments`를 포함한다.
-- 객관식 `response.selectedChoiceId`와 `representativeAnswer.selectedChoiceId`, 빈칸 `response.blankAnswers[].blankId`와 `representativeAnswer.blankAnswers[].blankId`는 각각 함께 반환된 보기·segment 식별자를 그대로 참조한다.
-- 미응답은 `response=null`, `unanswered=true`, `outcome=INCORRECT`, `reviewRequired=true`로 포함한다. 별도 미응답 집계를 반환하지 않는다.
+- 각 `questionResults` 항목은 다른 문제 조회 없이 렌더링할 수 있어야 한다. 객관식은 `choices: [{ choiceId, text }]`, 빈칸은 풀이 때와 같은 `prompt`와 `blanks: [{ blankId, number }]`를 포함한다.
+- 객관식 `response.selectedChoiceId`와 `representativeAnswer.selectedChoiceId`, 빈칸 `response.blankAnswers[].blankId`와 `representativeAnswer.blankAnswers[].blankId`는 각각 함께 반환된 보기·빈칸 식별자를 그대로 참조한다.
+- 미응답은 `response=null`, `outcome=INCORRECT`로 포함한다. 별도 `unanswered` 필드나 미응답 집계를 반환하지 않으며 클라이언트는 `response=null`로 답하지 않음을 표시하고 단답형 수정 행동을 제공하지 않는다.
 - `representativeAnswer`는 결과 설명에 필요한 대표 정답만 공개한다. 빈칸·단답형의 허용 정답 전체를 반환하지 않는다. 서술형은 `modelAnswer`와 `keyPoints`를 제공한다.
-- 결과의 원래 `outcome`은 복습 뒤에도 바뀌지 않는다. `reviewRequired`는 현재 해결 여부에 따라 조회 시점에 계산할 수 있다.
+- `summary.scoredGrading`의 분자·분모는 객관식·빈칸·단답형이며, 단답형은 최신 `outcome`을 분자 계산에 사용한다. 최초 제출 응답의 `automaticGrading`은 제출 시점 자동 판정 요약이므로 별도 의미를 유지한다.
+- `summary`는 저장된 문항 결과와 복습 해결 상태를 기준으로 조회 시 계산한다. 클라이언트는 쓰기 성공 응답의 전체 결과를 적용하고 필요하면 이 결과 API를 다시 조회한다.
+- 서버가 보존하는 객관식·빈칸과 단답형의 `automaticOutcome`은 복습 뒤에도 바뀌지 않는다. 조회 projection의 단답형 `outcome`만 사용자 수정으로 바뀔 수 있고 복습 자체는 이를 변경하지 않는다. 복습 대상 여부는 서버가 현재 판정과 복습 해결 상태로 계산하며 결과 화면은 `summary.reviewQuestionCount`를 사용한다.
 
 ## 복습 세션
+
+API의 `reviewSession`은 클라이언트가 복습 실행을 식별하는 공개 리소스 이름이다. 데이터 원장에서는 별도 복습 세션이 아니라 `attemptType=REVIEW`인 quiz attempt이며, `reviewSessionId`는 해당 REVIEW attempt의 공개 ID다. REVIEW attempt는 최초 `MAIN` attempt를 `sourceAttemptId`로 직접 가리키고 본 퀴즈와 같은 문항·제출 답안·채점 결과 구조를 사용한다.
+
+복습 시작 시 대상 문항을 REVIEW attempt의 문항 목록으로 먼저 고정한다. 풀이·제출·채점 응답은 본 퀴즈와 동일한 문제 유형별 필드와 response 모양을 사용하며 복습 전용 답안 형식을 추가하지 않는다.
 
 ### 최신 복습 현황
 
 `GET /api/v1/quiz-reviews/latest`
 
-- 현재 사용자의 가장 최근 `COMPLETED` 본 퀴즈 회차 하나만 조회한다.
+- 현재 사용자의 가장 최근 `COMPLETED` 본 퀴즈 회차 하나만 조회한다. 그 회차에서 현재 최종 판정이 `INCORRECT|PARTIAL`이고 `reviewResolvedAt=null`인 문항이 복습 대상이다.
 - `attemptNumber`는 해당 `quizSetId` 안에서 현재 사용자가 완료한 본 퀴즈 회차의 1부터 시작하는 순번이다.
 - `reviewQuestionCount`는 그 회차의 현재 미해결 문항 수다.
 - 그 회차를 원본으로 한 활성 복습 세션이 있으면 `activeReviewSessionId`를 반환한다.
@@ -532,7 +610,7 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 {
   "success": true,
   "data": {
-    "sourceAttemptId": "attempt_123",
+    "sourceAttemptId": "550e8400-e29b-41d4-a716-446655440000",
     "quizSetId": "qset_123",
     "attemptNumber": 2,
     "reviewQuestionCount": 2,
@@ -564,19 +642,22 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 
 `POST /api/v1/review-sessions`
 
-Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
+Headers: `Authorization`, `Content-Type: application/json`
 
 ```json
 {
-  "sourceAttemptId": "attempt_123"
+  "sourceAttemptId": "550e8400-e29b-41d4-a716-446655440000"
 }
 ```
 
 - `sourceAttemptId`는 [최신 복습 현황](#최신-복습-현황)에서 받은 가장 최근 완료 회차여야 한다.
-- 해당 회차의 `reviewRequired=true` 문항을 번호 오름차순으로 snapshot해 서버 복습 세션을 만든다.
+- 해당 회차에서 현재 최종 판정이 `INCORRECT|PARTIAL`이고 아직 해결되지 않은 문항을 번호 오름차순으로 snapshot해 서버 복습 세션을 만든다. 별도 저장 `reviewRequired` 플래그는 두지 않는다.
+- 생성된 활성 세션의 snapshot은 원본 회차 단답형 판정 수정 뒤에도 중간 변경하지 않는다. 원본 회차의 최신 `reviewQuestionCount`와 활성 세션의 남은 문항 수는 별도 값이며, 수정된 대상 여부는 다음 세션 생성부터 반영한다.
 - 과거 회차를 임의 선택하거나 여러 회차를 합치지 않는다. 최신 회차가 바뀌었거나 대상이 없으면 `REVIEW_001`이다.
 - 새 세션을 만들면 `201 Created`, 같은 `sourceAttemptId`의 활성 세션이 이미 있으면 새로 만들지 않고 `200 OK`로 기존 세션을 반환한다.
+- source MAIN을 짧게 잠근 서비스 트랜잭션에서 기존 활성 세션을 먼저 확인해 같은 원본의 활성 세션을 하나만 유지한다. 별도 멱등 키나 payload fingerprint를 만들지 않는다.
 - 더 오래된 회차의 미완료 복습 세션은 최신 회차의 새 복습을 막지 않으며 복습 탭 대상에 합치지 않는다.
+- snapshot에 저장된 문항 목록 자체가 생성 시점의 복습 대상을 보존하며 별도 source summary revision을 저장하지 않는다.
 
 ```json
 {
@@ -584,8 +665,8 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
   "data": {
     "reviewSession": {
       "reviewSessionId": "review_123",
-      "sourceAttemptId": "attempt_123",
-      "status": "IN_PROGRESS",
+      "sourceAttemptId": "550e8400-e29b-41d4-a716-446655440000",
+      "status": "SOLVING",
       "reviewQuestionCount": 2,
       "questions": []
     }
@@ -598,34 +679,26 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 
 `GET /api/v1/review-sessions/{reviewSessionId}`
 
-- `status`: `IN_PROGRESS`, `COMPLETED`.
+- `status`: `SOLVING`, `SELF_ASSESSMENT_REQUIRED`, `COMPLETED`.
 - 문항은 원래 `number` 오름차순이고 한 세션에 각 문항이 한 번만 존재한다.
-- 문항별 `processingStatus`는 `PENDING`, `SELF_ASSESSMENT_REQUIRED`, `GRADED`다.
-- `PENDING` 문항은 풀이 전 공개 모양만 포함한다. `GRADED` 문항은 저장된 응답과 판정을 함께 반환해 응답 유실 후 복구할 수 있다.
-- `SELF_ASSESSMENT_REQUIRED` 서술형은 저장된 `answer`, `modelAnswer`, `keyPoints`, `explanation`, `sourceExcerpt`를 반환한다. 이 상태가 하나 있으면 최상위 `nextQuestionId`는 다른 미처리 문항이 아니라 해당 서술형 `questionId`다.
-- `nextQuestionId`는 번호가 가장 낮은 미처리 문항이며 모두 처리되면 `null`이다.
+- `SOLVING`에서는 본 퀴즈의 `READY` 문제와 동일한 풀이 전 공개 모양만 반환한다. 정답·모범 답안·해설·원문 근거와 서버 중간 답안은 포함하지 않는다.
+- 제출 전 현재 문항과 답안은 열린 클라이언트 화면의 메모리에만 둔다. 화면을 이탈한 뒤 세션을 다시 조회하면 고정된 문제 목록만 받고 첫 문항부터 다시 풀며, 서버 draft 답안이나 `nextQuestionId`는 제공하지 않는다.
+- `SELF_ASSESSMENT_REQUIRED`에서는 결과 조회를 통해 제출된 서술형의 자기평가 상세와 남은 문항을 확인한다.
 
 ```json
 {
   "success": true,
   "data": {
     "reviewSessionId": "review_123",
-    "sourceAttemptId": "attempt_123",
-    "status": "IN_PROGRESS",
-    "nextQuestionId": "question_4",
+    "sourceAttemptId": "550e8400-e29b-41d4-a716-446655440000",
+    "status": "SOLVING",
     "questions": [
       {
         "questionId": "question_4",
         "number": 4,
         "type": "ESSAY",
         "topic": "기아 방지",
-        "prompt": "에이징의 목적을 설명하세요.",
-        "processingStatus": "SELF_ASSESSMENT_REQUIRED",
-        "answer": "오래 기다린 프로세스의 우선순위를 높인다.",
-        "modelAnswer": "대기 시간이 긴 프로세스의 우선순위를 점차 높여 기아를 방지한다.",
-        "keyPoints": ["대기 시간 반영", "우선순위 상승", "기아 방지"],
-        "explanation": "에이징은 장기 대기 프로세스가 실행 기회를 얻도록 돕습니다.",
-        "sourceExcerpt": "대기 시간이 길수록 우선순위를 높이는 에이징으로 기아를 방지한다."
+        "prompt": "에이징의 목적을 설명하세요."
       }
     ]
   },
@@ -633,53 +706,61 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 }
 ```
 
-### 문항 답안 저장
+### 전체 답안 제출
 
-`POST /api/v1/review-sessions/{reviewSessionId}/responses`
+`PUT /api/v1/review-sessions/{reviewSessionId}/submission`
 
-Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
+Headers: `Authorization`, `Content-Type: application/json`
 
 ```json
 {
-  "questionId": "question_1",
-  "selectedChoiceId": "choice_2"
+  "responses": [
+    {
+      "questionId": "question_1",
+      "selectedChoiceId": "choice_2"
+    },
+    {
+      "questionId": "question_4",
+      "text": "대기 시간이 길수록 우선순위를 높인다."
+    }
+  ]
 }
 ```
 
-- body는 본 퀴즈 제출의 응답 항목과 같은 모양이며 `questionId`와 유형별 답안 필드만 보낸다. `type`은 보내지 않는다.
+- body는 본 퀴즈 최종 제출과 같은 `responses[]` 모양이며 `questionId`와 유형별 답안 필드만 보낸다. `type`은 보내지 않는다.
 - 빈칸은 `blankAnswers: [{ blankId, answer }]`를 사용하며 일부만 보내는 것을 허용한다. 빠진 빈칸이 있으면 문항 전체를 오답 처리하고 누락 항목을 빈 문자열로 보정하지 않는다.
-- 객관식·빈칸·단답형은 응답 저장과 판정을 한 번에 수행하고 `CORRECT`면 `RESOLVED`, 아니면 `UNRESOLVED`다.
-- 서술형은 응답을 저장한 뒤 `SELF_ASSESSMENT_REQUIRED`를 반환하고 모범 답안·핵심 포인트·해설·원문 근거를 공개한다.
-- `Idempotency-Key`는 문항 제출마다 새로 만들며 응답 유실 시 같은 문항·같은 payload와 함께 재사용한다.
-- 이미 처리한 문항을 다른 키나 답으로 덮어쓰지 않는다. 같은 키 재요청만 기존 결과를 반환하며 같은 세션에서 재출제하지 않는다.
+- `responses`에서 빠진 대상 문제는 미응답 오답으로 확정한다. 제출 전에는 문항별 채점 API를 호출하지 않는다.
+- 첫 제출은 세션의 전체 답안 저장과 객관식·빈칸·단답형 일괄 채점을 한 트랜잭션에서 수행한다. 자동 `CORRECT`면 `RESOLVED`, 아니면 `UNRESOLVED`다.
+- 작성한 서술형이 있으면 `SELF_ASSESSMENT_REQUIRED`, 없으면 `COMPLETED`가 된다. 미응답 서술형은 별도 자기평가 없이 `UNRESOLVED`다.
+- 이미 제출된 같은 `reviewSessionId` 재요청은 body를 다시 적용하거나 비교하지 않고 최초 제출의 현재 상태를 반환한다. 세션 식별자와 단일 제출 제약이 중복을 막으므로 별도 멱등 키·hash·payload fingerprint를 저장하지 않는다.
+- 자동 판정 또는 이후 서술형 자기평가가 끝나면 source attempt의 현재 결과에서 `reviewQuestionCount`를 다시 계산한다.
 
-자동 채점 응답 예시:
+제출 응답 예시:
 
 ```json
 {
   "success": true,
   "data": {
-    "questionId": "question_1",
-    "processingStatus": "GRADED",
-    "outcome": "CORRECT",
-    "reviewStatus": "RESOLVED",
-    "sessionStatus": "IN_PROGRESS",
-    "nextQuestionId": "question_2",
-    "representativeAnswer": { "selectedChoiceId": "choice_2" },
-    "explanation": "학습을 위한 해설",
-    "sourceExcerpt": "근거가 되는 원문 일부"
+    "reviewSessionId": "review_123",
+    "status": "SELF_ASSESSMENT_REQUIRED",
+    "automaticGrading": {
+      "correctQuestionCount": 1,
+      "gradedQuestionCount": 1
+    },
+    "pendingEssayQuestionIds": ["question_4"],
+    "submittedAt": "2026-08-24T05:20:00Z"
   },
   "error": null
 }
 ```
 
-서술형 답안 저장은 `processingStatus=SELF_ASSESSMENT_REQUIRED`, 저장한 `answer`, `modelAnswer`, `keyPoints`, `explanation`, `sourceExcerpt`를 반환한다. `reviewStatus`는 자기평가 전까지 `null`이고 `nextQuestionId`는 제출한 서술형 `questionId`다.
+자기평가에 필요한 내 답·모범 답안·핵심 포인트·해설·원문 근거는 [복습 결과 조회](#복습-결과-조회)에서 본 퀴즈 결과와 같은 문항 상세 모양으로 제공한다.
 
 ### 복습 서술형 자기평가
 
 `PUT /api/v1/review-sessions/{reviewSessionId}/essay-assessments/{questionId}`
 
-Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
+Headers: `Authorization`, `Content-Type: application/json`
 
 ```json
 {
@@ -689,7 +770,8 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 
 - `assessment`: `CORRECT`, `PARTIAL`, `INCORRECT`.
 - `CORRECT`면 `RESOLVED`, `PARTIAL` 또는 `INCORRECT`면 `UNRESOLVED`다.
-- 각 판정 뒤 `nextQuestionId`를 반환한다. 마지막 문항이면 세션을 `COMPLETED`로 바꾸고 `nextQuestionId=null`을 반환한다.
+- 같은 평가 재요청은 현재 결과를 반환하고, 이미 확정된 평가를 다른 값으로 바꾸려는 요청은 `REVIEW_001`이다.
+- 마지막 대기 문항을 평가하면 세션을 `COMPLETED`로 바꾼다.
 - `UNRESOLVED` 문항도 같은 세션에는 다시 넣지 않으며 다음 복습 세션의 후보로 남긴다.
 - 복습 응답·판정은 원래 attempt 응답·판정을 수정하지 않는다.
 
@@ -700,12 +782,21 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
     "questionId": "question_4",
     "assessment": "PARTIAL",
     "reviewStatus": "UNRESOLVED",
-    "sessionStatus": "COMPLETED",
-    "nextQuestionId": null
+    "status": "COMPLETED",
+    "remainingSelfAssessmentCount": 0
   },
   "error": null
 }
 ```
+
+### 복습 결과 조회
+
+`GET /api/v1/review-sessions/{reviewSessionId}/result`
+
+- `SELF_ASSESSMENT_REQUIRED`에서도 자동 채점 결과와 자기평가할 서술형 상세를 조회할 수 있다. 최종 완료 요약은 `COMPLETED`에서만 완료로 표현한다.
+- `questionResults`는 복습 세션에 snapshot된 문항만 원래 `number` 오름차순으로 반환한다.
+- 문항 결과의 `response`, 대표 답안 또는 모범 답안, `outcome`, 해설과 원문 근거 모양은 본 퀴즈 결과와 동일하다.
+- 응답에는 `reviewSessionId`, `sourceAttemptId`, `status`, `summary`, `questionResults`를 포함한다. `summary`는 이번 재풀이의 자동 채점 수, 서술형 자기평가 수, 해결·미해결 수를 구분한다.
 
 ## 오류
 
@@ -713,17 +804,17 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 
 | 조건 | HTTP | 코드 | 복구 |
 | --- | --- | --- | --- |
-| 필드 누락·형식·허용 enum/개수, 일반 멱등 payload 불일치 | `400` | 기존 `COMMON_001` | `fields`에 따라 입력 수정 또는 원래 payload로 재시도 |
+| 필드 누락·형식·허용 enum/개수 | `400` | 기존 `COMMON_001` | `fields`에 따라 입력 수정 |
 | 읽을 수 없는 JSON | `400` | 기존 `COMMON_002` | 요청 본문 수정 |
 | 없거나 소유하지 않은 리소스, 접근할 수 없는 Notion 페이지 | `404` | 기존 `COMMON_003` | 목록·권한·페이지 선택 확인 |
-| 예상하지 못한 서버 오류 | `500` | 기존 `COMMON_999` | 잠시 후 같은 멱등 키로 재시도 |
+| 예상하지 못한 서버 오류 | `500` | 기존 `COMMON_999` | 생성 요청은 같은 멱등 키, 제출은 같은 attempt 또는 review session 식별자로 재시도 |
 | 인증 정보 없음·잘못됨·만료 | `401` | 기존 `AUTH_005` | 갱신 또는 재로그인 |
 | 잠긴 학습자료 본문 수정 | `409` | `MATERIAL_001` | 제목만 수정하거나 새 자료 만들기 |
 | 학습자료 본문 20,000자 초과 | `413` | `MATERIAL_002` | 본문을 줄인 뒤 같은 저장 흐름 재시도 |
 | 같은 학습자료에 이미 `GENERATING` 작업이 있음 | `409` | `QUIZ_001` | 기존 생성 상태 확인 |
 | 생성 작업을 접수할 수 없는 일시적 서버 상태 | `503` | `QUIZ_002` | 새 QuizSet이 만들어지지 않았음을 확인하고 같은 멱등 키로 재시도 |
-| `READY`가 아닌 세트 제출, 제출·자기평가 상태 또는 attempt 멱등 payload 충돌 | `409` | `ATTEMPT_001` | 최신 문제 세트·attempt 상태와 결과 확인 |
-| 완료·처리된 복습 세션/문항 변경 또는 복습 멱등 payload 충돌 | `409` | `REVIEW_001` | 세션을 재조회해 다음 미처리 문항으로 이동 |
+| `READY`가 아닌 세트 제출, attempt UUID의 소유자·QuizSet 불일치, 자기평가 상태 또는 수정 불가 단답형 | `409` | `ATTEMPT_001` | 최신 문제 세트·attempt 상태와 결과 확인 |
+| 완료된 복습 세션 재변경 또는 이미 확정된 서술형 평가 변경 | `409` | `REVIEW_001` | 세션과 결과 재조회 |
 
 - MVP의 안정 오류 코드는 `COMMON_001/002/003/999`, `AUTH_005`, `MATERIAL_001/002`, `QUIZ_001/002`, `ATTEMPT_001`, `REVIEW_001`로 제한한다.
 - Notion, 외부 생성 서비스, LLM 또는 세부 검증 단계별 공개 오류 코드를 추가하지 않는다.
@@ -731,18 +822,16 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 - `error.message`는 사용자가 다음 행동을 이해할 수준으로 쓰고 내부 예외·LLM·Notion 상세를 노출하지 않는다.
 - 입력 오류의 `fields`는 `responses[0].selectedChoiceId`나 `responses[1].blankAnswers[0].blankId`처럼 클라이언트가 해당 입력을 찾을 수 있는 경로를 사용한다.
 
-## 정렬·불변성과 보존
+## 정렬과 조회 경계
 
 - 문제, 결과, 복습 문항은 원래 문제 `number` 오름차순이다.
-- 문제 세트는 생성마다 새로 만들며 생성 성공 뒤 내용을 수정하지 않는다.
-- 본 퀴즈 attempt는 최종 제출마다 새로 만들고 제출 응답과 판정을 수정하지 않는다. 서술형 자기평가는 비어 있던 판정을 한 번 완성하는 전이만 허용한다.
-- 복습 세션은 원래 attempt의 학습 상태를 참조하지만 원래 응답과 판정을 변경하지 않는다.
-- 서버에는 본 퀴즈 중간 진행·답안 API가 없다. 최종 제출 전 기기 임시 기록의 7일 보존과 사용자 분리는 클라이언트 책임이며 HTTP 계약이 아니다.
+- 문제 세트·attempt·채점 결과·복습 snapshot의 불변성과 생명주기는 [학습자료와 퀴즈 데이터 계약](contract-data-quiz-learning.md)을 따른다.
+- 서버에는 본 퀴즈 중간 진행·답안 API가 없다. 최종 제출 전 상태의 지속 저장과 새로고침·종료 뒤 복구를 HTTP 계약으로 요구하지 않는다.
 
 ## 개인정보와 로그
 
 - 학습자료 본문, 사용자 답안, 모범 답안과 원문 근거는 민감한 학습 콘텐츠로 취급한다.
-- 요청·응답 본문, Notion 접근 자격, 외부 생성 서비스 원문과 `Idempotency-Key` 원문을 일반 애플리케이션 로그에 남기지 않는다.
+- 요청·응답 본문, Notion 접근 자격과 외부 생성 서비스 원문을 일반 애플리케이션 로그에 남기지 않는다. `attemptId`, `reviewSessionId`와 생성 요청의 `Idempotency-Key`는 비밀이 아니지만 운영 로그에는 문제 해결에 필요한 식별자만 최소로 남긴다.
 - 운영 로그는 요청 추적 식별자, 사용자 내부 식별자, 리소스 식별자, 공개 오류 코드와 상태 전이에 필요한 최소 메타데이터만 남긴다.
 
 ## 호환성과 폐기
@@ -754,4 +843,3 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 ## 열린 질문
 
 - 재연결 뒤 페이지 선택 복원 여부는 [학습자료 흐름의 열린 질문](../ux/flow-content-import.md#열린-질문)이 책임진다.
-- 학습자료 생성을 제외한 비동기 생성·제출·복습 `Idempotency-Key` 결과의 최소 보존 기간. 비동기 생성의 종료 전과 일반적인 네트워크 응답 유실 재시도 동안에는 만료할 수 없다.

@@ -44,6 +44,8 @@ scope: repository
 | 퀴즈 생성부터 복습까지 | [퀴즈 흐름](ux/flow-quiz-solving.md) | Flow | 검토 중 |
 | 홈 | [홈 화면](ux/screen-home.md) | Screen Spec | 초안 |
 | 학습 | [학습 화면](ux/screen-learning.md) | Screen Spec | 초안 |
+| 미완료 서술형 자기평가 재진입 | [미완료 서술형 자기평가 재진입 화면](ux/screen-quiz-resume.md) | Screen Spec | 초안 |
+| 틀린 문제 다시 풀기 | [틀린 문제 다시 풀기 화면](ux/screen-review.md) | Screen Spec | 초안 |
 | 프로필 | [프로필 화면](ux/screen-profile.md) | Screen Spec | 초안 |
 | 회원가입 | [회원가입 화면](ux/screen-signup.md) | Screen Spec | 초안 |
 
@@ -56,7 +58,7 @@ Flow는 여러 화면의 순서와 분기를, Screen Spec은 한 화면의 구�
 | 이메일 기반 자체 인증 | [인증 API](contracts/contract-api-authentication.md) | API Contract | 초안 |
 | 사용자와 인증 | [사용자·인증 데이터](contracts/contract-data-authentication.md) | Data Contract | 초안 |
 | 학습자료·퀴즈·복습 | [학습·퀴즈 API](contracts/contract-api-quiz-learning.md) | API Contract | 검토 중 |
-| 학습자료·퀴즈·복습 데이터 | [학습자료·퀴즈 데이터](contracts/contract-data-quiz-learning.md) | Data Contract | 초안 |
+| 학습자료·퀴즈·복습 데이터 | [학습자료·퀴즈 데이터](contracts/contract-data-quiz-learning.md) | Data Contract | 검토 중 |
 
 ## 애플리케이션 TRD
 
@@ -69,10 +71,10 @@ TRD는 각 애플리케이션의 `docs/trd/trd-*.md`에 두며, 파일명과 제
 | Server | OpenAPI와 Swagger UI | [서버 OpenAPI 운영 TRD](../server/docs/trd/trd-openapi-documentation.md) | 초안 |
 | Server | 패키지 구조 | [서버 패키지 구조 TRD](../server/docs/trd/trd-package-structure.md) | 구현 동기화 |
 | Server | 학습자료 생성 | [학습자료 생성 TRD](../server/docs/trd/trd-learning-material-creation.md) | 검토 중 |
-| Server | 퀴즈 채점 | [퀴즈 채점 TRD](../server/docs/trd/trd-quiz-grading.md) | 초안 |
+| Server | 퀴즈·복습 통합 저장 모델 | [퀴즈 채점 TRD](../server/docs/trd/trd-quiz-grading.md) | 목표 설계 확정, V5 SQL 반영·Java 구현 동기화 전 |
 | Web | 인증 상태·토큰·API 통합 | [웹 인증 TRD](../web/docs/trd/trd-authentication.md) | 구현 동기화 |
-| Web | 본 퀴즈 임시 상태·보존 | [웹 퀴즈 TRD](../web/docs/trd/trd-quiz-solving.md) | 검토 중 |
-| App | WebView 본 퀴즈 임시 상태·보존 | [앱 퀴즈 TRD](../app/docs/trd/trd-quiz-solving.md) | 검토 중 |
+| Web | 퀴즈 화면 상태 | [웹 퀴즈 TRD](../web/docs/trd/trd-quiz-solving.md) | 검토 중 |
+| App | WebView 퀴즈 상태 | [앱 퀴즈 TRD](../app/docs/trd/trd-quiz-solving.md) | 검토 중 |
 
 ## 문서 템플릿
 

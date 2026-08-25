@@ -15,6 +15,7 @@ import type {
   QuizBinaryOutcome,
   QuizConditions,
   QuizEssayAssessmentResult,
+  QuizFlowKind,
   QuizFlowScene,
   QuizGenerationFailure,
   QuizSubmissionResult,
@@ -26,9 +27,19 @@ import type {
  * Presentation-only mount for a dev preview route.
  * The delay and result changes live entirely in fixtures and must not be treated as an API contract.
  */
-export function QuizFixturePage({ initialScene }: { initialScene?: QuizFlowScene }) {
+export function QuizFixturePage({
+  initialScene,
+  flowKind = 'QUIZ',
+}: {
+  initialScene?: QuizFlowScene
+  flowKind?: QuizFlowKind
+}) {
+  const isReview = flowKind === 'REVIEW'
+  const initialQuestions = isReview
+    ? quizFixtureQuestions.filter((question) => ['q2', 'q3', 'q4'].includes(question.id))
+    : quizFixtureQuestions
   const [conditions, setConditions] = useState(quizFixtureConditions)
-  const [questions, setQuestions] = useState(quizFixtureQuestions)
+  const [questions, setQuestions] = useState(initialQuestions)
   const [pendingEssayQuestionIds, setPendingEssayQuestionIds] = useState<string[]>([])
   const [essayOutcomes, setEssayOutcomes] = useState<Record<string, QuizResultOutcome>>({})
   const [submittedAnswers, setSubmittedAnswers] = useState<QuizSubmitPayload['answers']>()
@@ -78,9 +89,10 @@ export function QuizFixturePage({ initialScene }: { initialScene?: QuizFlowScene
       materialTitle="자료구조 핵심 개념"
       questions={questions}
       result={result}
-      initialScene={initialScene}
+      flowKind={flowKind}
+      initialScene={isReview ? 'SOLVING' : initialScene}
       initialConditions={quizFixtureConditions}
-      initialAnswers={quizFixtureAnswers}
+      initialAnswers={isReview ? {} : quizFixtureAnswers}
       generationState={
         initialScene === 'READY'
           ? {

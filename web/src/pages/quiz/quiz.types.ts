@@ -174,10 +174,13 @@ export type QuizFlowScene =
   | 'SELF_ASSESSMENT'
   | 'RESULT'
 
+export type QuizFlowKind = 'QUIZ' | 'REVIEW'
+
 export type QuizFlowPageProps = {
   materialTitle: string
   questions: QuizQuestion[]
   result: QuizResult
+  flowKind?: QuizFlowKind
   initialScene?: QuizFlowScene
   initialConditions?: QuizConditions
   initialAnswers?: QuizAnswers
