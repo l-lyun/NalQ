@@ -12,40 +12,130 @@ scope: shared
 
 ## 목적과 경계
 
-학습자료와 원문 출처, 문제·정답 원장, 본 퀴즈와 복습 회차, 사용자 제출 답안과 채점 결과가 웹·앱·서버에서 같은 의미로 사용되도록 소유권과 생명주기를 정의한다. 물리 테이블과 컬럼은 서버 TRD와 migration이 책임지며 이 계약의 의미를 위반할 수 없다.
+학습자료와 원문 출처, 문제 유형별 정의·정답 원장, 본 퀴즈와 복습 회차, 사용자 제출 답안과 채점 결과가 웹·앱·서버에서 같은 의미로 사용되도록 소유권과 생명주기를 정의한다. 물리 테이블과 컬럼의 최종 구현은 서버 TRD와 migration이 책임지며 이 계약의 의미를 위반할 수 없다.
 
-객관식 보기와 빈칸처럼 화면 렌더링에 필요한 문제 유형별 메타정보는 별도 설계 대상으로 남긴다. 이 문서는 정답·제출·채점·복습 관계만 확정한다.
-
-![퀴즈·복습 통합 ERD](../assets/quiz-erd.svg)
+이 문서의 snake_case 이름은 현재 서버의 `quiz_*`, `question_id`, `answer_value`, `normalized_value` 관례에 맞춘 구현 기준 이름이다. 아직 migration에 반영되지 않은 이름은 목표 구조이며, 현재 구현 상태를 뜻하지 않는다.
 
 ## 공유 개념
 
 - **문제 세트와 문제:** 한 번 생성된 문제 세트, 문제, 정답 기준과 원문 근거는 불변이다. 다시 생성할 때는 기존 문제를 수정하지 않고 새 문제 세트를 만든다.
-- **문제 정답 원장:** 한 문제의 정답, 허용 답안과 서술형 예시 답안을 동일한 원장에 행 단위로 보존한다. 사용자 제출 답안과 분리한다.
+- **문제 유형별 원장:** 공통 문제 행에는 모든 유형이 공유하는 정보만 두고 객관식 보기, 단답형 허용 답안, 서술형 답안 가이드, 빈칸과 빈칸별 허용 답안은 서로 다른 원장에 보존한다.
 - **풀이 회차(attempt):** 본 퀴즈와 복습을 공통으로 나타내는 사용자 소유 실행 단위다. `MAIN`은 원본 회차이고 `REVIEW`는 최초 `MAIN`을 원본으로 하는 재풀이 회차다.
 - **회차 문항:** 한 회차에 포함된 문제를 고정한다. 복습을 시작할 때 대상 문제를 먼저 저장하므로 제출·채점 전에도 존재할 수 있다.
-- **제출 답안:** 사용자가 실제 제출한 원문이다. 한 문항에 답안 행이 없으면 미응답이고, 복수 선택은 선택값마다 한 행을 가진다.
+- **제출 답안:** 사용자가 실제 제출한 선택지 식별자 또는 원문이다. 한 문항에 답안 행이 없으면 미응답이고, 빈칸형은 작성한 빈칸마다 한 행을 가진다.
 - **채점 결과:** 서버 최초 자동 채점과 현재 최종 판정을 구분한다. 복습은 원본 회차의 최초 제출·판정을 바꾸지 않고 해결 시점만 기록한다.
 
 HTTP 필드 모양과 공개 오류는 [학습자료·퀴즈·복습 API](contract-api-quiz-learning.md)가 책임진다. 공개 `reviewSession` 리소스는 저장 모델에서 `attemptType=REVIEW`인 attempt이며 별도 복습 세션 원장을 만들지 않는다.
 
-## 문제와 정답 원장
+## 문제와 유형별 원장
 
-문제는 `questionType`을 가진다. 현재 지원 유형은 `MULTIPLE_CHOICE`, `FILL_IN_THE_BLANK`, `SHORT_ANSWER`, `ESSAY`다. 객관식 단일·복수 선택 구분과 보기 식별자, 빈칸 위치 식별자처럼 화면에 필요한 세부 메타정보는 후속 설계에서 확정한다.
+문제 유형의 서버 기준 값은 `MULTIPLE_CHOICE`, `FILL_IN_THE_BLANK`, `SHORT_ANSWER`, `ESSAY`다. 공개 API도 같은 값을 사용한다. 기존 웹의 `FILL_BLANK`는 서버 기준 `FILL_IN_THE_BLANK`로 전환해야 한다.
 
-각 정답 행은 다음 값을 가진다.
+### 공통 문제: `quiz_questions`
 
-| 값 | 의미 |
+`quiz_questions`는 모든 문제 유형이 공유하는 다음 값만 가진다.
+
+| 컬럼 | 의미 |
 | --- | --- |
-| `answerValue` | 결과 화면에 사용할 원문. 서버가 정규화 문자열로 덮어쓰지 않음 |
-| `normalizedValue` | 단답형 자동 채점에만 사용하는 비교값. 그 외 유형에서는 `null` 가능 |
-| `answerRole=CORRECT` | 객관식 정답 선택값 또는 단답형 대표 정답 |
-| `answerRole=ACCEPTED` | 단답형에서 추가로 인정하는 표현 |
-| `answerRole=EXAMPLE` | 서술형 자기평가에 보여주는 예시 답안 |
+| `quiz_set_id` | 문제가 속한 불변 문제 세트 |
+| `question_number` | 문제 세트 안의 표시 순서 |
+| `question_type` | 서버 기준 문제 유형 |
+| `topic` | 결과와 복습에서 사용할 간결한 주제명 |
+| `prompt` | 일반 텍스트 문제 본문. 빈칸형은 `[1]`, `[2]` 마커를 포함 |
+| `explanation` | 제출·채점 뒤 공개할 해설 |
+| `source_excerpt` | 학습자료에서 가져온 근거 문구 |
 
-복수 선택 정답은 배열이나 구분 문자열 하나로 저장하지 않고 정답 선택값마다 `CORRECT` 행을 하나씩 둔다. 단답형은 대표 `CORRECT` 한 행과 0개 이상의 `ACCEPTED` 행을 가진다. 서술형은 `EXAMPLE` 한 행을 가진다.
+`status`는 기존 `quiz_sets`에 있고 `topic`, `explanation`, `source_excerpt`는 기존 `quiz_questions`에 있으므로 유형별 테이블에 복제하지 않는다.
 
-단답형 정답 원문과 사용자 제출 원문은 그대로 보존한다. 문제 저장 시 정답 원문의 `normalizedValue`를 계산하고, 채점 시 사용자 제출 원문을 같은 규칙으로 메모리에서 정규화해 비교한다. 내부 `normalizedValue`와 전체 허용 답안 목록은 클라이언트에 공개하지 않는다.
+### 객관식 보기: `quiz_question_choices`
+
+| 컬럼 | 의미 |
+| --- | --- |
+| `public_id` | 공개 `choiceId`로 사용하는 불변 식별자 |
+| `question_id` | `MULTIPLE_CHOICE` 문제 |
+| `choice_value` | 사용자에게 보여줄 보기 문구 |
+| `is_correct` | 서버 채점에만 사용하는 정답 여부 |
+
+- MVP 객관식은 보기 4개 또는 5개와 `is_correct=true`인 보기 정확히 하나를 가진다.
+- 보기와 문제 세트는 불변이므로 별도 순서 컬럼을 두지 않는다. 서버가 배열을 만들 때는 생성·저장 순서가 흔들리지 않도록 내부 `id` 오름차순을 사용한다.
+- 풀이 전 응답은 `public_id`, `choice_value`를 각각 `choiceId`, `text`로 전달하고 `is_correct`는 노출하지 않는다.
+- 기존 `quiz_question_answers`에 정답 보기만 저장하지 않는다. 오답 보기도 문제 구성의 일부이므로 모든 보기를 이 원장에 저장한다.
+
+### 단답형 허용 답안: `quiz_short_answer_answers`
+
+| 컬럼 | 의미 |
+| --- | --- |
+| `question_id` | `SHORT_ANSWER` 문제 |
+| `answer_value` | 결과 화면에 사용할 허용 답안 원문 |
+| `normalized_value` | 자동 채점에만 사용하는 비교값 |
+
+- 이 테이블의 모든 행은 허용 답안이므로 `answer_role`을 두지 않는다.
+- 한 문제는 허용 답안을 하나 이상 가진다. 결과 화면의 `representativeAnswer`는 내부 `id`가 가장 작은 답안의 `answer_value`를 사용한다.
+- 정규화 뒤 빈 문자열이 되거나 같은 `normalized_value`가 되는 중복 답안은 문제 확정 전에 제거하거나 거절한다.
+- 채점은 사용자 원문을 같은 규칙으로 정규화한 값이 허용 답안 집합에 포함되는지 순서와 무관하게 비교한다.
+
+### 서술형 답안 가이드: `quiz_essay_answer_guides`
+
+| 컬럼 | 의미 |
+| --- | --- |
+| `question_id` | `ESSAY` 문제와 일대일 연결하며 이 테이블의 PK로 사용 |
+| `model_answer` | 자기평가와 결과에서 보여줄 모범 답안 |
+| `key_points` | 자기평가 기준이 되는 문자열 목록. MySQL JSON 배열로 저장 |
+
+서술형의 `model_answer`와 `key_points`는 풀이 전에는 공개하지 않는다. `explanation`과 `source_excerpt`는 공통 문제 원장의 값을 사용한다.
+
+### 빈칸 정의와 허용 답안
+
+빈칸형은 공통 `prompt`에 `[1]`, `[2]` 마커를 넣고 별도 segment 원장을 만들지 않는다.
+
+`quiz_fill_in_the_blanks`:
+
+| 컬럼 | 의미 |
+| --- | --- |
+| `public_id` | 공개 `blankId`로 사용하는 불변 식별자 |
+| `question_id` | `FILL_IN_THE_BLANK` 문제 |
+| `blank_number` | `prompt`의 `[n]`과 연결되는 1부터 시작하는 번호 |
+
+`quiz_fill_in_the_blank_answers`:
+
+| 컬럼 | 의미 |
+| --- | --- |
+| `blank_id` | 답안이 속한 `quiz_fill_in_the_blanks.id` |
+| `answer_value` | 빈칸에서 인정할 답안 원문 |
+| `normalized_value` | 자동 채점에만 사용하는 비교값 |
+
+- 한 문제는 빈칸 1개 또는 2개를 가지며 `blank_number`는 1부터 빠짐없이 이어진다.
+- 각 `[n]` 마커는 `prompt`에 정확히 한 번 나오고 같은 번호의 빈칸 행과 일대일로 대응해야 한다.
+- 각 빈칸은 허용 답안을 하나 이상 가진다. 대표 답안은 해당 빈칸에서 내부 `id`가 가장 작은 답안이다.
+- 모든 빈칸이 각자의 허용 답안 중 하나와 일치해야 문항 전체가 `CORRECT`다. 답이 없거나 하나라도 다르면 문항 전체가 `INCORRECT`다.
+
+### 공통 정답 테이블 폐기
+
+기존 `quiz_question_answers(answer_value, normalized_value, answer_role)`는 목표 구조의 원장이 아니다. 유형별 모양과 검증 규칙이 다르므로 migration과 Java 구현을 동기화할 때 제거하고 위 네 유형별 원장으로 전환한다.
+
+단답형과 빈칸형의 정답 원문 및 사용자 제출 원문은 그대로 보존한다. 문제 저장 시 `normalized_value`를 계산하고, 채점 시 사용자 제출 원문을 같은 규칙으로 메모리에서 정규화한다. 내부 `normalized_value`와 전체 허용 답안 목록은 클라이언트에 공개하지 않는다.
+
+## 문제 세트 생성 결과
+
+`quiz_sets.status`는 `GENERATING`, `READY`, `FAILED`다.
+
+- 유형별 검증을 통과해 저장할 수 있는 문제가 하나 이상이면 `READY`다. 최대 문제 수보다 적거나 요청 유형 일부가 없어도 실패가 아니다.
+- 유효 문제가 0개면 `FAILED`이며 빈 문제 세트를 풀이 대상으로 공개하지 않는다.
+- 실패 뒤 재조회에서도 원인을 구분해야 하므로 `quiz_sets.failure_code`를 nullable 값으로 둔다. `FAILED`에서는 `SOURCE_INSUFFICIENT` 또는 `GENERATION_FAILED`, 그 외 상태에서는 `null`이다.
+- 공개 `message`와 `retryable`은 `failure_code`에 대한 서버 정책으로 계산하며 별도 컬럼으로 복제하지 않는다.
+- 선택 유형·난이도·최대 문제 수는 생성 요청 입력이며 성공 판정용 QuizSet 컬럼이 아니다. 실제 문제 수와 실제 포함 유형은 `quiz_questions`에서 계산한다.
+- 현재 API의 `requestedConfig`를 화면 재진입 뒤에도 반환하려면 작업 원장이나 별도 저장소가 필요하다. 이 요구는 성공 판정과 분리하며, 이 문서에서는 `quiz_sets`에 요청 설정 컬럼을 추가하지 않는다.
+
+문제 하나를 유효하다고 확정하는 최소 조건은 다음과 같다.
+
+| 유형 | 유형별 필수 조건 |
+| --- | --- |
+| `MULTIPLE_CHOICE` | 보기 4개 또는 5개, 공개 식별자·문구 존재, 정답 보기 정확히 1개 |
+| `FILL_IN_THE_BLANK` | 빈칸 1개 또는 2개, `[1]..[N]` 마커가 각각 정확히 한 번 존재, 빈칸 번호와 마커 일치, 빈칸마다 허용 답안 1개 이상 |
+| `SHORT_ANSWER` | 정규화 뒤 비어 있지 않은 허용 답안 1개 이상 |
+| `ESSAY` | 비어 있지 않은 `model_answer`와 `key_points` 1개 이상 |
+
+공통 `prompt`, `topic`, `explanation`, `source_excerpt`도 비어 있지 않아야 한다. 생성 결과 중 위 검증을 통과하지 못한 문제는 제외하며, 제외된 문제가 있어도 유효 문제 하나 이상을 최종 저장하면 QuizSet은 `READY`다.
 
 ## 본 퀴즈와 복습 attempt
 
@@ -70,17 +160,33 @@ HTTP 필드 모양과 공개 오류는 [학습자료·퀴즈·복습 API](contra
 
 ## 제출 답안
 
-사용자 제출은 정답 원장과 별도 행으로 저장한다.
+사용자 제출은 정답 원장과 별도 `quiz_submitted_answers` 행으로 저장한다. 목표 컬럼은 다음과 같다.
+
+| 컬럼 | 의미 |
+| --- | --- |
+| `attempt_question_id` | 답안을 제출한 회차 문항 |
+| `selected_choice_id` | 객관식에서 선택한 `quiz_question_choices.id`; 그 외 유형은 `null` |
+| `blank_id` | 빈칸형에서 답한 `quiz_fill_in_the_blanks.id`; 그 외 유형은 `null` |
+| `answer_value` | 빈칸·단답형·서술형 사용자 원문; 객관식은 `null` |
 
 | 문제 유형 | 제출 답안 행 |
 | --- | --- |
-| 객관식 단일 선택 | 선택값 한 행 |
-| 객관식 복수 선택 | 선택값마다 한 행 |
-| 단답형 | 사용자 원문 한 행 |
-| 서술형 | 사용자 원문 한 행 |
+| 객관식 단일 선택 | `selected_choice_id`만 가진 한 행 |
+| 빈칸형 | `blank_id`, `answer_value`를 가진 작성 빈칸별 한 행 |
+| 단답형 | `answer_value`만 가진 한 행 |
+| 서술형 | `answer_value`만 가진 한 행 |
 | 미응답 | 0행 |
 
-사용자 제출 원문은 정규화 값으로 교체하지 않는다. 문제 유형별 답안 개수, 존재하는 선택값인지 여부와 중복 선택 방지는 제출 서비스가 검증한다.
+객관식은 보기 문구를 제출 답안에 복제하지 않고 선택지 FK만 보존한다. 사용자 제출 원문은 정규화 값으로 교체하지 않는다.
+
+DB는 `selected_choice_id`와 `answer_value`가 동시에 존재하지 않는 기본 shape, `(attempt_question_id, selected_choice_id)` 및 `(attempt_question_id, blank_id)` 중복 방지를 보조할 수 있다. 다음 교차 원장 규칙은 제출 서비스가 검증한다.
+
+- `selected_choice_id`가 해당 `attempt_question_id`의 객관식 문제에 속하는지
+- `blank_id`가 해당 회차의 빈칸형 문제에 속하는지
+- 객관식은 선택 행이 최대 하나인지
+- 단답형·서술형은 원문 행이 최대 하나인지
+- 빈칸형은 같은 `blank_id`가 중복되지 않는지
+- 요청 DTO는 서버의 기존 이름인 `selectedChoiceId`, `blankAnswers: [{ blankId, answer }]`, `text`를 사용하는지
 
 ## 채점 결과
 
@@ -116,20 +222,55 @@ MVP에서는 전체 사용자 수정 이력을 별도 테이블로 보존하지 
 - 복습 시작은 원본 `MAIN` 잠금, 미완료 `REVIEW` 확인과 snapshot 생성을 한 트랜잭션에서 처리한다.
 - 복습 제출은 제출 답안, 복습 채점과 원본 `reviewResolvedAt` 갱신을 한 트랜잭션에서 처리한다.
 - 같은 UUID 재요청은 먼저 확정된 attempt를 반환하고 request hash·fingerprint·replay 테이블을 만들지 않는다.
-- 한 번 attempt가 연결된 문제 세트·문제·정답 원장은 수정하거나 물리 삭제하지 않는다.
+- 문제 생성은 공통 문제와 해당 유형의 상세 원장을 함께 검증·저장한 뒤에만 그 문제를 유효 문제 수에 포함한다. 유형 상세 저장이 실패한 문제는 부분 문제로 남기지 않는다.
+- 유효 문제가 하나 이상이면 해당 문제들과 `quiz_sets.status=READY`, `failure_code=null`을 확정한다. 유효 문제가 없으면 문제 행을 공개 가능한 상태로 남기지 않고 `status=FAILED`와 `failure_code`를 확정한다.
+- 한 번 attempt가 연결된 문제 세트·문제·보기·빈칸·정답 가이드는 수정하거나 물리 삭제하지 않는다.
 
 ## 생명주기
 
-- 정답 원장은 문제와 같은 생명주기를 가진다.
+- 객관식 보기, 단답형 허용 답안, 서술형 답안 가이드, 빈칸과 빈칸별 허용 답안은 문제와 같은 생명주기를 가진다.
 - 회차 문항, 제출 답안과 채점 결과는 attempt와 같은 생명주기를 가진다.
 - `REVIEW` attempt는 최초 `MAIN`을 참조하므로 원본을 먼저 물리 삭제하지 않는다.
 - 향후 계정·학습자료 삭제 정책을 정할 때 본 퀴즈와 복습 이력도 함께 삭제·익명화하거나 보존 기간을 명시해야 한다.
 
-## 열린 질문
+## 구현 전환 기준
 
-- 객관식 보기 문구·식별자와 단일·복수 선택 모드를 어떤 구조로 전달·저장할지
-- 빈칸 위치와 빈칸별 정답을 어떤 식별자로 연결할지
+| 조치 | 대상 | 전환 기준 |
+| --- | --- | --- |
+| 유지·확장 | `quiz_sets` | 기존 식별자·소유권·`status`를 유지하고 nullable `failure_code` 추가 |
+| 유지 | `quiz_questions` | `question_number`, `question_type`, `topic`, `prompt`, `explanation`, `source_excerpt` 유지 |
+| 제거 | `quiz_question_answers` | 유형별 원장으로 대체하고 `answer_role` 사용 중단 |
+| 추가 | `quiz_question_choices` | 모든 객관식 보기와 정답 여부 저장 |
+| 추가 | `quiz_short_answer_answers` | 단답형 허용 답안 원문과 정규화 값 저장 |
+| 추가 | `quiz_essay_answer_guides` | 서술형 모범 답안과 핵심 포인트 저장 |
+| 추가 | `quiz_fill_in_the_blanks` | 공개 빈칸 식별자와 번호 저장 |
+| 추가 | `quiz_fill_in_the_blank_answers` | 빈칸별 허용 답안 원문과 정규화 값 저장 |
+| 유지·확장 | `quiz_submitted_answers` | `selected_choice_id`, `blank_id` 추가, `answer_value` nullable 전환 |
+| 유지 | `quiz_attempts`, `quiz_attempt_questions` | MAIN·REVIEW 통합 회차와 채점 구조 유지 |
+
+migration, Java entity·repository·service와 테스트는 같은 목표 구조를 사용해야 한다. 기존 서버 TRD나 migration에 `quiz_question_answers`가 정답 원장으로 남아 있다면 이 계약과 충돌하므로 구현 전에 함께 동기화한다. 공개 API의 `FILL_BLANK` 소비자는 계약 변경 뒤 `FILL_IN_THE_BLANK`로 전환한다.
+
+## 확정·제안·열린 질문
+
+### 확정
+
+- 공통 문제와 네 유형별 원장을 분리하고 기존 `quiz_question_answers`와 `answer_role`을 제거한다.
+- 객관식은 모든 보기를 저장하며 단일 정답 여부를 `is_correct`로 표현한다.
+- 빈칸은 `prompt`의 번호 마커와 `blank_number`로 연결하며 별도 segment 원장은 만들지 않는다.
+- 제출 답안은 `selected_choice_id`, `blank_id`, `answer_value`의 유형별 조합으로 보존한다.
+- 문제 유형 서버 기준 값은 `FILL_IN_THE_BLANK`다.
+- 유효 문제 1개 이상은 `READY`, 0개는 `FAILED`다.
+
+### 제안
+
+- 공개 식별자가 필요한 보기와 빈칸은 기존 서버 관례대로 내부 숫자 `id`와 UUID `public_id`를 분리한다.
+- 별도 순서 컬럼이 없는 객관식 보기와 허용 답안의 대표값은 내부 `id` 오름차순으로 결정한다.
+- 성능용 보조 인덱스는 실제 조회 패턴 측정 뒤 추가한다.
+
+### 열린 질문
+
+- 현재 API가 모든 생성 상태에서 요구하는 `requestedConfig`를 재진입·프로세스 재시작 뒤에도 제공하기 위해 어떤 작업 원장 또는 저장소를 사용할지
 - 사용자 계정이나 학습자료를 삭제할 때 파생 문제 세트와 풀이 이력을 삭제·익명화·기간 보존 중 어떻게 처리할지
 - 생성·채점 모델과 평가 근거를 어느 수준까지 추적해야 결과를 재현하고 감사할 수 있는지
 
-위 질문은 화면 계약이나 데이터 보존 범위를 바꾸므로 후속 설계에서 확정한다. 성능 개선용 보조 인덱스는 현재 SQL 범위에 포함하지 않는다.
+위 열린 질문은 요청 설정의 재조회와 데이터 보존 범위를 바꾸므로 구현에서 임의로 확정하지 않는다.

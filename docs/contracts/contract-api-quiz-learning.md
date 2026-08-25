@@ -205,13 +205,13 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 
 ```json
 {
-  "selectedTypes": ["MULTIPLE_CHOICE", "FILL_BLANK", "SHORT_ANSWER", "ESSAY"],
+  "selectedTypes": ["MULTIPLE_CHOICE", "FILL_IN_THE_BLANK", "SHORT_ANSWER", "ESSAY"],
   "difficulty": "NORMAL",
   "maxQuestionCount": 10
 }
 ```
 
-- `selectedTypes`: 중복 없는 1개 이상. 값은 `MULTIPLE_CHOICE`, `FILL_BLANK`, `SHORT_ANSWER`, `ESSAY`.
+- `selectedTypes`: 중복 없는 1개 이상. 값은 서버 `QuestionType`과 같은 `MULTIPLE_CHOICE`, `FILL_IN_THE_BLANK`, `SHORT_ANSWER`, `ESSAY`.
 - `difficulty`: `EASY`, `NORMAL`, `HARD`.
 - `maxQuestionCount`: 필수, `5`, `10`, `15` 중 하나.
 - 요청을 접수하면 새 불변 `quizSetId`를 만들고 학습자료 본문을 원자적으로 잠근다.
@@ -227,7 +227,7 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
     "status": "GENERATING",
     "pollAfterSeconds": 3,
     "requestedConfig": {
-      "selectedTypes": ["MULTIPLE_CHOICE", "FILL_BLANK", "SHORT_ANSWER", "ESSAY"],
+      "selectedTypes": ["MULTIPLE_CHOICE", "FILL_IN_THE_BLANK", "SHORT_ANSWER", "ESSAY"],
       "difficulty": "NORMAL",
       "maxQuestionCount": 10
     },
@@ -278,8 +278,9 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 `GET /api/v1/quiz-sets/{quizSetId}`
 
 - `GENERATING`, `READY`, `FAILED` 모두 `quizSetId`, `materialId`, `status`, `requestedConfig`를 반환한다.
+- `requestedConfig`는 생성 요청을 다시 보여주기 위한 값이지 `READY|FAILED` 판정 기준이 아니다. QuizSet 물리 컬럼 추가 여부는 이 API 계약이 정하지 않으며, 실제 문제 수와 포함 유형은 확정된 `questions`에서 계산한다.
 - `GENERATING`은 다음 조회 권고값 `pollAfterSeconds`도 반환한다.
-- `READY`는 유효 문제가 1개 이상이고 요청한 유형이 각각 최소 1문제 포함됐다는 뜻이다. 실제 수가 최대 문제 수보다 적을 수 있다.
+- `READY`는 유효 문제가 1개 이상이라는 뜻이다. 실제 수가 최대 문제 수보다 적거나 요청한 유형 일부가 포함되지 않아도 된다.
 - `FAILED`에는 문제를 포함하지 않는다. 사용자에게는 재시도 가능한 일반 안내만 제공하고 외부 생성 서비스 상세는 노출하지 않는다.
 - 문제는 `number` 오름차순이다.
 
@@ -310,14 +311,15 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 ```json
 {
   "code": "SOURCE_INSUFFICIENT",
-  "message": "선택한 조건으로 충분한 문제를 만들지 못했어요. 자료나 문제 유형을 확인해 주세요.",
+  "message": "학습자료에서 문제를 만들지 못했어요. 자료나 조건을 확인해 주세요.",
   "retryable": false
 }
 ```
 
 - `failure.code`는 `SOURCE_INSUFFICIENT` 또는 `GENERATION_FAILED`다.
-- `SOURCE_INSUFFICIENT`: 유효 문제가 0개이거나 선택 유형을 각각 최소 한 문제 충족하지 못했다. 같은 입력의 즉시 반복보다 자료·유형 확인을 안내하며 기본 `retryable=false`다.
-- `GENERATION_FAILED`: 접수 뒤 내부 생성 작업을 완료하지 못했다. 내부·LLM 상세는 숨기고 재시도가 가능하면 `retryable=true`다.
+- `SOURCE_INSUFFICIENT`: 품질 기준을 충족한 유효 문제가 0개다. 같은 입력의 즉시 반복보다 자료·조건 확인을 안내하며 기본 `retryable=false`다.
+- `GENERATION_FAILED`: 접수 뒤 내부 생성 작업에서 최종 확정할 유효 문제를 하나도 남기지 못했다. 검증과 저장을 마친 유효 문제가 1개 이상이면 일부 결과를 사용할 수 없어도 `READY`다. 내부·LLM 상세는 숨기고 재시도가 가능하면 `retryable=true`다.
+- 상태 재조회에서도 같은 실패 의미를 반환할 수 있도록 서버는 QuizSet의 `failure_code`를 보존한다. `message`와 `retryable`은 저장된 코드에 대한 공개 정책으로 계산한다.
 - 두 값은 비동기 QuizSet 작업 결과이지 HTTP `ApiError.code`가 아니다. 네트워크 실패를 `FAILED`로 추정해서는 안 된다.
 
 `READY`의 각 문제 공통 필드:
@@ -337,9 +339,25 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 | 유형 | 추가 필드 | 규칙 |
 | --- | --- | --- |
 | `MULTIPLE_CHOICE` | `choices: [{ choiceId, text }]` | 4개 또는 5개. 정답 표시 없음 |
-| `FILL_BLANK` | `segments: [{ kind: "TEXT", text } 또는 { kind: "BLANK", blankId }]` | 순서 보존, `BLANK` 1개 또는 2개 |
+| `FILL_IN_THE_BLANK` | `blanks: [{ blankId, number }]` | 공통 `prompt`의 `[1]`, `[2]` 마커와 `number`로 연결. 1개 또는 2개 |
 | `SHORT_ANSWER` | 없음 | 일반 텍스트 입력 |
 | `ESSAY` | 없음 | 일반 텍스트 입력 |
+
+빈칸형 예시:
+
+```json
+{
+  "questionId": "question_2",
+  "number": 2,
+  "type": "FILL_IN_THE_BLANK",
+  "topic": "자료구조 처리 순서",
+  "prompt": "큐는 [1] 방식이고 스택은 [2] 방식이다.",
+  "blanks": [
+    { "blankId": "blank_1", "number": 1 },
+    { "blankId": "blank_2", "number": 2 }
+  ]
+}
+```
 
 정답, 허용 답안, 모범 답안, 핵심 포인트, 해설, 원문 근거와 내부 생성 메타데이터는 `READY` 풀이 데이터에 포함하지 않는다.
 
@@ -563,8 +581,8 @@ Headers: `Authorization`, `Content-Type: application/json`
 - 객관식·빈칸의 자동 채점 `outcome`: `CORRECT`, `INCORRECT`.
 - 답을 작성한 단답형은 화면에 표시할 현재 유효 `outcome`을 제공한다. 서버가 보존하는 `automaticOutcome`과 `userOverrideOutcome`은 현재 결과 화면에서 직접 사용하지 않으므로 이 조회 projection에 반복하지 않는다.
 - 서술형 `outcome`: `CORRECT`, `PARTIAL`, `INCORRECT`.
-- 각 `questionResults` 항목은 다른 문제 조회 없이 렌더링할 수 있어야 한다. 객관식은 `choices: [{ choiceId, text }]`, 빈칸은 풀이 때와 같은 순서의 `segments`를 포함한다.
-- 객관식 `response.selectedChoiceId`와 `representativeAnswer.selectedChoiceId`, 빈칸 `response.blankAnswers[].blankId`와 `representativeAnswer.blankAnswers[].blankId`는 각각 함께 반환된 보기·segment 식별자를 그대로 참조한다.
+- 각 `questionResults` 항목은 다른 문제 조회 없이 렌더링할 수 있어야 한다. 객관식은 `choices: [{ choiceId, text }]`, 빈칸은 풀이 때와 같은 `prompt`와 `blanks: [{ blankId, number }]`를 포함한다.
+- 객관식 `response.selectedChoiceId`와 `representativeAnswer.selectedChoiceId`, 빈칸 `response.blankAnswers[].blankId`와 `representativeAnswer.blankAnswers[].blankId`는 각각 함께 반환된 보기·빈칸 식별자를 그대로 참조한다.
 - 미응답은 `response=null`, `outcome=INCORRECT`로 포함한다. 별도 `unanswered` 필드나 미응답 집계를 반환하지 않으며 클라이언트는 `response=null`로 답하지 않음을 표시하고 단답형 수정 행동을 제공하지 않는다.
 - `representativeAnswer`는 결과 설명에 필요한 대표 정답만 공개한다. 빈칸·단답형의 허용 정답 전체를 반환하지 않는다. 서술형은 `modelAnswer`와 `keyPoints`를 제공한다.
 - `summary.scoredGrading`의 분자·분모는 객관식·빈칸·단답형이며, 단답형은 최신 `outcome`을 분자 계산에 사용한다. 최초 제출 응답의 `automaticGrading`은 제출 시점 자동 판정 요약이므로 별도 의미를 유지한다.
