@@ -72,7 +72,8 @@ scope: shared
 
 ### 쓰기 요청 식별과 재시도
 
-- 학습자료 생성과 비동기 QuizSet 생성 접수처럼 아직 자연스러운 리소스 식별자가 없는 생성 요청만 `Idempotency-Key` 헤더를 사용한다. 기존 키 형식과 재시도 규칙은 해당 엔드포인트 절에서 정의한다.
+- `Idempotency-Key` 헤더는 학습자료 생성 `POST /api/v1/learning-materials`에서만 사용한다. 비동기 QuizSet 생성 접수에는 별도 멱등 키·request fingerprint·replay 원장을 두지 않는다.
+- QuizSet 생성 접수 응답을 확인하지 못한 클라이언트는 같은 요청을 즉시 재전송하지 않고 먼저 해당 자료의 활성 생성을 조회한다. `GENERATING` 세트가 있으면 그 식별자로 상태 조회를 이어가고, 활성 생성이 없을 때만 새 생성 요청을 보낸다.
 - 본 퀴즈 최종 제출은 클라이언트가 `crypto.randomUUID()` 수준의 안전한 난수원으로 만든 UUID v4를 `attemptId`로 사용한다. 서버는 parse 가능한 UUID 형식과 DB unique 제약만 확인하며 hash·fingerprint 충돌 방지 체계를 추가하지 않는다.
 - attempt UUID는 비밀 정보가 아니므로 서버에서 hash하지 않는다. 서버는 `attemptId`의 전역 unique 제약과 소유권·QuizSet 일치 검증만 수행한다.
 - 같은 `attemptId`의 재요청은 payload fingerprint를 계산하거나 비교하지 않고 최초로 확정된 attempt를 반환한다. 클라이언트 버그로 같은 UUID에 다른 답안을 보낸 경우에도 최초 제출 우선이며 새 회차를 만들지 않는다.
@@ -201,7 +202,7 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 
 `POST /api/v1/learning-materials/{materialId}/quiz-sets`
 
-Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
+Headers: `Authorization`, `Content-Type: application/json`
 
 ```json
 {
@@ -217,6 +218,7 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 - 요청을 접수하면 새 불변 `quizSetId`를 만들고 학습자료 본문을 원자적으로 잠근다.
 - 같은 학습자료에 `GENERATING` 세트가 있으면 새 요청을 받지 않는다.
 - 서버가 생성 작업 자체를 접수할 수 없으면 `503 QUIZ_002`를 반환하고 QuizSet을 만들거나 본문 잠금 상태를 바꾸지 않는다.
+- 이 요청은 `Idempotency-Key`를 받지 않는다. 접수 응답 유실 여부는 [자료의 활성 생성 조회](#자료의-활성-생성-조회)로 확인하며, 활성 생성이 없을 때만 새 QuizSet 생성을 요청한다.
 - 성공 응답의 `requestedConfig`는 이 요청의 입력값을 그대로 echo하는 값이다. 서버는 이를 DB에 영속화하지 않으며 이후 GET 응답에서는 반환하지 않는다.
 - 클라이언트는 성공 응답의 `quizSetId`와 `requestedConfig`를 현재 사용자 범위의 기기 로컬 상태에 연결할 수 있다. 이 값은 생성 중·성공 화면의 요청 조건 표시용이며 서버 상태나 성공 판정의 근거가 아니다.
 
@@ -807,12 +809,12 @@ Headers: `Authorization`, `Content-Type: application/json`
 | 필드 누락·형식·허용 enum/개수 | `400` | 기존 `COMMON_001` | `fields`에 따라 입력 수정 |
 | 읽을 수 없는 JSON | `400` | 기존 `COMMON_002` | 요청 본문 수정 |
 | 없거나 소유하지 않은 리소스, 접근할 수 없는 Notion 페이지 | `404` | 기존 `COMMON_003` | 목록·권한·페이지 선택 확인 |
-| 예상하지 못한 서버 오류 | `500` | 기존 `COMMON_999` | 생성 요청은 같은 멱등 키, 제출은 같은 attempt 또는 review session 식별자로 재시도 |
+| 예상하지 못한 서버 오류 | `500` | 기존 `COMMON_999` | 학습자료 생성은 같은 멱등 키로 재시도하고, QuizSet 생성은 활성 생성 조회 후 없을 때만 새 요청하며, 제출은 같은 attempt 또는 review session 식별자로 재시도 |
 | 인증 정보 없음·잘못됨·만료 | `401` | 기존 `AUTH_005` | 갱신 또는 재로그인 |
 | 잠긴 학습자료 본문 수정 | `409` | `MATERIAL_001` | 제목만 수정하거나 새 자료 만들기 |
 | 학습자료 본문 20,000자 초과 | `413` | `MATERIAL_002` | 본문을 줄인 뒤 같은 저장 흐름 재시도 |
 | 같은 학습자료에 이미 `GENERATING` 작업이 있음 | `409` | `QUIZ_001` | 기존 생성 상태 확인 |
-| 생성 작업을 접수할 수 없는 일시적 서버 상태 | `503` | `QUIZ_002` | 새 QuizSet이 만들어지지 않았음을 확인하고 같은 멱등 키로 재시도 |
+| 생성 작업을 접수할 수 없는 일시적 서버 상태 | `503` | `QUIZ_002` | 새 QuizSet과 본문 잠금이 생기지 않았으므로 같은 조건으로 새 생성 요청 |
 | `READY`가 아닌 세트 제출, attempt UUID의 소유자·QuizSet 불일치, 자기평가 상태 또는 수정 불가 단답형 | `409` | `ATTEMPT_001` | 최신 문제 세트·attempt 상태와 결과 확인 |
 | 완료된 복습 세션 재변경 또는 이미 확정된 서술형 평가 변경 | `409` | `REVIEW_001` | 세션과 결과 재조회 |
 
@@ -831,7 +833,7 @@ Headers: `Authorization`, `Content-Type: application/json`
 ## 개인정보와 로그
 
 - 학습자료 본문, 사용자 답안, 모범 답안과 원문 근거는 민감한 학습 콘텐츠로 취급한다.
-- 요청·응답 본문, Notion 접근 자격과 외부 생성 서비스 원문을 일반 애플리케이션 로그에 남기지 않는다. `attemptId`, `reviewSessionId`와 생성 요청의 `Idempotency-Key`는 비밀이 아니지만 운영 로그에는 문제 해결에 필요한 식별자만 최소로 남긴다.
+- 요청·응답 본문, Notion 접근 자격과 외부 생성 서비스 원문을 일반 애플리케이션 로그에 남기지 않는다. `attemptId`, `reviewSessionId`, `quizSetId`는 비밀이 아니지만 운영 로그에는 문제 해결에 필요한 식별자만 최소로 남긴다. 학습자료 생성의 `Idempotency-Key` 원문은 로그에 남기지 않는다.
 - 운영 로그는 요청 추적 식별자, 사용자 내부 식별자, 리소스 식별자, 공개 오류 코드와 상태 전이에 필요한 최소 메타데이터만 남긴다.
 
 ## 호환성과 폐기
