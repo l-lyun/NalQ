@@ -3,6 +3,7 @@ package com.openmd.server.quiz.controller;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -10,7 +11,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.openmd.server.auth.security.AccessPrincipal;
 import com.openmd.server.quiz.domain.type.QuizAttemptStatus;
+import com.openmd.server.quiz.dto.response.EssaySelfAssessmentSummary;
 import com.openmd.server.quiz.dto.response.GradingCount;
+import com.openmd.server.quiz.dto.response.ReviewAttemptResult;
+import com.openmd.server.quiz.dto.response.ReviewAttemptSummary;
 import com.openmd.server.quiz.dto.response.ReviewSessionStart;
 import com.openmd.server.quiz.dto.response.ReviewSessionView;
 import com.openmd.server.quiz.dto.response.ReviewSubmission;
@@ -87,6 +91,25 @@ class QuizReviewControllerTest {
         .andExpect(jsonPath("$.data.reviewSessionId").value("review-1"))
         .andExpect(jsonPath("$.data.attemptId").doesNotExist())
         .andExpect(jsonPath("$.data.submittedAt").value("2026-08-24T05:20:00Z"));
+  }
+
+  @Test
+  void reviewResultSeparatesResolvedAndUnresolvedCounts() throws Exception {
+    when(results.reviewResult(7L, "review-1"))
+        .thenReturn(
+            new ReviewAttemptResult(
+                "review-1",
+                "source-1",
+                "COMPLETED",
+                new ReviewAttemptSummary(
+                    new GradingCount(1, 2), new EssaySelfAssessmentSummary(0, 1, 0), 1, 2),
+                List.of()));
+
+    mvc.perform(get("/api/v1/review-sessions/review-1/result"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.summary.resolvedQuestionCount").value(1))
+        .andExpect(jsonPath("$.data.summary.unresolvedQuestionCount").value(2))
+        .andExpect(jsonPath("$.data.summary.reviewQuestionCount").doesNotExist());
   }
 
   private HandlerMethodArgumentResolver principal() {

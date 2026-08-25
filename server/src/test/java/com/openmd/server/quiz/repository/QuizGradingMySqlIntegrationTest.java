@@ -23,6 +23,9 @@ import com.openmd.server.quiz.domain.type.GradingMethod;
 import com.openmd.server.quiz.domain.type.GradingOutcome;
 import com.openmd.server.quiz.domain.type.QuestionType;
 import com.openmd.server.quiz.domain.type.QuizAttemptStatus;
+import com.openmd.server.quiz.domain.type.QuizDifficulty;
+import com.openmd.server.quiz.domain.type.QuizSetStatus;
+import com.openmd.server.quiz.dto.command.QuizGenerationConfig;
 import com.openmd.server.quiz.dto.request.BlankAnswerRequest;
 import com.openmd.server.quiz.dto.request.QuizResponseRequest;
 import com.openmd.server.quiz.error.QuizErrorCode;
@@ -30,6 +33,7 @@ import com.openmd.server.quiz.service.EssayAssessmentService;
 import com.openmd.server.quiz.service.QuizAttemptResultService;
 import com.openmd.server.quiz.service.QuizAttemptSubmissionService;
 import com.openmd.server.quiz.service.QuizGenerationPersistenceService;
+import com.openmd.server.quiz.service.QuizGenerationService;
 import com.openmd.server.quiz.service.QuizReviewService;
 import com.openmd.server.quiz.service.ShortAnswerGradingService;
 import java.time.Duration;
@@ -91,6 +95,7 @@ class QuizGradingMySqlIntegrationTest {
   @Autowired QuizAttemptRepository attempts;
   @Autowired QuizAttemptQuestionRepository attemptQuestions;
   @Autowired QuizGenerationPersistenceService generation;
+  @Autowired QuizGenerationService generationAcceptance;
   @Autowired QuizAttemptSubmissionService submissions;
   @Autowired QuizAttemptResultService results;
   @Autowired ShortAnswerGradingService gradings;
@@ -118,6 +123,66 @@ class QuizGradingMySqlIntegrationTest {
             "users")) {
       jdbc.update("DELETE FROM " + table);
     }
+  }
+
+  @Test
+  void acceptsAndFindsAnActiveGenerationWithoutPersistingRequestedConfig() {
+    Fixture owner = fixture();
+    Fixture other = fixture();
+    QuizGenerationConfig config =
+        new QuizGenerationConfig(
+            List.of(QuestionType.MULTIPLE_CHOICE, QuestionType.ESSAY), QuizDifficulty.NORMAL, 10);
+
+    var accepted =
+        generationAcceptance.accept(owner.userId(), Long.toString(owner.materialId()), config);
+
+    assertEquals(QuizSetStatus.GENERATING, accepted.status());
+    assertEquals(config.selectedTypes(), accepted.requestedConfig().selectedTypes());
+    assertEquals(
+        accepted.quizSetId(),
+        generationAcceptance.active(owner.userId(), Long.toString(owner.materialId())).quizSetId());
+    assertEquals(
+        0,
+        jdbc.queryForObject(
+            """
+            SELECT COUNT(*) FROM information_schema.columns
+            WHERE table_schema=DATABASE() AND table_name='quiz_sets'
+              AND column_name IN ('selected_types','difficulty','max_question_count','requested_config')
+            """,
+            Integer.class));
+
+    BusinessException active =
+        assertThrows(
+            BusinessException.class,
+            () ->
+                generationAcceptance.accept(
+                    owner.userId(), Long.toString(owner.materialId()), config));
+    assertEquals(QuizErrorCode.GENERATION_ACTIVE, active.getErrorCode());
+
+    BusinessException foreign =
+        assertThrows(
+            BusinessException.class,
+            () -> generationAcceptance.active(other.userId(), Long.toString(owner.materialId())));
+    assertEquals(CommonErrorCode.RESOURCE_NOT_FOUND, foreign.getErrorCode());
+  }
+
+  @Test
+  void rejectsInvalidGenerationConfigWithoutCreatingAQuizSet() {
+    Fixture fixture = fixture();
+    QuizGenerationConfig duplicateTypes =
+        new QuizGenerationConfig(
+            List.of(QuestionType.ESSAY, QuestionType.ESSAY), QuizDifficulty.NORMAL, 10);
+
+    BusinessException invalid =
+        assertThrows(
+            BusinessException.class,
+            () ->
+                generationAcceptance.accept(
+                    fixture.userId(), Long.toString(fixture.materialId()), duplicateTypes));
+
+    assertEquals(CommonErrorCode.INVALID_INPUT, invalid.getErrorCode());
+    assertEquals("selectedTypes", invalid.getFields().getFirst().field());
+    assertEquals(0L, jdbc.queryForObject("SELECT COUNT(*) FROM quiz_sets", Long.class));
   }
 
   @Test

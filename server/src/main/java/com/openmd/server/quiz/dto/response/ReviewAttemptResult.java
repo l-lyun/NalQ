@@ -6,5 +6,5 @@ public record ReviewAttemptResult(
     String reviewSessionId,
     String sourceAttemptId,
     String status,
-    QuizAttemptSummary summary,
+    ReviewAttemptSummary summary,
     List<QuizQuestionResultView> questionResults) {}

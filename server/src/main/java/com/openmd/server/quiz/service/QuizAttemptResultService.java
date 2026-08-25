@@ -2,10 +2,14 @@ package com.openmd.server.quiz.service;
 
 import com.openmd.server.global.error.BusinessException;
 import com.openmd.server.global.error.CommonErrorCode;
+import com.openmd.server.quiz.domain.type.GradingOutcome;
+import com.openmd.server.quiz.domain.type.QuestionType;
 import com.openmd.server.quiz.domain.type.QuizAttemptStatus;
+import com.openmd.server.quiz.dto.response.GradingCount;
 import com.openmd.server.quiz.dto.response.PendingSelfAssessment;
 import com.openmd.server.quiz.dto.response.QuizAttemptResult;
 import com.openmd.server.quiz.dto.response.ReviewAttemptResult;
+import com.openmd.server.quiz.dto.response.ReviewAttemptSummary;
 import com.openmd.server.quiz.repository.QuizAttemptQuestionRepository;
 import com.openmd.server.quiz.repository.QuizAttemptRepository;
 import com.openmd.server.quiz.repository.QuizQuestionRepository;
@@ -58,11 +62,39 @@ public class QuizAttemptResultService {
             .findById(review.getSourceAttemptId())
             .orElseThrow(() -> new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND));
     var projected = projector.project(review);
+    int automaticallyGraded =
+        (int)
+            projected.questionResults().stream()
+                .filter(result -> result.type() != QuestionType.ESSAY)
+                .count();
+    int automaticallyCorrect =
+        (int)
+            projected.questionResults().stream()
+                .filter(result -> result.type() != QuestionType.ESSAY)
+                .filter(result -> result.outcome() == GradingOutcome.CORRECT)
+                .count();
+    int resolved =
+        (int)
+            projected.questionResults().stream()
+                .filter(result -> result.outcome() == GradingOutcome.CORRECT)
+                .count();
+    int unresolved =
+        (int)
+            projected.questionResults().stream()
+                .filter(result -> result.outcome() != null)
+                .filter(result -> result.outcome() != GradingOutcome.CORRECT)
+                .count();
+    ReviewAttemptSummary summary =
+        new ReviewAttemptSummary(
+            new GradingCount(automaticallyCorrect, automaticallyGraded),
+            projected.summary().essaySelfAssessment(),
+            resolved,
+            unresolved);
     return new ReviewAttemptResult(
         review.getPublicId(),
         source.getPublicId(),
         review.getStatus().name(),
-        projected.summary(),
+        summary,
         projected.questionResults());
   }
 
