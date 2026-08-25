@@ -1,90 +1,56 @@
-export type QuizQuestionType = 'MULTIPLE_CHOICE' | 'FILL_BLANK' | 'SHORT_ANSWER' | 'ESSAY'
-
+export type QuizQuestionType = 'MULTIPLE_CHOICE' | 'FILL_IN_THE_BLANK' | 'SHORT_ANSWER' | 'ESSAY'
 export type QuizDifficulty = 'EASY' | 'NORMAL' | 'HARD'
-
-export type QuizMaxCount = 5 | 10 | 15
-
-export type QuizConditions = {
-  questionTypes: QuizQuestionType[]
+export type QuizMaxQuestionCount = 5 | 10 | 15
+export type QuizRequestedConfig = {
+  selectedTypes: QuizQuestionType[]
   difficulty: QuizDifficulty
-  maxCount: QuizMaxCount
+  maxQuestionCount: QuizMaxQuestionCount
 }
+export type QuizConditions = QuizRequestedConfig
 
-export type ObjectiveQuestion = {
-  id: string
-  number: number
+type QuizQuestionBase = { questionId: string; number: number; topic: string; prompt: string }
+export type ObjectiveQuestion = QuizQuestionBase & {
   type: 'MULTIPLE_CHOICE'
-  topic: string
-  prompt: string
-  choices: { id: string; label: string }[]
+  choices: { choiceId: string; text: string }[]
 }
-
-export type FillBlankQuestion = {
-  id: string
-  number: number
-  type: 'FILL_BLANK'
-  topic: string
-  prompt: string
-  blanks: { id: string; label: string }[]
+export type FillBlankQuestion = QuizQuestionBase & {
+  type: 'FILL_IN_THE_BLANK'
+  blanks: { blankId: string; number: number }[]
 }
+export type ShortAnswerQuestion = QuizQuestionBase & { type: 'SHORT_ANSWER' }
+export type EssayQuestion = QuizQuestionBase & { type: 'ESSAY' }
+export type QuizQuestion = ObjectiveQuestion | FillBlankQuestion | ShortAnswerQuestion | EssayQuestion
 
-export type ShortAnswerQuestion = {
-  id: string
-  number: number
-  type: 'SHORT_ANSWER'
-  topic: string
-  prompt: string
-}
-
-export type EssayQuestion = {
-  id: string
-  number: number
-  type: 'ESSAY'
-  topic: string
-  prompt: string
-}
-
-export type QuizQuestion =
-  | ObjectiveQuestion
-  | FillBlankQuestion
-  | ShortAnswerQuestion
-  | EssayQuestion
-
+/** Open-screen memory only. Never persisted or sent directly. */
 export type QuizAnswer =
-  | { type: 'MULTIPLE_CHOICE'; choiceId: string }
-  | { type: 'FILL_BLANK'; values: Record<string, string> }
-  | { type: 'SHORT_ANSWER'; value: string }
-  | { type: 'ESSAY'; value: string }
-
+  | { type: 'MULTIPLE_CHOICE'; selectedChoiceId: string }
+  | { type: 'FILL_IN_THE_BLANK'; blankAnswers: Record<string, string> }
+  | { type: 'SHORT_ANSWER'; text: string }
+  | { type: 'ESSAY'; text: string }
 export type QuizAnswers = Record<string, QuizAnswer | undefined>
+export type QuizResponse =
+  | { questionId: string; selectedChoiceId: string }
+  | { questionId: string; blankAnswers: { blankId: string; answer: string }[] }
+  | { questionId: string; text: string }
+export type QuizSubmissionPayload = { responses: QuizResponse[] }
 
 export type QuizGenerationReady = {
   actualCount: number
-  requestedCount: QuizMaxCount
-  conditions: QuizConditions
+  includedTypes: QuizQuestionType[]
+  requestedConfig?: QuizRequestedConfig
 }
-
 export type QuizGenerationFailureKind =
-  | 'REQUEST_FAILED'
-  | 'STATUS_UNAVAILABLE'
-  | 'SOURCE_INSUFFICIENT'
-  | 'GENERATION_FAILED'
-
-export type QuizGenerationFailure = {
-  kind: QuizGenerationFailureKind
-  retryable: boolean
-  message?: string
-}
-
+  | 'REQUEST_FAILED' | 'STATUS_UNAVAILABLE' | 'SOURCE_INSUFFICIENT' | 'GENERATION_FAILED'
+export type QuizGenerationFailure = { kind: QuizGenerationFailureKind; retryable: boolean; message?: string }
 export type QuizGenerationState =
-  | { status: 'GENERATING' }
+  | { status: 'GENERATING'; requestedConfig?: QuizRequestedConfig }
   | { status: 'READY'; ready: QuizGenerationReady }
   | { status: 'ERROR'; error: QuizGenerationFailure }
 
 export type QuizBinaryOutcome = 'CORRECT' | 'INCORRECT'
-
 export type QuizResultOutcome = QuizBinaryOutcome | 'PARTIAL'
-
+export type QuizAttemptStatus = 'SELF_ASSESSMENT_REQUIRED' | 'COMPLETED'
+export type ReviewSessionStatus = 'SOLVING' | QuizAttemptStatus
 export type QuizResultItem = {
   questionId: string
   number: number
@@ -93,14 +59,12 @@ export type QuizResultItem = {
   prompt: string
   answer: string
   correctAnswer: string
-  outcome?: QuizResultOutcome
+  outcome: QuizResultOutcome
   keyPoints?: string[]
   explanation: string
   sourceExcerpt: string
   editable: boolean
-  edited?: boolean
 }
-
 export type QuizResultSummary = {
   correctCount: number
   gradedCount: number
@@ -109,34 +73,30 @@ export type QuizResultSummary = {
   essayIncorrectCount: number
   reviewCount: number
 }
-
 export type QuizResult = {
+  status: QuizAttemptStatus | ReviewSessionStatus
   summary: QuizResultSummary
   items: QuizResultItem[]
 }
-
-export type QuizSubmitPayload = {
-  answers: QuizAnswers
-  unansweredQuestionIds: string[]
-}
-
-export type QuizAttemptStatus = 'SELF_ASSESSMENT_REQUIRED' | 'COMPLETED'
-
 export type QuizSubmissionResult = {
   attemptId: string
   status: QuizAttemptStatus
-  automaticGrading: {
-    correctQuestionCount: number
-    gradedQuestionCount: number
-  }
+  automaticGrading: { correctQuestionCount: number; gradedQuestionCount: number }
   pendingEssayQuestionIds: string[]
   createdAt: string
 }
-
+export type ReviewSubmissionResult = {
+  reviewSessionId: string
+  status: QuizAttemptStatus
+  automaticGrading: { correctQuestionCount: number; gradedQuestionCount: number }
+  pendingEssayQuestionIds: string[]
+  submittedAt: string
+}
 export type QuizEssayAssessmentResult = {
-  attemptId: string
+  attemptId?: string
   questionId: string
   assessment: QuizResultOutcome
+  reviewStatus?: 'RESOLVED' | 'UNRESOLVED'
   status: QuizAttemptStatus
   remainingSelfAssessmentCount: number
 }
@@ -151,9 +111,12 @@ export type QuizPresentationCallbacks = {
   onDeferQuiz?: () => void
   onAnswersChange?: (answers: QuizAnswers) => void
   onNavigateQuestion?: (questionId: string) => void
-  onSubmit?: (payload: QuizSubmitPayload) => QuizSubmissionResult | Promise<QuizSubmissionResult>
+  onSubmit?: (input: { attemptId?: string; payload: QuizSubmissionPayload }) =>
+    | QuizSubmissionResult | ReviewSubmissionResult
+    | Promise<QuizSubmissionResult | ReviewSubmissionResult>
+  onLoadResult?: (resourceId: string) => QuizResult | Promise<QuizResult>
   onSaveEssayAssessment?: (input: {
-    attemptId: string
+    resourceId: string
     questionId: string
     assessment: QuizResultOutcome
   }) => QuizEssayAssessmentResult | Promise<QuizEssayAssessmentResult>
@@ -161,21 +124,15 @@ export type QuizPresentationCallbacks = {
   onUpdateShortAnswerOutcome?: (input: {
     questionId: string
     outcome: QuizBinaryOutcome
-  }) => QuizResultSummary | Promise<QuizResultSummary>
+  }) => QuizResult | Promise<QuizResult>
+  onCompleted?: (resourceId: string) => void
   onResultExit?: () => void
 }
 
 export type QuizFlowScene =
-  | 'CONDITIONS'
-  | 'GENERATION'
-  | 'READY'
-  | 'SOLVING'
-  | 'SUBMIT_ERROR'
-  | 'SELF_ASSESSMENT'
-  | 'RESULT'
-
+  | 'CONDITIONS' | 'GENERATION' | 'READY' | 'SOLVING' | 'SUBMIT_ERROR'
+  | 'SELF_ASSESSMENT' | 'RESULT'
 export type QuizFlowKind = 'QUIZ' | 'REVIEW'
-
 export type QuizFlowPageProps = {
   materialTitle: string
   questions: QuizQuestion[]
@@ -185,5 +142,7 @@ export type QuizFlowPageProps = {
   initialConditions?: QuizConditions
   initialAnswers?: QuizAnswers
   generationState?: QuizGenerationState
+  initialResourceId?: string
+  initialPendingEssayQuestionIds?: string[]
   callbacks?: QuizPresentationCallbacks
 }

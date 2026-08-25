@@ -376,7 +376,8 @@ function LearningMain({
           <LearningSectionSkeleton label="복습 정보를 불러오는 중" rows={1} />
         ) : reviewState.status === 'error' ? (
           <LearningInlineError message={reviewState.message} onRetry={onRetryReview} />
-        ) : reviewState.data && reviewState.data.reviewQuestionCount > 0 ? (
+        ) : reviewState.data &&
+          (reviewState.data.reviewQuestionCount > 0 || reviewState.data.activeReviewSessionId) ? (
           <LearningActionList
             label="최신 복습"
             rows={[
@@ -386,10 +387,12 @@ function LearningMain({
                 actionLabel: reviewState.data.activeReviewSessionId ? '복습 계속하기' : '복습 시작',
                 detail: (
                   <>
-                    미해결 문항 {reviewState.data.reviewQuestionCount}개 · {reviewState.data.completedAtLabel}
+                    {reviewState.data.activeReviewSessionId
+                      ? `진행 중인 복습 · ${reviewState.data.completedAtLabel}`
+                      : `미해결 문항 ${reviewState.data.reviewQuestionCount}개 · ${reviewState.data.completedAtLabel}`}
                     <br />
                     {reviewState.data.activeReviewSessionId
-                      ? '마지막으로 저장한 문항부터 계속해요'
+                      ? '같은 문제 목록을 첫 문제부터 다시 풀어요'
                       : '가장 최근 완료한 퀴즈를 복습해요'}
                   </>
                 ),

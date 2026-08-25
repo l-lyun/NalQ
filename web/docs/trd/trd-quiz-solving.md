@@ -37,6 +37,15 @@ scope: web
 - 생성 조건 로컬 값은 현재 인증 사용자 키로만 조회한다. 로그아웃하면 해당 사용자의 생성 조건 값을 삭제하고 계정 전환 뒤 이전 계정 값을 노출하지 않는다.
 - storage를 사용할 수 없거나 쓰기에 실패하면 생성 조건 표시만 생략한다. 서버 상태나 퀴즈 풀이·제출에는 영향을 주지 않는다.
 
+## 실제 통합 라우트와 Query 경계
+
+- 퀴즈 생성·자기평가·복습 서버 API가 함께 배포되기 전에는 `VITE_QUIZ_API_ENABLED=false`를 기본값으로 사용한다. 이때 개발 preview는 유지하지만 프로덕션 인증 라우트와 최신 복습 Query는 등록·실행하지 않는다.
+- 인증 라우트는 생성 조건 진입 `/learning/:materialId/quiz`, QuizSet 상태·풀이 `/quiz-sets/:quizSetId`, 본 퀴즈 결과 `/quiz-attempts/:attemptId/result`, 최신 복습 진입 `/review`, 복습 실행 `/review-sessions/:reviewSessionId`로 연결한다.
+- 서버 상태 Query key는 모두 `private` prefix 아래에 두어 기존 로그아웃·세션 종료 시 취소와 캐시 제거 범위에 포함한다.
+- 생성 접수 성공 뒤에는 응답의 `quizSetId` 라우트로 교체하고, 활성 생성 재진입도 서버가 반환한 `quizSetId` 라우트로 교체한다. 따라서 polling과 풀이 데이터의 기준은 URL의 서버 리소스 ID다.
+- `docs/contracts/contract-api-quiz-learning.md`의 복습 결과 절은 `summary`의 의미만 정의하고 JSON 필드명을 정의하지 않는다. 계약이 확정되기 전 adapter는 전송 필드를 추측하지 않고 `questionResults`에서 현재 화면에 이미 필요한 표시 수치만 계산한다.
+- 같은 계약의 복습 `SELF_ASSESSMENT_REQUIRED` 재조회에는 남은 서술형 문항 ID 또는 미평가 상태 표현이 없다. 현재 화면에서 제출 응답의 `pendingEssayQuestionIds`를 가진 흐름은 계속 처리하지만, 화면 상태를 잃은 재진입은 임의 추정하지 않고 일반 조회 실패 경계에서 멈춘다. 서버 계약에 남은 문항 식별 정보가 추가되면 기존 자기평가 화면으로 연결한다.
+
 ## 표현 컴포넌트 경계
 
 - `web/src/pages/quiz/`는 API가 준비되기 전에도 검토할 수 있는 표현 전용 화면과 fixture를 제공한다. fixture의 지연·요약 갱신은 개발 미리보기용이며 공개 API 계약으로 해석하지 않는다.
