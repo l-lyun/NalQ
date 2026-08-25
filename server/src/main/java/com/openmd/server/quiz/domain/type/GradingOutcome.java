@@ -1,6 +1,7 @@
 package com.openmd.server.quiz.domain.type;
 
 public enum GradingOutcome {
-	CORRECT,
-	INCORRECT
+  CORRECT,
+  PARTIAL,
+  INCORRECT
 }

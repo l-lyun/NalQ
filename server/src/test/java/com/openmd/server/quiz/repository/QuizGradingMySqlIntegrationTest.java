@@ -1,7 +1,8 @@
 package com.openmd.server.quiz.repository;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -12,28 +13,30 @@ import com.openmd.server.global.error.CommonErrorCode;
 import com.openmd.server.learningmaterial.domain.LearningMaterial;
 import com.openmd.server.learningmaterial.domain.SourceType;
 import com.openmd.server.learningmaterial.repository.LearningMaterialRepository;
+import com.openmd.server.quiz.domain.QuizGenerationCandidate;
+import com.openmd.server.quiz.domain.QuizGenerationCandidate.BlankCandidate;
+import com.openmd.server.quiz.domain.QuizGenerationCandidate.ChoiceCandidate;
 import com.openmd.server.quiz.domain.entity.QuizQuestion;
+import com.openmd.server.quiz.domain.entity.QuizQuestionChoice;
 import com.openmd.server.quiz.domain.entity.QuizSet;
+import com.openmd.server.quiz.domain.type.GradingMethod;
 import com.openmd.server.quiz.domain.type.GradingOutcome;
-import com.openmd.server.quiz.dto.model.QuizAttemptSubmissionResult;
+import com.openmd.server.quiz.domain.type.QuestionType;
+import com.openmd.server.quiz.domain.type.QuizAttemptStatus;
+import com.openmd.server.quiz.dto.request.BlankAnswerRequest;
 import com.openmd.server.quiz.dto.request.QuizResponseRequest;
-import com.openmd.server.quiz.dto.response.CreatedReviewSnapshot;
-import com.openmd.server.quiz.dto.response.QuizAttemptResult;
-import com.openmd.server.quiz.dto.response.SubmittedQuizAttempt;
 import com.openmd.server.quiz.error.QuizErrorCode;
+import com.openmd.server.quiz.service.EssayAssessmentService;
 import com.openmd.server.quiz.service.QuizAttemptResultService;
 import com.openmd.server.quiz.service.QuizAttemptSubmissionService;
-import com.openmd.server.quiz.service.ReviewSessionSnapshotService;
+import com.openmd.server.quiz.service.QuizGenerationPersistenceService;
+import com.openmd.server.quiz.service.QuizReviewService;
 import com.openmd.server.quiz.service.ShortAnswerGradingService;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
-import java.util.concurrent.Callable;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -50,359 +53,437 @@ import org.testcontainers.utility.DockerImageName;
 
 @Testcontainers
 @Tag("integration")
-@SpringBootTest(properties = {
-	"openmd.auth.enabled=false",
-	"spring.jpa.open-in-view=false",
-	"spring.autoconfigure.exclude="
-		+ "org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration,"
-		+ "org.springframework.boot.data.redis.autoconfigure.DataRedisReactiveAutoConfiguration,"
-		+ "org.springframework.boot.data.redis.autoconfigure.DataRedisRepositoriesAutoConfiguration"
-})
+@SpringBootTest(
+    properties = {
+      "openmd.auth.enabled=false",
+      "spring.jpa.open-in-view=false",
+      "spring.autoconfigure.exclude="
+          + "org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration,"
+          + "org.springframework.boot.data.redis.autoconfigure.DataRedisReactiveAutoConfiguration,"
+          + "org.springframework.boot.data.redis.autoconfigure.DataRedisRepositoriesAutoConfiguration"
+    })
 class QuizGradingMySqlIntegrationTest {
-	private static final String FAIL_RESULT_INSERT_CHECK = "test_fail_quiz_question_result_insert";
-	private static final String FAIL_RESULT_INSERT_ANSWER = "__force_result_insert_failure__";
+  private static final String FAIL_ANSWER = "__force_answer_insert_failure__";
+  private static final AtomicInteger DIGEST_SEED = new AtomicInteger();
 
-	@Container
-	static final MySQLContainer MYSQL = new MySQLContainer(DockerImageName.parse("mysql:8.4"))
-		.withDatabaseName("openmd")
-		.withUsername("openmd")
-		.withPassword("openmd")
-		.withStartupTimeout(Duration.ofMinutes(2));
+  @Container
+  static final MySQLContainer MYSQL =
+      new MySQLContainer(DockerImageName.parse("mysql:8.4"))
+          .withDatabaseName("openmd")
+          .withUsername("openmd")
+          .withPassword("openmd")
+          .withStartupTimeout(Duration.ofMinutes(2));
 
-	@DynamicPropertySource
-	static void mysqlProperties(DynamicPropertyRegistry registry) {
-		registry.add("spring.datasource.url", MYSQL::getJdbcUrl);
-		registry.add("spring.datasource.username", MYSQL::getUsername);
-		registry.add("spring.datasource.password", MYSQL::getPassword);
-	}
+  @DynamicPropertySource
+  static void props(DynamicPropertyRegistry registry) {
+    registry.add("spring.datasource.url", MYSQL::getJdbcUrl);
+    registry.add("spring.datasource.username", MYSQL::getUsername);
+    registry.add("spring.datasource.password", MYSQL::getPassword);
+  }
 
-	@Autowired JdbcTemplate jdbc;
-	@Autowired UserRepository users;
-	@Autowired LearningMaterialRepository materials;
-	@Autowired QuizSetRepository quizSets;
-	@Autowired QuizQuestionRepository questions;
-	@Autowired QuizAttemptRepository attempts;
-	@Autowired QuizQuestionResultRepository results;
-	@Autowired QuizAttemptSubmissionService submissions;
-	@Autowired QuizAttemptResultService attemptResults;
-	@Autowired ShortAnswerGradingService gradings;
-	@Autowired ReviewSessionSnapshotService reviewSnapshots;
+  @Autowired JdbcTemplate jdbc;
+  @Autowired UserRepository users;
+  @Autowired LearningMaterialRepository materials;
+  @Autowired QuizSetRepository sets;
+  @Autowired QuizQuestionRepository questions;
+  @Autowired QuizQuestionChoiceRepository choices;
+  @Autowired QuizFillInTheBlankRepository blanks;
+  @Autowired QuizAttemptRepository attempts;
+  @Autowired QuizAttemptQuestionRepository attemptQuestions;
+  @Autowired QuizGenerationPersistenceService generation;
+  @Autowired QuizAttemptSubmissionService submissions;
+  @Autowired QuizAttemptResultService results;
+  @Autowired ShortAnswerGradingService gradings;
+  @Autowired EssayAssessmentService essayAssessments;
+  @Autowired QuizReviewService reviews;
 
-	@BeforeEach
-	void clearData() {
-		dropResultInsertFailureCheck();
-		for (String table : List.of(
-			"quiz_review_session_questions", "quiz_review_sessions",
-			"quiz_question_results", "quiz_attempts", "quiz_short_answer_accepted_answers",
-			"quiz_questions", "quiz_sets", "learning_materials", "users"
-		)) {
-			jdbc.update("DELETE FROM " + table);
-		}
-	}
+  @BeforeEach
+  void clear() {
+    dropFailureCheck();
+    jdbc.update("DELETE FROM quiz_submitted_answers");
+    jdbc.update("DELETE FROM quiz_attempt_questions WHERE source_attempt_question_id IS NOT NULL");
+    jdbc.update("DELETE FROM quiz_attempt_questions");
+    jdbc.update("DELETE FROM quiz_attempts WHERE source_attempt_id IS NOT NULL");
+    for (String table :
+        List.of(
+            "quiz_attempts",
+            "quiz_fill_in_the_blank_answers",
+            "quiz_fill_in_the_blanks",
+            "quiz_essay_answer_guides",
+            "quiz_short_answer_answers",
+            "quiz_question_choices",
+            "quiz_questions",
+            "quiz_sets",
+            "learning_materials",
+            "users")) {
+      jdbc.update("DELETE FROM " + table);
+    }
+  }
 
-	@Test
-	void concurrentSubmissionsWithTheSameAttemptIdCreateExactlyOneAttempt() throws Exception {
-		Fixture fixture = fixture("concurrent-submit@example.com", List.of("fifo"));
-		String attemptId = "550e8400-e29b-41d4-a716-446655440010";
-		List<QuizResponseRequest> responses = List.of(
-			new QuizResponseRequest(fixture.questionId(), null, null, "FIFO")
-		);
+  @Test
+  void validatesPersistsRenumbersAndGradesAllAutomaticTypes() {
+    Fixture fixture = fixture();
+    QuizSet set = sets.saveAndFlush(QuizSet.generating(fixture.userId(), fixture.materialId()));
+    assertEquals(
+        4,
+        generation.complete(
+            fixture.userId(),
+            set.getPublicId(),
+            List.of(multipleChoice(2), multipleChoice(3), fillBlank(), shortAnswer(), essay())));
 
-		List<QuizAttemptSubmissionResult> submitted = runConcurrently(
-			() -> submissions.submit(fixture.userId(), fixture.quizSetId(), attemptId, responses),
-			() -> submissions.submit(fixture.userId(), fixture.quizSetId(), attemptId, responses)
-		);
+    List<QuizQuestion> stored = questions.findAllByQuizSetIdOrderByNumber(set.getId());
+    assertEquals(List.of(1, 2, 3, 4), stored.stream().map(QuizQuestion::getNumber).toList());
+    QuizQuestion multipleChoice = stored.get(0);
+    QuizQuestion blank = stored.get(1);
+    QuizQuestion shortQuestion = stored.get(2);
+    QuizQuestion essayQuestion = stored.get(3);
+    String choiceId =
+        choices.findAllByQuestionIdOrderById(multipleChoice.getId()).stream()
+            .filter(QuizQuestionChoice::isCorrect)
+            .findFirst()
+            .orElseThrow()
+            .getPublicId();
+    String blankId =
+        blanks.findAllByQuestionIdOrderByNumber(blank.getId()).getFirst().getPublicId();
 
-		assertTrue(submitted.getFirst().created() ^ submitted.getLast().created());
-		assertEquals(attemptId, submitted.getFirst().attempt().attemptId());
-		assertEquals(attemptId, submitted.getLast().attempt().attemptId());
-		assertEquals(1L, jdbc.queryForObject("SELECT COUNT(*) FROM quiz_attempts", Long.class));
-		assertEquals(1L, jdbc.queryForObject("SELECT COUNT(*) FROM quiz_question_results", Long.class));
-	}
+    var submission =
+        submissions.submit(
+            fixture.userId(),
+            set.getPublicId(),
+            uuid(1),
+            List.of(
+                new QuizResponseRequest(multipleChoice.getPublicId(), choiceId, null, null),
+                new QuizResponseRequest(
+                    blank.getPublicId(),
+                    null,
+                    List.of(new BlankAnswerRequest(blankId, " fifo ")),
+                    null),
+                new QuizResponseRequest(shortQuestion.getPublicId(), null, null, "FiFo"),
+                new QuizResponseRequest(essayQuestion.getPublicId(), null, null, "내 설명")));
 
-	@Test
-	void concurrentOppositeOverridesBothSucceedAndLeaveAConsistentResultSummary() throws Exception {
-		Fixture fixture = fixture("concurrent-grading@example.com", List.of("fifo"));
-		SubmittedQuizAttempt submitted = submissions.submit(
-			fixture.userId(), fixture.quizSetId(), "550e8400-e29b-41d4-a716-446655440011",
-			List.of(new QuizResponseRequest(fixture.questionId(), null, null, "선입선출"))
-		).attempt();
+    assertEquals(3, submission.attempt().automaticGrading().correctQuestionCount());
+    assertEquals(
+        List.of(essayQuestion.getPublicId()), submission.attempt().pendingEssayQuestionIds());
+    assertEquals(
+        0,
+        essayAssessments
+            .assess(fixture.userId(), uuid(1), essayQuestion.getPublicId(), "PARTIAL")
+            .remainingSelfAssessmentCount());
+    assertEquals(
+        QuizAttemptStatus.COMPLETED,
+        essayAssessments
+            .assess(fixture.userId(), uuid(1), essayQuestion.getPublicId(), "PARTIAL")
+            .status());
+    assertThrows(
+        BusinessException.class,
+        () ->
+            essayAssessments.assess(
+                fixture.userId(), uuid(1), essayQuestion.getPublicId(), "CORRECT"));
+    assertEquals(
+        3,
+        results.result(fixture.userId(), uuid(1)).summary().scoredGrading().correctQuestionCount());
+    assertEquals(
+        0L,
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM quiz_questions WHERE question_number=8", Long.class));
+  }
 
-		List<QuizAttemptResult> updates = runConcurrently(
-			() -> gradings.update(fixture.userId(), submitted.attemptId(), fixture.questionId(), "CORRECT"),
-			() -> gradings.update(fixture.userId(), submitted.attemptId(), fixture.questionId(), "INCORRECT")
-		);
-		assertEquals(2, updates.size());
+  @Test
+  void sameUuidRetriesWithoutApplyingTheSecondBodyAndRejectsForeignReuse() {
+    ReadyQuiz first = readyShortAnswer(fixture());
+    Fixture otherOwner = fixture();
+    ReadyQuiz second = readyShortAnswer(otherOwner);
 
-		var attempt = attempts.findByPublicIdAndUserId(submitted.attemptId(), fixture.userId()).orElseThrow();
-		GradingOutcome storedOutcome = results.findByAttemptIdAndQuestionId(
-			attempt.getId(), questions.findByPublicIdAndQuizSetId(fixture.questionId(), attempt.getQuizSetId()).orElseThrow().getId()
-		).orElseThrow().currentOutcome();
-		QuizAttemptResult current = attemptResults.result(fixture.userId(), submitted.attemptId());
+    assertTrue(submissions.submit(first.userId(), first.setId(), uuid(2), List.of()).created());
+    assertFalse(
+        submissions
+            .submit(
+                first.userId(),
+                first.setId(),
+                uuid(2),
+                List.of(new QuizResponseRequest(first.questionId(), null, null, "fifo")))
+            .created());
+    assertEquals(
+        GradingOutcome.INCORRECT,
+        results.result(first.userId(), uuid(2)).questionResults().getFirst().outcome());
 
-		assertEquals(storedOutcome, current.questionResults().getFirst().outcome());
-		assertEquals(
-			storedOutcome == GradingOutcome.CORRECT ? 1 : 0,
-			current.summary().scoredGrading().correctQuestionCount()
-		);
-		assertEquals(
-			storedOutcome == GradingOutcome.INCORRECT ? 1 : 0,
-			current.summary().reviewQuestionCount()
-		);
-	}
+    BusinessException reused =
+        assertThrows(
+            BusinessException.class,
+            () -> submissions.submit(otherOwner.userId(), second.setId(), uuid(2), List.of()));
+    assertEquals(QuizErrorCode.ATTEMPT_CONFLICT, reused.getErrorCode());
+    assertEquals(1L, jdbc.queryForObject("SELECT COUNT(*) FROM quiz_attempts", Long.class));
+  }
 
-	@Test
-	void rollsBackTheAttemptWhenAQuestionResultInsertFails() {
-		Fixture fixture = fixture("rollback-submit@example.com", List.of("fifo"));
-		jdbc.execute("ALTER TABLE quiz_question_results ADD CONSTRAINT " + FAIL_RESULT_INSERT_CHECK
-			+ " CHECK (submitted_answer <> '" + FAIL_RESULT_INSERT_ANSWER + "')");
+  @Test
+  void rejectsMalformedUuidNonReadySetAndCrossQuestionChoiceAndBlankIds() {
+    ReadyQuiz owner = readyShortAnswer(fixture());
+    BusinessException malformed =
+        assertThrows(
+            BusinessException.class,
+            () -> submissions.submit(owner.userId(), owner.setId(), "not-a-uuid", List.of()));
+    assertEquals(CommonErrorCode.INVALID_INPUT, malformed.getErrorCode());
 
-		try {
-			assertThrows(DataIntegrityViolationException.class, () -> submissions.submit(
-				fixture.userId(), fixture.quizSetId(), "550e8400-e29b-41d4-a716-446655440012",
-				List.of(new QuizResponseRequest(fixture.questionId(), null, null, FAIL_RESULT_INSERT_ANSWER))
-			));
-		} finally {
-			dropResultInsertFailureCheck();
-		}
+    QuizSet originalSet = sets.findByPublicIdAndUserId(owner.setId(), owner.userId()).orElseThrow();
+    QuizSet set =
+        sets.saveAndFlush(QuizSet.generating(owner.userId(), originalSet.getLearningMaterialId()));
+    BusinessException notReady =
+        assertThrows(
+            BusinessException.class,
+            () -> submissions.submit(owner.userId(), set.getPublicId(), uuid(3), List.of()));
+    assertEquals(QuizErrorCode.ATTEMPT_CONFLICT, notReady.getErrorCode());
 
-		assertEquals(0L, jdbc.queryForObject("SELECT COUNT(*) FROM quiz_attempts", Long.class));
-		assertEquals(0L, jdbc.queryForObject("SELECT COUNT(*) FROM quiz_question_results", Long.class));
-	}
+    ReadyQuiz left = readyMultipleChoice(fixture());
+    ReadyQuiz right =
+        readyMultipleChoice(
+            new Fixture(left.userId(), materials.saveAndFlush(material(left.userId())).getId()));
+    QuizQuestion foreignQuestion =
+        questions
+            .findByPublicIdAndQuizSetId(
+                right.questionId(),
+                sets.findByPublicIdAndUserId(right.setId(), right.userId()).orElseThrow().getId())
+            .orElseThrow();
+    String foreignChoice =
+        choices.findAllByQuestionIdOrderById(foreignQuestion.getId()).getFirst().getPublicId();
+    assertThrows(
+        BusinessException.class,
+        () ->
+            submissions.submit(
+                left.userId(),
+                left.setId(),
+                uuid(4),
+                List.of(new QuizResponseRequest(left.questionId(), foreignChoice, null, null))));
 
-	@Test
-	void migrationDoesNotCreateReplayTablesOrPublicRevisionColumns() {
-		Integer replayTableCount = jdbc.queryForObject("""
-			SELECT COUNT(*)
-			FROM information_schema.tables
-			WHERE table_schema = DATABASE()
-			  AND table_name IN ('quiz_attempt_submissions', 'quiz_short_answer_grading_idempotencies')
-			""", Integer.class);
-		Integer revisionColumnCount = jdbc.queryForObject("""
-			SELECT COUNT(*)
-			FROM information_schema.columns
-			WHERE table_schema = DATABASE()
-			  AND (
-				(table_name = 'quiz_attempts' AND column_name = 'summary_revision')
-				OR (table_name = 'quiz_question_results' AND column_name IN ('grading_revision', 'corrected_at'))
-				OR (table_name = 'quiz_review_sessions' AND column_name = 'source_summary_revision')
-			  )
-			""", Integer.class);
+    ReadyQuiz leftBlank = ready(fixture(), fillBlank());
+    ReadyQuiz rightBlank =
+        ready(
+            new Fixture(
+                leftBlank.userId(), materials.saveAndFlush(material(leftBlank.userId())).getId()),
+            fillBlank());
+    QuizSet rightBlankSet =
+        sets.findByPublicIdAndUserId(rightBlank.setId(), rightBlank.userId()).orElseThrow();
+    QuizQuestion rightBlankQuestion =
+        questions
+            .findByPublicIdAndQuizSetId(rightBlank.questionId(), rightBlankSet.getId())
+            .orElseThrow();
+    String foreignBlank =
+        blanks
+            .findAllByQuestionIdOrderByNumber(rightBlankQuestion.getId())
+            .getFirst()
+            .getPublicId();
+    assertThrows(
+        BusinessException.class,
+        () ->
+            submissions.submit(
+                leftBlank.userId(),
+                leftBlank.setId(),
+                uuid(8),
+                List.of(
+                    new QuizResponseRequest(
+                        leftBlank.questionId(),
+                        null,
+                        List.of(new BlankAnswerRequest(foreignBlank, "fifo")),
+                        null))));
+  }
 
-		assertEquals(0, replayTableCount);
-		assertEquals(0, revisionColumnCount);
-	}
+  @Test
+  void overrideKeepsAutomaticResultAndChangesOnlyCurrentFinalResult() {
+    ReadyQuiz quiz = readyShortAnswer(fixture());
+    submissions.submit(
+        quiz.userId(),
+        quiz.setId(),
+        uuid(5),
+        List.of(new QuizResponseRequest(quiz.questionId(), null, null, "fifo")));
 
-	@Test
-	void submitsGradesProjectsAndUpdatesAtomicallyWithoutChangingTheAutomaticResult() {
-		Fixture fixture = fixture("owner@example.com", List.of("fifo"));
-		String attemptId = "550e8400-e29b-41d4-a716-446655440000";
-		QuizAttemptSubmissionResult firstSubmission = submissions.submit(
-			fixture.userId(), fixture.quizSetId(), attemptId,
-			List.of(new QuizResponseRequest(fixture.questionId(), null, null, "  FIFO\u2003"))
-		);
-		SubmittedQuizAttempt submitted = firstSubmission.attempt();
-		assertEquals(true, firstSubmission.created());
-		assertEquals(attemptId, submitted.attemptId());
-		assertEquals(1, submitted.automaticGrading().correctQuestionCount());
+    var changed = gradings.update(quiz.userId(), uuid(5), quiz.questionId(), "INCORRECT");
+    var attempt = attempts.findByPublicId(uuid(5)).orElseThrow();
+    var stored =
+        attemptQuestions.findAllByAttemptIdOrderBySequenceNumber(attempt.getId()).getFirst();
 
-		QuizAttemptSubmissionResult replayWithDifferentBody = submissions.submit(
-			fixture.userId(), fixture.quizSetId(), attemptId,
-			List.of(new QuizResponseRequest(fixture.questionId(), null, null, "선입선출"))
-		);
-		assertEquals(false, replayWithDifferentBody.created());
-		assertEquals(submitted, replayWithDifferentBody.attempt());
-		assertEquals(1L, jdbc.queryForObject("SELECT COUNT(*) FROM quiz_attempts", Long.class));
+    assertEquals(GradingOutcome.CORRECT, stored.getAutomaticGradingResult());
+    assertEquals(GradingOutcome.INCORRECT, stored.getFinalGradingResult());
+    assertEquals(GradingMethod.USER_OVERRIDE, stored.getGradingMethod());
+    assertEquals(0, changed.summary().scoredGrading().correctQuestionCount());
+    assertEquals(1, changed.summary().reviewQuestionCount());
+  }
 
-		QuizAttemptResult initial = attemptResults.result(fixture.userId(), submitted.attemptId());
-		assertEquals(GradingOutcome.CORRECT, initial.questionResults().getFirst().outcome());
+  @Test
+  void reviewSnapshotIsStableRetryableAndResolutionDoesNotChangeOriginalOutcome() {
+    ReadyQuiz quiz = readyShortAnswer(fixture());
+    submissions.submit(
+        quiz.userId(),
+        quiz.setId(),
+        uuid(6),
+        List.of(new QuizResponseRequest(quiz.questionId(), null, null, "wrong")));
+    var first = reviews.start(quiz.userId(), uuid(6)).reviewSession();
+    var retry = reviews.start(quiz.userId(), uuid(6)).reviewSession();
+    assertEquals(first.reviewSessionId(), retry.reviewSessionId());
 
-		QuizAttemptResult changed = gradings.update(
-			fixture.userId(), submitted.attemptId(), fixture.questionId(), "INCORRECT"
-		);
-		assertEquals(0, changed.summary().scoredGrading().correctQuestionCount());
-		assertEquals(1, changed.summary().reviewQuestionCount());
-		assertEquals(changed, attemptResults.result(fixture.userId(), submitted.attemptId()));
-		assertEquals(changed, gradings.update(
-			fixture.userId(), submitted.attemptId(), fixture.questionId(), "INCORRECT"
-		));
+    gradings.update(quiz.userId(), uuid(6), quiz.questionId(), "CORRECT");
+    assertEquals(1, reviews.get(quiz.userId(), first.reviewSessionId()).reviewQuestionCount());
+    submissions.submitReview(
+        quiz.userId(),
+        first.reviewSessionId(),
+        List.of(new QuizResponseRequest(quiz.questionId(), null, null, "FIFO")));
 
-		var attempt = attempts.findByPublicIdAndUserId(submitted.attemptId(), fixture.userId()).orElseThrow();
-		var stored = results.findAllByAttemptId(attempt.getId()).getFirst();
-		assertEquals("  FIFO\u2003", stored.getSubmittedAnswer());
-		assertEquals(GradingOutcome.CORRECT, stored.getAutomaticOutcome());
-		assertEquals(GradingOutcome.INCORRECT, stored.getUserOverrideOutcome());
+    assertEquals(0, reviews.latest(quiz.userId()).reviewQuestionCount());
+    assertEquals(
+        GradingOutcome.CORRECT,
+        results.result(quiz.userId(), uuid(6)).questionResults().getFirst().outcome());
+    var source =
+        attemptQuestions
+            .findAllByAttemptIdOrderBySequenceNumber(
+                attempts.findByPublicId(uuid(6)).orElseThrow().getId())
+            .getFirst();
+    assertEquals(GradingOutcome.INCORRECT, source.getAutomaticGradingResult());
+    assertNotEquals(null, source.getReviewResolvedAt());
+  }
 
-		QuizAttemptResult lastWrite = gradings.update(
-			fixture.userId(), submitted.attemptId(), fixture.questionId(), "CORRECT"
-		);
-		assertEquals(GradingOutcome.CORRECT, lastWrite.questionResults().getFirst().outcome());
-		assertEquals(1, lastWrite.summary().scoredGrading().correctQuestionCount());
-	}
+  @Test
+  void rollsBackTheWholeAttemptWhenSubmittedAnswerPersistenceFails() {
+    ReadyQuiz quiz = readyShortAnswer(fixture());
+    jdbc.execute(
+        "ALTER TABLE quiz_submitted_answers ADD CONSTRAINT test_fail_answer "
+            + "CHECK (answer_value <> '"
+            + FAIL_ANSWER
+            + "')");
+    try {
+      assertThrows(
+          DataIntegrityViolationException.class,
+          () ->
+              submissions.submit(
+                  quiz.userId(),
+                  quiz.setId(),
+                  uuid(7),
+                  List.of(new QuizResponseRequest(quiz.questionId(), null, null, FAIL_ANSWER))));
+    } finally {
+      dropFailureCheck();
+    }
+    assertEquals(0L, jdbc.queryForObject("SELECT COUNT(*) FROM quiz_attempts", Long.class));
+    assertEquals(
+        0L, jdbc.queryForObject("SELECT COUNT(*) FROM quiz_attempt_questions", Long.class));
+    assertEquals(
+        0L, jdbc.queryForObject("SELECT COUNT(*) FROM quiz_submitted_answers", Long.class));
+  }
 
-	@Test
-	void keepsAnActiveReviewSnapshotAndRejectsUnansweredOrForeignShortAnswers() {
-		Fixture fixture = fixture("first@example.com", List.of("fifo"));
-		SubmittedQuizAttempt submitted = submissions.submit(
-			fixture.userId(), fixture.quizSetId(), "550e8400-e29b-41d4-a716-446655440001", List.of()
-		).attempt();
-		QuizAttemptResult unanswered = attemptResults.result(fixture.userId(), submitted.attemptId());
-		assertNull(unanswered.questionResults().getFirst().response());
-		BusinessException cannotOverride = assertThrows(BusinessException.class, () -> gradings.update(
-			fixture.userId(), submitted.attemptId(), fixture.questionId(), "CORRECT"
-		));
-		assertEquals(QuizErrorCode.ATTEMPT_CONFLICT, cannotOverride.getErrorCode());
+  private ReadyQuiz readyShortAnswer(Fixture fixture) {
+    return ready(fixture, shortAnswer());
+  }
 
-		CreatedReviewSnapshot snapshot = reviewSnapshots.createForAttempt(fixture.userId(), submitted.attemptId());
-		assertEquals(1, snapshot.questionCount());
-		long snapshotItems = jdbc.queryForObject(
-			"SELECT COUNT(*) FROM quiz_review_session_questions", Long.class
-		);
-		assertEquals(1L, snapshotItems);
+  private ReadyQuiz readyMultipleChoice(Fixture fixture) {
+    return ready(fixture, multipleChoice(3));
+  }
 
-		Fixture answeredFixture = fixture("second@example.com", List.of("fifo"));
-		SubmittedQuizAttempt answered = submissions.submit(
-			answeredFixture.userId(), answeredFixture.quizSetId(), "550e8400-e29b-41d4-a716-446655440002",
-			List.of(new QuizResponseRequest(answeredFixture.questionId(), null, null, "선입선출"))
-		).attempt();
-		CreatedReviewSnapshot active = reviewSnapshots.createForAttempt(answeredFixture.userId(), answered.attemptId());
-		gradings.update(
-			answeredFixture.userId(), answered.attemptId(), answeredFixture.questionId(),
-			"CORRECT"
-		);
-		assertEquals(1L, jdbc.queryForObject(
-			"SELECT COUNT(*) FROM quiz_review_session_questions q JOIN quiz_review_sessions s ON s.id=q.review_session_id WHERE s.public_id=?",
-			Long.class, active.reviewSessionId()
-		));
+  private ReadyQuiz ready(Fixture fixture, QuizGenerationCandidate candidate) {
+    QuizSet set = sets.saveAndFlush(QuizSet.generating(fixture.userId(), fixture.materialId()));
+    generation.complete(fixture.userId(), set.getPublicId(), List.of(candidate));
+    return new ReadyQuiz(
+        fixture.userId(),
+        set.getPublicId(),
+        questions.findAllByQuizSetIdOrderByNumber(set.getId()).getFirst().getPublicId());
+  }
 
-		BusinessException foreign = assertThrows(BusinessException.class, () -> attemptResults.result(
-			fixture.userId(), answered.attemptId()
-		));
-		assertEquals(CommonErrorCode.RESOURCE_NOT_FOUND, foreign.getErrorCode());
-	}
+  private QuizGenerationCandidate multipleChoice(int count) {
+    List<ChoiceCandidate> values =
+        java.util.stream.IntStream.range(0, count)
+            .mapToObj(i -> new ChoiceCandidate("보기 " + i, i == 1))
+            .toList();
+    return new QuizGenerationCandidate(
+        8,
+        QuestionType.MULTIPLE_CHOICE,
+        "객관식",
+        "정답?",
+        "해설",
+        "근거",
+        values,
+        List.of(),
+        List.of(),
+        null,
+        List.of());
+  }
 
-	@Test
-	void rejectsMalformedOrReusedAttemptIdsWithoutCreatingAnotherAttempt() {
-		Fixture first = fixture("uuid-first@example.com", List.of("fifo"));
-		Fixture second = fixture("uuid-second@example.com", List.of("fifo"));
+  private QuizGenerationCandidate fillBlank() {
+    return new QuizGenerationCandidate(
+        9,
+        QuestionType.FILL_IN_THE_BLANK,
+        "빈칸",
+        "큐는 [1]이다.",
+        "해설",
+        "근거",
+        List.of(),
+        List.of(),
+        List.of(new BlankCandidate(1, List.of("FIFO"))),
+        null,
+        List.of());
+  }
 
-		BusinessException malformed = assertThrows(BusinessException.class, () -> submissions.submit(
-			first.userId(), first.quizSetId(), "not-a-uuid", List.of()
-		));
-		assertEquals(CommonErrorCode.INVALID_INPUT, malformed.getErrorCode());
-		assertEquals("attemptId", malformed.getFields().getFirst().field());
+  private QuizGenerationCandidate shortAnswer() {
+    return new QuizGenerationCandidate(
+        10,
+        QuestionType.SHORT_ANSWER,
+        "단답",
+        "처리 순서?",
+        "해설",
+        "근거",
+        List.of(),
+        List.of("fifo", "FIFO"),
+        List.of(),
+        null,
+        List.of());
+  }
 
-		String attemptId = "550e8400-e29b-41d4-a716-446655440003";
-		submissions.submit(first.userId(), first.quizSetId(), attemptId, List.of());
-		BusinessException reused = assertThrows(BusinessException.class, () -> submissions.submit(
-			second.userId(), second.quizSetId(), attemptId, List.of()
-		));
-		assertEquals(QuizErrorCode.ATTEMPT_CONFLICT, reused.getErrorCode());
-		assertEquals("attemptId", reused.getFields().getFirst().field());
-		assertEquals(1L, jdbc.queryForObject("SELECT COUNT(*) FROM quiz_attempts", Long.class));
-	}
+  private QuizGenerationCandidate essay() {
+    return new QuizGenerationCandidate(
+        11,
+        QuestionType.ESSAY,
+        "서술",
+        "설명하세요.",
+        "해설",
+        "근거",
+        List.of(),
+        List.of(),
+        List.of(),
+        "모범 답안",
+        List.of("핵심"));
+  }
 
-	@Test
-	void rejectsSubmissionsToANonReadyOwnedSetOrAnotherUsersSet() {
-		Fixture owner = fixture("set-state-owner@example.com", List.of("fifo"));
-		Fixture other = fixture("set-state-other@example.com", List.of("fifo"));
-		jdbc.update("UPDATE quiz_sets SET status = 'GENERATING' WHERE public_id = ?", owner.quizSetId());
+  private Fixture fixture() {
+    String email = UUID.randomUUID() + "@example.com";
+    User user = User.pending(email, email, "hash");
+    user.activate(Instant.parse("2026-08-20T00:00:00Z"));
+    user = users.saveAndFlush(user);
+    LearningMaterial material = materials.saveAndFlush(material(user.getId()));
+    return new Fixture(user.getId(), material.getId());
+  }
 
-		BusinessException nonReady = assertThrows(BusinessException.class, () -> submissions.submit(
-			owner.userId(), owner.quizSetId(), "550e8400-e29b-41d4-a716-446655440013", List.of()
-		));
-		assertEquals(QuizErrorCode.ATTEMPT_CONFLICT, nonReady.getErrorCode());
+  private LearningMaterial material(long userId) {
+    byte[] idempotency = new byte[32];
+    byte[] fingerprint = new byte[32];
+    int seed = DIGEST_SEED.incrementAndGet();
+    idempotency[0] = (byte) seed;
+    fingerprint[0] = (byte) (seed + 1);
+    return LearningMaterial.create(userId, "자료", "내용", SourceType.PASTE, idempotency, fingerprint);
+  }
 
-		BusinessException foreign = assertThrows(BusinessException.class, () -> submissions.submit(
-			owner.userId(), other.quizSetId(), "550e8400-e29b-41d4-a716-446655440014", List.of()
-		));
-		assertEquals(CommonErrorCode.RESOURCE_NOT_FOUND, foreign.getErrorCode());
-		assertEquals(0L, jdbc.queryForObject("SELECT COUNT(*) FROM quiz_attempts", Long.class));
-	}
+  private String uuid(int suffix) {
+    return "550e8400-e29b-41d4-a716-4466554400" + String.format("%02d", suffix);
+  }
 
-	@Test
-	void rejectsAnAttemptIdAlreadyUsedByTheSameUserInAnotherQuizSet() {
-		Fixture first = fixture("same-user-uuid@example.com", List.of("fifo"));
-		Fixture second = fixture(first.userId(), 3, List.of("fifo"));
-		String attemptId = "550e8400-e29b-41d4-a716-446655440015";
-		submissions.submit(first.userId(), first.quizSetId(), attemptId, List.of());
+  private void dropFailureCheck() {
+    Integer count =
+        jdbc.queryForObject(
+            """
+            SELECT COUNT(*) FROM information_schema.table_constraints
+            WHERE table_schema=DATABASE() AND table_name='quiz_submitted_answers'
+            AND constraint_name='test_fail_answer'
+            """,
+            Integer.class);
+    if (count != null && count > 0) {
+      jdbc.execute("ALTER TABLE quiz_submitted_answers DROP CHECK test_fail_answer");
+    }
+  }
 
-		BusinessException reused = assertThrows(BusinessException.class, () -> submissions.submit(
-			first.userId(), second.quizSetId(), attemptId, List.of()
-		));
+  private record Fixture(long userId, long materialId) {}
 
-		assertEquals(QuizErrorCode.ATTEMPT_CONFLICT, reused.getErrorCode());
-		assertEquals("attemptId", reused.getFields().getFirst().field());
-		assertEquals(1L, jdbc.queryForObject("SELECT COUNT(*) FROM quiz_attempts", Long.class));
-	}
-
-	private Fixture fixture(String email, List<String> acceptedAnswers) {
-		User user = User.pending(email, email, "hash");
-		user.activate(Instant.parse("2026-08-20T00:00:00Z"));
-		user = users.saveAndFlush(user);
-		return fixture(user.getId(), 1, acceptedAnswers);
-	}
-
-	private Fixture fixture(long userId, int digestSeed, List<String> acceptedAnswers) {
-		LearningMaterial material = materials.saveAndFlush(LearningMaterial.create(
-			userId, "자료", "FIFO 자료", SourceType.PASTE, digest(digestSeed), digest(digestSeed + 1)
-		));
-		QuizSet set = quizSets.saveAndFlush(QuizSet.ready(userId, material.getId()));
-		QuizQuestion question = questions.saveAndFlush(QuizQuestion.shortAnswer(
-			set.getId(), 1, "큐", "처리 순서는?", "fifo", acceptedAnswers, "FIFO 구조", "FIFO 원칙"
-		));
-		return new Fixture(userId, set.getPublicId(), question.getPublicId());
-	}
-
-	private byte[] digest(int firstByte) {
-		byte[] value = new byte[32];
-		value[0] = (byte) firstByte;
-		return value;
-	}
-
-	private void dropResultInsertFailureCheck() {
-		Integer constraintCount = jdbc.queryForObject("""
-			SELECT COUNT(*)
-			FROM information_schema.table_constraints
-			WHERE table_schema = DATABASE()
-			  AND table_name = 'quiz_question_results'
-			  AND constraint_name = ?
-			""", Integer.class, FAIL_RESULT_INSERT_CHECK);
-		if (constraintCount != null && constraintCount > 0) {
-			jdbc.execute("ALTER TABLE quiz_question_results DROP CHECK " + FAIL_RESULT_INSERT_CHECK);
-		}
-	}
-
-	private <T> List<T> runConcurrently(Callable<T> first, Callable<T> second) throws Exception {
-		ExecutorService executor = Executors.newFixedThreadPool(2);
-		CountDownLatch ready = new CountDownLatch(2);
-		CountDownLatch start = new CountDownLatch(1);
-		try {
-			Future<T> firstResult = executor.submit(awaitStart(first, ready, start));
-			Future<T> secondResult = executor.submit(awaitStart(second, ready, start));
-			assertTrue(ready.await(5, TimeUnit.SECONDS));
-			start.countDown();
-			return List.of(
-				firstResult.get(15, TimeUnit.SECONDS),
-				secondResult.get(15, TimeUnit.SECONDS)
-			);
-		} finally {
-			start.countDown();
-			executor.shutdownNow();
-			executor.awaitTermination(5, TimeUnit.SECONDS);
-		}
-	}
-
-	private <T> Callable<T> awaitStart(Callable<T> task, CountDownLatch ready, CountDownLatch start) {
-		return () -> {
-			ready.countDown();
-			if (!start.await(5, TimeUnit.SECONDS)) {
-				throw new IllegalStateException("Concurrent test start timed out");
-			}
-			return task.call();
-		};
-	}
-
-	private record Fixture(long userId, String quizSetId, String questionId) {
-	}
+  private record ReadyQuiz(long userId, String setId, String questionId) {}
 }

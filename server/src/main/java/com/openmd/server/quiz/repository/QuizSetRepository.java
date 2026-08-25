@@ -9,8 +9,10 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface QuizSetRepository extends JpaRepository<QuizSet, Long> {
+  Optional<QuizSet> findByPublicIdAndUserId(String publicId, long userId);
 
-	@Lock(LockModeType.PESSIMISTIC_WRITE)
-	@Query("select q from QuizSet q where q.publicId = :publicId and q.userId = :userId")
-	Optional<QuizSet> findOwnedForUpdate(@Param("publicId") String publicId, @Param("userId") long userId);
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("select q from QuizSet q where q.publicId = :publicId and q.userId = :userId")
+  Optional<QuizSet> findOwnedForUpdate(
+      @Param("publicId") String publicId, @Param("userId") long userId);
 }
