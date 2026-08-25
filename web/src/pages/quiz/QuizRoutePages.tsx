@@ -279,7 +279,16 @@ export function QuizSetRoutePage() {
     (pendingQuery.data && pendingResultQuery.isPending)
   ) return <RouteLoading />
   if (stateQuery.isError || !stateQuery.data || pendingQuery.isError || pendingResultQuery.isError) {
-    return <RouteStatus message="퀴즈를 불러오지 못했어요. 다시 시도해 주세요." retry={() => void stateQuery.refetch()} />
+    return (
+      <RouteStatus
+        message="퀴즈를 불러오지 못했어요. 다시 시도해 주세요."
+        retry={() => {
+          if (stateQuery.isError) void stateQuery.refetch()
+          if (pendingQuery.isError) void pendingQuery.refetch()
+          if (pendingResultQuery.isError) void pendingResultQuery.refetch()
+        }}
+      />
+    )
   }
 
   const state = stateQuery.data
@@ -338,6 +347,8 @@ export function QuizSetRoutePage() {
         onLoadResult: async (attemptId) => adaptQuizResult(await getQuizResult(attemptId)),
         onSaveEssayAssessment: ({ resourceId, questionId, assessment }) =>
           saveEssayAssessment(resourceId, questionId, assessment),
+        onCompleted: (attemptId) =>
+          navigate(`/quiz-attempts/${attemptId}/result`, { replace: true }),
         onUpdateShortAnswerOutcome: async ({ questionId, outcome }) => {
           if (!lastAttemptIdRef.current) throw new Error('attempt ID가 현재 화면에 없습니다.')
           return adaptQuizResult(
@@ -404,7 +415,10 @@ export function ReviewEntryRoutePage() {
   if (latestQuery.isError || createMutation.isError) {
     return <RouteStatus message="복습 정보를 불러오지 못했어요. 다시 시도해 주세요." retry={() => { startedRef.current = false; void latestQuery.refetch() }} />
   }
-  if (latestQuery.data?.reviewQuestionCount === 0) {
+  if (
+    latestQuery.data?.reviewQuestionCount === 0 &&
+    !latestQuery.data.activeReviewSessionId
+  ) {
     return <RouteStatus message="지금 복습할 문제가 없어요." />
   }
   return <RouteLoading />
@@ -418,14 +432,27 @@ export function ReviewSessionRoutePage() {
     queryFn: ({ signal }) => getReviewSession(reviewSessionId!, signal),
     enabled: Boolean(reviewSessionId),
   })
+  const shouldLoadResult =
+    sessionQuery.data?.status === 'SELF_ASSESSMENT_REQUIRED' ||
+    sessionQuery.data?.status === 'COMPLETED'
   const resultQuery = useQuery({
     queryKey: ['private', 'review-session', reviewSessionId, 'result'],
     queryFn: ({ signal }) => getReviewResult(reviewSessionId!, signal),
-    enabled: sessionQuery.data?.status !== 'SOLVING',
+    enabled: Boolean(reviewSessionId && shouldLoadResult),
   })
-  if (sessionQuery.isPending || (sessionQuery.data?.status !== 'SOLVING' && resultQuery.isPending)) return <RouteLoading />
-  if (sessionQuery.isError || !sessionQuery.data || resultQuery.isError) {
-    return <RouteStatus message="복습을 불러오지 못했어요. 다시 시도해 주세요." retry={() => void sessionQuery.refetch()} />
+  if (sessionQuery.isPending || (shouldLoadResult && resultQuery.isPending)) {
+    return <RouteLoading />
+  }
+  if (sessionQuery.isError || !sessionQuery.data || (shouldLoadResult && resultQuery.isError)) {
+    return (
+      <RouteStatus
+        message="복습을 불러오지 못했어요. 다시 시도해 주세요."
+        retry={() => {
+          if (sessionQuery.isError) void sessionQuery.refetch()
+          if (resultQuery.isError) void resultQuery.refetch()
+        }}
+      />
+    )
   }
   const session = sessionQuery.data
   const result = resultQuery.data ? adaptReviewResult(resultQuery.data) : emptyResult

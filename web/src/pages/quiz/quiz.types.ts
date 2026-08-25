@@ -125,6 +125,7 @@ export type QuizPresentationCallbacks = {
     questionId: string
     outcome: QuizBinaryOutcome
   }) => QuizResult | Promise<QuizResult>
+  onCompleted?: (resourceId: string) => void
   onResultExit?: () => void
 }
 

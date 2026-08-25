@@ -4,6 +4,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { queryClient } from '@/app/providers/queryClient'
 import { AuthBootstrap } from '@/app/router/AuthBootstrap'
 import { AuthGate, PublicOnlyGate } from '@/app/router/AuthGate'
+import { quizApiEnabled } from '@/features/quiz/model/quizFeature'
 import { AuthenticatedHomePage } from '@/pages/home/AuthenticatedHomePage'
 import { AuthenticatedLearningPage } from '@/pages/learning/AuthenticatedLearningPage'
 import { LoginPage } from '@/pages/login/LoginPage'
@@ -44,11 +45,21 @@ export function App() {
             <Route element={<AuthGate />}>
               <Route path="/" element={<AuthenticatedHomePage />} />
               <Route path="/learning" element={<AuthenticatedLearningPage />} />
-              <Route path="/learning/:materialId/quiz" element={<QuizMaterialRoutePage />} />
-              <Route path="/quiz-sets/:quizSetId" element={<QuizSetRoutePage />} />
-              <Route path="/quiz-attempts/:attemptId/result" element={<QuizAttemptResultRoutePage />} />
-              <Route path="/review" element={<ReviewEntryRoutePage />} />
-              <Route path="/review-sessions/:reviewSessionId" element={<ReviewSessionRoutePage />} />
+              {quizApiEnabled ? (
+                <>
+                  <Route path="/learning/:materialId/quiz" element={<QuizMaterialRoutePage />} />
+                  <Route path="/quiz-sets/:quizSetId" element={<QuizSetRoutePage />} />
+                  <Route
+                    path="/quiz-attempts/:attemptId/result"
+                    element={<QuizAttemptResultRoutePage />}
+                  />
+                  <Route path="/review" element={<ReviewEntryRoutePage />} />
+                  <Route
+                    path="/review-sessions/:reviewSessionId"
+                    element={<ReviewSessionRoutePage />}
+                  />
+                </>
+              ) : null}
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

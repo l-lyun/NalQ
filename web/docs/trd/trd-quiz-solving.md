@@ -39,6 +39,7 @@ scope: web
 
 ## 실제 통합 라우트와 Query 경계
 
+- 퀴즈 생성·자기평가·복습 서버 API가 함께 배포되기 전에는 `VITE_QUIZ_API_ENABLED=false`를 기본값으로 사용한다. 이때 개발 preview는 유지하지만 프로덕션 인증 라우트와 최신 복습 Query는 등록·실행하지 않는다.
 - 인증 라우트는 생성 조건 진입 `/learning/:materialId/quiz`, QuizSet 상태·풀이 `/quiz-sets/:quizSetId`, 본 퀴즈 결과 `/quiz-attempts/:attemptId/result`, 최신 복습 진입 `/review`, 복습 실행 `/review-sessions/:reviewSessionId`로 연결한다.
 - 서버 상태 Query key는 모두 `private` prefix 아래에 두어 기존 로그아웃·세션 종료 시 취소와 캐시 제거 범위에 포함한다.
 - 생성 접수 성공 뒤에는 응답의 `quizSetId` 라우트로 교체하고, 활성 생성 재진입도 서버가 반환한 `quizSetId` 라우트로 교체한다. 따라서 polling과 풀이 데이터의 기준은 URL의 서버 리소스 ID다.

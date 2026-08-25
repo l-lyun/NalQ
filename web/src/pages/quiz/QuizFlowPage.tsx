@@ -257,6 +257,7 @@ export function QuizFlowPage({
   useEffect(() => {
     if (!generationState) return
     if (
+      scene === 'CONDITIONS' ||
       scene === 'SOLVING' ||
       scene === 'SUBMIT_ERROR' ||
       scene === 'SELF_ASSESSMENT' ||
@@ -421,6 +422,7 @@ export function QuizFlowPage({
       } else {
         setPendingEssayQuestionIds([])
         setScene('RESULT')
+        callbacks?.onCompleted?.(nextResourceId)
       }
     } catch {
       setSubmitError('답안을 제출하지 못했어요. 입력한 답은 유지되며 다시 시도할 수 있어요.')
@@ -475,7 +477,10 @@ export function QuizFlowPage({
       }
       setPendingEssayQuestionIds(remainingIds)
       setEssayOutcome(undefined)
-      if (saved.status === 'COMPLETED') setScene('RESULT')
+      if (saved.status === 'COMPLETED') {
+        setScene('RESULT')
+        callbacks?.onCompleted?.(resourceId)
+      }
     } catch {
       setEssayError('자기평가를 저장하지 못했어요. 선택한 판정은 저장되지 않았으며 다시 시도할 수 있어요.')
     } finally {
