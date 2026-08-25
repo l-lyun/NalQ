@@ -29,12 +29,10 @@ async function getData<T>(url: string, signal?: AbortSignal) {
 export async function createQuizSet(
   materialId: string,
   payload: CreateQuizSetRequest,
-  idempotencyKey: string,
 ) {
   const response = await protectedApi.post<ApiResponse<CreateQuizSetResponse>>(
     `/api/v1/learning-materials/${materialId}/quiz-sets`,
     payload,
-    { headers: { 'Idempotency-Key': idempotencyKey } },
   )
   return unwrapApiResponse(response.data)
 }

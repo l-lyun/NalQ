@@ -670,6 +670,7 @@ Headers: `Authorization`, `Content-Type: application/json`
       "sourceAttemptId": "550e8400-e29b-41d4-a716-446655440000",
       "status": "SOLVING",
       "reviewQuestionCount": 2,
+      "pendingEssayQuestionIds": [],
       "questions": []
     }
   },
@@ -685,7 +686,8 @@ Headers: `Authorization`, `Content-Type: application/json`
 - 문항은 원래 `number` 오름차순이고 한 세션에 각 문항이 한 번만 존재한다.
 - `SOLVING`에서는 본 퀴즈의 `READY` 문제와 동일한 풀이 전 공개 모양만 반환한다. 정답·모범 답안·해설·원문 근거와 서버 중간 답안은 포함하지 않는다.
 - 제출 전 현재 문항과 답안은 열린 클라이언트 화면의 메모리에만 둔다. 화면을 이탈한 뒤 세션을 다시 조회하면 고정된 문제 목록만 받고 첫 문항부터 다시 풀며, 서버 draft 답안이나 `nextQuestionId`는 제공하지 않는다.
-- `SELF_ASSESSMENT_REQUIRED`에서는 결과 조회를 통해 제출된 서술형의 자기평가 상세와 남은 문항을 확인한다.
+- `pendingEssayQuestionIds`는 아직 자기평가하지 않은 서술형 문제 ID를 문제 번호 오름차순으로 반환한다. `SOLVING`과 `COMPLETED`에서는 빈 배열이다.
+- `SELF_ASSESSMENT_REQUIRED`에서는 이 목록과 결과 조회를 함께 사용해 제출된 서술형의 자기평가 상세를 복원한다.
 
 ```json
 {
@@ -694,6 +696,7 @@ Headers: `Authorization`, `Content-Type: application/json`
     "reviewSessionId": "review_123",
     "sourceAttemptId": "550e8400-e29b-41d4-a716-446655440000",
     "status": "SOLVING",
+    "pendingEssayQuestionIds": [],
     "questions": [
       {
         "questionId": "question_4",

@@ -30,7 +30,6 @@ import {
   loadRequestedConfig,
   saveRequestedConfig,
 } from '@/features/quiz/model/quizRequestedConfigStorage'
-import { createUuidV4 } from '@/features/quiz/model/randomUuid'
 import { useCurrentUser } from '@/features/auth/model/auth.queries'
 
 import { QuizFlowPage } from './QuizFlowPage'
@@ -118,7 +117,6 @@ export function QuizMaterialRoutePage() {
   const currentUser = useCurrentUser()
   const materialTitle = (location.state as { materialTitle?: string } | null)?.materialTitle ?? '학습자료'
   const [quizSetId, setQuizSetId] = useState<string>()
-  const idempotencyKeyRef = useRef<string | undefined>(undefined)
   const lastConditionsRef = useRef<QuizConditions | undefined>(undefined)
 
   const activeQuery = useQuery({
@@ -155,12 +153,9 @@ export function QuizMaterialRoutePage() {
   const createMutation = useMutation({
     mutationFn: async (conditions: QuizConditions) => {
       lastConditionsRef.current = conditions
-      const idempotencyKey = idempotencyKeyRef.current ?? createUuidV4()
-      idempotencyKeyRef.current = idempotencyKey
-      return createQuizSet(materialId!, conditions, idempotencyKey)
+      return createQuizSet(materialId!, conditions)
     },
     onSuccess: (created) => {
-      idempotencyKeyRef.current = undefined
       if (currentUser.data) {
         saveRequestedConfig(currentUser.data.id, created.quizSetId, created.requestedConfig)
       }
@@ -203,7 +198,21 @@ export function QuizMaterialRoutePage() {
         onGenerate: async (conditions) => { await createMutation.mutateAsync(conditions) },
         onRetryGeneration: async (_failure: QuizGenerationFailure) => {
           const conditions = requestedConfig ?? lastConditionsRef.current
-          if (conditions) await createMutation.mutateAsync(conditions)
+          if (!conditions) return
+          const activeResult = await activeQuery.refetch()
+          if (activeResult.isError) throw activeResult.error
+          const active = activeResult.data
+          if (active) {
+            if (currentUser.data) {
+              saveRequestedConfig(currentUser.data.id, active.quizSetId, conditions)
+            }
+            navigate(`/quiz-sets/${active.quizSetId}`, {
+              replace: true,
+              state: { materialTitle },
+            })
+            return
+          }
+          await createMutation.mutateAsync(conditions)
         },
         onRefreshGenerationStatus: async () => { await quizSetQuery.refetch() },
         onExitGeneration: () => navigate('/learning'),
@@ -232,7 +241,6 @@ export function QuizSetRoutePage() {
   const currentUser = useCurrentUser()
   const materialTitle = (location.state as { materialTitle?: string } | null)?.materialTitle ?? '학습자료'
   const lastAttemptIdRef = useRef<string | undefined>(undefined)
-  const createKeyRef = useRef<string | undefined>(undefined)
   const createConditionsRef = useRef<QuizConditions | undefined>(undefined)
   const stateQuery = useQuery({
     queryKey: ['private', 'quiz-set', quizSetId],
@@ -261,12 +269,9 @@ export function QuizSetRoutePage() {
   const createMutation = useMutation({
     mutationFn: async ({ materialId, conditions }: { materialId: string; conditions: QuizConditions }) => {
       createConditionsRef.current = conditions
-      const key = createKeyRef.current ?? createUuidV4()
-      createKeyRef.current = key
-      return createQuizSet(materialId, conditions, key)
+      return createQuizSet(materialId, conditions)
     },
     onSuccess: (created) => {
-      createKeyRef.current = undefined
       if (currentUser.data) saveRequestedConfig(currentUser.data.id, created.quizSetId, created.requestedConfig)
       navigate(`/quiz-sets/${created.quizSetId}`, { replace: true, state: { materialTitle } })
     },
@@ -317,6 +322,21 @@ export function QuizSetRoutePage() {
         onRefreshGenerationStatus: async () => { await stateQuery.refetch() },
         onRetryGeneration: async (failure) => {
           if (failure.kind === 'REQUEST_FAILED' && createConditionsRef.current) {
+            const active = await getActiveQuizSet(state.materialId)
+            if (active) {
+              if (currentUser.data) {
+                saveRequestedConfig(
+                  currentUser.data.id,
+                  active.quizSetId,
+                  createConditionsRef.current,
+                )
+              }
+              navigate(`/quiz-sets/${active.quizSetId}`, {
+                replace: true,
+                state: { materialTitle },
+              })
+              return
+            }
             await createMutation.mutateAsync({
               materialId: state.materialId,
               conditions: createConditionsRef.current,
@@ -324,7 +344,6 @@ export function QuizSetRoutePage() {
             return
           }
           if (failure.kind === 'GENERATION_FAILED' && requestedConfig) {
-            createKeyRef.current = undefined
             await createMutation.mutateAsync({ materialId: state.materialId, conditions: requestedConfig })
             return
           }
@@ -456,16 +475,10 @@ export function ReviewSessionRoutePage() {
   }
   const session = sessionQuery.data
   const result = resultQuery.data ? adaptReviewResult(resultQuery.data) : emptyResult
-  if (session.status === 'SELF_ASSESSMENT_REQUIRED') {
-    return (
-      <RouteStatus
-        message="남은 자기평가 문항을 확인하지 못했어요. 다시 시도해 주세요."
-        retry={() => void resultQuery.refetch()}
-      />
-    )
-  }
   const scene = session.status === 'SOLVING'
     ? 'SOLVING'
+    : session.status === 'SELF_ASSESSMENT_REQUIRED'
+      ? 'SELF_ASSESSMENT'
     : 'RESULT'
   return (
     <QuizFlowPage
@@ -476,6 +489,7 @@ export function ReviewSessionRoutePage() {
       flowKind="REVIEW"
       initialScene={scene}
       initialResourceId={reviewSessionId}
+      initialPendingEssayQuestionIds={session.pendingEssayQuestionIds}
       callbacks={{
         onExitQuiz: () => navigate('/learning'),
         onResultExit: () => navigate('/learning'),

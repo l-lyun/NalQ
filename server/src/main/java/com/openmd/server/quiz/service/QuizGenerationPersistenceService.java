@@ -6,6 +6,10 @@ import com.openmd.server.quiz.domain.entity.*;
 import com.openmd.server.quiz.domain.type.*;
 import com.openmd.server.quiz.repository.*;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +27,7 @@ public class QuizGenerationPersistenceService {
   private final QuizEssayAnswerGuideRepository essays;
   private final QuizFillInTheBlankRepository blanks;
   private final QuizFillInTheBlankAnswerRepository blankAnswers;
+  private final TransactionTemplate transactions;
 
   public QuizGenerationPersistenceService(
       QuizSetRepository sets,
@@ -31,7 +36,8 @@ public class QuizGenerationPersistenceService {
       QuizShortAnswerAnswerRepository shorts,
       QuizEssayAnswerGuideRepository essays,
       QuizFillInTheBlankRepository blanks,
-      QuizFillInTheBlankAnswerRepository blankAnswers) {
+      QuizFillInTheBlankAnswerRepository blankAnswers,
+      PlatformTransactionManager transactionManager) {
     this.sets = sets;
     this.questions = questions;
     this.choices = choices;
@@ -39,6 +45,26 @@ public class QuizGenerationPersistenceService {
     this.essays = essays;
     this.blanks = blanks;
     this.blankAnswers = blankAnswers;
+    this.transactions = new TransactionTemplate(transactionManager);
+  }
+
+  /** TODO: 외부 문제 생성 모델 연동이 완료되면 이 임시 고정 후보 생성 경로를 제거한다. */
+  public void completeWithTemporaryStubAfterDelay(
+      long userId,
+      String quizSetId,
+      List<QuestionType> selectedTypes,
+      int maxQuestionCount) {
+    List<QuestionType> types = List.copyOf(selectedTypes);
+    CompletableFuture.runAsync(
+        () ->
+            transactions.executeWithoutResult(
+                ignored ->
+                    complete(
+                        userId,
+                        quizSetId,
+                        types.stream().map(this::temporaryCandidate).toList(),
+                        maxQuestionCount)),
+        CompletableFuture.delayedExecutor(3, TimeUnit.SECONDS));
   }
 
   @Transactional
@@ -74,6 +100,66 @@ public class QuizGenerationPersistenceService {
         sets.findOwnedForUpdate(quizSetId, userId)
             .orElseThrow(() -> new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND));
     if (set.getStatus() == QuizSetStatus.GENERATING) set.fail(QuizSetFailureCode.GENERATION_FAILED);
+  }
+
+  private QuizGenerationCandidate temporaryCandidate(QuestionType type) {
+    return switch (type) {
+      case MULTIPLE_CHOICE ->
+          new QuizGenerationCandidate(
+              null,
+              type,
+              "임시 객관식",
+              "OpenMD의 임시 퀴즈 정답을 고르세요.",
+              "외부 모델 연동 전 사용하는 임시 해설입니다.",
+              "외부 모델 연동 전 사용하는 임시 원문 근거입니다.",
+              List.of(
+                  new QuizGenerationCandidate.ChoiceCandidate("정답", true),
+                  new QuizGenerationCandidate.ChoiceCandidate("오답 1", false),
+                  new QuizGenerationCandidate.ChoiceCandidate("오답 2", false)),
+              List.of(),
+              List.of(),
+              null,
+              List.of());
+      case FILL_IN_THE_BLANK ->
+          new QuizGenerationCandidate(
+              null,
+              type,
+              "임시 빈칸",
+              "OpenMD의 임시 빈칸 정답은 [1]입니다.",
+              "외부 모델 연동 전 사용하는 임시 해설입니다.",
+              "외부 모델 연동 전 사용하는 임시 원문 근거입니다.",
+              List.of(),
+              List.of(),
+              List.of(new QuizGenerationCandidate.BlankCandidate(1, List.of("정답"))),
+              null,
+              List.of());
+      case SHORT_ANSWER ->
+          new QuizGenerationCandidate(
+              null,
+              type,
+              "임시 단답형",
+              "OpenMD의 임시 단답형 정답을 입력하세요.",
+              "외부 모델 연동 전 사용하는 임시 해설입니다.",
+              "외부 모델 연동 전 사용하는 임시 원문 근거입니다.",
+              List.of(),
+              List.of("정답"),
+              List.of(),
+              null,
+              List.of());
+      case ESSAY ->
+          new QuizGenerationCandidate(
+              null,
+              type,
+              "임시 서술형",
+              "OpenMD의 임시 서술형 답안을 작성하세요.",
+              "외부 모델 연동 전 사용하는 임시 해설입니다.",
+              "외부 모델 연동 전 사용하는 임시 원문 근거입니다.",
+              List.of(),
+              List.of(),
+              List.of(),
+              "외부 모델 연동 전 사용하는 임시 모범 답안입니다.",
+              List.of("임시 핵심 포인트"));
+    };
   }
 
   private void persist(long setId, ValidatedQuizQuestion validated) {

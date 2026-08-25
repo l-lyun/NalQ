@@ -29,10 +29,15 @@ public class QuizGenerationService {
 
   private final LearningMaterialRepository materials;
   private final QuizSetRepository quizSets;
+  private final QuizGenerationPersistenceService generationPersistence;
 
-  public QuizGenerationService(LearningMaterialRepository materials, QuizSetRepository quizSets) {
+  public QuizGenerationService(
+      LearningMaterialRepository materials,
+      QuizSetRepository quizSets,
+      QuizGenerationPersistenceService generationPersistence) {
     this.materials = materials;
     this.quizSets = quizSets;
+    this.generationPersistence = generationPersistence;
   }
 
   @Transactional
@@ -52,6 +57,11 @@ public class QuizGenerationService {
     } catch (DataAccessException exception) {
       throw new BusinessException(QuizErrorCode.GENERATION_UNAVAILABLE);
     }
+    generationPersistence.completeWithTemporaryStubAfterDelay(
+        userId,
+        quizSet.getPublicId(),
+        config.selectedTypes(),
+        config.maxQuestionCount());
     return new AcceptedQuizGeneration(
         quizSet.getPublicId(),
         materialPublicId,

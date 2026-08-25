@@ -76,12 +76,12 @@ public class EssayAssessmentService {
 
     if (attemptQuestion.getFinalGradingResult() != null) {
       if (attemptQuestion.getFinalGradingResult() != outcome) {
-        throw new BusinessException(QuizErrorCode.ATTEMPT_CONFLICT);
+        throw assessmentConflict(expectedType);
       }
       return response(attempt, questionId, outcome);
     }
     if (attempt.getStatus() != QuizAttemptStatus.SELF_ASSESSMENT_REQUIRED) {
-      throw new BusinessException(QuizErrorCode.ATTEMPT_CONFLICT);
+      throw assessmentConflict(expectedType);
     }
 
     attemptQuestion.selfAssess(outcome);
@@ -121,5 +121,12 @@ public class EssayAssessmentService {
 
   private BusinessException notFound() {
     return new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND);
+  }
+
+  private BusinessException assessmentConflict(QuizAttemptType type) {
+    return new BusinessException(
+        type == QuizAttemptType.REVIEW
+            ? QuizErrorCode.REVIEW_UNAVAILABLE
+            : QuizErrorCode.ATTEMPT_CONFLICT);
   }
 }

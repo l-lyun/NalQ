@@ -127,13 +127,15 @@ class QuizGradingMySqlIntegrationTest {
   }
 
   @Test
-  void acceptsAndFindsAnActiveGenerationWithoutPersistingRequestedConfig() {
+  void acceptsAndFindsAnActiveGenerationThenTemporarilyCompletesItAfterThreeSeconds()
+      throws InterruptedException {
     Fixture owner = fixture();
     Fixture other = fixture();
     QuizGenerationConfig config =
         new QuizGenerationConfig(
             List.of(QuestionType.MULTIPLE_CHOICE, QuestionType.ESSAY), QuizDifficulty.NORMAL, 10);
 
+    long acceptedAt = System.nanoTime();
     var accepted =
         generationAcceptance.accept(owner.userId(), Long.toString(owner.materialId()), config);
 
@@ -165,6 +167,31 @@ class QuizGradingMySqlIntegrationTest {
             BusinessException.class,
             () -> generationAcceptance.active(other.userId(), Long.toString(owner.materialId())));
     assertEquals(CommonErrorCode.RESOURCE_NOT_FOUND, foreign.getErrorCode());
+
+    long deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos();
+    String status;
+    do {
+      status =
+          jdbc.queryForObject(
+              "SELECT status FROM quiz_sets WHERE public_id = ?",
+              String.class,
+              accepted.quizSetId());
+      if (QuizSetStatus.READY.name().equals(status)) break;
+      Thread.sleep(100);
+    } while (System.nanoTime() < deadline);
+
+    assertEquals(QuizSetStatus.READY.name(), status);
+    assertTrue(System.nanoTime() - acceptedAt >= Duration.ofMillis(2500).toNanos());
+    assertEquals(
+        List.of(QuestionType.MULTIPLE_CHOICE.name(), QuestionType.ESSAY.name()),
+        jdbc.queryForList(
+            """
+            SELECT q.question_type FROM quiz_questions q
+            JOIN quiz_sets s ON s.id = q.quiz_set_id
+            WHERE s.public_id = ? ORDER BY q.question_number
+            """,
+            String.class,
+            accepted.quizSetId()));
   }
 
   @Test
@@ -449,6 +476,9 @@ class QuizGradingMySqlIntegrationTest {
         quiz.userId(),
         reviewId,
         List.of(new QuizResponseRequest(quiz.questionId(), null, null, "복습 설명")));
+    assertEquals(
+        List.of(quiz.questionId()),
+        reviews.get(quiz.userId(), reviewId).pendingEssayQuestionIds());
     assertNull(results.pending(quiz.userId(), quiz.setId()));
     assertEquals(
         QuizErrorCode.ATTEMPT_CONFLICT,
@@ -463,6 +493,18 @@ class QuizGradingMySqlIntegrationTest {
         essayAssessments
             .assessReview(quiz.userId(), reviewId, quiz.questionId(), "CORRECT")
             .status());
+    assertEquals(
+        GradingOutcome.CORRECT,
+        essayAssessments
+            .assessReview(quiz.userId(), reviewId, quiz.questionId(), "CORRECT")
+            .assessment());
+    BusinessException changedReviewAssessment =
+        assertThrows(
+            BusinessException.class,
+            () ->
+                essayAssessments.assessReview(
+                    quiz.userId(), reviewId, quiz.questionId(), "PARTIAL"));
+    assertEquals(QuizErrorCode.REVIEW_UNAVAILABLE, changedReviewAssessment.getErrorCode());
   }
 
   @Test

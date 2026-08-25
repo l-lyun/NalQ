@@ -87,7 +87,10 @@ const fixtureQuestionResults: QuizResultResponse['questionResults'] = [
   },
   {
     ...quizFixtureQuestions[3], response: { answer: '스택은 나중 값부터, 큐는 먼저 넣은 값부터 꺼냅니다.' },
-    modelAnswer: '스택은 후입선출, 큐는 선입선출 방식입니다.', keyPoints: ['스택은 후입선출', '큐는 선입선출'],
+    representativeAnswer: {
+      modelAnswer: '스택은 후입선출, 큐는 선입선출 방식입니다.',
+      keyPoints: ['스택은 후입선출', '큐는 선입선출'],
+    },
     outcome: 'PARTIAL', explanation: '제거 순서를 비교합니다.', sourceExcerpt: '두 구조는 제거 순서가 다르다.',
   },
   {

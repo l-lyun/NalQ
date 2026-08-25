@@ -24,6 +24,7 @@ import com.openmd.server.quiz.repository.QuizFillInTheBlankRepository;
 import com.openmd.server.quiz.repository.QuizQuestionChoiceRepository;
 import com.openmd.server.quiz.repository.QuizQuestionRepository;
 import com.openmd.server.quiz.repository.QuizSetRepository;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
@@ -129,16 +130,25 @@ public class QuizReviewService {
 
   private ReviewSessionView view(QuizAttempt review) {
     QuizAttempt source = attempts.findById(review.getSourceAttemptId()).orElseThrow();
-    List<QuizQuestionView> views =
-        attemptQuestions.findAllByAttemptIdOrderBySequenceNumber(review.getId()).stream()
-            .map(row -> question(row.getQuestionId()))
-            .toList();
+    List<QuizQuestionView> views = new ArrayList<>();
+    List<String> pendingEssayQuestionIds = new ArrayList<>();
+    for (QuizAttemptQuestion row :
+        attemptQuestions.findAllByAttemptIdOrderBySequenceNumber(review.getId())) {
+      QuizQuestionView view = question(row.getQuestionId());
+      views.add(view);
+      if (review.getStatus() == QuizAttemptStatus.SELF_ASSESSMENT_REQUIRED
+          && view.type() == QuestionType.ESSAY
+          && row.getFinalGradingResult() == null) {
+        pendingEssayQuestionIds.add(view.questionId());
+      }
+    }
     return new ReviewSessionView(
         review.getPublicId(),
         source.getPublicId(),
         publicStatus(review.getStatus()),
         views.size(),
-        views);
+        List.copyOf(pendingEssayQuestionIds),
+        List.copyOf(views));
   }
 
   private String publicStatus(QuizAttemptStatus status) {
