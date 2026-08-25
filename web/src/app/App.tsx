@@ -7,7 +7,14 @@ import { AuthGate, PublicOnlyGate } from '@/app/router/AuthGate'
 import { AuthenticatedHomePage } from '@/pages/home/AuthenticatedHomePage'
 import { AuthenticatedLearningPage } from '@/pages/learning/AuthenticatedLearningPage'
 import { LoginPage } from '@/pages/login/LoginPage'
-import { QuizFixturePage } from '@/pages/quiz'
+import {
+  QuizAttemptResultRoutePage,
+  QuizFixturePage,
+  QuizMaterialRoutePage,
+  QuizSetRoutePage,
+  ReviewEntryRoutePage,
+  ReviewSessionRoutePage,
+} from '@/pages/quiz'
 import { SignUpPage } from '@/pages/sign-up/SignUpPage'
 import { VerifyEmailPage } from '@/pages/verify-email/VerifyEmailPage'
 
@@ -37,6 +44,11 @@ export function App() {
             <Route element={<AuthGate />}>
               <Route path="/" element={<AuthenticatedHomePage />} />
               <Route path="/learning" element={<AuthenticatedLearningPage />} />
+              <Route path="/learning/:materialId/quiz" element={<QuizMaterialRoutePage />} />
+              <Route path="/quiz-sets/:quizSetId" element={<QuizSetRoutePage />} />
+              <Route path="/quiz-attempts/:attemptId/result" element={<QuizAttemptResultRoutePage />} />
+              <Route path="/review" element={<ReviewEntryRoutePage />} />
+              <Route path="/review-sessions/:reviewSessionId" element={<ReviewSessionRoutePage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

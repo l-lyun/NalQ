@@ -389,7 +389,7 @@ function LearningMain({
                     미해결 문항 {reviewState.data.reviewQuestionCount}개 · {reviewState.data.completedAtLabel}
                     <br />
                     {reviewState.data.activeReviewSessionId
-                      ? '마지막으로 저장한 문항부터 계속해요'
+                      ? '같은 문제 목록을 첫 문제부터 다시 풀어요'
                       : '가장 최근 완료한 퀴즈를 복습해요'}
                   </>
                 ),

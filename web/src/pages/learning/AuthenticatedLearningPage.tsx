@@ -1,10 +1,17 @@
 import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+
+import { getLatestReview } from '@/features/quiz/api/quiz.api'
 
 import { LearningPage } from './LearningPage'
 import type { LearningNavigationDestination } from './learning.types'
 
 export function AuthenticatedLearningPage() {
   const navigate = useNavigate()
+  const reviewQuery = useQuery({
+    queryKey: ['private', 'quiz-review', 'latest'],
+    queryFn: ({ signal }) => getLatestReview(signal),
+  })
 
   const handleNavigate = (destination: LearningNavigationDestination) => {
     if (destination === 'home') {
@@ -16,9 +23,32 @@ export function AuthenticatedLearningPage() {
 
   return (
     <LearningPage
-      reviewState={{ status: 'error', message: '복습 데이터 연동을 준비하고 있어요.' }}
+      reviewState={
+        reviewQuery.isPending
+          ? { status: 'loading' }
+          : reviewQuery.isError
+            ? { status: 'error', message: '복습 정보를 불러오지 못했어요.' }
+            : reviewQuery.data && reviewQuery.data.sourceAttemptId
+              ? {
+                  status: 'ready',
+                  data: {
+                    sourceAttemptId: reviewQuery.data.sourceAttemptId,
+                    materialTitle: '최근 완료한 퀴즈',
+                    completedAtLabel: `${reviewQuery.data.attemptNumber ?? 1}회차`,
+                    reviewQuestionCount: reviewQuery.data.reviewQuestionCount,
+                    activeReviewSessionId: reviewQuery.data.activeReviewSessionId ?? undefined,
+                  },
+                }
+              : { status: 'ready', data: null }
+      }
       materialsState={{ status: 'error', message: '학습자료 데이터 연동을 준비하고 있어요.' }}
-      callbacks={{ onNavigate: handleNavigate }}
+      callbacks={{
+        onNavigate: handleNavigate,
+        onRetryReview: () => void reviewQuery.refetch(),
+        onStartReview: () => navigate('/review'),
+        onOpenQuizConditions: (material) =>
+          navigate(`/learning/${material.id}/quiz`, { state: { materialTitle: material.title } }),
+      }}
     />
   )
 }

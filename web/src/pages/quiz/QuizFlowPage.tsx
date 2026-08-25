@@ -22,6 +22,9 @@ import {
 } from '@seed-design/react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
+import { createSubmissionPayload, isQuestionAnswered } from '@/features/quiz/model/quizAdapter'
+import { createUuidV4 } from '@/features/quiz/model/randomUuid'
+
 import type {
   QuizAnswer,
   QuizAnswers,
@@ -31,7 +34,7 @@ import type {
   QuizFlowPageProps,
   QuizGenerationFailure,
   QuizGenerationReady,
-  QuizMaxCount,
+  QuizMaxQuestionCount,
   QuizQuestion,
   QuizQuestionType,
   QuizResult,
@@ -52,7 +55,7 @@ type Sheet =
 
 const typeLabels: Record<QuizQuestionType, string> = {
   MULTIPLE_CHOICE: '객관식',
-  FILL_BLANK: '빈칸 채우기',
+  FILL_IN_THE_BLANK: '빈칸 채우기',
   SHORT_ANSWER: '단답형',
   ESSAY: '서술형',
 }
@@ -61,6 +64,10 @@ const difficultyLabels: Record<QuizDifficulty, string> = {
   EASY: '쉬움',
   NORMAL: '보통',
   HARD: '어려움',
+}
+
+function firstResultQuestionId(result: QuizResult) {
+  return result.items.find((item) => item.type === 'SHORT_ANSWER')?.questionId ?? result.items[0]?.questionId
 }
 
 function CheckmarkIcon() {
@@ -147,17 +154,6 @@ function SheetFrame({
   )
 }
 
-function isAnswered(question: QuizQuestion, answer: QuizAnswer | undefined) {
-  if (!answer || answer.type !== question.type) return false
-  if (answer.type === 'MULTIPLE_CHOICE') return answer.choiceId.length > 0
-  if (answer.type === 'FILL_BLANK') {
-    return question.type === 'FILL_BLANK'
-      ? question.blanks.every((blank) => answer.values[blank.id]?.trim())
-      : false
-  }
-  return answer.value.trim().length > 0
-}
-
 function generationErrorCopy(error: QuizGenerationFailure) {
   switch (error.kind) {
     case 'REQUEST_FAILED':
@@ -195,9 +191,15 @@ export function QuizFlowPage({
   result,
   flowKind = 'QUIZ',
   initialScene = 'CONDITIONS',
-  initialConditions = { questionTypes: ['MULTIPLE_CHOICE'], difficulty: 'NORMAL', maxCount: 10 },
+  initialConditions = {
+    selectedTypes: ['MULTIPLE_CHOICE'],
+    difficulty: 'NORMAL',
+    maxQuestionCount: 10,
+  },
   initialAnswers = {},
   generationState,
+  initialResourceId,
+  initialPendingEssayQuestionIds = [],
   callbacks,
 }: QuizFlowPageProps) {
   const [scene, setScene] = useState(initialScene)
@@ -211,27 +213,32 @@ export function QuizFlowPage({
   const [questionIndex, setQuestionIndex] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string>()
-  const [attemptId, setAttemptId] = useState<string>()
-  const [pendingEssayQuestionIds, setPendingEssayQuestionIds] = useState<string[]>([])
-  const [essayAssessmentCount, setEssayAssessmentCount] = useState(0)
+  const [resourceId, setResourceId] = useState(initialResourceId)
+  const [pendingEssayQuestionIds, setPendingEssayQuestionIds] = useState(initialPendingEssayQuestionIds)
+  const [essayAssessmentCount, setEssayAssessmentCount] = useState(initialPendingEssayQuestionIds.length)
   const [essayOutcome, setEssayOutcome] = useState<QuizResultOutcome>()
   const [savingEssay, setSavingEssay] = useState(false)
   const [essayError, setEssayError] = useState<string>()
   const [resultState, setResultState] = useState<QuizResult>(result)
-  const [resultQuestionId, setResultQuestionId] = useState(
-    result.items.find((item) => item.type === 'SHORT_ANSWER')?.questionId ?? result.items[0]?.questionId,
-  )
+  const [resultQuestionId, setResultQuestionId] = useState(firstResultQuestionId(result))
   const [correctionOutcome, setCorrectionOutcome] = useState<QuizBinaryOutcome>('CORRECT')
   const [savingCorrection, setSavingCorrection] = useState(false)
   const [correctionError, setCorrectionError] = useState<string>()
   const questionHeadingRef = useRef<HTMLHeadingElement>(null)
   const submitLockRef = useRef(false)
+  const submissionRef = useRef<{
+    attemptId?: string
+    payload: ReturnType<typeof createSubmissionPayload>
+  } | undefined>(undefined)
   const essaySaveLockRef = useRef(false)
+  const correctionSaveLockRef = useRef(false)
 
   const currentQuestion = questions[questionIndex]
-  const answeredCount = questions.filter((question) => isAnswered(question, answers[question.id])).length
+  const answeredCount = questions.filter((question) =>
+    isQuestionAnswered(question, answers[question.questionId]),
+  ).length
   const unansweredQuestions = questions.filter(
-    (question) => !isAnswered(question, answers[question.id]),
+    (question) => !isQuestionAnswered(question, answers[question.questionId]),
   )
   const resultItem = resultState.items.find((item) => item.questionId === resultQuestionId)
   const essayItem = resultState.items.find(
@@ -243,25 +250,40 @@ export function QuizFlowPage({
     setResultQuestionId((current) =>
       current && result.items.some((item) => item.questionId === current)
         ? current
-        : (result.items.find((item) => item.type === 'SHORT_ANSWER')?.questionId ??
-          result.items[0]?.questionId),
+        : firstResultQuestionId(result),
     )
   }, [result])
 
   useEffect(() => {
     if (!generationState) return
+    if (
+      scene === 'SOLVING' ||
+      scene === 'SUBMIT_ERROR' ||
+      scene === 'SELF_ASSESSMENT' ||
+      scene === 'RESULT'
+    ) return
     setGeneration(generationState)
     if (generationState.status === 'READY') {
       setScene('READY')
-      setSheet('READY_START')
+      if (scene !== 'READY') setSheet('READY_START')
     } else {
       setScene('GENERATION')
     }
-  }, [generationState])
+  }, [generationState, scene])
 
   useEffect(() => {
     if (scene === 'SOLVING') questionHeadingRef.current?.focus()
   }, [questionIndex, scene])
+
+  useEffect(() => {
+    if (scene !== 'SOLVING' || answeredCount === 0) return
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', warnBeforeUnload)
+    return () => window.removeEventListener('beforeunload', warnBeforeUnload)
+  }, [answeredCount, scene])
 
   const updateConditions = (next: QuizConditions) => {
     setConditions(next)
@@ -270,7 +292,7 @@ export function QuizFlowPage({
   }
 
   const startGeneration = async () => {
-    if (conditions.questionTypes.length === 0) {
+    if (conditions.selectedTypes.length === 0) {
       setConditionsError('문제 유형을 하나 이상 선택해 주세요.')
       return
     }
@@ -328,6 +350,7 @@ export function QuizFlowPage({
   }
 
   const setAnswer = (questionId: string, answer: QuizAnswer) => {
+    submissionRef.current = undefined
     setAnswers((current) => {
       const next = { ...current, [questionId]: answer }
       callbacks?.onAnswersChange?.(next)
@@ -338,7 +361,7 @@ export function QuizFlowPage({
   const goToQuestion = (index: number) => {
     const normalized = Math.max(0, Math.min(index, questions.length - 1))
     setQuestionIndex(normalized)
-    callbacks?.onNavigateQuestion?.(questions[normalized].id)
+    callbacks?.onNavigateQuestion?.(questions[normalized].questionId)
   }
 
   const requestSubmit = () => {
@@ -364,15 +387,25 @@ export function QuizFlowPage({
     setSubmitting(true)
     setSubmitError(undefined)
     try {
-      const submission = await submit({
-        answers,
-        unansweredQuestionIds: unansweredQuestions.map((question) => question.id),
-      })
+      const request = submissionRef.current ?? {
+        attemptId: flowKind === 'QUIZ' ? createUuidV4() : undefined,
+        payload: createSubmissionPayload(questions, answers),
+      }
+      submissionRef.current = request
+      const submission = await submit(request)
       setSheet(null)
-      setAttemptId(submission.attemptId)
+      const nextResourceId = 'attemptId' in submission
+        ? submission.attemptId
+        : submission.reviewSessionId
+      setResourceId(nextResourceId)
+      const latestResult = callbacks?.onLoadResult
+        ? await callbacks.onLoadResult(nextResourceId)
+        : resultState
+      setResultState(latestResult)
+      setResultQuestionId(firstResultQuestionId(latestResult))
       if (submission.status === 'SELF_ASSESSMENT_REQUIRED') {
         const pendingItems = submission.pendingEssayQuestionIds.map((questionId) =>
-          resultState.items.find((item) => item.questionId === questionId && item.type === 'ESSAY'),
+          latestResult.items.find((item) => item.questionId === questionId && item.type === 'ESSAY'),
         )
         if (
           submission.pendingEssayQuestionIds.length === 0 ||
@@ -404,7 +437,7 @@ export function QuizFlowPage({
     if (
       essaySaveLockRef.current ||
       !save ||
-      !attemptId ||
+      !resourceId ||
       !essayItem ||
       !essayOutcome
     ) {
@@ -415,7 +448,7 @@ export function QuizFlowPage({
     setEssayError(undefined)
     try {
       const saved = await save({
-        attemptId,
+        resourceId,
         questionId: essayItem.questionId,
         assessment: essayOutcome,
       })
@@ -423,7 +456,6 @@ export function QuizFlowPage({
         (questionId) => questionId !== saved.questionId,
       )
       if (
-        saved.attemptId !== attemptId ||
         saved.questionId !== essayItem.questionId ||
         saved.assessment !== essayOutcome ||
         saved.remainingSelfAssessmentCount !== remainingIds.length ||
@@ -432,22 +464,15 @@ export function QuizFlowPage({
       ) {
         throw new Error('Essay assessment response mismatch')
       }
-      setResultState((current) => ({
-        summary: {
-          ...current.summary,
-          essayCorrectCount:
-            current.summary.essayCorrectCount + (saved.assessment === 'CORRECT' ? 1 : 0),
-          essayPartialCount:
-            current.summary.essayPartialCount + (saved.assessment === 'PARTIAL' ? 1 : 0),
-          essayIncorrectCount:
-            current.summary.essayIncorrectCount + (saved.assessment === 'INCORRECT' ? 1 : 0),
-          reviewCount:
-            current.summary.reviewCount + (saved.assessment === 'CORRECT' ? 0 : 1),
-        },
-        items: current.items.map((item) =>
-          item.questionId === saved.questionId ? { ...item, outcome: saved.assessment } : item,
-        ),
-      }))
+      if (callbacks?.onLoadResult) {
+        const latestResult = await callbacks.onLoadResult(resourceId)
+        setResultState(latestResult)
+        setResultQuestionId((current) =>
+          current && latestResult.items.some((item) => item.questionId === current)
+            ? current
+            : firstResultQuestionId(latestResult),
+        )
+      }
       setPendingEssayQuestionIds(remainingIds)
       setEssayOutcome(undefined)
       if (saved.status === 'COMPLETED') setScene('RESULT')
@@ -468,28 +493,26 @@ export function QuizFlowPage({
 
   const saveCorrection = async () => {
     const updateShortAnswerOutcome = callbacks?.onUpdateShortAnswerOutcome
-    if (!resultItem || !resultItem.editable || !updateShortAnswerOutcome) return
+    if (
+      correctionSaveLockRef.current ||
+      !resultItem ||
+      !resultItem.editable ||
+      !updateShortAnswerOutcome
+    ) return
+    correctionSaveLockRef.current = true
     setSavingCorrection(true)
     setCorrectionError(undefined)
     try {
-      const serverSummary = await updateShortAnswerOutcome({
+      const latestResult = await updateShortAnswerOutcome({
         questionId: resultItem.questionId,
         outcome: correctionOutcome,
       })
-      setResultState((current) => {
-        return {
-          summary: serverSummary,
-          items: current.items.map((item) =>
-            item.questionId === resultItem.questionId
-              ? { ...item, outcome: correctionOutcome, edited: true }
-              : item,
-          ),
-        }
-      })
+      setResultState(latestResult)
       setSheet(null)
     } catch {
       setCorrectionError('채점 결과를 저장하지 못했어요. 이전 판정과 점수는 그대로 유지돼요.')
     } finally {
+      correctionSaveLockRef.current = false
       setSavingCorrection(false)
     }
   }
@@ -529,9 +552,9 @@ export function QuizFlowPage({
             questionIndex={questionIndex}
             questionCount={questions.length}
             answeredCount={answeredCount}
-            answer={answers[currentQuestion.id]}
+            answer={answers[currentQuestion.questionId]}
             headingRef={questionHeadingRef}
-            onAnswer={(answer) => setAnswer(currentQuestion.id, answer)}
+            onAnswer={(answer) => setAnswer(currentQuestion.questionId, answer)}
             onExit={() => setSheet('QUIZ_EXIT')}
             onOpenMap={() => setSheet('ANSWER_MAP')}
             onPrevious={() => goToQuestion(questionIndex - 1)}
@@ -567,6 +590,7 @@ export function QuizFlowPage({
           <ResultScreen
             result={resultState}
             item={resultItem}
+            title={flowKind === 'REVIEW' ? '다시 푼 문제 결과' : '채점 결과'}
             correctionAvailable={Boolean(callbacks?.onUpdateShortAnswerOutcome)}
             onBack={() => callbacks?.onResultExit?.()}
             onOpenList={() => setSheet('RESULT_LIST')}
@@ -641,7 +665,7 @@ export function QuizFlowPage({
         open={sheet === 'QUIZ_EXIT'}
         onOpenChange={(open) => setSheet(open ? 'QUIZ_EXIT' : null)}
         title="지금 나갈까요?"
-        description="입력한 답과 위치는 이 기기에 최대 7일 동안 보관될 수 있어요. 다른 기기에서는 이어서 풀 수 없어요."
+        description="작성 중인 답이 사라져요. 나갈까요?"
         footer={
           <VStack gap="x2" width="full">
             <ActionButton size="large" variant="brandSolid" onClick={() => setSheet(null)}>
@@ -730,9 +754,9 @@ function ConditionsScreen({
   const toggleType = (type: QuizQuestionType, checked: boolean) => {
     onChange({
       ...conditions,
-      questionTypes: checked
-        ? [...new Set([...conditions.questionTypes, type])]
-        : conditions.questionTypes.filter((candidate) => candidate !== type),
+      selectedTypes: checked
+        ? [...new Set([...conditions.selectedTypes, type])]
+        : conditions.selectedTypes.filter((candidate) => candidate !== type),
     })
   }
 
@@ -756,7 +780,7 @@ function ConditionsScreen({
               <Checkbox.Root
                 className="quiz-check-option"
                 key={type}
-                checked={conditions.questionTypes.includes(type)}
+                checked={conditions.selectedTypes.includes(type)}
                 onCheckedChange={(checked) => toggleType(type, checked)}
               >
                 <Checkbox.HiddenInput />
@@ -790,14 +814,17 @@ function ConditionsScreen({
         <ChoiceFieldset
           legend="최대 문제 수"
           name="quiz-max-count"
-          value={String(conditions.maxCount)}
-          options={([5, 10, 15] as QuizMaxCount[]).map((value) => ({
+          value={String(conditions.maxQuestionCount)}
+          options={([5, 10, 15] as QuizMaxQuestionCount[]).map((value) => ({
             value: String(value),
             label: `${value}개`,
           }))}
           description="학습자료 내용에 따라 만들어지는 문제 수가 적을 수 있어요."
-          onChange={(maxCount) =>
-            onChange({ ...conditions, maxCount: Number(maxCount) as QuizMaxCount })
+          onChange={(maxQuestionCount) =>
+            onChange({
+              ...conditions,
+              maxQuestionCount: Number(maxQuestionCount) as QuizMaxQuestionCount,
+            })
           }
         />
 
@@ -882,6 +909,22 @@ function GenerationScreen({
               완료까지 걸리는 시간은 자료마다 달라요.
             </Text>
           </VStack>
+          {state.requestedConfig ? (
+            <dl className="quiz-meta-list">
+              <div>
+                <dt>문제 유형</dt>
+                <dd>{state.requestedConfig.selectedTypes.map((type) => typeLabels[type]).join(' · ')}</dd>
+              </div>
+              <div>
+                <dt>난이도</dt>
+                <dd>{difficultyLabels[state.requestedConfig.difficulty]}</dd>
+              </div>
+              <div>
+                <dt>최대 문제 수</dt>
+                <dd>{state.requestedConfig.maxQuestionCount}개</dd>
+              </div>
+            </dl>
+          ) : null}
           <Box className="quiz-notice" bg="bg.informativeWeak" borderRadius="r3" p="x4">
             <Text as="p" textStyle="t4Regular" color="fg.neutralMuted">
               지금 나가도 문제 만들기는 계속돼요. 같은 학습자료를 다시 열면 진행 상태를
@@ -955,19 +998,23 @@ function ReadyScreen({
             {ready.actualCount}문제를 만들었어요
           </Text>
           <Text as="p" className="quiz-center-copy" textStyle="t5Regular" color="fg.neutralMuted">
-            요청한 {ready.requestedCount}개 중 학습자료로 만들 수 있는
-            <br />
-            {ready.actualCount}문제를 준비했어요.
+            {ready.requestedConfig
+              ? `요청한 ${ready.requestedConfig.maxQuestionCount}개 중 학습자료로 만들 수 있는 ${ready.actualCount}문제를 준비했어요.`
+              : `학습자료로 만들 수 있는 ${ready.actualCount}문제를 준비했어요.`}
           </Text>
         </VStack>
         <dl className="quiz-meta-list">
           <div>
             <dt>문제 유형</dt>
-            <dd>{ready.conditions.questionTypes.map((type) => typeLabels[type]).join(' · ')}</dd>
+            <dd>{ready.includedTypes.map((type) => typeLabels[type]).join(' · ')}</dd>
           </div>
           <div>
             <dt>난이도</dt>
-            <dd>{difficultyLabels[ready.conditions.difficulty]}</dd>
+            <dd>
+              {ready.requestedConfig
+                ? difficultyLabels[ready.requestedConfig.difficulty]
+                : '요청 조건 정보 없음'}
+            </dd>
           </div>
           <div>
             <dt>학습자료</dt>
@@ -1047,7 +1094,7 @@ function SolvingScreen({
           </div>
         </VStack>
 
-        <VStack key={question.id} className="quiz-question-panel" gap="x8">
+        <VStack key={question.questionId} className="quiz-question-panel" gap="x8">
           <VStack gap="x3" aria-live="polite">
             <Text textStyle="t4Bold" color="fg.brand">
               {typeLabels[question.type]}
@@ -1101,22 +1148,24 @@ function QuestionAnswer({
   onAnswer: (answer: QuizAnswer) => void
 }) {
   if (question.type === 'MULTIPLE_CHOICE') {
-    const selected = answer?.type === 'MULTIPLE_CHOICE' ? answer.choiceId : ''
+    const selected = answer?.type === 'MULTIPLE_CHOICE' ? answer.selectedChoiceId : ''
     return (
       <fieldset className="quiz-fieldset quiz-objective-options">
         <legend className="quiz-sr-only">답 선택</legend>
         <VStack gap="x3">
           {question.choices.map((choice, index) => (
-            <label key={choice.id} data-selected={selected === choice.id ? '' : undefined}>
+            <label key={choice.choiceId} data-selected={selected === choice.choiceId ? '' : undefined}>
               <input
                 type="radio"
-                name={`answer-${question.id}`}
-                value={choice.id}
-                checked={selected === choice.id}
-                onChange={() => onAnswer({ type: 'MULTIPLE_CHOICE', choiceId: choice.id })}
+                name={`answer-${question.questionId}`}
+                value={choice.choiceId}
+                checked={selected === choice.choiceId}
+                onChange={() =>
+                  onAnswer({ type: 'MULTIPLE_CHOICE', selectedChoiceId: choice.choiceId })
+                }
               />
               <span>
-                {index + 1}. {choice.label}
+                {index + 1}. {choice.text}
               </span>
             </label>
           ))}
@@ -1125,22 +1174,25 @@ function QuestionAnswer({
     )
   }
 
-  if (question.type === 'FILL_BLANK') {
-    const values = answer?.type === 'FILL_BLANK' ? answer.values : {}
+  if (question.type === 'FILL_IN_THE_BLANK') {
+    const blankAnswers = answer?.type === 'FILL_IN_THE_BLANK' ? answer.blankAnswers : {}
     return (
       <VStack gap="x4">
-        {question.blanks.map((blank, index) => (
-          <Field.Root key={blank.id}>
-            <Field.Label>{index + 1}번</Field.Label>
+        {question.blanks.map((blank) => (
+          <Field.Root key={blank.blankId}>
+            <Field.Label>{blank.number}번</Field.Label>
             <TextField.Root>
               <TextField.Input
-                value={values[blank.id] ?? ''}
-                placeholder={`${index + 1}번 답을 입력해 주세요`}
+                value={blankAnswers[blank.blankId] ?? ''}
+                placeholder={`${blank.number}번 답을 입력해 주세요`}
                 autoComplete="off"
                 onChange={(event) =>
                   onAnswer({
-                    type: 'FILL_BLANK',
-                    values: { ...values, [blank.id]: event.currentTarget.value },
+                    type: 'FILL_IN_THE_BLANK',
+                    blankAnswers: {
+                      ...blankAnswers,
+                      [blank.blankId]: event.currentTarget.value,
+                    },
                   })
                 }
               />
@@ -1152,7 +1204,7 @@ function QuestionAnswer({
   }
 
   if (question.type === 'SHORT_ANSWER') {
-    const value = answer?.type === 'SHORT_ANSWER' ? answer.value : ''
+    const value = answer?.type === 'SHORT_ANSWER' ? answer.text : ''
     return (
       <Field.Root>
         <Field.Label>답</Field.Label>
@@ -1162,7 +1214,7 @@ function QuestionAnswer({
             placeholder="단어나 짧은 문장으로 입력해 주세요"
             autoComplete="off"
             onChange={(event) =>
-              onAnswer({ type: 'SHORT_ANSWER', value: event.currentTarget.value })
+              onAnswer({ type: 'SHORT_ANSWER', text: event.currentTarget.value })
             }
           />
         </TextField.Root>
@@ -1170,7 +1222,7 @@ function QuestionAnswer({
     )
   }
 
-  const value = answer?.type === 'ESSAY' ? answer.value : ''
+  const value = answer?.type === 'ESSAY' ? answer.text : ''
   return (
     <VStack gap="x4">
       <Field.Root>
@@ -1180,7 +1232,7 @@ function QuestionAnswer({
             className="quiz-essay-input"
             value={value}
             placeholder="내 답을 작성해 주세요"
-            onChange={(event) => onAnswer({ type: 'ESSAY', value: event.currentTarget.value })}
+            onChange={(event) => onAnswer({ type: 'ESSAY', text: event.currentTarget.value })}
           />
         </TextField.Root>
       </Field.Root>
@@ -1210,9 +1262,11 @@ function AnswerMapSheet({
   onOpenChange: (open: boolean) => void
   onSelect: (index: number) => void
 }) {
-  const answeredCount = questions.filter((question) => isAnswered(question, answers[question.id])).length
+  const answeredCount = questions.filter((question) =>
+    isQuestionAnswered(question, answers[question.questionId]),
+  ).length
   const firstUnanswered = questions.findIndex(
-    (question) => !isAnswered(question, answers[question.id]),
+    (question) => !isQuestionAnswered(question, answers[question.questionId]),
   )
   return (
     <SheetFrame
@@ -1239,10 +1293,10 @@ function AnswerMapSheet({
     >
       <Grid className="quiz-question-map" columns={5} gap="x2" aria-label="문항별 답안 상태">
         {questions.map((question, index) => {
-          const answered = isAnswered(question, answers[question.id])
+          const answered = isQuestionAnswered(question, answers[question.questionId])
           return (
             <button
-              key={question.id}
+              key={question.questionId}
               type="button"
               data-answered={answered ? '' : undefined}
               data-current={index === currentIndex ? '' : undefined}
@@ -1469,6 +1523,7 @@ function EssayAssessmentScreen({
 function ResultScreen({
   result,
   item,
+  title,
   correctionAvailable,
   onBack,
   onOpenList,
@@ -1476,6 +1531,7 @@ function ResultScreen({
 }: {
   result: QuizResult
   item: QuizResultItem
+  title: string
   correctionAvailable: boolean
   onBack: () => void
   onOpenList: () => void
@@ -1484,7 +1540,7 @@ function ResultScreen({
   return (
     <VStack className="quiz-screen">
       <ScreenHeader
-        title="채점 결과"
+        title={title}
         backLabel="학습 화면으로 돌아가기"
         onBack={onBack}
         action={
@@ -1560,7 +1616,7 @@ function ResultScreen({
                 variant="brandOutline"
                 onClick={onCorrect}
               >
-                {item.edited ? '채점 다시 수정' : '채점 수정'}
+                채점 수정
               </ActionButton>
               <Text as="p" textStyle="t4Regular" color="fg.neutralMuted">
                 답을 작성한 단답형은 채점 결과를 직접 수정할 수 있어요.
