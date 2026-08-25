@@ -33,7 +33,7 @@ scope: server
 - 최초 자동 판정과 현재 최종 판정을 `automatic_grading_result`, `final_grading_result`로 구분한다.
 - `grading_method`는 최종 판정의 출처이며 조회 시 항상 `final_grading_result`를 사용한다.
 - 복습 성공은 원본 `MAIN` 문항의 `review_resolved_at`으로 기록하고 원래 오답 판정은 바꾸지 않는다.
-- UUID attempt 자체를 재시도 원장으로 사용하며 hash·fingerprint·replay 테이블은 만들지 않는다.
+- `attemptId`는 클라이언트가 정한 불변 `MAIN` 회차의 공개 식별자다. 같은 경로에 이미 존재하는 회차는 저장된 현재 상태를 반환하며 별도 request hash·fingerprint·replay 원장은 만들지 않는다.
 - 생성 요청의 `requestedConfig`는 서버 DB에 저장하지 않는다. 생성 접수 성공 응답에서만 요청값을 echo하고 이후 상태 조회는 서버 상태와 실제 확정 문제 정보만 반환한다.
 - MVP에는 worker lease·별도 생성 잠금 테이블, 교차 문제 참조를 막는 복합 FK, 유형별 제출 테이블을 추가하지 않는다. 일반 트랜잭션과 기존 unique/check 제약, 제출 서비스의 문제 소속 검증을 사용한다.
 - 성능 개선용 보조 인덱스는 이번 migration에 추가하지 않는다.
