@@ -282,7 +282,8 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 - `GENERATING`은 다음 조회 권고값 `pollAfterSeconds`도 반환한다.
 - `READY`는 유효 문제가 1개 이상이라는 뜻이다. 실제 수가 최대 문제 수보다 적거나 요청한 유형 일부가 포함되지 않아도 된다.
 - `FAILED`에는 문제를 포함하지 않는다. 사용자에게는 재시도 가능한 일반 안내만 제공하고 외부 생성 서비스 상세는 노출하지 않는다.
-- 문제는 `number` 오름차순이다.
+- 외부 생성 후보의 문제 번호는 공개 계약에 사용하지 않는다. 서버는 유형별 검증을 통과한 후보의 원래 배열 순서에 따라 `number=1..N`을 새로 부여한다.
+- 검증에서 제외된 후보는 `questions`에 포함하지 않으며 문제는 빈 번호 없이 `number` 오름차순으로 반환한다.
 
 `GENERATING` 예시:
 
@@ -338,7 +339,7 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 
 | 유형 | 추가 필드 | 규칙 |
 | --- | --- | --- |
-| `MULTIPLE_CHOICE` | `choices: [{ choiceId, text }]` | 4개 또는 5개. 정답 표시 없음 |
+| `MULTIPLE_CHOICE` | `choices: [{ choiceId, text }]` | 가변 길이 3~5개. 정답 표시 없음 |
 | `FILL_IN_THE_BLANK` | `blanks: [{ blankId, number }]` | 공통 `prompt`의 `[1]`, `[2]` 마커와 `number`로 연결. 1개 또는 2개 |
 | `SHORT_ANSWER` | 없음 | 일반 텍스트 입력 |
 | `ESSAY` | 없음 | 일반 텍스트 입력 |
@@ -360,6 +361,8 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 ```
 
 정답, 허용 답안, 모범 답안, 핵심 포인트, 해설, 원문 근거와 내부 생성 메타데이터는 `READY` 풀이 데이터에 포함하지 않는다.
+
+클라이언트는 객관식 `choices` 길이를 4개로 가정하지 않고 3개, 4개, 5개를 모두 렌더링·선택·제출할 수 있어야 한다. 배열 순서는 서버가 확정한 보기 순서를 그대로 사용한다.
 
 ## 본 퀴즈 제출과 자기평가
 

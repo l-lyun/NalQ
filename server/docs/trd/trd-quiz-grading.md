@@ -27,6 +27,7 @@ scope: server
 - 공통 `quiz_question_answers`와 `answer_role`은 제거하고 객관식·단답형·서술형·빈칸형 원장을 분리한다.
 - 사용자 제출은 유형별 정답 원장과 분리된 `quiz_submitted_answers`에 저장한다.
 - 문제 유형 값은 현재 서버 `QuestionType`과 같은 `MULTIPLE_CHOICE|FILL_IN_THE_BLANK|SHORT_ANSWER|ESSAY`를 사용한다.
+- 외부 생성 결과의 문제 번호는 저장하지 않는다. 유형별 검증을 통과한 후보만 원래 배열 순서대로 모아 서버가 `question_number=1..N`을 부여한다.
 - 생성 요청 수나 유형별 목표 수를 성공 조건으로 저장하지 않는다. 유형별 원장이 완전한 유효 문제 하나 이상을 확정하면 `READY`, 하나도 없으면 `FAILED`다.
 - 생성 실패 원인은 `quiz_sets.failure_code`에 보존하고 메시지와 재시도 가능 여부는 서버 정책으로 계산한다.
 - 최초 자동 판정과 현재 최종 판정을 `automatic_grading_result`, `final_grading_result`로 구분한다.
@@ -70,7 +71,7 @@ scope: server
 | `choice_value` | 사용자에게 표시할 보기 문구 |
 | `is_correct` | 서버 채점용 정답 여부. 풀이 전 외부 비공개 |
 
-MVP는 문제당 보기 4개 또는 5개, `is_correct=true`인 보기 정확히 하나를 요구한다. 모든 보기를 저장하므로 오답을 정답 테이블에 표현하기 위한 역할 값은 필요하지 않다.
+MVP는 문제당 보기 3개 이상 5개 이하, `is_correct=true`인 보기 정확히 하나를 요구한다. 모든 보기를 저장하므로 오답을 정답 테이블에 표현하기 위한 역할 값은 필요하지 않다.
 
 보기는 불변이고 의미 있는 별도 순서를 요구하지 않으므로 순서 컬럼을 두지 않는다. API 배열은 조회마다 흔들리지 않도록 내부 `id` 오름차순으로 만든다.
 
@@ -114,7 +115,19 @@ MVP는 문제당 보기 4개 또는 5개, `is_correct=true`인 보기 정확히 
 
 한 문제는 빈칸 1개 또는 2개를 가진다. `blank_number`는 1부터 연속이고 `(question_id, blank_number)`는 unique다. 각 번호 마커는 `prompt`에 정확히 한 번 나타나야 하며 각 빈칸은 허용 답안을 하나 이상 가진다. 별도 segment 테이블은 만들지 않는다.
 
-### 3.6 `quiz_attempts`
+### 3.6 생성 후보 확정
+
+외부 생성 응답은 바로 영속화할 문제가 아니라 후보 목록이다. 서버는 다음 순서로 최종 문제를 확정한다.
+
+1. 후보의 외부 번호는 버리고 배열 위치만 임시 순서로 사용한다.
+2. 공통 `prompt`, `topic`, `explanation`, `source_excerpt`와 유형별 상세 구조를 메모리에서 검증한다.
+3. 검증을 통과한 후보만 원래 상대 순서대로 모은다.
+4. 유효 후보에 `question_number=1..N`을 새로 부여한다.
+5. 짧은 최종 트랜잭션에서 공통 문제·유형별 하위 행·QuizSet 상태를 함께 저장한다.
+
+무효 후보에는 `quiz_questions`와 유형별 하위 행을 만들지 않는다. 일부 후보가 제외되어도 유효 후보가 하나 이상이면 `READY`, 하나도 없으면 `FAILED`다.
+
+### 3.7 `quiz_attempts`
 
 | 컬럼 | 의미 |
 | --- | --- |
@@ -127,7 +140,7 @@ MVP는 문제당 보기 4개 또는 5개, `is_correct=true`인 보기 정확히 
 
 저장된 문항 결과에서 점수를 계산하므로 자동 정답 수·채점 수 캐시 컬럼과 summary revision은 두지 않는다.
 
-### 3.7 `quiz_attempt_questions`
+### 3.8 `quiz_attempt_questions`
 
 | 컬럼 | 의미 |
 | --- | --- |
@@ -148,7 +161,7 @@ MVP는 문제당 보기 4개 또는 5개, `is_correct=true`인 보기 정확히 
 - `SELF_ASSESSMENT`: 자동 판정은 `null`이고 최종 판정이 존재한다.
 - 제출 전: 세 채점 컬럼이 모두 `null`이다.
 
-### 3.8 `quiz_submitted_answers`
+### 3.9 `quiz_submitted_answers`
 
 | 컬럼 | 의미 |
 | --- | --- |
@@ -234,7 +247,8 @@ DB는 PK, FK, public ID unique, 회차 안의 문항·순서 unique와 enum 범�
 - 원본·복습 회차 문항의 `question_id`가 같은지
 - 문제 유형별 원장 행 수와 제출 컬럼 조합
 - 선택지와 빈칸이 제출 대상 문제에 속하는지
-- 객관식 보기 4~5개와 단일 정답, 단답형·빈칸형 허용 답안 존재 여부
+- 객관식 보기 3~5개와 단일 정답, 단답형·빈칸형 허용 답안 존재 여부
+- 유효 후보만 연속 `question_number=1..N`을 가지는지
 - 빈칸 번호와 `prompt` 마커의 일대일 대응
 - 채점 결과와 `grading_method` 조합
 - `review_resolved_at`이 원본 MAIN 문항에만 기록되는지
@@ -258,7 +272,7 @@ DB는 PK, FK, public ID unique, 회차 안의 문항·순서 unique와 enum 범�
 
 구현 순서는 다음과 같다.
 
-1. 목표 migration과 유형별 무결성 테스트를 먼저 작성한다.
+1. 목표 migration과 유형별 무결성 테스트를 먼저 작성한다. 객관식 보기 3·4·5개 성공, 2·6개 실패와 무효 후보 제거 뒤 연속 번호 재부여를 포함한다.
 2. 유형별 entity·repository를 추가하고 기존 공통 정답 매핑을 제거한다.
 3. 생성 결과 검증과 `READY|FAILED`, `failure_code` 확정을 구현한다.
 4. 제출 저장과 자동 채점을 새 FK·답안 원장에 연결한다.

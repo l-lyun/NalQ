@@ -56,7 +56,7 @@ HTTP 필드 모양과 공개 오류는 [학습자료·퀴즈·복습 API](contra
 | `choice_value` | 사용자에게 보여줄 보기 문구 |
 | `is_correct` | 서버 채점에만 사용하는 정답 여부 |
 
-- MVP 객관식은 보기 4개 또는 5개와 `is_correct=true`인 보기 정확히 하나를 가진다.
+- MVP 객관식은 보기 3개 이상 5개 이하와 `is_correct=true`인 보기 정확히 하나를 가진다.
 - 보기와 문제 세트는 불변이므로 별도 순서 컬럼을 두지 않는다. 서버가 배열을 만들 때는 생성·저장 순서가 흔들리지 않도록 내부 `id` 오름차순을 사용한다.
 - 풀이 전 응답은 `public_id`, `choice_value`를 각각 `choiceId`, `text`로 전달하고 `is_correct`는 노출하지 않는다.
 - 기존 `quiz_question_answers`에 정답 보기만 저장하지 않는다. 오답 보기도 문제 구성의 일부이므로 모든 보기를 이 원장에 저장한다.
@@ -130,12 +130,14 @@ HTTP 필드 모양과 공개 오류는 [학습자료·퀴즈·복습 API](contra
 
 | 유형 | 유형별 필수 조건 |
 | --- | --- |
-| `MULTIPLE_CHOICE` | 보기 4개 또는 5개, 공개 식별자·문구 존재, 정답 보기 정확히 1개 |
+| `MULTIPLE_CHOICE` | 보기 3개 이상 5개 이하, 공개 식별자·문구 존재, 정답 보기 정확히 1개 |
 | `FILL_IN_THE_BLANK` | 빈칸 1개 또는 2개, `[1]..[N]` 마커가 각각 정확히 한 번 존재, 빈칸 번호와 마커 일치, 빈칸마다 허용 답안 1개 이상 |
 | `SHORT_ANSWER` | 정규화 뒤 비어 있지 않은 허용 답안 1개 이상 |
 | `ESSAY` | 비어 있지 않은 `model_answer`와 `key_points` 1개 이상 |
 
-공통 `prompt`, `topic`, `explanation`, `source_excerpt`도 비어 있지 않아야 한다. 생성 결과 중 위 검증을 통과하지 못한 문제는 제외하며, 제외된 문제가 있어도 유효 문제 하나 이상을 최종 저장하면 QuizSet은 `READY`다.
+공통 `prompt`, `topic`, `explanation`, `source_excerpt`도 비어 있지 않아야 한다. 외부 생성 결과는 후보 목록이며 후보가 보낸 문제 번호는 저장값으로 사용하지 않는다.
+
+서버는 원래 후보 배열 순서대로 공통 정보와 유형별 상세 구조를 검증한다. 검증을 통과한 후보만 같은 상대 순서로 모은 뒤 최종 `question_number=1..N`을 부여한다. 검증에서 제외된 후보에는 `quiz_questions`를 포함해 어떤 영속 행도 만들지 않는다. 제외된 후보가 있어도 유효 문제 하나 이상을 최종 저장하면 QuizSet은 `READY`이고, 유효 후보가 없으면 `FAILED`다.
 
 ## 본 퀴즈와 복습 attempt
 
@@ -222,7 +224,7 @@ MVP에서는 전체 사용자 수정 이력을 별도 테이블로 보존하지 
 - 복습 시작은 원본 `MAIN` 잠금, 미완료 `REVIEW` 확인과 snapshot 생성을 한 트랜잭션에서 처리한다.
 - 복습 제출은 제출 답안, 복습 채점과 원본 `reviewResolvedAt` 갱신을 한 트랜잭션에서 처리한다.
 - 같은 UUID 재요청은 먼저 확정된 attempt를 반환하고 request hash·fingerprint·replay 테이블을 만들지 않는다.
-- 문제 생성은 공통 문제와 해당 유형의 상세 원장을 함께 검증·저장한 뒤에만 그 문제를 유효 문제 수에 포함한다. 유형 상세 저장이 실패한 문제는 부분 문제로 남기지 않는다.
+- 문제 생성은 외부 후보의 공통 정보와 해당 유형의 상세 구조를 먼저 검증하고, 유효 후보에 서버가 연속 `question_number`를 부여한 뒤 공통·상세 원장을 함께 저장한다. 무효 후보와 유형 상세 저장이 실패한 문제는 부분 문제로 남기지 않는다.
 - 유효 문제가 하나 이상이면 해당 문제들과 `quiz_sets.status=READY`, `failure_code=null`을 확정한다. 유효 문제가 없으면 문제 행을 공개 가능한 상태로 남기지 않고 `status=FAILED`와 `failure_code`를 확정한다.
 - 한 번 attempt가 연결된 문제 세트·문제·보기·빈칸·정답 가이드는 수정하거나 물리 삭제하지 않는다.
 
@@ -255,10 +257,12 @@ migration, Java entity·repository·service와 테스트는 같은 목표 구조
 ### 확정
 
 - 공통 문제와 네 유형별 원장을 분리하고 기존 `quiz_question_answers`와 `answer_role`을 제거한다.
-- 객관식은 모든 보기를 저장하며 단일 정답 여부를 `is_correct`로 표현한다.
+- 객관식은 3~5개의 모든 보기를 저장하며 단일 정답 여부를 `is_correct`로 표현한다.
 - 빈칸은 `prompt`의 번호 마커와 `blank_number`로 연결하며 별도 segment 원장은 만들지 않는다.
 - 제출 답안은 `selected_choice_id`, `blank_id`, `answer_value`의 유형별 조합으로 보존한다.
 - 문제 유형 서버 기준 값은 `FILL_IN_THE_BLANK`다.
+- 외부 후보의 문제 번호는 버리고 유효 후보의 원래 배열 순서에 따라 서버가 `question_number=1..N`을 부여한다.
+- 무효 후보는 `quiz_questions`와 유형별 하위 행을 모두 남기지 않는다.
 - 유효 문제 1개 이상은 `READY`, 0개는 `FAILED`다.
 
 ### 제안
