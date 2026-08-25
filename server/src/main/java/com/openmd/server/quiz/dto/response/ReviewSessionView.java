@@ -7,4 +7,5 @@ public record ReviewSessionView(
     String sourceAttemptId,
     String status,
     int reviewQuestionCount,
+    List<String> pendingEssayQuestionIds,
     List<QuizQuestionView> questions) {}

@@ -69,6 +69,7 @@ function blankText(
 function toResultItem(item: QuestionResult): QuizResultItem {
   let answer = ''
   let correctAnswer = ''
+  let keyPoints: string[] | undefined
   if (item.type === 'MULTIPLE_CHOICE') {
     const response = item.response && 'selectedChoiceId' in item.response ? item.response : undefined
     const representative = item.representativeAnswer && 'selectedChoiceId' in item.representativeAnswer
@@ -83,13 +84,22 @@ function toResultItem(item: QuestionResult): QuizResultItem {
       : undefined
     answer = item.response === null ? '' : blankText(item, response?.blankAnswers)
     correctAnswer = blankText(item, representative?.blankAnswers)
+  } else if (item.type === 'ESSAY') {
+    const response = item.response && 'answer' in item.response ? item.response.answer : ''
+    const representative =
+      item.representativeAnswer && 'modelAnswer' in item.representativeAnswer
+        ? item.representativeAnswer
+        : undefined
+    answer = item.response === null ? '' : response
+    correctAnswer = representative?.modelAnswer ?? ''
+    keyPoints = representative?.keyPoints
   } else {
     const response = item.response && 'answer' in item.response ? item.response.answer : ''
     const representative = item.representativeAnswer && 'answer' in item.representativeAnswer
       ? item.representativeAnswer.answer
       : ''
     answer = item.response === null ? '' : response
-    correctAnswer = item.type === 'ESSAY' ? (item.modelAnswer ?? '') : representative
+    correctAnswer = representative
   }
   return {
     questionId: item.questionId,
@@ -100,7 +110,7 @@ function toResultItem(item: QuestionResult): QuizResultItem {
     answer,
     correctAnswer,
     outcome: item.outcome ?? 'INCORRECT',
-    keyPoints: item.keyPoints,
+    keyPoints,
     explanation: item.explanation,
     sourceExcerpt: item.sourceExcerpt,
     editable: item.type === 'SHORT_ANSWER' && item.response !== null,

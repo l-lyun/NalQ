@@ -78,8 +78,7 @@ export type QuestionResult = QuestionResultBase & {
     | { selectedChoiceId: string }
     | { blankAnswers: { blankId: string; answer: string }[] }
     | { answer: string }
-  modelAnswer?: string
-  keyPoints?: string[]
+    | { modelAnswer: string; keyPoints: string[] }
 }
 export type QuizResultResponse = {
   attemptId: string
@@ -105,6 +104,7 @@ export type ReviewSession = {
   sourceAttemptId: string
   status: ReviewSessionStatus
   reviewQuestionCount?: number
+  pendingEssayQuestionIds: string[]
   questions?: QuizQuestion[]
 }
 export type ReviewSessionEnvelope = { reviewSession: ReviewSession }

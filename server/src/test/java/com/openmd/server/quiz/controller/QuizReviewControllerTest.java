@@ -54,7 +54,8 @@ class QuizReviewControllerTest {
 
   @Test
   void startsForTheRequestedSourceAndUsesCreatedOrOkStatus() throws Exception {
-    ReviewSessionView view = new ReviewSessionView("review-1", "source-1", "SOLVING", 1, List.of());
+    ReviewSessionView view =
+        new ReviewSessionView("review-1", "source-1", "SOLVING", 1, List.of(), List.of());
     when(reviews.start(7L, "source-1")).thenReturn(new ReviewSessionStart(true, view));
 
     mvc.perform(
@@ -72,6 +73,24 @@ class QuizReviewControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"sourceAttemptId\":\"source-1\"}"))
         .andExpect(status().isOk());
+  }
+
+  @Test
+  void returnsPendingEssayQuestionIdsWhenResumingAReviewSession() throws Exception {
+    ReviewSessionView view =
+        new ReviewSessionView(
+            "review-1",
+            "source-1",
+            "SELF_ASSESSMENT_REQUIRED",
+            1,
+            List.of("question-1"),
+            List.of());
+    when(reviews.get(7L, "review-1")).thenReturn(view);
+
+    mvc.perform(get("/api/v1/review-sessions/review-1"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.status").value("SELF_ASSESSMENT_REQUIRED"))
+        .andExpect(jsonPath("$.data.pendingEssayQuestionIds[0]").value("question-1"));
   }
 
   @Test
