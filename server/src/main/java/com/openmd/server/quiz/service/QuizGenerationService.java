@@ -17,6 +17,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,15 +30,15 @@ public class QuizGenerationService {
 
   private final LearningMaterialRepository materials;
   private final QuizSetRepository quizSets;
-  private final QuizGenerationPersistenceService generationPersistence;
+  private final ApplicationEventPublisher events;
 
   public QuizGenerationService(
       LearningMaterialRepository materials,
       QuizSetRepository quizSets,
-      QuizGenerationPersistenceService generationPersistence) {
+      ApplicationEventPublisher events) {
     this.materials = materials;
     this.quizSets = quizSets;
-    this.generationPersistence = generationPersistence;
+    this.events = events;
   }
 
   @Transactional
@@ -57,11 +58,12 @@ public class QuizGenerationService {
     } catch (DataAccessException exception) {
       throw new BusinessException(QuizErrorCode.GENERATION_UNAVAILABLE);
     }
-    generationPersistence.completeWithTemporaryStubAfterDelay(
-        userId,
-        quizSet.getPublicId(),
-        config.selectedTypes(),
-        config.maxQuestionCount());
+    events.publishEvent(
+        new TemporaryQuizGenerationRequested(
+            userId,
+            quizSet.getPublicId(),
+            config.selectedTypes(),
+            config.maxQuestionCount()));
     return new AcceptedQuizGeneration(
         quizSet.getPublicId(),
         materialPublicId,
