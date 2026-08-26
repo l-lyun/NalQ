@@ -44,7 +44,7 @@ class LearningMaterialServiceTest {
 			NewLearningMaterial input = invocation.getArgument(0);
 			return new StoredLearningMaterial(
 				31L, input.userId(), input.title(), input.content(), input.sourceType(),
-				ContentEditStatus.EDITABLE, input.requestFingerprint(), Instant.parse("2026-08-20T01:02:03Z")
+				input.requestFingerprint(), Instant.parse("2026-08-20T01:02:03Z")
 			);
 		});
 
@@ -122,7 +122,7 @@ class LearningMaterialServiceTest {
 			NewLearningMaterial requested = invocation.getArgument(0);
 			return new StoredLearningMaterial(
 				31L, requested.userId(), "제목", "원래 본문", SourceType.PASTE,
-				ContentEditStatus.EDITABLE, new byte[32], Instant.parse("2026-08-20T01:02:03Z")
+				new byte[32], Instant.parse("2026-08-20T01:02:03Z")
 			);
 		});
 		BusinessException conflict = assertThrows(BusinessException.class, () -> service.create(
@@ -135,7 +135,7 @@ class LearningMaterialServiceTest {
 	private StoredLearningMaterial stored(NewLearningMaterial input) {
 		return new StoredLearningMaterial(
 			31L, input.userId(), input.title(), input.content(), input.sourceType(),
-			ContentEditStatus.EDITABLE, input.requestFingerprint(), Instant.parse("2026-08-20T01:02:03Z")
+			input.requestFingerprint(), Instant.parse("2026-08-20T01:02:03Z")
 		);
 	}
 

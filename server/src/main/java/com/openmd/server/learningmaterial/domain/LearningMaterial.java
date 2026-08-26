@@ -24,10 +24,6 @@ public class LearningMaterial extends BaseEntity {
 	@Column(name = "source_type", nullable = false, length = 16)
 	private SourceType sourceType;
 
-	@Enumerated(EnumType.STRING)
-	@Column(name = "content_edit_status", nullable = false, length = 32)
-	private ContentEditStatus contentEditStatus;
-
 	@Column(name = "idempotency_key_hash", nullable = false, columnDefinition = "BINARY(32)")
 	private byte[] idempotencyKeyHash;
 
@@ -49,7 +45,6 @@ public class LearningMaterial extends BaseEntity {
 		this.title = title;
 		this.content = content;
 		this.sourceType = sourceType;
-		this.contentEditStatus = ContentEditStatus.EDITABLE;
 		this.idempotencyKeyHash = idempotencyKeyHash.clone();
 		this.requestFingerprint = requestFingerprint.clone();
 	}
@@ -69,7 +64,6 @@ public class LearningMaterial extends BaseEntity {
 	public String getTitle() { return title; }
 	public String getContent() { return content; }
 	public SourceType getSourceType() { return sourceType; }
-	public ContentEditStatus getContentEditStatus() { return contentEditStatus; }
 	public byte[] getIdempotencyKeyHash() { return idempotencyKeyHash.clone(); }
 	public byte[] getRequestFingerprint() { return requestFingerprint.clone(); }
 }

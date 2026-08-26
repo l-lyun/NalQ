@@ -7,6 +7,7 @@ import com.openmd.server.global.api.FieldError;
 import com.openmd.server.global.error.BusinessException;
 import com.openmd.server.global.error.CommonErrorCode;
 import com.openmd.server.learningmaterial.domain.SourceType;
+import com.openmd.server.learningmaterial.domain.ContentEditStatus;
 import com.openmd.server.learningmaterial.dto.command.CreateLearningMaterialCommand;
 import com.openmd.server.learningmaterial.dto.model.NewLearningMaterial;
 import com.openmd.server.learningmaterial.dto.model.StoredLearningMaterial;
@@ -87,7 +88,7 @@ public class LearningMaterialService {
 			Long.toString(stored.id()),
 			stored.title(),
 			codePointCount(stored.content()),
-			stored.contentEditStatus(),
+			ContentEditStatus.EDITABLE,
 			stored.createdAt()
 		);
 	}

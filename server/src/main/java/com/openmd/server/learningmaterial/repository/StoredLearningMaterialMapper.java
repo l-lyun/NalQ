@@ -15,7 +15,6 @@ final class StoredLearningMaterialMapper {
 			material.getTitle(),
 			material.getContent(),
 			material.getSourceType(),
-			material.getContentEditStatus(),
 			material.getRequestFingerprint(),
 			material.getCreatedAt()
 		);

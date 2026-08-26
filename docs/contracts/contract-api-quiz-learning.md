@@ -86,6 +86,8 @@ scope: shared
 | 사용자 행동 | Method / Path | 성공 |
 | --- | --- | --- |
 | 학습자료 저장 | `POST /api/v1/learning-materials` | `201 Created` |
+| 학습자료 목록 조회·제목 검색 | `GET /api/v1/learning-materials` | `200 OK` |
+| 학습자료 상세 조회 | `GET /api/v1/learning-materials/{materialId}` | `200 OK` |
 | 학습자료 수정 | `PATCH /api/v1/learning-materials/{materialId}` | `200 OK` |
 | Notion 페이지 일회성 복사 | `POST /api/v1/learning-material-imports/notion` | `200 OK` |
 | 문제 세트 생성 접수 | `POST /api/v1/learning-materials/{materialId}/quiz-sets` | `202 Accepted` |
@@ -104,6 +106,12 @@ scope: shared
 | 복습 서술형 자기평가 저장 | `PUT /api/v1/review-sessions/{reviewSessionId}/essay-assessments/{questionId}` | `200 OK` |
 
 ## 학습자료
+
+### 이번 조회 연동 범위
+
+- **확정·이번 구현:** 기존 학습자료 저장을 유지하고, 인증 사용자의 학습자료 목록과 상세를 조회한다.
+- **확정·후속 구현:** 학습자료 수정과 Notion 단일 페이지 일회성 복사는 계약을 유지하되 이번 조회 연동 구현에는 포함하지 않는다.
+- **비범위:** 학습자료 삭제, Notion 동기화와 실제 외부 문제 생성 서비스 연동은 이번 작업에서 다루지 않는다.
 
 ### 저장
 
@@ -146,6 +154,90 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 - 입력 검증 실패와 저장 트랜잭션 롤백은 키를 점유하지 않는다. 같은 키의 동시 요청도 학습자료 한 건만 만들고 두 요청은 같은 성공 결과를 관찰해야 한다.
 - 생성 멱등 결과는 연결된 학습자료가 존재하는 동안 만료하지 않는다. MVP에는 학습자료 삭제 API가 없으므로 자동 만료하지 않는다.
 
+### 목록 조회와 제목 검색
+
+`GET /api/v1/learning-materials?page=1&size=6&query=운영체제`
+
+- `page`: 선택, 1부터 시작하며 기본값은 `1`이다.
+- `size`: 선택, 기본값은 `6`이고 `1..20`만 허용한다.
+- `query`: 선택, 제목 부분 검색어다. 생략하거나 빈 값이면 제목 필터를 적용하지 않는다.
+- 현재 인증 사용자가 소유한 학습자료만 반환한다.
+- 정렬은 `updatedAt DESC`, 같은 시각에는 `materialId DESC`로 고정한다.
+- `content`는 목록에서 반환하지 않는다. 목록 항목은 화면 구분과 상태 안내에 필요한 최소 필드만 포함한다.
+- `page < 1`, `size < 1`, `size > 20` 또는 해석할 수 없는 값은 `400 COMMON_001`이다.
+- 전체 페이지 범위를 벗어난 양수 `page`는 오류가 아니다. 요청한 `page`와 전체 집계를 유지하고 `200 OK`, `items=[]`를 반환한다.
+- 검색어가 바뀐 클라이언트는 `page=1`부터 다시 조회한다.
+
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "materialId": "123",
+        "title": "운영체제 스케줄링",
+        "sourceType": "PASTE",
+        "contentEditStatus": "EDITABLE",
+        "updatedAt": "2026-08-26T01:00:00Z"
+      }
+    ],
+    "page": 1,
+    "size": 6,
+    "totalElements": 13,
+    "totalPages": 3
+  },
+  "error": null
+}
+```
+
+- `page`와 `size`는 적용된 요청값이고 `totalElements`는 현재 검색 조건의 전체 자료 수다.
+- `totalPages`는 `totalElements`와 `size`로 계산하며 검색 결과가 없으면 `0`이다.
+- `contentEditStatus`는 공개 enum `EDITABLE`, `LOCKED_GENERATING` 중 하나다. 같은 학습자료에 `GENERATING` QuizSet이 있으면 `LOCKED_GENERATING`, 없으면 `EDITABLE`이다.
+- 목록 응답은 활성 `quizSetId`나 과거 QuizSet 상태를 포함하지 않는다. 선택한 자료의 활성 생성 복원은 별도 [자료의 활성 생성 조회](#자료의-활성-생성-조회)를 사용한다.
+
+검색 결과가 없을 때도 같은 모양을 유지한다.
+
+```json
+{
+  "success": true,
+  "data": {
+    "items": [],
+    "page": 1,
+    "size": 6,
+    "totalElements": 0,
+    "totalPages": 0
+  },
+  "error": null
+}
+```
+
+### 상세 조회
+
+`GET /api/v1/learning-materials/{materialId}`
+
+```json
+{
+  "success": true,
+  "data": {
+    "materialId": "123",
+    "title": "운영체제 스케줄링",
+    "content": "학습자료 전체 본문",
+    "contentLength": 8240,
+    "sourceType": "PASTE",
+    "contentEditStatus": "EDITABLE",
+    "createdAt": "2026-08-20T01:00:00Z",
+    "updatedAt": "2026-08-26T01:00:00Z"
+  },
+  "error": null
+}
+```
+
+- `contentLength`는 저장·검증과 같은 Unicode code point 계산을 사용한다.
+- `contentEditStatus`는 목록과 같은 규칙으로 계산하며 별도 학습자료 잠금 컬럼을 공개하지 않는다.
+- 존재하지 않거나 현재 사용자 소유가 아닌 자료는 `404 COMMON_003`이다.
+- 경로의 `materialId`를 요구된 형식으로 해석할 수 없으면 `400 COMMON_001`이다.
+- 활성 QuizSet과 과거 퀴즈 목록은 상세 응답에 합치지 않는다.
+
 ### 수정
 
 `PATCH /api/v1/learning-materials/{materialId}`
@@ -159,8 +251,9 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 
 - 보낸 필드만 수정한다. 빈 요청은 `COMMON_001`이다.
 - `title`은 본문 잠금과 관계없이 수정할 수 있다.
-- `contentEditStatus=EDITABLE`일 때만 `content`를 수정할 수 있다. 생성 접수부터 `LOCKED_GENERATING`, 첫 성공 뒤 `LOCKED_PERMANENT`다.
-- 성공한 문제 세트가 전혀 없는 생성이 실패하면 `LOCKED_GENERATING`에서 `EDITABLE`로 돌아간다. 하나라도 성공한 이력이 있으면 영구 잠금을 유지한다.
+- `contentEditStatus=EDITABLE`일 때만 `content`를 수정할 수 있다. 같은 학습자료의 QuizSet이 `GENERATING`인 동안에만 `LOCKED_GENERATING`이며 생성이 `READY` 또는 `FAILED`로 끝나면 `EDITABLE`이다.
+- 공개 상태는 `EDITABLE`, `LOCKED_GENERATING`뿐이며 영구 잠금 상태는 두지 않는다.
+- 학습자료 수정은 이미 만들어진 QuizSet·풀이·결과를 바꾸지 않는다. 이후 새 QuizSet은 생성 접수 시점의 최신 저장 본문을 근거로 한다.
 
 ### Notion 단일 페이지 일회성 복사
 
@@ -814,7 +907,7 @@ Headers: `Authorization`, `Content-Type: application/json`
 | 없거나 소유하지 않은 리소스, 접근할 수 없는 Notion 페이지 | `404` | 기존 `COMMON_003` | 목록·권한·페이지 선택 확인 |
 | 예상하지 못한 서버 오류 | `500` | 기존 `COMMON_999` | 학습자료 생성은 같은 멱등 키로 재시도하고, QuizSet 생성은 활성 생성 조회 후 없을 때만 새 요청하며, 제출은 같은 attempt 또는 review session 식별자로 재시도 |
 | 인증 정보 없음·잘못됨·만료 | `401` | 기존 `AUTH_005` | 갱신 또는 재로그인 |
-| 잠긴 학습자료 본문 수정 | `409` | `MATERIAL_001` | 제목만 수정하거나 새 자료 만들기 |
+| 생성 중인 학습자료 본문 수정 | `409` | `MATERIAL_001` | 제목만 수정하거나 생성 종료를 확인한 뒤 본문 저장 재시도 |
 | 학습자료 본문 20,000자 초과 | `413` | `MATERIAL_002` | 본문을 줄인 뒤 같은 저장 흐름 재시도 |
 | 같은 학습자료에 이미 `GENERATING` 작업이 있음 | `409` | `QUIZ_001` | 기존 생성 상태 확인 |
 | 생성 작업을 접수할 수 없는 일시적 서버 상태 | `503` | `QUIZ_002` | 새 QuizSet과 본문 잠금이 생기지 않았으므로 같은 조건으로 새 생성 요청 |

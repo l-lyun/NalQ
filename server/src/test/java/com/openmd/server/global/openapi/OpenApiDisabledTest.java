@@ -8,6 +8,7 @@ import com.openmd.server.auth.service.TwoStepSignUpService;
 import com.openmd.server.auth.controller.support.BrowserRefreshCookie;
 import com.openmd.server.auth.security.AccessTokenService;
 import com.openmd.server.learningmaterial.service.LearningMaterialService;
+import com.openmd.server.learningmaterial.service.LearningMaterialQueryService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -36,6 +37,7 @@ class OpenApiDisabledTest {
 	@MockitoBean AccessTokenService accessTokenService;
 	@MockitoBean BrowserRefreshCookie browserRefreshCookie;
 	@MockitoBean LearningMaterialService learningMaterialService;
+	@MockitoBean LearningMaterialQueryService learningMaterialQueryService;
 
 	@Test
 	void doesNotExposeApiDocumentationWhenDocumentationIsDisabled() throws Exception {

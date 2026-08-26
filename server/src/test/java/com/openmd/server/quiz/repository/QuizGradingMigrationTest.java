@@ -49,9 +49,9 @@ class QuizGradingMigrationTest {
 			""");
 		jdbc.update("""
 			INSERT INTO learning_materials (
-				id, user_id, title, content, source_type, content_edit_status,
+				id, user_id, title, content, source_type,
 				idempotency_key_hash, request_fingerprint, created_at, updated_at
-			) VALUES (1, 1, '자료', '내용', 'PASTE', 'EDITABLE',
+			) VALUES (1, 1, '자료', '내용', 'PASTE',
 				UNHEX(REPEAT('01', 32)), UNHEX(REPEAT('02', 32)), NOW(6), NOW(6))
 			""");
 	}

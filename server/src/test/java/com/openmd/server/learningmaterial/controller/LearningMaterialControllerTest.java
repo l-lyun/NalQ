@@ -13,6 +13,7 @@ import com.openmd.server.global.error.CommonErrorCode;
 import com.openmd.server.learningmaterial.dto.command.CreateLearningMaterialCommand;
 import com.openmd.server.learningmaterial.dto.response.CreatedLearningMaterial;
 import com.openmd.server.learningmaterial.service.LearningMaterialService;
+import com.openmd.server.learningmaterial.service.LearningMaterialQueryService;
 import com.openmd.server.learningmaterial.domain.ContentEditStatus;
 import java.time.Instant;
 import java.util.List;
@@ -29,11 +30,12 @@ import org.springframework.web.method.support.ModelAndViewContainer;
 class LearningMaterialControllerTest {
 
 	private final LearningMaterialService service = mock(LearningMaterialService.class);
+	private final LearningMaterialQueryService queries = mock(LearningMaterialQueryService.class);
 	private MockMvc mockMvc;
 
 	@BeforeEach
 	void setUp() {
-		mockMvc = MockMvcBuilders.standaloneSetup(new LearningMaterialController(service))
+		mockMvc = MockMvcBuilders.standaloneSetup(new LearningMaterialController(service, queries))
 			.setControllerAdvice(new com.openmd.server.global.error.GlobalExceptionHandler())
 			.setCustomArgumentResolvers(accessPrincipalResolver())
 			.build();
