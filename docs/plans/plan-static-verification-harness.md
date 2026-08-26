@@ -76,6 +76,8 @@ GitHub pull request / dev·main push
 
 워크플로는 `contents: read` 최소 권한만 사용하고 PR에 운영 비밀을 주입하지 않는다. 중복 실행을 취소하며, 서버 테스트가 실패하면 HTML report를 7일간 artifact로 보존한다.
 
+첫 workflow를 추가하는 bootstrap PR에서는 대상 브랜치에 아직 workflow가 없어 `pull_request` 실행이 생성되지 않을 수 있다. 이 경우 PR 코드에 쓰기 권한이나 비밀을 주는 `pull_request_target`으로 우회하지 않는다. 로컬 `./scripts/verify.sh all`을 완료한 뒤 병합하고, `dev` push 실행을 확인한 다음 후속 PR부터 `pull_request` 검증을 required check로 사용한다.
+
 ### CI가 아직 잡지 못하는 문제
 
 - 타입과 빌드는 맞지만 로그인, refresh, logout 등의 사용자 행동이 잘못된 경우
