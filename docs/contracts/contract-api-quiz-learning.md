@@ -308,7 +308,8 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 ```
 
 - 서버는 사용자가 선택한 페이지 하나를 요청 시점에 한 번 읽는다.
-- 공개 요청은 Notion 선택기가 반환한 불투명 `pageId`만 받는다. 전체 Notion URL을 직접 받는 계약은 아니며, URL 입력 UX를 제공한다면 클라이언트가 페이지 ID를 추출해 전송한다.
+- Notion OAuth의 페이지 선택기는 접근 권한만 부여하며 선택한 페이지 ID 목록을 callback이나 token 응답으로 반환하지 않는다. 연결 뒤 서버가 Notion Search API로 접근 가능한 페이지를 조회하고, 사용자가 OpenMD에서 그중 하나를 선택해 얻은 불투명 `pageId`만 이 요청에 보낸다.
+- 전체 Notion URL을 직접 받는 계약은 아니다.
 - 성공 응답은 프론트 편집용 값이며 서버 학습자료·draft·import job을 만들지 않는다.
 - 복사된 본문이 20,000자를 넘더라도 잘라 저장하지 않고 초과 경고와 함께 반환할 수 있다. 20,000자 저장 제한은 사용자가 프론트에서 수정한 뒤 학습자료 저장 요청에서 검증한다.
 - `warnings[].code`는 저장을 막지 않는 사용자 검토 신호다. 외부 블록 타입이나 파싱 예외 원문을 노출하지 않는다.
