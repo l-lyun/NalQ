@@ -3,6 +3,7 @@ package com.openmd.server.quiz.repository;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -452,6 +453,11 @@ class QuizGradingMySqlIntegrationTest {
         quiz.setId(),
         uuid(6),
         List.of(new QuizResponseRequest(quiz.questionId(), null, null, "wrong")));
+    var latest = reviews.latest(quiz.userId());
+    assertEquals("자료", latest.materialTitle());
+    assertNotNull(latest.completedAt());
+    assertEquals(1, latest.totalQuestionCount());
+    assertEquals(1, latest.attemptNumber());
     var first = reviews.start(quiz.userId(), uuid(6)).reviewSession();
     var retry = reviews.start(quiz.userId(), uuid(6)).reviewSession();
     assertEquals(first.reviewSessionId(), retry.reviewSessionId());

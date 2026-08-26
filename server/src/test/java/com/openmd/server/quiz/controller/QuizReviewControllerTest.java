@@ -16,6 +16,7 @@ import com.openmd.server.quiz.dto.response.EssaySelfAssessmentSummary;
 import com.openmd.server.quiz.dto.response.GradingCount;
 import com.openmd.server.quiz.dto.response.ReviewAttemptResult;
 import com.openmd.server.quiz.dto.response.ReviewAttemptSummary;
+import com.openmd.server.quiz.dto.response.ReviewLatestView;
 import com.openmd.server.quiz.dto.response.ReviewSessionStart;
 import com.openmd.server.quiz.dto.response.ReviewSessionView;
 import com.openmd.server.quiz.dto.response.ReviewSubmission;
@@ -91,6 +92,28 @@ class QuizReviewControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.status").value("SELF_ASSESSMENT_REQUIRED"))
         .andExpect(jsonPath("$.data.pendingEssayQuestionIds[0]").value("question-1"));
+  }
+
+  @Test
+  void latestReviewIncludesTheMaterialAndFullQuizContext() throws Exception {
+    when(reviews.latest(7L))
+        .thenReturn(
+            new ReviewLatestView(
+                "source-1",
+                "quiz-set-1",
+                2,
+                "운영체제 핵심 정리",
+                Instant.parse("2026-08-26T00:20:00Z"),
+                10,
+                3,
+                null));
+
+    mvc.perform(get("/api/v1/quiz-reviews/latest"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.materialTitle").value("운영체제 핵심 정리"))
+        .andExpect(jsonPath("$.data.completedAt").value("2026-08-26T00:20:00Z"))
+        .andExpect(jsonPath("$.data.totalQuestionCount").value(10))
+        .andExpect(jsonPath("$.data.reviewQuestionCount").value(3));
   }
 
   @Test

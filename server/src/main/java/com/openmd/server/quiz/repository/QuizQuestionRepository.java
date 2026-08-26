@@ -9,5 +9,7 @@ public interface QuizQuestionRepository extends JpaRepository<QuizQuestion, Long
 
   List<QuizQuestion> findAllByQuizSetIdOrderByNumber(long quizSetId);
 
+  long countByQuizSetId(long quizSetId);
+
   Optional<QuizQuestion> findByPublicIdAndQuizSetId(String publicId, long quizSetId);
 }

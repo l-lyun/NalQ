@@ -132,6 +132,12 @@ export function LearningPage({
     if (screen.id !== 'main') headingRef.current?.focus()
   }, [screen])
 
+  useEffect(() => {
+    if (screen.id === 'main' && materialsQuery.trim()) {
+      setMainSearchOpen(true)
+    }
+  }, [materialsQuery, screen.id])
+
   const push = (next: Screen) => {
     const nextDepth = historyDepthRef.current + 1
     window.history.pushState(
