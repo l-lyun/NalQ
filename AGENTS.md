@@ -83,6 +83,13 @@ Do not skip the failure check unless the environment makes it impossible; report
 - 이미 확인한 내용은 불필요하게 다시 읽지 않는다.
 - 코드 리뷰는 변경 diff부터 확인하고, 변경의 영향을 판단하는 데 필요한 코드만 추가로 읽는다.
 
+## Repository Verification Harness
+
+- 로컬과 에이전트는 CI와 같은 저장소 명령을 사용한다. 기본 검증은 루트에서 `./scripts/verify.sh fast`, Testcontainers까지 포함한 전체 검증은 `./scripts/verify.sh all`이다.
+- 애플리케이션 하나만 변경한 경우 각 하위 `AGENTS.md`의 범위별 명령을 우선 실행한다. 배포 전 변경이나 검증 하네스 자체를 수정한 경우에는 `./scripts/verify.sh all`을 실행한다.
+- 실행 결과는 `PASS`, `BLOCKED`, `PRE-EXISTING FAILURE` 중 하나로 분류하고, 실행하지 않은 검사를 통과한 것으로 보고하지 않는다.
+- 상세 명령, CI 구조와 단계별 강화 계획은 [정적 검증 하네스 실행 계획](docs/plans/plan-static-verification-harness.md)을 따른다.
+
 ## Code Review Rules
 
 ### Review language and scope

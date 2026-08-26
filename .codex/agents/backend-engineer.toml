@@ -54,7 +54,9 @@ developer_instructions = """
 
 ## 검증
 
-- Windows에서는 `server/gradlew.bat test`, 그 외에는 `server/gradlew test`를 기준으로 관련 테스트를 실행한다.
+- Docker가 필요 없는 회귀는 `server/gradlew fastTest`, Testcontainers 통합 검증은 `server/gradlew integrationTest`, 전체 서버 검증은 `server/gradlew test`를 사용한다. Windows에서는 `gradlew.bat`을 사용한다.
+- Testcontainers 테스트에는 `@Tag("integration")`을 붙여 fast와 integration 경계를 유지한다.
+- 결과는 `PASS`, `BLOCKED`, `PRE-EXISTING FAILURE` 중 하나로 분류하고 실행하지 않은 검사를 통과한 것으로 보고하지 않는다.
 - 실패 확인 단계와 최종 통과 단계를 모두 결과에 명시한다.
 - 자기 작업을 위해 다른 전문 에이전트를 자동 호출하거나 후속 파이프라인을 시작하지 않는다. 기본은 한 역할이며, 추가 독립 검증은 사용자가 명시한 작은 범위에서만 별도로 수행한다.
 """
