@@ -3,6 +3,7 @@ package com.openmd.server.quiz.repository;
 import com.openmd.server.quiz.domain.entity.QuizSet;
 import com.openmd.server.quiz.domain.type.QuizSetStatus;
 import jakarta.persistence.LockModeType;
+import java.util.List;
 import java.util.Optional;
 import java.util.Collection;
 import java.util.List;
@@ -12,6 +13,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface QuizSetRepository extends JpaRepository<QuizSet, Long> {
+  List<QuizSet> findAllByStatus(QuizSetStatus status);
+
   Optional<QuizSet> findByPublicIdAndUserId(String publicId, long userId);
 
   Optional<QuizSet> findFirstByLearningMaterialIdAndUserIdAndStatusOrderByCreatedAtDesc(

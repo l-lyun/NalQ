@@ -6,10 +6,6 @@ import com.openmd.server.quiz.domain.entity.*;
 import com.openmd.server.quiz.domain.type.*;
 import com.openmd.server.quiz.repository.*;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,7 +23,6 @@ public class QuizGenerationPersistenceService {
   private final QuizEssayAnswerGuideRepository essays;
   private final QuizFillInTheBlankRepository blanks;
   private final QuizFillInTheBlankAnswerRepository blankAnswers;
-  private final TransactionTemplate transactions;
 
   public QuizGenerationPersistenceService(
       QuizSetRepository sets,
@@ -36,8 +31,7 @@ public class QuizGenerationPersistenceService {
       QuizShortAnswerAnswerRepository shorts,
       QuizEssayAnswerGuideRepository essays,
       QuizFillInTheBlankRepository blanks,
-      QuizFillInTheBlankAnswerRepository blankAnswers,
-      PlatformTransactionManager transactionManager) {
+      QuizFillInTheBlankAnswerRepository blankAnswers) {
     this.sets = sets;
     this.questions = questions;
     this.choices = choices;
@@ -45,26 +39,20 @@ public class QuizGenerationPersistenceService {
     this.essays = essays;
     this.blanks = blanks;
     this.blankAnswers = blankAnswers;
-    this.transactions = new TransactionTemplate(transactionManager);
   }
 
   /** TODO: 외부 문제 생성 모델 연동이 완료되면 이 임시 고정 후보 생성 경로를 제거한다. */
-  public void completeWithTemporaryStubAfterDelay(
+  @Transactional
+  public void completeWithTemporaryStub(
       long userId,
       String quizSetId,
       List<QuestionType> selectedTypes,
       int maxQuestionCount) {
-    List<QuestionType> types = List.copyOf(selectedTypes);
-    CompletableFuture.runAsync(
-        () ->
-            transactions.executeWithoutResult(
-                ignored ->
-                    complete(
-                        userId,
-                        quizSetId,
-                        types.stream().map(this::temporaryCandidate).toList(),
-                        maxQuestionCount)),
-        CompletableFuture.delayedExecutor(3, TimeUnit.SECONDS));
+    complete(
+        userId,
+        quizSetId,
+        selectedTypes.stream().map(this::temporaryCandidate).toList(),
+        maxQuestionCount);
   }
 
   @Transactional
@@ -100,6 +88,13 @@ public class QuizGenerationPersistenceService {
         sets.findOwnedForUpdate(quizSetId, userId)
             .orElseThrow(() -> new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND));
     if (set.getStatus() == QuizSetStatus.GENERATING) set.fail(QuizSetFailureCode.GENERATION_FAILED);
+  }
+
+  @Transactional
+  public int failInterruptedGenerations() {
+    List<QuizSet> interrupted = sets.findAllByStatus(QuizSetStatus.GENERATING);
+    interrupted.forEach(set -> set.fail(QuizSetFailureCode.GENERATION_FAILED));
+    return interrupted.size();
   }
 
   private QuizGenerationCandidate temporaryCandidate(QuestionType type) {
