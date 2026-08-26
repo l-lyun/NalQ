@@ -25,6 +25,7 @@ import com.openmd.server.quiz.domain.type.GradingOutcome;
 import com.openmd.server.quiz.domain.type.QuestionType;
 import com.openmd.server.quiz.domain.type.QuizAttemptStatus;
 import com.openmd.server.quiz.domain.type.QuizDifficulty;
+import com.openmd.server.quiz.domain.type.QuizSetFailureCode;
 import com.openmd.server.quiz.domain.type.QuizSetStatus;
 import com.openmd.server.quiz.dto.command.QuizGenerationConfig;
 import com.openmd.server.quiz.dto.request.BlankAnswerRequest;
@@ -192,6 +193,28 @@ class QuizGradingMySqlIntegrationTest {
             """,
             String.class,
             accepted.quizSetId()));
+  }
+
+  @Test
+  void marksGeneratingQuizSetsFailedWhenRecoveringAfterAServerRestart() {
+    Fixture fixture = fixture();
+    QuizSet interrupted =
+        sets.saveAndFlush(QuizSet.generating(fixture.userId(), fixture.materialId()));
+
+    assertEquals(1, generation.failInterruptedGenerations());
+
+    assertEquals(
+        QuizSetStatus.FAILED.name(),
+        jdbc.queryForObject(
+            "SELECT status FROM quiz_sets WHERE id = ?",
+            String.class,
+            interrupted.getId()));
+    assertEquals(
+        QuizSetFailureCode.GENERATION_FAILED.name(),
+        jdbc.queryForObject(
+            "SELECT failure_code FROM quiz_sets WHERE id = ?",
+            String.class,
+            interrupted.getId()));
   }
 
   @Test
