@@ -34,6 +34,7 @@ public class SecurityConfiguration {
 		"/swagger-ui/**",
 		"/swagger-ui.html"
 	};
+	private static final String NOTION_OAUTH_CALLBACK_PATH = "/api/v1/notion/oauth/callback";
 
 	@Bean
 	SecurityFilterChain securityFilterChain(
@@ -56,6 +57,7 @@ public class SecurityConfiguration {
 			.authorizeHttpRequests(authorize -> {
 				authorize.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll();
 				authorize.requestMatchers("/api/v1/auth/**").permitAll();
+				authorize.requestMatchers(NOTION_OAUTH_CALLBACK_PATH).permitAll();
 				if (apiDocsEnabled) {
 					authorize.requestMatchers(API_DOCUMENTATION_PATHS).permitAll();
 				}

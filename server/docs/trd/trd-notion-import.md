@@ -1,12 +1,12 @@
 ---
 document_type: trd
-status: proposed
+status: implementation_sync
 scope: server
 ---
 
 # [TRD · Server] Notion 단일 페이지 일회성 복사
 
-- 상태: 공식 API 검증을 반영한 구현 제안, 외부 호출 미구현
+- 상태: OAuth 연결 생명주기 구현 동기화, 페이지 검색·본문 복사 미구현
 - 대상: Notion 연결·페이지 탐색과 `POST /api/v1/learning-material-imports/notion`
 - 제품 정책: [학습자료 만들기 PRD](../../../docs/prd/prd-content-import.md)
 - 공유 계약: [학습자료·퀴즈 API 계약](../../../docs/contracts/contract-api-quiz-learning.md)
@@ -15,7 +15,7 @@ scope: server
 
 ## 1. 책임과 제품 전제
 
-이 문서는 로그인한 OpenMD 사용자가 자신의 Notion workspace를 연결하고, 접근을 허용한 페이지 중 하나를 선택해 제목·본문·변환 경고를 한 번 복사하는 서버 구조를 제안한다. OAuth와 외부 API 호출은 아직 구현하지 않는다.
+이 문서는 로그인한 OpenMD 사용자가 자신의 Notion workspace를 연결하고, 접근을 허용한 페이지 중 하나를 선택해 제목·본문·변환 경고를 한 번 복사하는 서버 구조를 정의한다. OAuth 연결 시작·callback·상태 조회·해제와 token 교환·refresh·revoke 경계까지 구현됐고, 페이지 Search와 본문 복사는 후속 범위다.
 
 다음 제품 전제는 이미 확정됐다.
 
@@ -50,16 +50,16 @@ OpenMD 로그인
   -> 사용자가 수정 후 기존 학습자료 생성 API로 저장
 ```
 
-OAuth와 페이지 탐색을 위한 경로명은 아직 공유 계약에 없는 **서버 제안**이다.
+OAuth 연결 경로는 공유 계약에 반영해 구현했다. 페이지 탐색 경로는 아직 후속 **서버 제안**이다.
 
 | OpenMD 경계 | 책임 | 공개 형태 제안 |
 | --- | --- | --- |
-| `POST /api/v1/notion/authorizations` | 현재 사용자에게 바인딩한 일회용 `state` 생성, Notion 승인 URL 반환 | JSON 응답 |
-| `GET /api/v1/notion/oauth/callback` | `code`·`state` 검증, token 교환·저장, 허용된 프론트 경로로 이동 | 브라우저 redirect |
-| `GET /api/v1/notion/connection` | 연결 여부와 workspace 표시 정보 조회 | token 없는 JSON 응답 |
-| `GET /api/v1/notion/pages` | 접근 가능한 page 제목 검색·cursor 페이지 이동 | JSON 응답 |
-| `DELETE /api/v1/notion/connection` | Notion token 철회 시도 후 로컬 연결 제거 | 빈 성공 응답 |
-| `POST /api/v1/learning-material-imports/notion` | 선택한 `pageId`를 한 번 읽어 편집용 제목·본문·경고 반환 | 기존 계약 유지 |
+| `POST /api/v1/notion/authorizations` | 현재 사용자에게 바인딩한 일회용 `state` 생성, Notion 승인 URL 반환 | 구현됨 |
+| `GET /api/v1/notion/oauth/callback` | `code`·`state` 검증, token 교환·저장, 고정 프론트 URI로 이동 | 구현됨, 이 경로만 인증 예외 |
+| `GET /api/v1/notion/connection` | 연결 여부와 workspace 표시 정보 조회 | 구현됨, token 없는 JSON 응답 |
+| `GET /api/v1/notion/pages` | 접근 가능한 page 제목 검색·cursor 페이지 이동 | 후속 범위 |
+| `DELETE /api/v1/notion/connection` | Notion token 철회 시도 후 로컬 연결 제거 | 구현됨, 멱등 성공 |
+| `POST /api/v1/learning-material-imports/notion` | 선택한 `pageId`를 한 번 읽어 편집용 제목·본문·경고 반환 | 후속 범위, 기존 계약 유지 |
 
 페이지 탐색 응답은 `pageId`, `title`, `lastEditedTime`, `nextCursor`, `hasMore`까지만 노출한다. Notion access token, workspace 내부 URL, 원본 property 전체와 외부 응답은 전달하지 않는다. Search cursor는 해석하지 않는 불투명 문자열로 왕복한다.
 
@@ -68,11 +68,11 @@ OAuth와 페이지 탐색을 위한 경로명은 아직 공유 계약에 없는 
 ### 4.1 연결 시작과 state
 
 - 서버가 `client_id`, 고정 `redirect_uri`, `response_type=code`, `owner=user`, 무작위 `state`로 승인 URL을 만든다.
-- `state` 원문은 브라우저가 Notion에 전달하고, 서버에는 SHA-256 digest를 key로 현재 `userId`, 허용된 복귀 경로와 만료 시각을 Redis에 둔다.
-- 기존 Redis 인프라를 재사용하되 OAuth state 저장소는 별도 port로 분리한다. 값은 일회성 소비이며 짧은 TTL을 둔다. 정확한 TTL은 설정값으로 두고 구현 PR에서 확정한다.
+- `state` 원문은 브라우저가 Notion에 전달하고, 서버에는 SHA-256 digest를 key로 현재 `userId`만 Redis에 둔다. 복귀 URI는 요청 상태가 아니라 서버 설정의 고정값이다.
+- 기존 Redis 인프라를 재사용하되 OAuth state 저장소는 별도 port로 분리한다. 값은 Lua의 `GET`·`DEL` 한 실행으로 일회성 소비하며 기본 TTL은 10분이고 설정으로 조정한다.
 - callback은 `state`가 없거나 만료됐거나 이미 소비됐거나 현재 흐름과 일치하지 않으면 token 교환을 시도하지 않는다.
 - 사용자가 승인을 취소하면 Notion의 `error`를 내부 실패로 정규화하고 token이나 연결 행을 만들지 않는다.
-- 복귀 경로는 서버 allowlist 안의 상대 경로만 저장한다. 요청이 보낸 임의 URL로 redirect하지 않는다.
+- 복귀 경로를 요청에서 받지 않는다. 성공·취소 모두 서버에 설정된 하나의 절대 HTTP(S) 프론트 URI로만 redirect한다.
 
 ### 4.2 code 교환과 token lifecycle
 
@@ -89,7 +89,7 @@ OAuth와 페이지 탐색을 위한 경로명은 아직 공유 계약에 없는 
 
 ## 5. 연결 저장 모델 제안
 
-사용자 한 명당 활성 Notion workspace 연결 하나를 기본값으로 제안한다. 여러 workspace 동시 연결이 필요해지기 전까지 UI와 token 선택 규칙을 단순하게 유지한다. 이 cardinality는 제품 확정 전 제안이다.
+사용자 한 명당 Notion workspace 연결 하나를 `UNIQUE(user_id)`로 구현했다. 같은 사용자의 재연결은 token pair와 workspace 표시 정보를 한 행에서 교체한다.
 
 ```text
 notion_connections
@@ -97,20 +97,21 @@ notion_connections
 - user_id                 UNIQUE, FK users.id
 - workspace_id
 - workspace_name          nullable, 표시용
-- workspace_icon          nullable, 표시용
+- workspace_icon_url      nullable, 표시용
 - bot_id
 - access_token_ciphertext
 - refresh_token_ciphertext
 - encryption_key_version
 - status                  CONNECTED | REAUTH_REQUIRED
-- connected_at
+- created_at
 - updated_at
 ```
 
 - token은 복호화 가능한 인증 암호화 방식으로 저장하고 암호문과 key version만 DB에 둔다. 암호화 key는 환경 변수 또는 운영 secret manager에서 주입하며 DB·Git에 저장하지 않는다.
-- 현재 서버에는 외부 token 암호화 경계가 없으므로 실제 migration보다 먼저 `NotionTokenCipher` port와 key rotation 방식을 구현해야 한다.
+- `NotionTokenCipher` port 뒤의 AES-256-GCM 구현은 매 암호화마다 12-byte nonce를 만들고 `userId + workspaceId + token 종류`를 AAD로 인증한다. 암호문에는 nonce를 붙이고 DB의 key version으로 active 또는 이전 key를 선택한다.
 - 재연결이 같은 사용자에게 성공하면 기존 연결을 새 token pair와 workspace 정보로 교체한다. 기존 token revoke는 best effort로 수행한다.
-- OAuth client ID·secret, redirect URI, API base URL, `Notion-Version`, timeout과 traversal budget은 설정으로 분리한다.
+- OAuth client ID·secret, redirect URI, API base URL, HTTP timeout과 token 암호화 key는 설정으로 분리했다. `openmd.notion.enabled` 기본값은 `false`이며 비활성 상태에서는 Notion secret 없이 기존 서버가 기동한다.
+- OAuth adapter의 connect timeout은 기본 3초, read timeout은 기본 10초이며 둘 다 양수 설정만 허용한다. timeout·HTTP 오류는 credential과 Notion 응답 body를 cause에 보존하지 않는 `NotionOAuthException`으로 정규화한다.
 
 ## 6. 페이지 탐색
 
@@ -143,8 +144,8 @@ Notion 공식 가이드는 큰 페이지를 읽을 때 비동기 구조를 권�
 ## 8. 서버 의존 방향
 
 ```text
-NotionAuthorizationController
-  -> NotionAuthorizationService
+NotionConnectionController
+  -> NotionConnectionService
        -> NotionOAuthClient (port)
        -> NotionConnectionRepository
        -> NotionTokenCipher
@@ -163,7 +164,7 @@ NotionImportController
        -> NotionTextRenderer
 ```
 
-서버가 Java이므로 JavaScript SDK를 전제로 하지 않고 Notion REST API를 작은 port 뒤에 둔다. Spring HTTP client의 구체 선택은 기존 서버 의존성과 테스트 용이성을 보고 구현 PR에서 정한다.
+서버가 Java이므로 JavaScript SDK를 전제로 하지 않고 Notion REST API를 `NotionOAuthPort` 뒤에 뒀다. OAuth token·refresh·revoke adapter는 Spring `RestClient`를 사용하고 로컬 fake HTTP server로 검증한다. Data API client는 후속 구현에서 별도 port로 추가한다.
 
 모든 Data API 요청은 `Authorization: Bearer ...`, `Notion-Version: 2026-03-11`을 보내며 JSON body가 있으면 `Content-Type: application/json`을 보낸다.
 
@@ -186,7 +187,7 @@ NotionImportController
 ## 10. 테스트 전략
 
 - OAuth service: state 발급·일회성 소비·만료·사용자 binding·취소 callback·code 교환 실패를 검증한다.
-- OAuth HTTP adapter: code 교환, 새 token pair로 refresh, revoke 요청을 로컬 fake server로 검증한다.
+- OAuth HTTP adapter: code 교환, 새 token pair로 refresh, revoke, connect/read timeout과 민감정보 제거를 로컬 fake server로 검증한다.
 - connection repository/cipher: token 평문이 DB·로그에 남지 않음, key version, 재연결 교체와 refresh 원자성을 검증한다.
 - Search adapter: page filter, title query, cursor 왕복, 빈 결과와 index 지연 재조회 가능성을 검증한다.
 - page reader: children page_size 100, cursor pagination, 중첩 children, 순서, unsupported block, 401 refresh 1회, 403/404, 429/529 `Retry-After`, timeout과 traversal budget을 검증한다.
@@ -194,12 +195,12 @@ NotionImportController
 - controller: OpenMD Bearer 사용자 binding, 공통 응답 봉투, `pageId` 검증과 공개 오류만 검증한다.
 - 자동화 테스트는 실제 Notion API·계정·token을 호출하지 않는다. 별도 로컬 profile의 수동 smoke test만 전용 test workspace에서 허용한다.
 
-## 11. 구현 전 결정
+## 11. 구현 상태와 남은 결정
 
 | 항목 | 권장안 | 상태 |
 | --- | --- | --- |
-| 인증 방식 | Public connection OAuth 2.0, Read content만 요청 | 구현 제안 |
-| 사용자당 workspace 수 | 활성 연결 1개 | 제품 확인 필요 |
+| 인증 방식 | Public connection OAuth 2.0, Read content만 요청 | 연결 생명주기 구현, portal 설정 필요 |
+| 사용자당 workspace 수 | 연결 1개 | V7 `UNIQUE(user_id)` 구현 |
 | 페이지 선택 | OAuth picker는 권한 부여, OpenMD Search 결과에서 1개 선택 | 공식 동작에 따른 제안 |
 | 큰 페이지 | 동기 처리 유지, 유한 budget 초과 시 전체 실패 | 수치 계측 필요 |
 | 공개 오류 | 재승인 필요와 일시 장애를 구분하는 안정 코드 2개 | 공유 계약 결정 필요 |
@@ -225,3 +226,4 @@ NotionImportController
 | --- | --- | --- |
 | 2026-08-26 | 단일 페이지 일회성 복사의 최소 서버 경계와 인증 선택지 초안 | 구현 전 제안 |
 | 2026-08-26 | 공식 API를 검증해 Public OAuth, Search 기반 페이지 선택, token lifecycle, 재귀 조회·제한·테스트 설계로 개편 | 구현 전 제안 |
+| 2026-08-26 | V7 연결 모델, AES-GCM token 저장, Redis state, OAuth 시작·callback·상태·해제와 refresh 경계를 구현 | 사용자 요청 |

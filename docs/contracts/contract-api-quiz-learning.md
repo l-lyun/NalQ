@@ -89,6 +89,10 @@ scope: shared
 | 학습자료 목록 조회·제목 검색 | `GET /api/v1/learning-materials` | `200 OK` |
 | 학습자료 상세 조회 | `GET /api/v1/learning-materials/{materialId}` | `200 OK` |
 | 학습자료 수정 | `PATCH /api/v1/learning-materials/{materialId}` | `200 OK` |
+| Notion 연결 시작 | `POST /api/v1/notion/authorizations` | `200 OK` |
+| Notion OAuth callback | `GET /api/v1/notion/oauth/callback` | `302 Found` |
+| Notion 연결 상태 조회 | `GET /api/v1/notion/connection` | `200 OK` |
+| Notion 연결 해제 | `DELETE /api/v1/notion/connection` | `200 OK` |
 | Notion 페이지 일회성 복사 | `POST /api/v1/learning-material-imports/notion` | `200 OK` |
 | 문제 세트 생성 접수 | `POST /api/v1/learning-materials/{materialId}/quiz-sets` | `202 Accepted` |
 | 자료의 활성 생성 조회 | `GET /api/v1/learning-materials/{materialId}/quiz-sets/active` | `200 OK` |
@@ -109,8 +113,8 @@ scope: shared
 
 ### 현재 구현 범위
 
-- **구현됨:** 학습자료 저장, 인증 사용자의 목록·상세 조회와 제목·본문 수정.
-- **확정·후속 구현:** Notion 단일 페이지 일회성 복사는 계약을 유지하되 아직 외부 연동을 구현하지 않는다.
+- **구현됨:** 학습자료 저장, 인증 사용자의 목록·상세 조회와 제목·본문 수정, Notion OAuth 연결 시작·callback·상태 조회·연결 해제.
+- **확정·후속 구현:** Notion 페이지 검색과 단일 페이지 일회성 복사는 계약을 유지하되 아직 외부 연동을 구현하지 않는다.
 - **비범위:** 학습자료 삭제, Notion 동기화와 실제 외부 문제 생성 서비스 연동은 이번 작업에서 다루지 않는다.
 
 ### 저장
@@ -278,6 +282,71 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 
 - `sourceType`과 `createdAt`은 수정되지 않는다.
 - 존재하지 않거나 현재 사용자 소유가 아닌 자료는 `404 COMMON_003`이다.
+
+### Notion 연결 시작
+
+`POST /api/v1/notion/authorizations`
+
+Headers: `Authorization`
+
+```json
+{
+  "success": true,
+  "data": {
+    "authorizationUrl": "https://api.notion.com/v1/oauth/authorize?..."
+  },
+  "error": null
+}
+```
+
+- 서버가 현재 OpenMD 사용자에게 바인딩된 일회용 OAuth `state`를 만들고 고정 callback URI를 포함한 Notion 승인 URL을 반환한다.
+- 클라이언트는 URL의 `state`, `client_id`, `redirect_uri`를 수정하지 않고 브라우저로 이동한다.
+- 요청에서 별도 복귀 URL을 받지 않으며 callback 뒤에는 서버에 설정된 프론트 URI로만 이동한다.
+
+### Notion OAuth callback
+
+`GET /api/v1/notion/oauth/callback?code={code}&state={state}`
+
+- 이 경로만 OpenMD Bearer 인증 없이 접근할 수 있다. 나머지 `/api/v1/notion/**` 경로는 인증이 필요하다.
+- 서버는 만료되지 않은 일회성 `state`로 연결을 시작한 OpenMD 사용자를 식별하고, `code`를 Notion token pair로 교환해 암호화 저장한다.
+- 성공하면 설정된 프론트 URI의 `?notion=connected`로 `302 Found` 이동한다.
+- 사용자가 Notion 승인을 취소해 `error`와 유효한 `state`가 오면 token이나 연결을 만들지 않고 `?notion=cancelled`로 이동한다.
+- 누락·만료·재사용된 `state`와 누락된 `code`는 `400 COMMON_001`이며 token 교환을 시도하지 않는다.
+- callback 또는 token 응답은 access token, refresh token, OAuth code와 state 원문을 프론트에 반환하지 않는다.
+
+### Notion 연결 상태 조회
+
+`GET /api/v1/notion/connection`
+
+Headers: `Authorization`
+
+연결이 없을 때도 복구 가능한 정상 상태로 응답한다.
+
+```json
+{
+  "success": true,
+  "data": {
+    "connected": false,
+    "status": null,
+    "workspaceId": null,
+    "workspaceName": null,
+    "workspaceIconUrl": null
+  },
+  "error": null
+}
+```
+
+연결이 유효하면 `connected=true`, `status=CONNECTED`와 workspace 표시 정보를 반환한다. refresh credential이 거절된 연결은 `connected=false`, `status=REAUTH_REQUIRED`이며 다시 연결해야 한다. 어떤 상태에서도 token은 반환하지 않는다.
+
+### Notion 연결 해제
+
+`DELETE /api/v1/notion/connection`
+
+Headers: `Authorization`
+
+- Notion revoke를 시도한 뒤 로컬 암호화 token과 연결 행을 제거한다.
+- Notion이 일시적으로 응답하지 않아도 로컬 연결은 제거한다.
+- 이미 연결이 없어도 같은 `200 OK`, `success=true`, `data=null`을 반환한다.
 
 ### Notion 단일 페이지 일회성 복사
 
@@ -942,6 +1011,7 @@ Headers: `Authorization`, `Content-Type: application/json`
 
 - MVP의 안정 오류 코드는 `COMMON_001/002/003/999`, `AUTH_005`, `MATERIAL_001/002`, `QUIZ_001/002`, `ATTEMPT_001`, `REVIEW_001`로 제한한다.
 - Notion, 외부 생성 서비스, LLM 또는 세부 검증 단계별 공개 오류 코드를 추가하지 않는다.
+- Notion 기능이 서버 설정에서 비활성화된 환경은 `/api/v1/notion/**` handler를 등록하지 않는다. 연결 기능을 제공하는 배포에서는 필요한 OAuth와 암호화 설정을 모두 검증한 뒤 기능을 활성화한다.
 - 비동기 생성 실패는 정상 상태 조회의 `status=FAILED`로 전달한다. HTTP 오류와 혼용하지 않는다.
 - `error.message`는 사용자가 다음 행동을 이해할 수준으로 쓰고 내부 예외·LLM·Notion 상세를 노출하지 않는다.
 - 입력 오류의 `fields`는 `responses[0].selectedChoiceId`나 `responses[1].blankAnswers[0].blankId`처럼 클라이언트가 해당 입력을 찾을 수 있는 경로를 사용한다.
