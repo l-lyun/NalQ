@@ -1,6 +1,5 @@
 package com.openmd.server.learningmaterial.dto.model;
 
-import com.openmd.server.learningmaterial.domain.ContentEditStatus;
 import com.openmd.server.learningmaterial.domain.SourceType;
 import java.time.Instant;
 
@@ -10,7 +9,6 @@ public record StoredLearningMaterial(
 	String title,
 	String content,
 	SourceType sourceType,
-	ContentEditStatus contentEditStatus,
 	byte[] requestFingerprint,
 	Instant createdAt
 ) {

@@ -18,6 +18,7 @@ import com.openmd.server.auth.config.SecurityConfiguration;
 import com.openmd.server.auth.security.AccessTokenService;
 import com.openmd.server.learningmaterial.controller.LearningMaterialController;
 import com.openmd.server.learningmaterial.service.LearningMaterialService;
+import com.openmd.server.learningmaterial.service.LearningMaterialQueryService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootConfiguration;
@@ -51,6 +52,7 @@ class OpenApiContractTest {
 	@MockitoBean AccessTokenService accessTokenService;
 	@MockitoBean BrowserRefreshCookie browserRefreshCookie;
 	@MockitoBean LearningMaterialService learningMaterialService;
+	@MockitoBean LearningMaterialQueryService learningMaterialQueryService;
 
 	@SpringBootConfiguration
 	@EnableAutoConfiguration
@@ -135,6 +137,28 @@ class OpenApiContractTest {
 			.andExpect(jsonPath("$.paths['/api/v1/learning-materials'].post.responses['413'].content"
 				+ ".['application/json'].schema.$ref").value("#/components/schemas/ApiResponse"))
 			.andExpect(jsonPath("$.paths['/api/v1/learning-materials'].post.responses['500'].content"
+				+ ".['application/json'].schema.$ref").value("#/components/schemas/ApiResponse"))
+			.andExpect(jsonPath("$.paths['/api/v1/learning-materials'].get.operationId")
+				.value("listLearningMaterials"))
+			.andExpect(jsonPath("$.paths['/api/v1/learning-materials'].get.security[0].bearerAuth")
+				.isArray())
+			.andExpect(jsonPath("$.paths['/api/v1/learning-materials'].get.parameters[0].name")
+				.value("page"))
+			.andExpect(jsonPath("$.paths['/api/v1/learning-materials'].get.responses['200'].content"
+				+ ".['application/json'].schema.$ref")
+				.value("#/components/schemas/ApiResponseLearningMaterialPage"))
+			.andExpect(jsonPath("$.paths['/api/v1/learning-materials'].get.responses['400'].content"
+				+ ".['application/json'].schema.$ref").value("#/components/schemas/ApiResponse"))
+			.andExpect(jsonPath("$.paths['/api/v1/learning-materials'].get.responses['401'].content"
+				+ ".['application/json'].schema.$ref").value("#/components/schemas/ApiResponse"))
+			.andExpect(jsonPath("$.paths['/api/v1/learning-materials/{materialId}'].get.operationId")
+				.value("getLearningMaterial"))
+			.andExpect(jsonPath("$.paths['/api/v1/learning-materials/{materialId}'].get.security[0].bearerAuth")
+				.isArray())
+			.andExpect(jsonPath("$.paths['/api/v1/learning-materials/{materialId}'].get.responses['200'].content"
+				+ ".['application/json'].schema.$ref")
+				.value("#/components/schemas/ApiResponseLearningMaterialDetail"))
+			.andExpect(jsonPath("$.paths['/api/v1/learning-materials/{materialId}'].get.responses['404'].content"
 				+ ".['application/json'].schema.$ref").value("#/components/schemas/ApiResponse"))
 			.andExpect(jsonPath("$.components.schemas.RefreshTokenRequest.properties.refreshToken.maxLength")
 				.value(128))

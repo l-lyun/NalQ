@@ -75,6 +75,22 @@
   margin: 0;
 }
 
+.learning-pagination {
+  display: grid;
+  grid-template-columns: minmax(44px, 1fr) auto minmax(44px, 1fr);
+  align-items: center;
+  gap: var(--seed-dimension-x3);
+  width: 100%;
+}
+
+.learning-pagination > :last-child {
+  justify-self: end;
+}
+
+.learning-material-body {
+  white-space: pre-wrap;
+}
+
 .learning-textarea {
   min-height: 220px;
 }

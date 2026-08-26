@@ -1,19 +1,10 @@
-export type LearningMaterialSource = 'PASTE' | 'NOTION'
+import type {
+  LearningMaterialDetail,
+  LearningMaterialPage,
+  LearningMaterialSummary,
+} from '@/features/learning-material/api/learningMaterial.types'
 
-export type LearningMaterialContentEditStatus =
-  | 'EDITABLE'
-  | 'LOCKED_GENERATING'
-  | 'LOCKED_PERMANENT'
-
-export type LearningMaterial = {
-  id: string
-  title: string
-  body: string
-  source: LearningMaterialSource
-  updatedAtLabel: string
-  generating: boolean
-  contentEditStatus?: LearningMaterialContentEditStatus
-}
+export type { LearningMaterialDetail, LearningMaterialPage, LearningMaterialSummary }
 
 export type LearningReviewSummary = {
   sourceAttemptId: string
@@ -26,11 +17,9 @@ export type LearningReviewSummary = {
 
 export type LearningNavigationDestination = 'home' | 'learning' | 'profile'
 
-export type LearningMaterialDraft = Pick<LearningMaterial, 'title' | 'body'>
-
-export type LearningMaterialUpdate = {
+export type LearningMaterialDraft = {
   title: string
-  body?: string
+  body: string
 }
 
 export type LearningSectionState<T> =
@@ -41,18 +30,23 @@ export type LearningSectionState<T> =
 export type LearningPageCallbacks = {
   onNavigate?: (destination: LearningNavigationDestination) => void
   onStartReview?: (review: LearningReviewSummary) => void
-  onOpenQuizConditions?: (material: LearningMaterial) => void
+  onOpenQuizConditions?: (material: Pick<LearningMaterialSummary, 'materialId' | 'title'>) => void
   onStartNotionImport?: () => void
-  onCreateMaterial?: (draft: LearningMaterialDraft) => Promise<LearningMaterial>
-  onUpdateMaterial?: (materialId: string, update: LearningMaterialUpdate) => void
+  onCreateMaterial?: (
+    draft: LearningMaterialDraft,
+  ) => Promise<Pick<LearningMaterialSummary, 'materialId' | 'title'>>
+  onLoadMaterialDetail?: (materialId: string) => Promise<LearningMaterialDetail>
+  onMaterialsQueryChange?: (query: string) => void
+  onMaterialsPageChange?: (page: number) => void
   onRetryReview?: () => void
   onRetryMaterials?: () => void
 }
 
 export type LearningPageProps = {
-  initialMaterials?: LearningMaterial[]
   review?: LearningReviewSummary | null
   reviewState?: LearningSectionState<LearningReviewSummary | null>
-  materialsState?: LearningSectionState<LearningMaterial[]>
+  materialsState: LearningSectionState<LearningMaterialPage>
+  materialsQuery: string
+  materialsFetching?: boolean
   callbacks?: LearningPageCallbacks
 }

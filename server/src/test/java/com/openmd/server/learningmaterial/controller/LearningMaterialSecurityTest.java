@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -12,9 +13,12 @@ import com.openmd.server.auth.security.AccessPrincipal;
 import com.openmd.server.auth.security.AccessTokenService;
 import com.openmd.server.global.error.GlobalExceptionHandler;
 import com.openmd.server.learningmaterial.dto.response.CreatedLearningMaterial;
+import com.openmd.server.learningmaterial.dto.response.LearningMaterialPage;
 import com.openmd.server.learningmaterial.service.LearningMaterialService;
+import com.openmd.server.learningmaterial.service.LearningMaterialQueryService;
 import com.openmd.server.learningmaterial.domain.ContentEditStatus;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootConfiguration;
@@ -45,6 +49,7 @@ class LearningMaterialSecurityTest {
 
 	@Autowired MockMvc mockMvc;
 	@MockitoBean LearningMaterialService service;
+	@MockitoBean LearningMaterialQueryService queryService;
 	@MockitoBean AccessTokenService accessTokenService;
 
 	@SpringBootConfiguration
@@ -73,6 +78,20 @@ class LearningMaterialSecurityTest {
 				.header("Idempotency-Key", "request-2")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("{\"title\":\"제목\",\"content\":\"본문\",\"sourceType\":\"PASTE\"}"))
+			.andExpect(status().isUnauthorized())
+			.andExpect(jsonPath("$.error.code").value("AUTH_005"));
+	}
+
+	@Test
+	void learningMaterialQueriesRequireBearerAuthentication() throws Exception {
+		when(accessTokenService.verify("valid-token")).thenReturn(new AccessPrincipal(7L, "session"));
+		when(queryService.list(7L, 1, 6, null)).thenReturn(new LearningMaterialPage(List.of(), 1, 6, 0, 0));
+
+		mockMvc.perform(get("/api/v1/learning-materials")
+				.header(HttpHeaders.AUTHORIZATION, "Bearer valid-token"))
+			.andExpect(status().isOk());
+
+		mockMvc.perform(get("/api/v1/learning-materials"))
 			.andExpect(status().isUnauthorized())
 			.andExpect(jsonPath("$.error.code").value("AUTH_005"));
 	}

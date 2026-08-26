@@ -10,8 +10,13 @@ import com.openmd.server.global.error.BusinessException;
 import com.openmd.server.global.error.CommonErrorCode;
 import com.openmd.server.learningmaterial.dto.command.CreateLearningMaterialCommand;
 import com.openmd.server.learningmaterial.dto.response.CreatedLearningMaterial;
+import com.openmd.server.learningmaterial.dto.response.LearningMaterialPage;
 import com.openmd.server.learningmaterial.service.LearningMaterialService;
+import com.openmd.server.learningmaterial.service.LearningMaterialQueryService;
 import com.openmd.server.learningmaterial.error.LearningMaterialErrorCode;
+import com.openmd.server.learningmaterial.domain.ContentEditStatus;
+import com.openmd.server.quiz.domain.entity.QuizSet;
+import com.openmd.server.quiz.repository.QuizSetRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.CountDownLatch;
@@ -62,9 +67,12 @@ class LearningMaterialMySqlIntegrationTest {
 	@Autowired JdbcTemplate jdbcTemplate;
 	@Autowired UserRepository users;
 	@Autowired LearningMaterialService service;
+	@Autowired LearningMaterialQueryService queries;
+	@Autowired QuizSetRepository quizSets;
 
 	@BeforeEach
 	void clearMaterials() {
+		jdbcTemplate.update("DELETE FROM quiz_sets");
 		jdbcTemplate.update("DELETE FROM learning_materials");
 		jdbcTemplate.update("DELETE FROM users");
 	}
@@ -89,27 +97,85 @@ class LearningMaterialMySqlIntegrationTest {
 		));
 		assertThrows(DataAccessException.class, () -> jdbcTemplate.update("""
 			INSERT INTO learning_materials (
-			  user_id, title, content, source_type, content_edit_status,
+			  user_id, title, content, source_type,
 			  idempotency_key_hash, request_fingerprint, created_at, updated_at
-			) VALUES (?, '제목', ?, 'PASTE', 'EDITABLE', ?, ?, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
+			) VALUES (?, '제목', ?, 'PASTE', ?, ?, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
 			""", userId, "😀".repeat(20_001), new byte[32], new byte[32]));
 		assertThrows(DataAccessException.class, () -> jdbcTemplate.update("""
 			INSERT INTO learning_materials (
-			  user_id, title, content, source_type, content_edit_status,
+			  user_id, title, content, source_type,
 			  idempotency_key_hash, request_fingerprint, created_at, updated_at
-			) VALUES (?, '제목', '본문', 'UNKNOWN', 'EDITABLE', ?, ?, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
+			) VALUES (?, '제목', '본문', 'UNKNOWN', ?, ?, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
 			""", userId, digestFixture(1), digestFixture(2)));
 		assertThrows(DataAccessException.class, () -> jdbcTemplate.update("""
 			INSERT INTO learning_materials (
-			  user_id, title, content, source_type, content_edit_status,
+			  user_id, title, content, source_type,
 			  idempotency_key_hash, request_fingerprint, created_at, updated_at
-			) VALUES (999999, '제목', '본문', 'PASTE', 'EDITABLE', ?, ?, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
+			) VALUES (999999, '제목', '본문', 'PASTE', ?, ?, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
 			""", digestFixture(3), digestFixture(4)));
 
 		BusinessException tooLong = assertThrows(BusinessException.class, () -> service.create(
 			userId, "too-long", new CreateLearningMaterialCommand("제목", "😀".repeat(20_001), "PASTE")
 		));
 		assertEquals(LearningMaterialErrorCode.CONTENT_TOO_LONG, tooLong.getErrorCode());
+	}
+
+	@Test
+	void doesNotStoreTheCalculatedContentEditStatusOnLearningMaterials() {
+		Integer storedStatusColumns = jdbcTemplate.queryForObject("""
+			SELECT COUNT(*)
+			FROM information_schema.columns
+			WHERE table_schema = DATABASE()
+			  AND table_name = 'learning_materials'
+			  AND column_name = 'content_edit_status'
+			""", Integer.class);
+
+		assertEquals(0, storedStatusColumns);
+	}
+
+	@Test
+	void pagesOwnedTitleMatchesInStableOrderAndCalculatesGenerationLocks() {
+		long ownerId = activeUser("owner@example.com").getId();
+		long otherId = activeUser("other@example.com").getId();
+		CreatedLearningMaterial older = service.create(ownerId, "older", new CreateLearningMaterialCommand(
+			"운영체제 오래된 자료", "본문😀", "PASTE"));
+		CreatedLearningMaterial newer = service.create(ownerId, "newer", new CreateLearningMaterialCommand(
+			"운영체제 최신 자료", "최신", "NOTION"));
+		service.create(ownerId, "unmatched", new CreateLearningMaterialCommand("네트워크", "본문", "PASTE"));
+		service.create(otherId, "other-owner", new CreateLearningMaterialCommand(
+			"운영체제 타인 자료", "본문", "PASTE"));
+		jdbcTemplate.update(
+			"UPDATE learning_materials SET updated_at = ? WHERE id = ?",
+			java.sql.Timestamp.from(Instant.parse("2026-08-25T01:00:00Z")), Long.valueOf(older.materialId()));
+		jdbcTemplate.update(
+			"UPDATE learning_materials SET updated_at = ? WHERE id = ?",
+			java.sql.Timestamp.from(Instant.parse("2026-08-26T01:00:00Z")), Long.valueOf(newer.materialId()));
+		quizSets.saveAndFlush(QuizSet.generating(ownerId, Long.parseLong(older.materialId())));
+
+		LearningMaterialPage firstPage = queries.list(ownerId, 1, 1, "\u2003운영체제\u00a0");
+		LearningMaterialPage secondPage = queries.list(ownerId, 2, 1, "운영체제");
+		LearningMaterialPage outside = queries.list(ownerId, 3, 1, "운영체제");
+
+		assertEquals(2, firstPage.totalElements());
+		assertEquals(2, firstPage.totalPages());
+		assertEquals(newer.materialId(), firstPage.items().getFirst().materialId());
+		assertEquals(ContentEditStatus.EDITABLE, firstPage.items().getFirst().contentEditStatus());
+		assertEquals(older.materialId(), secondPage.items().getFirst().materialId());
+		assertEquals(ContentEditStatus.LOCKED_GENERATING, secondPage.items().getFirst().contentEditStatus());
+		assertEquals(2, outside.totalElements());
+		assertEquals(2, outside.totalPages());
+		assertEquals(0, outside.items().size());
+		assertEquals(3, queries.detail(ownerId, Long.parseLong(older.materialId())).contentLength());
+
+		BusinessException hidden = assertThrows(
+			BusinessException.class,
+			() -> queries.detail(ownerId, Long.parseLong(service.create(
+				otherId,
+				"hidden-detail",
+				new CreateLearningMaterialCommand("타인 상세", "본문", "PASTE")
+			).materialId()))
+		);
+		assertEquals(CommonErrorCode.RESOURCE_NOT_FOUND, hidden.getErrorCode());
 	}
 
 	@Test
