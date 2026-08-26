@@ -698,6 +698,9 @@ API의 `reviewSession`은 클라이언트가 복습 실행을 식별하는 공�
 
 - 현재 사용자의 가장 최근 `COMPLETED` 본 퀴즈 회차 하나만 조회한다. 그 회차에서 현재 최종 판정이 `INCORRECT|PARTIAL`이고 `reviewResolvedAt=null`인 문항이 복습 대상이다.
 - `attemptNumber`는 해당 `quizSetId` 안에서 현재 사용자가 완료한 본 퀴즈 회차의 1부터 시작하는 순번이다.
+- `materialTitle`은 해당 QuizSet이 참조하는 학습자료의 현재 제목이다. 클라이언트는 이 값을 하드코딩한 일반 제목으로 대체하거나 `attemptNumber`를 완료 시각처럼 표시하지 않는다.
+- `completedAt`은 최신 완료 본 퀴즈 회차가 완료된 시각이며 공통 계약에 따라 ISO 8601 UTC 문자열이다.
+- `totalQuestionCount`는 해당 `quizSetId`의 전체 문항 수다. `전체 다시 풀기`의 대상 수와 레이블은 이 값을 사용하며 `reviewQuestionCount`와 혼용하지 않는다.
 - `reviewQuestionCount`는 그 회차의 현재 미해결 문항 수다.
 - 그 회차를 원본으로 한 활성 복습 세션이 있으면 `activeReviewSessionId`를 반환한다.
 
@@ -708,6 +711,9 @@ API의 `reviewSession`은 클라이언트가 복습 실행을 식별하는 공�
     "sourceAttemptId": "550e8400-e29b-41d4-a716-446655440000",
     "quizSetId": "qset_123",
     "attemptNumber": 2,
+    "materialTitle": "운영체제 핵심 정리",
+    "completedAt": "2026-08-26T00:20:00Z",
+    "totalQuestionCount": 10,
     "reviewQuestionCount": 2,
     "activeReviewSessionId": "review_123"
   },
@@ -724,6 +730,9 @@ API의 `reviewSession`은 클라이언트가 복습 실행을 식별하는 공�
     "sourceAttemptId": null,
     "quizSetId": null,
     "attemptNumber": null,
+    "materialTitle": null,
+    "completedAt": null,
+    "totalQuestionCount": 0,
     "reviewQuestionCount": 0,
     "activeReviewSessionId": null
   },
@@ -731,7 +740,9 @@ API의 `reviewSession`은 클라이언트가 복습 실행을 식별하는 공�
 }
 ```
 
-최신 완료 회차는 있지만 미해결 문항이 없으면 세 식별 필드는 최신 회차 값으로 반환하고 `reviewQuestionCount=0`, `activeReviewSessionId=null`로 반환한다.
+최신 완료 회차는 있지만 미해결 문항이 없으면 세 식별 필드와 `materialTitle`, `completedAt`, `totalQuestionCount`는 최신 회차 맥락 값으로 반환하고 `reviewQuestionCount=0`, `activeReviewSessionId=null`로 반환한다.
+
+> 구현 동기화 필요: 이 응답 보강은 학습 메인의 `최근 퀴즈` UI가 전체 재풀이와 틀린 문제 풀이를 같은 QuizSet 맥락으로 정확히 표시하기 위한 공유 계약이다. 현재 서버 DTO와 웹 `LatestReview` 타입은 세 필드를 아직 제공하지 않으므로 서버·웹 기능 연결 단계에서 함께 변경해야 한다. 여러 API를 연쇄 조회하거나 일반 문구를 하드코딩하는 방식은 이 계약의 대체 구현으로 보지 않는다.
 
 ### 최신 대상 세션 생성
 

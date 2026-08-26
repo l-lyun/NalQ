@@ -27,7 +27,10 @@ export const learningMaterialFixtures: LearningMaterialSummary[] = [
 
 export const learningReviewFixture: LearningReviewSummary = {
   sourceAttemptId: 'attempt-network-2',
-  materialTitle: '네트워크 기초',
-  completedAtLabel: '오늘 오전 9:20 완료',
+  quizSetId: 'quiz-set-network',
+  materialTitle: '운영체제 핵심 정리',
+  completedAt: '2026-08-26T00:20:00Z',
+  totalQuestionCount: 10,
+  attemptNumber: 2,
   reviewQuestionCount: 3,
 }

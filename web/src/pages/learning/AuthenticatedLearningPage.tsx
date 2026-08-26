@@ -129,14 +129,9 @@ export function AuthenticatedLearningPage() {
             ? { status: 'error', message: '복습 정보를 불러오지 못했어요.' }
             : reviewQuery.data && reviewQuery.data.sourceAttemptId
               ? {
-                  status: 'ready',
-                  data: {
-                    sourceAttemptId: reviewQuery.data.sourceAttemptId,
-                    materialTitle: '최근 완료한 퀴즈',
-                    completedAtLabel: `${reviewQuery.data.attemptNumber ?? 1}회차`,
-                    reviewQuestionCount: reviewQuery.data.reviewQuestionCount,
-                    activeReviewSessionId: reviewQuery.data.activeReviewSessionId ?? undefined,
-                  },
+                  status: 'error',
+                  message:
+                    '최근 퀴즈의 학습자료명, 완료 시각과 전체 문제 수를 확인하지 못했어요.',
                 }
               : { status: 'ready', data: null }
       }

@@ -565,8 +565,8 @@ scope: ux
 ### 학습 메인에 필요한 데이터
 
 - 최근 퀴즈: `sourceAttemptId`, `quizSetId`, `attemptNumber`, `materialTitle`, `completedAt`, `totalQuestionCount`, `reviewQuestionCount`, `activeReviewSessionId`
-- `GET /api/v1/quiz-reviews/latest`는 현재 `sourceAttemptId`, `quizSetId`, `attemptNumber`, `reviewQuestionCount`, `activeReviewSessionId`만 반환한다. 실행 경로는 전체 재풀이와 틀린 문제 풀이를 모두 지원하지만, 화면 맥락에 필요한 `materialTitle`, `completedAt`, `totalQuestionCount`가 부족하다.
-- 프론트가 `최근 완료한 퀴즈`를 하드코딩하거나 회차를 완료 시각처럼 표시하지 않는다. 위 세 필드를 latest 응답에 추가하는 계약 보강을 권장한다. QuizSet·학습자료를 연쇄 조회하는 방식은 가능하지만 초기 표시 지연과 오류 경계를 늘리므로 기본안으로 삼지 않는다.
+- `GET /api/v1/quiz-reviews/latest`의 공유 계약에는 화면 맥락에 필요한 `materialTitle`, `completedAt`, `totalQuestionCount`가 추가되었다. 현재 서버 DTO와 웹 타입에는 아직 반영되지 않았으므로 기능 연결 단계에서 함께 동기화한다.
+- 프론트가 `최근 완료한 퀴즈`를 하드코딩하거나 회차를 완료 시각처럼 표시하지 않는다. QuizSet·학습자료를 연쇄 조회하는 방식도 초기 표시 지연과 오류 경계를 늘리므로 계약 구현의 대체안으로 삼지 않는다.
 - 활성 review session의 고정 문항 수를 표시하려면 별도 `activeReviewQuestionCount` 또는 세션 조회가 필요하다. 이번 설계는 추가 계약 없이 `틀린 문제 이어서 풀기`로 표시하고 최신 미해결 수를 세션 수로 추정하지 않는다.
 - 학습자료 목록 항목: `materialId`, `title`, `sourceType`, `contentEditStatus`, `updatedAt`
 - 페이지 정보: `page`, `size`, `totalElements`, `totalPages`. 기본 `size`는 6이며 제목 검색어는 서버 `query`로 전달한다.
@@ -604,7 +604,7 @@ scope: ux
 - QuizSet이 생성 당시 참조한 학습자료 근거의 불변 보존 방식
 - Notion 연결·권한, 페이지 목록과 WebView 복귀 계약
 - 학습자료 `PATCH` 응답과 입력 오류·저장 경합 처리. 실제 수정 API를 연결하기 전 [학습자료 PRD의 임시 잠금 정책](../prd/prd-content-import.md#후속-계약구현-동기화-주의)과 공유 계약의 동기화 여부를 확인한다.
-- 최근 퀴즈 표시에 필요한 `materialTitle`, `completedAt`, `totalQuestionCount`의 latest 응답 보강
+- 최신 복습 현황 계약에 추가된 `materialTitle`, `completedAt`, `totalQuestionCount`의 서버 DTO·웹 타입 동기화
 - 완료한 QuizSet을 여러 개 탐색하는 목록 API는 현재 없다. 과거 퀴즈 선택·기록 뎁스는 해당 API와 제품 범위가 생길 때 설계한다.
 
 위 항목은 화면 명세에서 임의의 API, 상태 enum 또는 클라이언트 저장 구조로 확정하지 않는다. 관련 기능명세·공유 계약과 애플리케이션 TRD에서 검증한다.
@@ -654,6 +654,7 @@ scope: ux
 
 | 날짜 | 변경 | 근거 | 작성자 |
 | --- | --- | --- | --- |
+| 2026-08-26 | 최근 퀴즈 표시에 필요한 `materialTitle`, `completedAt`, `totalQuestionCount`를 공유 API 계약으로 확정하고 서버·웹 동기화 작업을 후속 범위로 명시 | 사용자 승인 | OpenMD UX/UI 설계 |
 | 2026-08-26 | 원뎁스를 유지하면서 최근 퀴즈 맥락 surface로 전체 재풀이와 틀린 문제 풀이를 분리하고 학습자료 검색을 필요 시 펼치는 구조로 재설계 | 사용자 UX 개선 요청, 공식 Toss·Duolingo 패턴과 DESIGN.md·SEED 검토 | OpenMD UX/UI 설계 |
 | 2026-08-26 | 학습자료 목록을 모바일 6개 단위 번호 페이지와 서버 제목 검색으로 확정하고, 목록·상세 데이터 요구 및 GET 읽기 전용 단계와 후속 PATCH 편집 목표를 분리 | 사용자 확정 API·UX 및 동시 구현 범위 | OpenMD UX/UI 설계 |
 | 2026-08-20 | 내부 탭을 제거하고 새 문제 만들기·복습·자료 관리의 단일 페이지와 route-level 생성 진입·자료 편집 흐름으로 전면 재설계 | 사용자 확정 UX, 관련 기능명세·흐름·전역 내비게이션·DESIGN.md | OpenMD UX/UI 설계 |

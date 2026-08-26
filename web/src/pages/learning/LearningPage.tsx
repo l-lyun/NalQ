@@ -1,4 +1,4 @@
-import { ActionButton, Box, Divider, Skeleton, Text, VStack } from '@seed-design/react'
+import { ActionButton, Box, Flex, Skeleton, Text, VStack } from '@seed-design/react'
 import { type FormEvent, useEffect, useRef, useState } from 'react'
 
 import { LearningBottomNavigation } from './components/LearningBottomNavigation'
@@ -60,6 +60,8 @@ export function LearningPage({
   const initialHistoryEntry = getLearningHistoryEntry(window.history.state)
   const [screen, setScreen] = useState<Screen>(initialHistoryEntry?.screen ?? { id: 'main' })
   const [draft, setDraft] = useState<LearningMaterialDraft>({ title: '', body: '' })
+  const [mainSearchOpen, setMainSearchOpen] = useState(Boolean(materialsQuery.trim()))
+  const [mainSearchShouldFocus, setMainSearchShouldFocus] = useState(false)
   const headingRef = useRef<HTMLHeadingElement>(null)
   const screenRef = useRef(screen)
   const draftRef = useRef(draft)
@@ -172,6 +174,21 @@ export function LearningPage({
     })
   }
 
+  const restartQuiz = () => {
+    const currentReview =
+      resolvedReviewState.status === 'ready' ? resolvedReviewState.data : null
+    if (!currentReview) return
+    if (callbacks?.onRestartQuiz) {
+      callbacks.onRestartQuiz(currentReview)
+      return
+    }
+    push({
+      id: 'handoff',
+      title: '전체 문제 다시 풀기',
+      description: `“${currentReview.materialTitle}”의 전체 ${currentReview.totalQuestionCount}문제를 새 회차로 푸는 화면은 기능 연결 단계에서 이어집니다.`,
+    })
+  }
+
   const createMaterial = async (nextDraft: LearningMaterialDraft) => {
     const normalizedDraft = { ...nextDraft, title: nextDraft.title.trim() }
     if (!callbacks?.onCreateMaterial) {
@@ -203,9 +220,18 @@ export function LearningPage({
               materialsQuery={materialsQuery}
               materialsFetching={materialsFetching}
               reviewState={resolvedReviewState}
+              searchOpen={mainSearchOpen}
+              searchShouldFocus={mainSearchShouldFocus}
               onNewQuiz={() => push({ id: 'new-quiz' })}
               onStartReview={startReview}
+              onRestartQuiz={restartQuiz}
               onOpenMaterial={(materialId) => push({ id: 'material-detail', materialId })}
+              onSearchOpenChange={(open) => {
+                setMainSearchOpen(open)
+                setMainSearchShouldFocus(open)
+                if (!open) callbacks?.onMaterialsQueryChange?.('')
+              }}
+              onSearchFocused={() => setMainSearchShouldFocus(false)}
               onQueryChange={(query) => callbacks?.onMaterialsQueryChange?.(query)}
               onPageChange={(page) => callbacks?.onMaterialsPageChange?.(page)}
               onRetryReview={callbacks?.onRetryReview}
@@ -310,9 +336,14 @@ function LearningMain({
   materialsQuery,
   materialsFetching,
   reviewState,
+  searchOpen,
+  searchShouldFocus,
   onNewQuiz,
   onStartReview,
+  onRestartQuiz,
   onOpenMaterial,
+  onSearchOpenChange,
+  onSearchFocused,
   onQueryChange,
   onPageChange,
   onRetryReview,
@@ -322,9 +353,14 @@ function LearningMain({
   materialsQuery: string
   materialsFetching: boolean
   reviewState: LearningSectionState<LearningReviewSummary | null>
+  searchOpen: boolean
+  searchShouldFocus: boolean
   onNewQuiz: () => void
   onStartReview: () => void
+  onRestartQuiz: () => void
   onOpenMaterial: (materialId: string) => void
+  onSearchOpenChange: (open: boolean) => void
+  onSearchFocused: () => void
   onQueryChange: (query: string) => void
   onPageChange: (page: number) => void
   onRetryReview?: () => void
@@ -342,50 +378,45 @@ function LearningMain({
       </VStack>
 
       <VStack as="section" gap="x3" aria-labelledby="learning-review-title">
-        <LearningSectionTitle id="learning-review-title">복습하기</LearningSectionTitle>
+        <LearningSectionTitle id="learning-review-title">최근 퀴즈</LearningSectionTitle>
         {reviewState.status === 'loading' ? (
-          <LearningSectionSkeleton label="복습 정보를 불러오는 중" rows={1} />
+          <Box bg="bg.neutralWeak" borderRadius="r3" p="x4">
+            <LearningSectionSkeleton label="최근 퀴즈를 불러오는 중" rows={2} />
+          </Box>
         ) : reviewState.status === 'error' ? (
-          <LearningInlineError message={reviewState.message} onRetry={onRetryReview} />
-        ) : reviewState.data &&
-          (reviewState.data.reviewQuestionCount > 0 || reviewState.data.activeReviewSessionId) ? (
-          <LearningActionList
-            label="최신 복습"
-            rows={[
-              {
-                id: reviewState.data.sourceAttemptId,
-                title: reviewState.data.materialTitle,
-                actionLabel: reviewState.data.activeReviewSessionId ? '복습 계속하기' : '복습 시작',
-                detail: (
-                  <>
-                    {reviewState.data.activeReviewSessionId
-                      ? `진행 중인 복습 · ${reviewState.data.completedAtLabel}`
-                      : `미해결 문항 ${reviewState.data.reviewQuestionCount}개 · ${reviewState.data.completedAtLabel}`}
-                    <br />
-                    {reviewState.data.activeReviewSessionId
-                      ? '같은 문제 목록을 첫 문제부터 다시 풀어요'
-                      : '가장 최근 완료한 퀴즈를 복습해요'}
-                  </>
-                ),
-                onClick: onStartReview,
-              },
-            ]}
+          <LearningInlineError
+            message="최근 퀴즈를 확인하지 못했어요. 완료한 기록은 그대로 있어요. 잠시 후 다시 확인해 주세요."
+            onRetry={onRetryReview}
+          />
+        ) : reviewState.data ? (
+          <RecentQuizContext
+            review={reviewState.data}
+            onStartReview={onStartReview}
+            onRestartQuiz={onRestartQuiz}
           />
         ) : reviewState.data === null ? (
           <Text as="p" textStyle="t5Regular" color="fg.neutralMuted">
-            문제를 완료하면 복습할 문항이 여기에 보여요.
+            아직 완료한 퀴즈가 없어요. 새 문제를 만들고 풀면 여기에서 다시 풀 수 있어요.
           </Text>
-        ) : (
-          <Text as="p" textStyle="t5Regular" color="fg.neutralMuted">
-            지금 복습할 문항이 없어요. 가장 최근에 완료한 퀴즈는 모두 해결했어요.
-          </Text>
-        )}
+        ) : null}
       </VStack>
 
-      <Divider as="div" color="stroke.neutralSubtle" />
-
       <VStack as="section" gap="x3" aria-labelledby="learning-materials-title">
-        <LearningSectionTitle id="learning-materials-title">학습자료 관리</LearningSectionTitle>
+        <Flex align="center" justify="space-between" gap="x3">
+          <LearningSectionTitle id="learning-materials-title">내 학습자료</LearningSectionTitle>
+          <ActionButton
+            type="button"
+            size="small"
+            variant="ghost"
+            color="fg.neutralMuted"
+            fontWeight="medium"
+            aria-expanded={searchOpen}
+            aria-controls="learning-material-search"
+            onClick={() => onSearchOpenChange(!searchOpen)}
+          >
+            {searchOpen ? '닫기' : '검색'}
+          </ActionButton>
+        </Flex>
         <MaterialCollection
           materialsState={materialsState}
           query={materialsQuery}
@@ -394,6 +425,9 @@ function LearningMain({
           onPageChange={onPageChange}
           onRetry={onRetryMaterials}
           onSelect={(material) => onOpenMaterial(material.materialId)}
+          searchVisible={searchOpen}
+          searchAutoFocus={searchShouldFocus}
+          onSearchFocus={onSearchFocused}
           label="학습자료 목록"
         />
       </VStack>
@@ -492,6 +526,67 @@ function MaterialSelectionScreen({
   )
 }
 
+function RecentQuizContext({
+  review,
+  onStartReview,
+  onRestartQuiz,
+}: {
+  review: LearningReviewSummary
+  onStartReview: () => void
+  onRestartQuiz: () => void
+}) {
+  const rows = [] as Parameters<typeof LearningActionList>[0]['rows']
+
+  if (review.activeReviewSessionId) {
+    rows.push({
+      id: `${review.sourceAttemptId}-review`,
+      title: '틀린 문제 이어서 풀기',
+      detail: '진행 중인 문제를 첫 문제부터 다시 풀어요',
+      onClick: onStartReview,
+    })
+  } else if (review.reviewQuestionCount > 0) {
+    rows.push({
+      id: `${review.sourceAttemptId}-review`,
+      title: `틀린 문제 ${review.reviewQuestionCount}개만 풀기`,
+      detail: '최근 회차의 미해결 문제만 풀어요',
+      onClick: onStartReview,
+    })
+  }
+
+  rows.push({
+    id: `${review.quizSetId}-restart`,
+    title: `전체 ${review.totalQuestionCount}문제 다시 풀기`,
+    detail: '같은 문제 전체를 새 회차로 풀어요',
+    onClick: onRestartQuiz,
+  })
+
+  return (
+    <Box bg="bg.neutralWeak" borderRadius="r3" p="x4">
+      <VStack gap="x3">
+        <VStack gap="x1">
+          <Text as="p" textStyle="t7Bold" color="fg.neutral">
+            {review.materialTitle}
+          </Text>
+          <Text as="p" textStyle="t4Regular" color="fg.neutralMuted">
+            {formatQuizCompletedAt(review.completedAt)} · {review.totalQuestionCount}문제 ·{' '}
+            {review.attemptNumber}회차
+          </Text>
+          {review.activeReviewSessionId ? (
+            <Text as="p" textStyle="t4Medium" color="fg.positive">
+              틀린 문제 풀이가 진행 중이에요
+            </Text>
+          ) : review.reviewQuestionCount === 0 ? (
+            <Text as="p" textStyle="t4Medium" color="fg.positive">
+              틀린 문제를 모두 해결했어요
+            </Text>
+          ) : null}
+        </VStack>
+        <LearningActionList label={`${review.materialTitle} 다시 풀기`} rows={rows} />
+      </VStack>
+    </Box>
+  )
+}
+
 function MaterialCollection({
   materialsState,
   query,
@@ -503,6 +598,9 @@ function MaterialCollection({
   onRetry,
   disableLocked = false,
   outlined = false,
+  searchVisible = true,
+  searchAutoFocus = false,
+  onSearchFocus,
   label,
 }: {
   materialsState: LearningSectionState<LearningMaterialPage>
@@ -515,6 +613,9 @@ function MaterialCollection({
   onRetry?: () => void
   disableLocked?: boolean
   outlined?: boolean
+  searchVisible?: boolean
+  searchAutoFocus?: boolean
+  onSearchFocus?: () => void
   label: string
 }) {
   const page =
@@ -526,13 +627,20 @@ function MaterialCollection({
 
   return (
     <VStack gap="x3" aria-busy={fetching || materialsState.status === 'loading'}>
-      <LearningField label="제목으로 검색">
-        <LearningTextInput
-          value={query}
-          placeholder="학습자료 제목"
-          onChange={(event) => onQueryChange(event.currentTarget.value)}
-        />
-      </LearningField>
+      {searchVisible ? (
+        <Box id="learning-material-search" className="learning-search-region">
+          <LearningField label="학습자료 제목">
+            <LearningTextInput
+              type="search"
+              value={query}
+              placeholder="제목으로 검색"
+              autoFocus={searchAutoFocus}
+              onFocus={onSearchFocus}
+              onChange={(event) => onQueryChange(event.currentTarget.value)}
+            />
+          </LearningField>
+        </Box>
+      ) : null}
       {fetching && page ? (
         <Text as="p" textStyle="t3Regular" color="fg.neutralMuted" role="status" aria-live="polite">
           목록을 업데이트하고 있어요.
@@ -622,7 +730,7 @@ function MaterialPagination({
   disabled: boolean
   onPageChange: (page: number) => void
 }) {
-  if (totalPages <= 0) return null
+  if (totalPages <= 1) return null
 
   return (
     <nav className="learning-pagination" aria-label="학습자료 페이지">
@@ -656,6 +764,17 @@ function formatMaterialDate(value: string) {
   if (Number.isNaN(date.getTime())) return value
   return new Intl.DateTimeFormat('ko-KR', {
     year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date)
+}
+
+function formatQuizCompletedAt(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat('ko-KR', {
     month: 'short',
     day: 'numeric',
     hour: 'numeric',
