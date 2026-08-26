@@ -107,10 +107,10 @@ scope: shared
 
 ## 학습자료
 
-### 이번 조회 연동 범위
+### 현재 구현 범위
 
-- **확정·이번 구현:** 기존 학습자료 저장을 유지하고, 인증 사용자의 학습자료 목록과 상세를 조회한다.
-- **확정·후속 구현:** 학습자료 수정과 Notion 단일 페이지 일회성 복사는 계약을 유지하되 이번 조회 연동 구현에는 포함하지 않는다.
+- **구현됨:** 학습자료 저장, 인증 사용자의 목록·상세 조회와 제목·본문 수정.
+- **확정·후속 구현:** Notion 단일 페이지 일회성 복사는 계약을 유지하되 아직 외부 연동을 구현하지 않는다.
 - **비범위:** 학습자료 삭제, Notion 동기화와 실제 외부 문제 생성 서비스 연동은 이번 작업에서 다루지 않는다.
 
 ### 저장
@@ -250,10 +250,34 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 ```
 
 - 보낸 필드만 수정한다. 빈 요청은 `COMMON_001`이다.
+- `title`, `content`의 정리·빈 값·Unicode code point 제한은 학습자료 저장과 같다. 명시적인 `null`은 해당 필드의 잘못된 입력이다.
 - `title`은 본문 잠금과 관계없이 수정할 수 있다.
 - `contentEditStatus=EDITABLE`일 때만 `content`를 수정할 수 있다. 같은 학습자료의 QuizSet이 `GENERATING`인 동안에만 `LOCKED_GENERATING`이며 생성이 `READY` 또는 `FAILED`로 끝나면 `EDITABLE`이다.
+- 생성 중에 `title`과 `content`를 함께 보내면 요청 전체를 `409 MATERIAL_001`로 거절하며 제목도 바꾸지 않는다. 제목만 다시 보내면 수정할 수 있다.
 - 공개 상태는 `EDITABLE`, `LOCKED_GENERATING`뿐이며 영구 잠금 상태는 두지 않는다.
 - 학습자료 수정은 이미 만들어진 QuizSet·풀이·결과를 바꾸지 않는다. 이후 새 QuizSet은 생성 접수 시점의 최신 저장 본문을 근거로 한다.
+
+성공 응답은 수정 뒤의 학습자료 상세와 같은 모양이다.
+
+```json
+{
+  "success": true,
+  "data": {
+    "materialId": "123",
+    "title": "수정한 제목",
+    "content": "수정한 본문",
+    "contentLength": 6,
+    "sourceType": "PASTE",
+    "contentEditStatus": "EDITABLE",
+    "createdAt": "2026-08-20T01:00:00Z",
+    "updatedAt": "2026-08-26T02:00:00Z"
+  },
+  "error": null
+}
+```
+
+- `sourceType`과 `createdAt`은 수정되지 않는다.
+- 존재하지 않거나 현재 사용자 소유가 아닌 자료는 `404 COMMON_003`이다.
 
 ### Notion 단일 페이지 일회성 복사
 
@@ -284,6 +308,7 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 ```
 
 - 서버는 사용자가 선택한 페이지 하나를 요청 시점에 한 번 읽는다.
+- 공개 요청은 Notion 선택기가 반환한 불투명 `pageId`만 받는다. 전체 Notion URL을 직접 받는 계약은 아니며, URL 입력 UX를 제공한다면 클라이언트가 페이지 ID를 추출해 전송한다.
 - 성공 응답은 프론트 편집용 값이며 서버 학습자료·draft·import job을 만들지 않는다.
 - 복사된 본문이 20,000자를 넘더라도 잘라 저장하지 않고 초과 경고와 함께 반환할 수 있다. 20,000자 저장 제한은 사용자가 프론트에서 수정한 뒤 학습자료 저장 요청에서 검증한다.
 - `warnings[].code`는 저장을 막지 않는 사용자 검토 신호다. 외부 블록 타입이나 파싱 예외 원문을 노출하지 않는다.

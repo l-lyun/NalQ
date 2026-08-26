@@ -19,6 +19,7 @@ import com.openmd.server.auth.security.AccessTokenService;
 import com.openmd.server.learningmaterial.controller.LearningMaterialController;
 import com.openmd.server.learningmaterial.service.LearningMaterialService;
 import com.openmd.server.learningmaterial.service.LearningMaterialQueryService;
+import com.openmd.server.learningmaterial.service.LearningMaterialUpdateService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootConfiguration;
@@ -53,6 +54,7 @@ class OpenApiContractTest {
 	@MockitoBean BrowserRefreshCookie browserRefreshCookie;
 	@MockitoBean LearningMaterialService learningMaterialService;
 	@MockitoBean LearningMaterialQueryService learningMaterialQueryService;
+	@MockitoBean LearningMaterialUpdateService learningMaterialUpdateService;
 
 	@SpringBootConfiguration
 	@EnableAutoConfiguration
@@ -160,6 +162,22 @@ class OpenApiContractTest {
 				.value("#/components/schemas/ApiResponseLearningMaterialDetail"))
 			.andExpect(jsonPath("$.paths['/api/v1/learning-materials/{materialId}'].get.responses['404'].content"
 				+ ".['application/json'].schema.$ref").value("#/components/schemas/ApiResponse"))
+			.andExpect(jsonPath("$.paths['/api/v1/learning-materials/{materialId}'].patch.operationId")
+				.value("updateLearningMaterial"))
+			.andExpect(jsonPath("$.paths['/api/v1/learning-materials/{materialId}'].patch.security[0].bearerAuth")
+				.isArray())
+			.andExpect(jsonPath("$.paths['/api/v1/learning-materials/{materialId}'].patch.requestBody.content"
+				+ ".['application/json'].schema.$ref")
+				.value("#/components/schemas/UpdateLearningMaterialRequest"))
+			.andExpect(jsonPath("$.paths['/api/v1/learning-materials/{materialId}'].patch.responses['200'].content"
+				+ ".['application/json'].schema.$ref")
+				.value("#/components/schemas/ApiResponseLearningMaterialDetail"))
+			.andExpect(jsonPath("$.paths['/api/v1/learning-materials/{materialId}'].patch.responses['409'].content"
+				+ ".['application/json'].schema.$ref").value("#/components/schemas/ApiResponse"))
+			.andExpect(jsonPath("$.components.schemas.UpdateLearningMaterialRequest.properties.title.type")
+				.value("string"))
+			.andExpect(jsonPath("$.components.schemas.UpdateLearningMaterialRequest.properties.content.type")
+				.value("string"))
 			.andExpect(jsonPath("$.components.schemas.RefreshTokenRequest.properties.refreshToken.maxLength")
 				.value(128))
 			.andExpect(jsonPath("$.components.schemas.SessionTokens.properties.accessToken.type").value("string"))

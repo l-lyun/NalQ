@@ -15,6 +15,7 @@ import com.openmd.server.learningmaterial.dto.response.LearningMaterialPage;
 import com.openmd.server.learningmaterial.dto.response.LearningMaterialSummary;
 import com.openmd.server.learningmaterial.service.LearningMaterialQueryService;
 import com.openmd.server.learningmaterial.service.LearningMaterialService;
+import com.openmd.server.learningmaterial.service.LearningMaterialUpdateService;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,11 +31,12 @@ class LearningMaterialQueryControllerTest {
 
 	private final LearningMaterialService creation = mock(LearningMaterialService.class);
 	private final LearningMaterialQueryService queries = mock(LearningMaterialQueryService.class);
+	private final LearningMaterialUpdateService updates = mock(LearningMaterialUpdateService.class);
 	private MockMvc mockMvc;
 
 	@BeforeEach
 	void setUp() {
-		mockMvc = MockMvcBuilders.standaloneSetup(new LearningMaterialController(creation, queries))
+		mockMvc = MockMvcBuilders.standaloneSetup(new LearningMaterialController(creation, queries, updates))
 			.setControllerAdvice(new com.openmd.server.global.error.GlobalExceptionHandler())
 			.setCustomArgumentResolvers(accessPrincipalResolver())
 			.build();

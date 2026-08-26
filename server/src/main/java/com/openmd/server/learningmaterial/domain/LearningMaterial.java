@@ -66,4 +66,12 @@ public class LearningMaterial extends BaseEntity {
 	public SourceType getSourceType() { return sourceType; }
 	public byte[] getIdempotencyKeyHash() { return idempotencyKeyHash.clone(); }
 	public byte[] getRequestFingerprint() { return requestFingerprint.clone(); }
+
+	public void updateTitle(String title) {
+		this.title = title;
+	}
+
+	public void updateContent(String content) {
+		this.content = content;
+	}
 }

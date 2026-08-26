@@ -3,11 +3,13 @@ package com.openmd.server.learningmaterial.controller;
 import com.openmd.server.auth.security.AccessPrincipal;
 import com.openmd.server.global.api.ApiResponse;
 import com.openmd.server.learningmaterial.dto.request.CreateLearningMaterialRequest;
+import com.openmd.server.learningmaterial.dto.request.UpdateLearningMaterialRequest;
 import com.openmd.server.learningmaterial.dto.response.CreatedLearningMaterial;
 import com.openmd.server.learningmaterial.dto.response.LearningMaterialDetail;
 import com.openmd.server.learningmaterial.dto.response.LearningMaterialPage;
 import com.openmd.server.learningmaterial.service.LearningMaterialQueryService;
 import com.openmd.server.learningmaterial.service.LearningMaterialService;
+import com.openmd.server.learningmaterial.service.LearningMaterialUpdateService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -19,6 +21,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -35,10 +38,16 @@ public class LearningMaterialController {
 
 	private final LearningMaterialService service;
 	private final LearningMaterialQueryService queries;
+	private final LearningMaterialUpdateService updates;
 
-	public LearningMaterialController(LearningMaterialService service, LearningMaterialQueryService queries) {
+	public LearningMaterialController(
+		LearningMaterialService service,
+		LearningMaterialQueryService queries,
+		LearningMaterialUpdateService updates
+	) {
 		this.service = service;
 		this.queries = queries;
+		this.updates = updates;
 	}
 
 	@GetMapping
@@ -101,6 +110,46 @@ public class LearningMaterialController {
 		@PathVariable long materialId
 	) {
 		return ApiResponse.success(queries.detail(principal.userId(), materialId));
+	}
+
+	@PatchMapping("/{materialId}")
+	@Operation(
+		operationId = "updateLearningMaterial",
+		summary = "내 학습자료의 제목 또는 본문을 수정한다",
+		security = @SecurityRequirement(name = "bearerAuth"),
+		responses = {
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(
+				responseCode = "200", description = "학습자료 수정 성공", useReturnTypeSchema = true
+			),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(
+				responseCode = "400", description = "COMMON_001 입력 검증 실패 또는 COMMON_002 읽을 수 없는 JSON",
+				content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))
+			),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(
+				responseCode = "401", description = "AUTH_005 Access Token 자격 없음 또는 만료",
+				content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))
+			),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(
+				responseCode = "404", description = "COMMON_003 자료 없음 또는 타 사용자 소유",
+				content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))
+			),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(
+				responseCode = "409", description = "MATERIAL_001 퀴즈 생성 중 본문 수정",
+				content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))
+			),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(
+				responseCode = "413", description = "MATERIAL_002 본문 20,000자 초과",
+				content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))
+			)
+		}
+	)
+	public ApiResponse<LearningMaterialDetail> update(
+		@AuthenticationPrincipal AccessPrincipal principal,
+		@Parameter(description = "학습자료 ID", example = "31")
+		@PathVariable long materialId,
+		@RequestBody UpdateLearningMaterialRequest request
+	) {
+		return ApiResponse.success(updates.update(principal.userId(), materialId, request.toCommand()));
 	}
 
 	@PostMapping

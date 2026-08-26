@@ -13,10 +13,14 @@ import com.openmd.server.learningmaterial.dto.response.CreatedLearningMaterial;
 import com.openmd.server.learningmaterial.dto.response.LearningMaterialPage;
 import com.openmd.server.learningmaterial.service.LearningMaterialService;
 import com.openmd.server.learningmaterial.service.LearningMaterialQueryService;
+import com.openmd.server.learningmaterial.service.LearningMaterialUpdateService;
+import com.openmd.server.learningmaterial.dto.command.UpdateLearningMaterialCommand;
 import com.openmd.server.learningmaterial.error.LearningMaterialErrorCode;
 import com.openmd.server.learningmaterial.domain.ContentEditStatus;
 import com.openmd.server.quiz.domain.entity.QuizSet;
 import com.openmd.server.quiz.repository.QuizSetRepository;
+import com.openmd.server.quiz.domain.entity.QuizAttempt;
+import com.openmd.server.quiz.repository.QuizAttemptRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.CountDownLatch;
@@ -68,13 +72,48 @@ class LearningMaterialMySqlIntegrationTest {
 	@Autowired UserRepository users;
 	@Autowired LearningMaterialService service;
 	@Autowired LearningMaterialQueryService queries;
+	@Autowired LearningMaterialUpdateService updates;
 	@Autowired QuizSetRepository quizSets;
+	@Autowired QuizAttemptRepository attempts;
 
 	@BeforeEach
 	void clearMaterials() {
+		jdbcTemplate.update("DELETE FROM quiz_attempts");
 		jdbcTemplate.update("DELETE FROM quiz_sets");
 		jdbcTemplate.update("DELETE FROM learning_materials");
 		jdbcTemplate.update("DELETE FROM users");
+	}
+
+	@Test
+	void updatesMaterialWithoutChangingExistingQuizSetsOrAttemptsAndLocksOnlyContentDuringGeneration() {
+		long userId = activeUser("update-owner@example.com").getId();
+		CreatedLearningMaterial created = service.create(
+			userId, "update-target", new CreateLearningMaterialCommand("기존 제목", "기존 본문", "PASTE")
+		);
+		long materialId = Long.parseLong(created.materialId());
+		QuizSet ready = quizSets.saveAndFlush(QuizSet.ready(userId, materialId));
+		QuizAttempt attempt = attempts.saveAndFlush(QuizAttempt.main("main-attempt", ready.getId(), userId));
+
+		updates.update(userId, materialId, new UpdateLearningMaterialCommand(true, "수정 제목", true, "수정 본문"));
+
+		assertEquals("수정 제목", queries.detail(userId, materialId).title());
+		assertEquals("수정 본문", queries.detail(userId, materialId).content());
+		assertEquals(com.openmd.server.quiz.domain.type.QuizSetStatus.READY,
+			quizSets.findById(ready.getId()).orElseThrow().getStatus());
+		assertEquals(com.openmd.server.quiz.domain.type.QuizAttemptStatus.IN_PROGRESS,
+			attempts.findById(attempt.getId()).orElseThrow().getStatus());
+
+		quizSets.saveAndFlush(QuizSet.generating(userId, materialId));
+		BusinessException locked = assertThrows(BusinessException.class, () -> updates.update(
+			userId, materialId, new UpdateLearningMaterialCommand(false, null, true, "차단할 본문")
+		));
+		assertEquals(LearningMaterialErrorCode.CONTENT_LOCKED_GENERATING, locked.getErrorCode());
+		assertEquals("수정 본문", queries.detail(userId, materialId).content());
+
+		assertEquals(ContentEditStatus.LOCKED_GENERATING, updates.update(
+			userId, materialId, new UpdateLearningMaterialCommand(true, "생성 중 제목", false, null)
+		).contentEditStatus());
+		assertEquals("생성 중 제목", queries.detail(userId, materialId).title());
 	}
 
 	@Test

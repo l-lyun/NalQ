@@ -4,6 +4,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -14,7 +15,11 @@ import com.openmd.server.learningmaterial.dto.command.CreateLearningMaterialComm
 import com.openmd.server.learningmaterial.dto.response.CreatedLearningMaterial;
 import com.openmd.server.learningmaterial.service.LearningMaterialService;
 import com.openmd.server.learningmaterial.service.LearningMaterialQueryService;
+import com.openmd.server.learningmaterial.service.LearningMaterialUpdateService;
 import com.openmd.server.learningmaterial.domain.ContentEditStatus;
+import com.openmd.server.learningmaterial.domain.SourceType;
+import com.openmd.server.learningmaterial.dto.command.UpdateLearningMaterialCommand;
+import com.openmd.server.learningmaterial.dto.response.LearningMaterialDetail;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,14 +36,37 @@ class LearningMaterialControllerTest {
 
 	private final LearningMaterialService service = mock(LearningMaterialService.class);
 	private final LearningMaterialQueryService queries = mock(LearningMaterialQueryService.class);
+	private final LearningMaterialUpdateService updates = mock(LearningMaterialUpdateService.class);
 	private MockMvc mockMvc;
 
 	@BeforeEach
 	void setUp() {
-		mockMvc = MockMvcBuilders.standaloneSetup(new LearningMaterialController(service, queries))
+		mockMvc = MockMvcBuilders.standaloneSetup(new LearningMaterialController(service, queries, updates))
 			.setControllerAdvice(new com.openmd.server.global.error.GlobalExceptionHandler())
 			.setCustomArgumentResolvers(accessPrincipalResolver())
 			.build();
+	}
+
+	@Test
+	void patchesOnlyProvidedFieldsAndReturnsTheDetailEnvelope() throws Exception {
+		when(updates.update(7L, 31L, new UpdateLearningMaterialCommand(true, " 수정 제목 ", false, null)))
+			.thenReturn(new LearningMaterialDetail(
+				"31", "수정 제목", "기존 본문", 5, SourceType.PASTE, ContentEditStatus.EDITABLE,
+				Instant.parse("2026-08-20T01:02:03Z"), Instant.parse("2026-08-26T02:03:04Z")
+			));
+
+		mockMvc.perform(patch("/api/v1/learning-materials/31")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"title\":\" 수정 제목 \"}"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.success").value(true))
+			.andExpect(jsonPath("$.data.materialId").value("31"))
+			.andExpect(jsonPath("$.data.title").value("수정 제목"))
+			.andExpect(jsonPath("$.data.content").value("기존 본문"))
+			.andExpect(jsonPath("$.data.contentEditStatus").value("EDITABLE"))
+			.andExpect(jsonPath("$.data.updatedAt").value("2026-08-26T02:03:04Z"));
+
+		verify(updates).update(7L, 31L, new UpdateLearningMaterialCommand(true, " 수정 제목 ", false, null));
 	}
 
 	@Test

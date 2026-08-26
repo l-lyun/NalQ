@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -16,6 +17,7 @@ import com.openmd.server.learningmaterial.dto.response.CreatedLearningMaterial;
 import com.openmd.server.learningmaterial.dto.response.LearningMaterialPage;
 import com.openmd.server.learningmaterial.service.LearningMaterialService;
 import com.openmd.server.learningmaterial.service.LearningMaterialQueryService;
+import com.openmd.server.learningmaterial.service.LearningMaterialUpdateService;
 import com.openmd.server.learningmaterial.domain.ContentEditStatus;
 import java.time.Instant;
 import java.util.List;
@@ -50,6 +52,7 @@ class LearningMaterialSecurityTest {
 	@Autowired MockMvc mockMvc;
 	@MockitoBean LearningMaterialService service;
 	@MockitoBean LearningMaterialQueryService queryService;
+	@MockitoBean LearningMaterialUpdateService updateService;
 	@MockitoBean AccessTokenService accessTokenService;
 
 	@SpringBootConfiguration
@@ -92,6 +95,15 @@ class LearningMaterialSecurityTest {
 			.andExpect(status().isOk());
 
 		mockMvc.perform(get("/api/v1/learning-materials"))
+			.andExpect(status().isUnauthorized())
+			.andExpect(jsonPath("$.error.code").value("AUTH_005"));
+	}
+
+	@Test
+	void learningMaterialPatchRequiresBearerAuthentication() throws Exception {
+		mockMvc.perform(patch("/api/v1/learning-materials/31")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"title\":\"수정 제목\"}"))
 			.andExpect(status().isUnauthorized())
 			.andExpect(jsonPath("$.error.code").value("AUTH_005"));
 	}
