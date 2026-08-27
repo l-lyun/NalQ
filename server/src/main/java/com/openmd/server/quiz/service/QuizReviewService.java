@@ -3,6 +3,8 @@ package com.openmd.server.quiz.service;
 import com.openmd.server.global.api.FieldError;
 import com.openmd.server.global.error.BusinessException;
 import com.openmd.server.global.error.CommonErrorCode;
+import com.openmd.server.learningmaterial.domain.LearningMaterial;
+import com.openmd.server.learningmaterial.repository.LearningMaterialRepository;
 import com.openmd.server.quiz.domain.entity.QuizAttempt;
 import com.openmd.server.quiz.domain.entity.QuizAttemptQuestion;
 import com.openmd.server.quiz.domain.entity.QuizQuestion;
@@ -39,6 +41,7 @@ public class QuizReviewService {
   private final QuizAttemptRepository attempts;
   private final QuizAttemptQuestionRepository attemptQuestions;
   private final QuizSetRepository sets;
+  private final LearningMaterialRepository materials;
   private final QuizQuestionRepository questions;
   private final QuizQuestionChoiceRepository choices;
   private final QuizFillInTheBlankRepository blanks;
@@ -47,12 +50,14 @@ public class QuizReviewService {
       QuizAttemptRepository attempts,
       QuizAttemptQuestionRepository attemptQuestions,
       QuizSetRepository sets,
+      LearningMaterialRepository materials,
       QuizQuestionRepository questions,
       QuizQuestionChoiceRepository choices,
       QuizFillInTheBlankRepository blanks) {
     this.attempts = attempts;
     this.attemptQuestions = attemptQuestions;
     this.sets = sets;
+    this.materials = materials;
     this.questions = questions;
     this.choices = choices;
     this.blanks = blanks;
@@ -65,8 +70,11 @@ public class QuizReviewService {
             .findFirstByUserIdAndTypeAndStatusOrderByCompletedAtDesc(
                 userId, QuizAttemptType.MAIN, QuizAttemptStatus.COMPLETED)
             .orElse(null);
-    if (main == null) return new ReviewLatestView(null, null, null, 0, null);
+    if (main == null) return new ReviewLatestView(null, null, null, null, null, 0, 0, null);
     QuizSet set = sets.findById(main.getQuizSetId()).orElseThrow();
+    LearningMaterial material =
+        materials.findByIdAndUserId(set.getLearningMaterialId(), userId).orElseThrow();
+    int totalQuestionCount = Math.toIntExact(questions.countByQuizSetId(set.getId()));
     int count = attemptQuestions.findReviewCandidates(main.getId(), REVIEW_OUTCOMES).size();
     String active =
         attempts
@@ -79,7 +87,14 @@ public class QuizReviewService {
             attempts.countByQuizSetIdAndUserIdAndTypeAndStatus(
                 main.getQuizSetId(), userId, QuizAttemptType.MAIN, QuizAttemptStatus.COMPLETED));
     return new ReviewLatestView(
-        main.getPublicId(), set.getPublicId(), attemptNumber, count, active);
+        main.getPublicId(),
+        set.getPublicId(),
+        attemptNumber,
+        material.getTitle(),
+        main.getCompletedAt(),
+        totalQuestionCount,
+        count,
+        active);
   }
 
   @Transactional

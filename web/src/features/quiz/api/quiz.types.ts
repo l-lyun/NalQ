@@ -96,6 +96,9 @@ export type LatestReview = {
   sourceAttemptId: string | null
   quizSetId: string | null
   attemptNumber: number | null
+  materialTitle: string | null
+  completedAt: string | null
+  totalQuestionCount: number
   reviewQuestionCount: number
   activeReviewSessionId: string | null
 }

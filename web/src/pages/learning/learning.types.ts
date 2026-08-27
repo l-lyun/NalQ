@@ -8,11 +8,13 @@ export type { LearningMaterialDetail, LearningMaterialPage, LearningMaterialSumm
 
 export type LearningReviewSummary = {
   sourceAttemptId: string
+  quizSetId: string
   materialTitle: string
-  completedAtLabel: string
+  completedAt: string
+  totalQuestionCount: number
+  attemptNumber: number
   reviewQuestionCount: number
   activeReviewSessionId?: string
-  completedQuestionCount?: number
 }
 
 export type LearningNavigationDestination = 'home' | 'learning' | 'profile'
@@ -30,6 +32,7 @@ export type LearningSectionState<T> =
 export type LearningPageCallbacks = {
   onNavigate?: (destination: LearningNavigationDestination) => void
   onStartReview?: (review: LearningReviewSummary) => void
+  onRestartQuiz?: (review: LearningReviewSummary) => void
   onOpenQuizConditions?: (material: Pick<LearningMaterialSummary, 'materialId' | 'title'>) => void
   onStartNotionImport?: () => void
   onCreateMaterial?: (
