@@ -55,12 +55,10 @@ PRD, 흐름, 화면 명세와 계약은 무엇을 구현해야 하는지를 책�
 
 ## 완료 조건
 
-코드 변경 후 `web/`에서 아래 검사를 실행하고 결과를 보고한다.
+코드 변경 후 `web/`에서 아래 검사를 실행하고 결과를 보고한다. 이 명령은 CI의 `web-static`과 같은 typecheck, lint, build를 실행한다.
 
 ```text
-pnpm typecheck
-pnpm lint
-pnpm build
+pnpm verify
 ```
 
 화면 작업은 작은 WebView 너비, 긴 문구, 키보드 탐색과 명세에 포함된 로딩·빈 상태·오류 상태도 확인한다.

@@ -77,6 +77,12 @@ TRD는 각 애플리케이션의 `docs/trd/trd-*.md`에 두며, 파일명과 제
 | Web | 퀴즈 화면 상태 | [웹 퀴즈 TRD](../web/docs/trd/trd-quiz-solving.md) | 검토 중 |
 | App | WebView 퀴즈 상태 | [앱 퀴즈 TRD](../app/docs/trd/trd-quiz-solving.md) | 검토 중 |
 
+## 실행 계획과 저장소 검증
+
+| 관심사 | 원장 | 유형 | 상태 |
+| --- | --- | --- | --- |
+| 웹·서버 정적 검증 하네스와 단계별 강화 | [정적 검증 하네스 실행 계획](plans/plan-static-verification-harness.md) | Execution Plan | 1단계 구현, 2·3단계 제안 |
+
 ## 문서 템플릿
 
 | 만들 문서 | 템플릿 |

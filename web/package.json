@@ -12,6 +12,7 @@
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b --pretty false",
     "lint": "oxlint",
+    "verify": "pnpm typecheck && pnpm lint && pnpm build",
     "preview": "vite preview"
   },
   "dependencies": {

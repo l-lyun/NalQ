@@ -38,7 +38,9 @@
 
 ## 검증
 
-- Windows: `server/gradlew.bat test`
-- macOS/Linux: `server/gradlew test`
+- Docker가 필요 없는 기본 회귀 검증: `server/gradlew fastTest`
+- Testcontainers 통합 검증: `server/gradlew integrationTest`
+- 전체 서버 검증: `server/gradlew test`
+- Windows에서는 각 명령의 `gradlew` 대신 `gradlew.bat`을 사용한다.
 
-변경 보고에는 먼저 작성한 테스트, 실패 확인 결과, 최종 테스트 결과와 남은 위험을 포함한다.
+MySQL·Redis 등 Testcontainers를 사용하는 테스트에는 `@Tag("integration")`을 붙여 fast와 integration 경계를 유지한다. 변경 보고에는 먼저 작성한 테스트, 실패 확인 결과, 최종 테스트 결과와 남은 위험을 포함한다.
