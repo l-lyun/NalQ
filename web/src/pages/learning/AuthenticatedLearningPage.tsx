@@ -4,16 +4,20 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import {
   createLearningMaterial,
-  getLearningMaterial,
-  getLearningMaterials,
   LEARNING_MATERIAL_PAGE_SIZE,
   learningMaterialKeys,
+  learningMaterialQueryOptions,
 } from '@/features/learning-material/api/learningMaterial.api'
-import { getLatestReview } from '@/features/quiz/api/quiz.api'
-import { quizApiEnabled } from '@/features/quiz/model/quizFeature'
+import {
+  quizApiEnabled,
+  quizMockEnabled,
+  quizRoutesEnabled,
+} from '@/features/quiz/model/quizFeature'
 import { createUuidV4 } from '@/features/quiz/model/randomUuid'
+import { latestReviewQueryOptions } from '@/features/quiz/model/quizQueries'
 
 import { LearningPage } from './LearningPage'
+import { learningReviewFixture } from './learning.fixtures'
 import type {
   LearningMaterialDraft,
   LearningNavigationDestination,
@@ -34,20 +38,11 @@ export function AuthenticatedLearningPage() {
   const creationAttemptRef = useRef<CreationAttempt | null>(null)
   const lastSuccessfulMaterialsRef = useRef<LearningMaterialPage | null>(null)
   const materialsQueryResult = useQuery({
-    queryKey: learningMaterialKeys.list({
+    ...learningMaterialQueryOptions.list({
       page: materialsPage,
       size: LEARNING_MATERIAL_PAGE_SIZE,
       query: materialsQuery.trim(),
     }),
-    queryFn: ({ signal }) =>
-      getLearningMaterials(
-        {
-          page: materialsPage,
-          size: LEARNING_MATERIAL_PAGE_SIZE,
-          query: materialsQuery,
-        },
-        signal,
-      ),
     placeholderData: (previousData) => previousData,
     refetchInterval: (query) =>
       query.state.data?.items.some(
@@ -64,8 +59,7 @@ export function AuthenticatedLearningPage() {
       ),
   })
   const reviewQuery = useQuery({
-    queryKey: ['private', 'quiz-review', 'latest'],
-    queryFn: ({ signal }) => getLatestReview(signal),
+    ...latestReviewQueryOptions(),
     enabled: quizApiEnabled,
   })
 
@@ -113,10 +107,7 @@ export function AuthenticatedLearningPage() {
 
   const loadMaterialDetail = useCallback(
     (materialId: string) =>
-      queryClient.fetchQuery({
-        queryKey: learningMaterialKeys.detail(materialId),
-        queryFn: ({ signal }) => getLearningMaterial(materialId, signal),
-      }),
+      queryClient.fetchQuery(learningMaterialQueryOptions.detail(materialId)),
     [queryClient],
   )
 
@@ -133,7 +124,9 @@ export function AuthenticatedLearningPage() {
   return (
     <LearningPage
       reviewState={
-        !quizApiEnabled
+        quizMockEnabled
+          ? { status: 'ready', data: learningReviewFixture }
+          : !quizApiEnabled
           ? { status: 'error', message: '복습 데이터 연동을 준비하고 있어요.' }
           : reviewQuery.isPending
           ? { status: 'loading' }
@@ -180,10 +173,17 @@ export function AuthenticatedLearningPage() {
         },
         onMaterialsPageChange: setMaterialsPage,
         onRetryMaterials: () => void materialsQueryResult.refetch(),
-        ...(quizApiEnabled
+        ...(quizRoutesEnabled
           ? {
-              onRetryReview: () => void reviewQuery.refetch(),
-              onStartReview: () => navigate('/review'),
+              ...(quizApiEnabled
+                ? { onRetryReview: () => void reviewQuery.refetch() }
+                : {}),
+              onStartReview: (review: { materialTitle: string }) =>
+                navigate('/review', { state: { materialTitle: review.materialTitle } }),
+              onRestartQuiz: (review: { quizSetId: string; materialTitle: string }) =>
+                navigate(`/quiz-sets/${review.quizSetId}`, {
+                  state: { materialTitle: review.materialTitle },
+                }),
               onOpenQuizConditions: (material: { materialId: string; title: string }) =>
                 navigate(`/learning/${material.materialId}/quiz`, {
                   state: { materialTitle: material.title },

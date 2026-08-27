@@ -79,7 +79,7 @@ scope: shared
 - 같은 `attemptId`의 재요청은 payload fingerprint를 계산하거나 비교하지 않고 최초로 확정된 attempt를 반환한다. 클라이언트 버그로 같은 UUID에 다른 답안을 보낸 경우에도 최초 제출 우선이며 새 회차를 만들지 않는다.
 - 다른 사용자 또는 QuizSet이 이미 사용한 UUID이면 `409 ATTEMPT_001`과 `fields.field=attemptId`를 반환한다. 자동으로 새 UUID를 만들어 재전송하지 않는다.
 - 복습 최종 제출은 이미 존재하는 `reviewSessionId` 하나에 한 번만 확정되므로 별도 요청 키를 만들지 않는다. 같은 세션 재요청은 최초 제출 결과를 반환한다.
-- 서술형 자기평가와 단답형 판정 수정처럼 특정 리소스에 원하는 현재 값을 저장하는 `PUT`은 저장된 현재 값 자체로 반복 요청을 처리한다. 별도 멱등 키, payload fingerprint와 공개 revision을 두지 않는다.
+- 서술형 자기평가와 자동 채점 판정 수정처럼 특정 리소스에 원하는 현재 값을 저장하는 `PUT`은 저장된 현재 값 자체로 반복 요청을 처리한다. 별도 멱등 키, payload fingerprint와 공개 revision을 두지 않는다.
 
 ## 엔드포인트 목록
 
@@ -97,7 +97,8 @@ scope: shared
 | 미완료 서술형 자기평가 회차 조회 | `GET /api/v1/quiz-sets/{quizSetId}/attempts/pending-self-assessment` | `200 OK` |
 | 서술형 자기평가 저장 | `PUT /api/v1/quiz-attempts/{attemptId}/essay-assessments/{questionId}` | `200 OK` |
 | 결과 조회 | `GET /api/v1/quiz-attempts/{attemptId}/result` | `200 OK` |
-| 단답형 현재 판정 수정 | `PUT /api/v1/quiz-attempts/{attemptId}/short-answer-gradings/{questionId}` | `200 OK` |
+| 단답형·빈칸 현재 판정 수정 | `PUT /api/v1/quiz-attempts/{attemptId}/grading-overrides/{questionId}` | `200 OK` |
+| 단답형 현재 판정 수정(호환 경로) | `PUT /api/v1/quiz-attempts/{attemptId}/short-answer-gradings/{questionId}` | `200 OK` |
 | 최신 복습 현황 조회 | `GET /api/v1/quiz-reviews/latest` | `200 OK` |
 | 최신 대상 복습 세션 생성 | `POST /api/v1/review-sessions` | `201 Created` 또는 `200 OK` |
 | 복습 세션 조회·재개 | `GET /api/v1/review-sessions/{reviewSessionId}` | `200 OK` |
@@ -589,9 +590,11 @@ Headers: `Authorization`, `Content-Type: application/json`
 }
 ```
 
-### 단답형 현재 판정 수정
+### 단답형·빈칸 현재 판정 수정
 
-`PUT /api/v1/quiz-attempts/{attemptId}/short-answer-gradings/{questionId}`
+`PUT /api/v1/quiz-attempts/{attemptId}/grading-overrides/{questionId}`
+
+기존 소비자 호환을 위해 `PUT /api/v1/quiz-attempts/{attemptId}/short-answer-gradings/{questionId}`도 역사적 이름의 호환 별칭으로 같은 요청·응답·허용 유형과 오류 의미를 유지한다. 기존 web/app 소비자는 즉시 경로를 변경하지 않아도 되며, 신규 소비자는 공통 `grading-overrides` 경로를 사용한다.
 
 Headers: `Authorization`, `Content-Type: application/json`
 
@@ -602,7 +605,7 @@ Headers: `Authorization`, `Content-Type: application/json`
 ```
 
 - `outcome`: `CORRECT` 또는 `INCORRECT`. 사용자가 확인한 현재 판정으로 교체할 값이다.
-- 현재 사용자 소유이며 `COMPLETED`인 attempt의 답을 작성한 `SHORT_ANSWER`에만 적용한다. 객관식·빈칸·서술형, 미응답 단답형과 완료 전 attempt는 `409 ATTEMPT_001`이다.
+- 현재 사용자 소유이며 `COMPLETED`인 `MAIN` attempt에서 답을 작성한 `SHORT_ANSWER` 또는 `FILL_IN_THE_BLANK`에 적용한다. 빈칸형은 일부 빈칸만 작성했더라도 제출 답안이 하나 이상 있으면 적용할 수 있다. 객관식·서술형, 완전 미응답 단답형·빈칸형과 완료 전 attempt는 `409 ATTEMPT_001`이다.
 - 최초 자동 판정과 현재 판정의 공유 의미·생명주기는 [데이터 계약의 본 퀴즈 회차와 채점 결과](contract-data-quiz-learning.md#본-퀴즈-회차와-채점-결과)를 따른다.
 - 같은 현재 판정을 반복 요청하면 값을 바꾸지 않는 no-op 성공이다. 다른 판정을 요청하면 최신 `userOverrideOutcome`을 교체하고 마지막으로 커밋된 요청을 현재 판정으로 사용한다.
 - 별도 `Idempotency-Key`, payload fingerprint, 과거 응답 snapshot, `expectedRevision`, `gradingRevision`과 `summary.revision`을 저장하거나 노출하지 않는다.
@@ -676,15 +679,15 @@ Headers: `Authorization`, `Content-Type: application/json`
 ```
 
 - 객관식·빈칸의 자동 채점 `outcome`: `CORRECT`, `INCORRECT`.
-- 답을 작성한 단답형은 화면에 표시할 현재 유효 `outcome`을 제공한다. 서버가 보존하는 `automaticOutcome`과 `userOverrideOutcome`은 현재 결과 화면에서 직접 사용하지 않으므로 이 조회 projection에 반복하지 않는다.
+- 답을 작성한 단답형·빈칸형은 화면에 표시할 현재 유효 `outcome`을 제공한다. 서버가 보존하는 `automaticOutcome`과 `userOverrideOutcome`은 현재 결과 화면에서 직접 사용하지 않으므로 이 조회 projection에 반복하지 않는다.
 - 서술형 `outcome`: `CORRECT`, `PARTIAL`, `INCORRECT`.
 - 각 `questionResults` 항목은 다른 문제 조회 없이 렌더링할 수 있어야 한다. 객관식은 `choices: [{ choiceId, text }]`, 빈칸은 풀이 때와 같은 `prompt`와 `blanks: [{ blankId, number }]`를 포함한다.
 - 객관식 `response.selectedChoiceId`와 `representativeAnswer.selectedChoiceId`, 빈칸 `response.blankAnswers[].blankId`와 `representativeAnswer.blankAnswers[].blankId`는 각각 함께 반환된 보기·빈칸 식별자를 그대로 참조한다.
-- 미응답은 `response=null`, `outcome=INCORRECT`로 포함한다. 별도 `unanswered` 필드나 미응답 집계를 반환하지 않으며 클라이언트는 `response=null`로 답하지 않음을 표시하고 단답형 수정 행동을 제공하지 않는다.
+- 미응답은 `response=null`, `outcome=INCORRECT`로 포함한다. 별도 `unanswered` 필드나 미응답 집계를 반환하지 않으며 클라이언트는 `response=null`로 답하지 않음을 표시하고 판정 수정 행동을 제공하지 않는다. 일부 빈칸만 작성한 경우 `response.blankAnswers`가 비어 있지 않으므로 판정 수정 행동을 제공할 수 있다.
 - `representativeAnswer`는 결과 설명에 필요한 대표 정답만 공개한다. 빈칸·단답형의 허용 정답 전체를 반환하지 않는다. 서술형은 `modelAnswer`와 `keyPoints`를 제공한다.
-- `summary.scoredGrading`의 분자·분모는 객관식·빈칸·단답형이며, 단답형은 최신 `outcome`을 분자 계산에 사용한다. 최초 제출 응답의 `automaticGrading`은 제출 시점 자동 판정 요약이므로 별도 의미를 유지한다.
+- `summary.scoredGrading`의 분자·분모는 객관식·빈칸·단답형이며, 단답형·빈칸형은 최신 `outcome`을 분자 계산에 사용한다. 최초 제출 응답의 `automaticGrading`은 제출 시점 자동 판정 요약이므로 별도 의미를 유지한다.
 - `summary`는 저장된 문항 결과와 복습 해결 상태를 기준으로 조회 시 계산한다. 클라이언트는 쓰기 성공 응답의 전체 결과를 적용하고 필요하면 이 결과 API를 다시 조회한다.
-- 서버가 보존하는 객관식·빈칸과 단답형의 `automaticOutcome`은 복습 뒤에도 바뀌지 않는다. 조회 projection의 단답형 `outcome`만 사용자 수정으로 바뀔 수 있고 복습 자체는 이를 변경하지 않는다. 복습 대상 여부는 서버가 현재 판정과 복습 해결 상태로 계산하며 결과 화면은 `summary.reviewQuestionCount`를 사용한다.
+- 서버가 보존하는 객관식·빈칸과 단답형의 `automaticOutcome`은 복습 뒤에도 바뀌지 않는다. 조회 projection의 단답형·빈칸형 `outcome`은 사용자 수정으로 바뀔 수 있고 복습 자체는 이를 변경하지 않는다. 복습 대상 여부는 서버가 현재 판정과 복습 해결 상태로 계산하며 결과 화면은 `summary.reviewQuestionCount`를 사용한다.
 
 ## 복습 세션
 
@@ -758,7 +761,7 @@ Headers: `Authorization`, `Content-Type: application/json`
 
 - `sourceAttemptId`는 [최신 복습 현황](#최신-복습-현황)에서 받은 가장 최근 완료 회차여야 한다.
 - 해당 회차에서 현재 최종 판정이 `INCORRECT|PARTIAL`이고 아직 해결되지 않은 문항을 번호 오름차순으로 snapshot해 서버 복습 세션을 만든다. 별도 저장 `reviewRequired` 플래그는 두지 않는다.
-- 생성된 활성 세션의 snapshot은 원본 회차 단답형 판정 수정 뒤에도 중간 변경하지 않는다. 원본 회차의 최신 `reviewQuestionCount`와 활성 세션의 남은 문항 수는 별도 값이며, 수정된 대상 여부는 다음 세션 생성부터 반영한다.
+- 생성된 활성 세션의 snapshot은 원본 회차 단답형·빈칸형 판정 수정 뒤에도 중간 변경하지 않는다. 원본 회차의 최신 `reviewQuestionCount`와 활성 세션의 남은 문항 수는 별도 값이며, 수정된 대상 여부는 다음 세션 생성부터 반영한다.
 - 과거 회차를 임의 선택하거나 여러 회차를 합치지 않는다. 최신 회차가 바뀌었거나 대상이 없으면 `REVIEW_001`이다.
 - 새 세션을 만들면 `201 Created`, 같은 `sourceAttemptId`의 활성 세션이 이미 있으면 새로 만들지 않고 `200 OK`로 기존 세션을 반환한다.
 - source MAIN을 짧게 잠근 서비스 트랜잭션에서 기존 활성 세션을 먼저 확인해 같은 원본의 활성 세션을 하나만 유지한다. 별도 멱등 키나 payload fingerprint를 만들지 않는다.
@@ -922,7 +925,7 @@ Headers: `Authorization`, `Content-Type: application/json`
 | 학습자료 본문 20,000자 초과 | `413` | `MATERIAL_002` | 본문을 줄인 뒤 같은 저장 흐름 재시도 |
 | 같은 학습자료에 이미 `GENERATING` 작업이 있음 | `409` | `QUIZ_001` | 기존 생성 상태 확인 |
 | 생성 작업을 접수할 수 없는 일시적 서버 상태 | `503` | `QUIZ_002` | 새 QuizSet과 본문 잠금이 생기지 않았으므로 같은 조건으로 새 생성 요청 |
-| `READY`가 아닌 세트 제출, attempt UUID의 소유자·QuizSet 불일치, 자기평가 상태 또는 수정 불가 단답형 | `409` | `ATTEMPT_001` | 최신 문제 세트·attempt 상태와 결과 확인 |
+| `READY`가 아닌 세트 제출, attempt UUID의 소유자·QuizSet 불일치, 자기평가 상태 또는 수정 불가 자동 채점 문항 | `409` | `ATTEMPT_001` | 최신 문제 세트·attempt 상태와 결과 확인 |
 | 완료된 복습 세션 재변경 또는 이미 확정된 서술형 평가 변경 | `409` | `REVIEW_001` | 세션과 결과 재조회 |
 
 - MVP의 안정 오류 코드는 `COMMON_001/002/003/999`, `AUTH_005`, `MATERIAL_001/002`, `QUIZ_001/002`, `ATTEMPT_001`, `REVIEW_001`로 제한한다.

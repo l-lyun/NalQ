@@ -1,6 +1,7 @@
 import type { ApiResponse } from '@/features/auth/api/auth.types'
 import { protectedApi } from '@/shared/api/protectedApi'
 import { unwrapApiResponse } from '@/shared/api/apiError'
+import { queryOptions } from '@tanstack/react-query'
 
 import type {
   CreateLearningMaterialRequest,
@@ -11,11 +12,27 @@ import type {
 } from './learningMaterial.types'
 
 export const LEARNING_MATERIAL_PAGE_SIZE = 6
+export const LEARNING_MATERIAL_STALE_TIME = 5 * 60 * 1_000
 
 export const learningMaterialKeys = {
   all: ['private', 'learning-materials'] as const,
   list: (params: GetLearningMaterialsParams) => [...learningMaterialKeys.all, 'list', params] as const,
   detail: (materialId: string) => [...learningMaterialKeys.all, 'detail', materialId] as const,
+}
+
+export const learningMaterialQueryOptions = {
+  list: (params: GetLearningMaterialsParams) =>
+    queryOptions({
+      queryKey: learningMaterialKeys.list(params),
+      queryFn: ({ signal }) => getLearningMaterials(params, signal),
+      staleTime: LEARNING_MATERIAL_STALE_TIME,
+    }),
+  detail: (materialId: string) =>
+    queryOptions({
+      queryKey: learningMaterialKeys.detail(materialId),
+      queryFn: ({ signal }) => getLearningMaterial(materialId, signal),
+      staleTime: LEARNING_MATERIAL_STALE_TIME,
+    }),
 }
 
 export async function getLearningMaterials(

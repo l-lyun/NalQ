@@ -7,7 +7,7 @@ import {
   quizFixtureConditions,
   quizFixtureQuestions,
   quizFixtureReady,
-  resolveQuizFixtureCorrection,
+  resolveQuizFixtureGradingOverride,
   resolveQuizFixtureEssayAssessment,
   resolveQuizFixtureGeneration,
   resolveQuizFixtureSubmission,
@@ -25,9 +25,13 @@ import type {
 export function QuizFixturePage({
   initialScene,
   flowKind = 'QUIZ',
+  materialTitle = '자료구조 핵심 개념',
+  onExit,
 }: {
   initialScene?: QuizFlowScene
   flowKind?: QuizFlowKind
+  materialTitle?: string
+  onExit?: () => void
 }) {
   const isReview = flowKind === 'REVIEW'
   const initialQuestions = isReview
@@ -39,9 +43,14 @@ export function QuizFixturePage({
   const [questions, setQuestions] = useState(initialQuestions)
   const [pendingEssayQuestionIds, setPendingEssayQuestionIds] = useState<string[]>([])
   const [essayOutcomes, setEssayOutcomes] = useState<Record<string, QuizResultOutcome>>({})
+  const [gradingOverrides, setGradingOverrides] = useState<Record<string, QuizBinaryOutcome>>({})
   const result = useMemo(
-    () => createQuizFixtureResult(questions, undefined, essayOutcomes),
-    [essayOutcomes, questions],
+    () => createQuizFixtureResult(
+      questions,
+      undefined,
+      { ...essayOutcomes, ...gradingOverrides },
+    ),
+    [essayOutcomes, gradingOverrides, questions],
   )
 
   const generate = async (nextConditions: QuizConditions) => {
@@ -49,12 +58,13 @@ export function QuizFixturePage({
     setQuestions(fixture.questions)
     setPendingEssayQuestionIds([])
     setEssayOutcomes({})
+    setGradingOverrides({})
     return fixture.ready
   }
 
   return (
     <QuizFlowPage
-      materialTitle="자료구조 핵심 개념"
+      materialTitle={materialTitle}
       questions={questions}
       result={result}
       flowKind={flowKind}
@@ -67,6 +77,10 @@ export function QuizFixturePage({
         onGenerate: generate,
         onRetryGeneration: (_failure: QuizGenerationFailure) => generate(conditions),
         onRefreshGenerationStatus: () => generate(conditions),
+        onExitGeneration: onExit,
+        onExitQuiz: onExit,
+        onDeferQuiz: onExit,
+        onResultExit: onExit,
         onSubmit: async (input) => {
           const submission = await resolveQuizFixtureSubmission(input, questions)
           setPendingEssayQuestionIds(submission.pendingEssayQuestionIds)
@@ -81,10 +95,20 @@ export function QuizFixturePage({
           setEssayOutcomes((current) => ({ ...current, [input.questionId]: input.assessment }))
           return saved
         },
-        onUpdateShortAnswerOutcome: (input: {
-          questionId: string
-          outcome: QuizBinaryOutcome
-        }) => resolveQuizFixtureCorrection(input, questions),
+        onUpdateGradingOutcome: isReview
+          ? undefined
+          : async (input: { questionId: string; outcome: QuizBinaryOutcome }) => {
+              const updated = await resolveQuizFixtureGradingOverride(
+                input,
+                questions,
+                { ...essayOutcomes, ...gradingOverrides },
+              )
+              setGradingOverrides((current) => ({
+                ...current,
+                [input.questionId]: input.outcome,
+              }))
+              return updated
+            },
       }}
     />
   )

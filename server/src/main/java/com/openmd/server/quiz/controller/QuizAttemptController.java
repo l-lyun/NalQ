@@ -4,7 +4,7 @@ import com.openmd.server.auth.security.AccessPrincipal;
 import com.openmd.server.global.api.ApiResponse;
 import com.openmd.server.quiz.dto.model.QuizAttemptSubmissionResult;
 import com.openmd.server.quiz.dto.request.EssayAssessmentRequest;
-import com.openmd.server.quiz.dto.request.ShortAnswerGradingRequest;
+import com.openmd.server.quiz.dto.request.GradingOverrideRequest;
 import com.openmd.server.quiz.dto.request.SubmitQuizAttemptRequest;
 import com.openmd.server.quiz.dto.response.EssayAssessmentResult;
 import com.openmd.server.quiz.dto.response.PendingSelfAssessment;
@@ -13,7 +13,7 @@ import com.openmd.server.quiz.dto.response.SubmittedQuizAttempt;
 import com.openmd.server.quiz.service.EssayAssessmentService;
 import com.openmd.server.quiz.service.QuizAttemptResultService;
 import com.openmd.server.quiz.service.QuizAttemptSubmissionService;
-import com.openmd.server.quiz.service.ShortAnswerGradingService;
+import com.openmd.server.quiz.service.GradingOverrideService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -32,17 +32,17 @@ public class QuizAttemptController {
 
   private final QuizAttemptSubmissionService submissions;
   private final QuizAttemptResultService results;
-  private final ShortAnswerGradingService gradings;
+  private final GradingOverrideService gradingOverrides;
   private final EssayAssessmentService essayAssessments;
 
   public QuizAttemptController(
       QuizAttemptSubmissionService submissions,
       QuizAttemptResultService results,
-      ShortAnswerGradingService gradings,
+      GradingOverrideService gradingOverrides,
       EssayAssessmentService essayAssessments) {
     this.submissions = submissions;
     this.results = results;
-    this.gradings = gradings;
+    this.gradingOverrides = gradingOverrides;
     this.essayAssessments = essayAssessments;
   }
 
@@ -69,10 +69,21 @@ public class QuizAttemptController {
       @AuthenticationPrincipal AccessPrincipal principal,
       @PathVariable String attemptId,
       @PathVariable String questionId,
-      @RequestBody ShortAnswerGradingRequest request) {
+      @RequestBody GradingOverrideRequest request) {
     return ResponseEntity.ok(
         ApiResponse.success(
-            gradings.update(principal.userId(), attemptId, questionId, request.outcome())));
+            gradingOverrides.update(principal.userId(), attemptId, questionId, request.outcome())));
+  }
+
+  @PutMapping("/quiz-attempts/{attemptId}/grading-overrides/{questionId}")
+  public ResponseEntity<ApiResponse<QuizAttemptResult>> updateGradingOverride(
+      @AuthenticationPrincipal AccessPrincipal principal,
+      @PathVariable String attemptId,
+      @PathVariable String questionId,
+      @RequestBody GradingOverrideRequest request) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            gradingOverrides.update(principal.userId(), attemptId, questionId, request.outcome())));
   }
 
   @PutMapping("/quiz-attempts/{attemptId}/essay-assessments/{questionId}")

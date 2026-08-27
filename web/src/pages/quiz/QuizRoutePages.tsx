@@ -1,5 +1,5 @@
 import { ActionButton, ProgressCircle, Text, VStack } from '@seed-design/react'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 
@@ -8,7 +8,6 @@ import {
   createQuizSet,
   createReviewSession,
   getActiveQuizSet,
-  getLatestReview,
   getPendingSelfAssessment,
   getQuizResult,
   getQuizSet,
@@ -18,7 +17,7 @@ import {
   saveReviewEssayAssessment,
   submitQuiz,
   submitReview,
-  updateShortAnswerGrading,
+  updateGradingOverride,
 } from '@/features/quiz/api/quiz.api'
 import type { QuizSetState } from '@/features/quiz/api/quiz.types'
 import {
@@ -31,6 +30,11 @@ import {
   saveRequestedConfig,
 } from '@/features/quiz/model/quizRequestedConfigStorage'
 import { useCurrentUser } from '@/features/auth/model/auth.queries'
+import { learningMaterialKeys } from '@/features/learning-material/api/learningMaterial.api'
+import {
+  latestReviewQueryOptions,
+  quizQueryKeys,
+} from '@/features/quiz/model/quizQueries'
 
 import { QuizFlowPage } from './QuizFlowPage'
 import type {
@@ -115,12 +119,13 @@ export function QuizMaterialRoutePage() {
   const navigate = useNavigate()
   const location = useLocation()
   const currentUser = useCurrentUser()
+  const queryClient = useQueryClient()
   const materialTitle = (location.state as { materialTitle?: string } | null)?.materialTitle ?? '학습자료'
   const [quizSetId, setQuizSetId] = useState<string>()
   const lastConditionsRef = useRef<QuizConditions | undefined>(undefined)
 
   const activeQuery = useQuery({
-    queryKey: ['private', 'quiz', 'active', materialId],
+    queryKey: quizQueryKeys.active(materialId!),
     queryFn: ({ signal }) => getActiveQuizSet(materialId!, signal),
     enabled: Boolean(materialId),
     retry: shouldRetryQuery,
@@ -136,7 +141,7 @@ export function QuizMaterialRoutePage() {
   }, [activeQuery.data, materialTitle, navigate])
 
   const quizSetQuery = useQuery({
-    queryKey: ['private', 'quiz-set', quizSetId],
+    queryKey: quizQueryKeys.quizSet(quizSetId!),
     queryFn: async ({ signal }) => {
       const state = await getQuizSet(quizSetId!, signal)
       if (state.status === 'READY') validateQuestions(state.questions)
@@ -160,12 +165,20 @@ export function QuizMaterialRoutePage() {
         saveRequestedConfig(currentUser.data.id, created.quizSetId, created.requestedConfig)
       }
       setQuizSetId(created.quizSetId)
+      void queryClient.invalidateQueries({ queryKey: learningMaterialKeys.all })
+      void queryClient.invalidateQueries({ queryKey: quizQueryKeys.active(created.materialId) })
       navigate(`/quiz-sets/${created.quizSetId}`, {
         replace: true,
         state: { materialTitle },
       })
     },
   })
+
+  useEffect(() => {
+    if (!materialId || !quizSetQuery.data || quizSetQuery.data.status === 'GENERATING') return
+    void queryClient.invalidateQueries({ queryKey: learningMaterialKeys.all })
+    void queryClient.invalidateQueries({ queryKey: quizQueryKeys.active(materialId) })
+  }, [materialId, queryClient, quizSetQuery.data])
 
   if (!materialId) return <RouteStatus message="학습자료를 확인하지 못했어요." />
   if (activeQuery.isPending || currentUser.isPending) return <RouteLoading />
@@ -219,14 +232,31 @@ export function QuizMaterialRoutePage() {
         onExitQuiz: () => navigate('/learning'),
         onDeferQuiz: () => navigate('/learning'),
         onResultExit: () => navigate('/learning'),
-        onSubmit: ({ attemptId, payload }) => {
+        onSubmit: async ({ attemptId, payload }) => {
           if (!attemptId) throw new Error('attempt UUID를 만들지 못했어요.')
-          return submitQuiz(quizSetId!, attemptId, payload)
+          const submission = await submitQuiz(quizSetId!, attemptId, payload)
+          void queryClient.invalidateQueries({
+            queryKey: quizQueryKeys.pendingSelfAssessment(quizSetId!),
+            refetchType: 'none',
+          })
+          void queryClient.invalidateQueries({
+            queryKey: quizQueryKeys.attemptResult(submission.attemptId),
+            refetchType: 'none',
+          })
+          void queryClient.invalidateQueries({ queryKey: quizQueryKeys.latestReview })
+          return submission
         },
         onLoadResult: async (attemptId) => adaptQuizResult(await getQuizResult(attemptId)),
-        onSaveEssayAssessment: ({ resourceId, questionId, assessment }) =>
-          saveEssayAssessment(resourceId, questionId, assessment),
-        onUpdateShortAnswerOutcome: async ({ questionId, outcome }) => {
+        onSaveEssayAssessment: async ({ resourceId, questionId, assessment }) => {
+          const saved = await saveEssayAssessment(resourceId, questionId, assessment)
+          void queryClient.invalidateQueries({
+            queryKey: quizQueryKeys.attemptResult(resourceId),
+            refetchType: 'none',
+          })
+          void queryClient.invalidateQueries({ queryKey: quizQueryKeys.latestReview })
+          return saved
+        },
+        onUpdateGradingOutcome: async ({ questionId, outcome }) => {
           throw new Error(`결과 화면 attempt 경로로 진입해야 채점 수정이 가능합니다: ${questionId}:${outcome}`)
         },
       }}
@@ -239,11 +269,12 @@ export function QuizSetRoutePage() {
   const navigate = useNavigate()
   const location = useLocation()
   const currentUser = useCurrentUser()
+  const queryClient = useQueryClient()
   const materialTitle = (location.state as { materialTitle?: string } | null)?.materialTitle ?? '학습자료'
   const lastAttemptIdRef = useRef<string | undefined>(undefined)
   const createConditionsRef = useRef<QuizConditions | undefined>(undefined)
   const stateQuery = useQuery({
-    queryKey: ['private', 'quiz-set', quizSetId],
+    queryKey: quizQueryKeys.quizSet(quizSetId!),
     queryFn: async ({ signal }) => {
       const state = await getQuizSet(quizSetId!, signal)
       if (state.status === 'READY') validateQuestions(state.questions)
@@ -257,12 +288,12 @@ export function QuizSetRoutePage() {
     },
   })
   const pendingQuery = useQuery({
-    queryKey: ['private', 'quiz-set', quizSetId, 'pending-self-assessment'],
+    queryKey: quizQueryKeys.pendingSelfAssessment(quizSetId!),
     queryFn: ({ signal }) => getPendingSelfAssessment(quizSetId!, signal),
     enabled: stateQuery.data?.status === 'READY',
   })
   const pendingResultQuery = useQuery({
-    queryKey: ['private', 'quiz-attempt', pendingQuery.data?.attemptId, 'result'],
+    queryKey: quizQueryKeys.attemptResult(pendingQuery.data?.attemptId),
     queryFn: ({ signal }) => getQuizResult(pendingQuery.data!.attemptId, signal),
     enabled: Boolean(pendingQuery.data?.attemptId),
   })
@@ -273,9 +304,19 @@ export function QuizSetRoutePage() {
     },
     onSuccess: (created) => {
       if (currentUser.data) saveRequestedConfig(currentUser.data.id, created.quizSetId, created.requestedConfig)
+      void queryClient.invalidateQueries({ queryKey: learningMaterialKeys.all })
+      void queryClient.invalidateQueries({ queryKey: quizQueryKeys.active(created.materialId) })
       navigate(`/quiz-sets/${created.quizSetId}`, { replace: true, state: { materialTitle } })
     },
   })
+
+  useEffect(() => {
+    if (!stateQuery.data || stateQuery.data.status === 'GENERATING') return
+    void queryClient.invalidateQueries({ queryKey: learningMaterialKeys.all })
+    void queryClient.invalidateQueries({
+      queryKey: quizQueryKeys.active(stateQuery.data.materialId),
+    })
+  }, [queryClient, stateQuery.data])
 
   if (
     stateQuery.isPending ||
@@ -361,18 +402,48 @@ export function QuizSetRoutePage() {
           if (!attemptId) throw new Error('attempt UUID를 만들지 못했어요.')
           const submission = await submitQuiz(state.quizSetId, attemptId, payload)
           lastAttemptIdRef.current = submission.attemptId
+          void queryClient.invalidateQueries({
+            queryKey: quizQueryKeys.pendingSelfAssessment(state.quizSetId),
+            refetchType: 'none',
+          })
+          void queryClient.invalidateQueries({
+            queryKey: quizQueryKeys.attemptResult(submission.attemptId),
+            refetchType: 'none',
+          })
+          void queryClient.invalidateQueries({ queryKey: quizQueryKeys.latestReview })
           return submission
         },
         onLoadResult: async (attemptId) => adaptQuizResult(await getQuizResult(attemptId)),
-        onSaveEssayAssessment: ({ resourceId, questionId, assessment }) =>
-          saveEssayAssessment(resourceId, questionId, assessment),
-        onCompleted: (attemptId) =>
-          navigate(`/quiz-attempts/${attemptId}/result`, { replace: true }),
-        onUpdateShortAnswerOutcome: async ({ questionId, outcome }) => {
+        onSaveEssayAssessment: async ({ resourceId, questionId, assessment }) => {
+          const saved = await saveEssayAssessment(resourceId, questionId, assessment)
+          void queryClient.invalidateQueries({
+            queryKey: quizQueryKeys.attemptResult(resourceId),
+            refetchType: 'none',
+          })
+          void queryClient.invalidateQueries({
+            queryKey: quizQueryKeys.pendingSelfAssessment(state.quizSetId),
+            refetchType: 'none',
+          })
+          void queryClient.invalidateQueries({ queryKey: quizQueryKeys.latestReview })
+          return saved
+        },
+        onCompleted: (attemptId) => {
+          void queryClient.invalidateQueries({ queryKey: quizQueryKeys.latestReview })
+          navigate(`/quiz-attempts/${attemptId}/result`, { replace: true })
+        },
+        onUpdateGradingOutcome: async ({ questionId, outcome }) => {
           if (!lastAttemptIdRef.current) throw new Error('attempt ID가 현재 화면에 없습니다.')
-          return adaptQuizResult(
-            await updateShortAnswerGrading(lastAttemptIdRef.current, questionId, outcome),
+          const updated = await updateGradingOverride(
+            lastAttemptIdRef.current,
+            questionId,
+            outcome,
           )
+          void queryClient.invalidateQueries({
+            queryKey: quizQueryKeys.attemptResult(lastAttemptIdRef.current),
+            refetchType: 'none',
+          })
+          void queryClient.invalidateQueries({ queryKey: quizQueryKeys.latestReview })
+          return adaptQuizResult(updated)
         },
       }}
     />
@@ -382,8 +453,9 @@ export function QuizSetRoutePage() {
 export function QuizAttemptResultRoutePage() {
   const { attemptId } = useParams<{ attemptId: string }>()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const resultQuery = useQuery({
-    queryKey: ['private', 'quiz-attempt', attemptId, 'result'],
+    queryKey: quizQueryKeys.attemptResult(attemptId!),
     queryFn: ({ signal }) => getQuizResult(attemptId!, signal),
     enabled: Boolean(attemptId),
   })
@@ -401,8 +473,15 @@ export function QuizAttemptResultRoutePage() {
       initialResourceId={attemptId}
       callbacks={{
         onResultExit: () => navigate('/learning'),
-        onUpdateShortAnswerOutcome: async ({ questionId, outcome }) =>
-          adaptQuizResult(await updateShortAnswerGrading(attemptId!, questionId, outcome)),
+        onUpdateGradingOutcome: async ({ questionId, outcome }) => {
+          const updated = await updateGradingOverride(attemptId!, questionId, outcome)
+          void queryClient.invalidateQueries({
+            queryKey: quizQueryKeys.attemptResult(attemptId!),
+            refetchType: 'none',
+          })
+          void queryClient.invalidateQueries({ queryKey: quizQueryKeys.latestReview })
+          return adaptQuizResult(updated)
+        },
       }}
     />
   )
@@ -410,12 +489,17 @@ export function QuizAttemptResultRoutePage() {
 
 export function ReviewEntryRoutePage() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const startedRef = useRef(false)
   const latestQuery = useQuery({
-    queryKey: ['private', 'quiz-review', 'latest'],
-    queryFn: ({ signal }) => getLatestReview(signal),
+    ...latestReviewQueryOptions(),
   })
-  const createMutation = useMutation({ mutationFn: createReviewSession })
+  const createMutation = useMutation({
+    mutationFn: createReviewSession,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: quizQueryKeys.latestReview })
+    },
+  })
   useEffect(() => {
     const latest = latestQuery.data
     if (!latest || startedRef.current) return
@@ -446,8 +530,9 @@ export function ReviewEntryRoutePage() {
 export function ReviewSessionRoutePage() {
   const { reviewSessionId } = useParams<{ reviewSessionId: string }>()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const sessionQuery = useQuery({
-    queryKey: ['private', 'review-session', reviewSessionId],
+    queryKey: quizQueryKeys.reviewSession(reviewSessionId!),
     queryFn: ({ signal }) => getReviewSession(reviewSessionId!, signal),
     enabled: Boolean(reviewSessionId),
   })
@@ -455,7 +540,7 @@ export function ReviewSessionRoutePage() {
     sessionQuery.data?.status === 'SELF_ASSESSMENT_REQUIRED' ||
     sessionQuery.data?.status === 'COMPLETED'
   const resultQuery = useQuery({
-    queryKey: ['private', 'review-session', reviewSessionId, 'result'],
+    queryKey: quizQueryKeys.reviewResult(reviewSessionId!),
     queryFn: ({ signal }) => getReviewResult(reviewSessionId!, signal),
     enabled: Boolean(reviewSessionId && shouldLoadResult),
   })
@@ -493,10 +578,37 @@ export function ReviewSessionRoutePage() {
       callbacks={{
         onExitQuiz: () => navigate('/learning'),
         onResultExit: () => navigate('/learning'),
-        onSubmit: ({ payload }) => submitReview(reviewSessionId!, payload),
+        onSubmit: async ({ payload }) => {
+          const submission = await submitReview(reviewSessionId!, payload)
+          void queryClient.invalidateQueries({
+            queryKey: quizQueryKeys.reviewSession(reviewSessionId!),
+            refetchType: 'none',
+          })
+          void queryClient.invalidateQueries({
+            queryKey: quizQueryKeys.reviewResult(reviewSessionId!),
+            refetchType: 'none',
+          })
+          void queryClient.invalidateQueries({ queryKey: quizQueryKeys.latestReview })
+          return submission
+        },
         onLoadResult: async () => adaptReviewResult(await getReviewResult(reviewSessionId!)),
-        onSaveEssayAssessment: ({ questionId, assessment }) =>
-          saveReviewEssayAssessment(reviewSessionId!, questionId, assessment),
+        onSaveEssayAssessment: async ({ questionId, assessment }) => {
+          const saved = await saveReviewEssayAssessment(
+            reviewSessionId!,
+            questionId,
+            assessment,
+          )
+          void queryClient.invalidateQueries({
+            queryKey: quizQueryKeys.reviewSession(reviewSessionId!),
+            refetchType: 'none',
+          })
+          void queryClient.invalidateQueries({
+            queryKey: quizQueryKeys.reviewResult(reviewSessionId!),
+            refetchType: 'none',
+          })
+          void queryClient.invalidateQueries({ queryKey: quizQueryKeys.latestReview })
+          return saved
+        },
       }}
     />
   )

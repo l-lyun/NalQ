@@ -60,7 +60,7 @@ class SecurityConfigurationTest {
 			List.of("http://localhost:5173")
 		));
 		MockHttpServletRequest request = new MockHttpServletRequest(
-			"OPTIONS", "/api/v1/quiz-attempts/attempt_1/short-answer-gradings/question_1"
+			"OPTIONS", "/api/v1/quiz-attempts/attempt_1/grading-overrides/question_1"
 		);
 		request.addHeader("Origin", "http://localhost:5173");
 		request.addHeader("Access-Control-Request-Method", "PUT");

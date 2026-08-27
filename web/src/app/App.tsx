@@ -4,7 +4,10 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { queryClient } from '@/app/providers/queryClient'
 import { AuthBootstrap } from '@/app/router/AuthBootstrap'
 import { AuthGate, PublicOnlyGate } from '@/app/router/AuthGate'
-import { quizApiEnabled } from '@/features/quiz/model/quizFeature'
+import {
+  quizMockEnabled,
+  quizRoutesEnabled,
+} from '@/features/quiz/model/quizFeature'
 import { AuthenticatedHomePage } from '@/pages/home/AuthenticatedHomePage'
 import { AuthenticatedLearningPage } from '@/pages/learning/AuthenticatedLearningPage'
 import { LoginPage } from '@/pages/login/LoginPage'
@@ -12,6 +15,10 @@ import {
   QuizAttemptResultRoutePage,
   QuizFixturePage,
   QuizMaterialRoutePage,
+  QuizMockAttemptResultRoutePage,
+  QuizMockMaterialRoutePage,
+  QuizMockReviewRoutePage,
+  QuizMockSetRoutePage,
   QuizSetRoutePage,
   ReviewEntryRoutePage,
   ReviewSessionRoutePage,
@@ -45,18 +52,31 @@ export function App() {
             <Route element={<AuthGate />}>
               <Route path="/" element={<AuthenticatedHomePage />} />
               <Route path="/learning" element={<AuthenticatedLearningPage />} />
-              {quizApiEnabled ? (
+              {quizRoutesEnabled ? (
                 <>
-                  <Route path="/learning/:materialId/quiz" element={<QuizMaterialRoutePage />} />
-                  <Route path="/quiz-sets/:quizSetId" element={<QuizSetRoutePage />} />
+                  <Route
+                    path="/learning/:materialId/quiz"
+                    element={quizMockEnabled ? <QuizMockMaterialRoutePage /> : <QuizMaterialRoutePage />}
+                  />
+                  <Route
+                    path="/quiz-sets/:quizSetId"
+                    element={quizMockEnabled ? <QuizMockSetRoutePage /> : <QuizSetRoutePage />}
+                  />
                   <Route
                     path="/quiz-attempts/:attemptId/result"
-                    element={<QuizAttemptResultRoutePage />}
+                    element={
+                      quizMockEnabled
+                        ? <QuizMockAttemptResultRoutePage />
+                        : <QuizAttemptResultRoutePage />
+                    }
                   />
-                  <Route path="/review" element={<ReviewEntryRoutePage />} />
+                  <Route
+                    path="/review"
+                    element={quizMockEnabled ? <QuizMockReviewRoutePage /> : <ReviewEntryRoutePage />}
+                  />
                   <Route
                     path="/review-sessions/:reviewSessionId"
-                    element={<ReviewSessionRoutePage />}
+                    element={quizMockEnabled ? <QuizMockReviewRoutePage /> : <ReviewSessionRoutePage />}
                   />
                 </>
               ) : null}
