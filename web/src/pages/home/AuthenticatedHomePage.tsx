@@ -65,7 +65,7 @@ export function AuthenticatedHomePage() {
     apiReview?.sourceAttemptId &&
       apiReview.quizSetId &&
       apiReview.materialTitle &&
-      apiReview.reviewQuestionCount > 0,
+      (apiReview.activeReviewSessionId || apiReview.reviewQuestionCount > 0),
   )
   const hasReview = quizMockEnabled || hasApiReview
   const reviewCount = quizMockEnabled
@@ -83,7 +83,9 @@ export function AuthenticatedHomePage() {
         description: activeReviewSessionId
           ? '진행 중인 복습을 첫 문제부터 다시 이어갈 수 있어요.'
           : '최근에 완료한 퀴즈에서 아직 해결하지 못한 문제를 다시 풀어보세요.',
-        context: `${reviewTitle ?? '최근 퀴즈'} · ${reviewCount}문제`,
+        context: activeReviewSessionId
+          ? (reviewTitle ?? '최근 퀴즈')
+          : `${reviewTitle ?? '최근 퀴즈'} · ${reviewCount}문제`,
         action: {
           label: activeReviewSessionId ? '복습 이어서 풀기' : '복습 시작',
           onClick: () => openReview(reviewTitle),
@@ -102,7 +104,7 @@ export function AuthenticatedHomePage() {
           data: {
             id: activeReviewSessionId ?? apiReview?.sourceAttemptId ?? mockReview.sourceAttemptId,
             title: activeReviewSessionId
-              ? `복습 이어서 풀기 · ${reviewCount}문제`
+              ? '복습 이어서 풀기'
               : `복습할 문제 ${reviewCount}개`,
             detail: reviewTitle ?? '최근 완료한 퀴즈',
             onClick: () => openReview(reviewTitle),
