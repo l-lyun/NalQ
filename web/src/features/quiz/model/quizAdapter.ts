@@ -113,7 +113,9 @@ function toResultItem(item: QuestionResult): QuizResultItem {
     keyPoints,
     explanation: item.explanation,
     sourceExcerpt: item.sourceExcerpt,
-    editable: item.type === 'SHORT_ANSWER' && item.response !== null,
+    editable:
+      (item.type === 'SHORT_ANSWER' || item.type === 'FILL_IN_THE_BLANK') &&
+      item.response !== null,
   }
 }
 

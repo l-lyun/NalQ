@@ -159,12 +159,15 @@ export async function resolveQuizFixtureGeneration(conditions: QuizConditions): 
   return { ready: { actualCount: questions.length, includedTypes: includedQuestionTypes(questions), requestedConfig: conditions }, questions }
 }
 
-export async function resolveQuizFixtureCorrection(
+export async function resolveQuizFixtureGradingOverride(
   { questionId, outcome }: { questionId: string; outcome: QuizBinaryOutcome },
   questions: QuizQuestion[] = quizFixtureQuestions,
+  currentOutcomes: Record<string, QuizResultOutcome> = {},
 ): Promise<QuizResult> {
   await new Promise((resolve) => window.setTimeout(resolve, 100))
-  return adaptQuizResult(fixtureContractResult(questions, { [questionId]: outcome }))
+  return adaptQuizResult(
+    fixtureContractResult(questions, { ...currentOutcomes, [questionId]: outcome }),
+  )
 }
 
 export async function resolveQuizFixtureSubmission(

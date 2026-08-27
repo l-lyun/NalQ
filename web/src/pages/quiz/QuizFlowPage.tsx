@@ -490,25 +490,29 @@ export function QuizFlowPage({
   }
 
   const openCorrection = (item: QuizResultItem) => {
-    if (item.type !== 'SHORT_ANSWER' || !item.outcome || item.outcome === 'PARTIAL') return
+    if (
+      !item.editable ||
+      (item.type !== 'SHORT_ANSWER' && item.type !== 'FILL_IN_THE_BLANK') ||
+      item.outcome === 'PARTIAL'
+    ) return
     setCorrectionOutcome(item.outcome === 'CORRECT' ? 'INCORRECT' : 'CORRECT')
     setCorrectionError(undefined)
     setSheet('CORRECTION')
   }
 
   const saveCorrection = async () => {
-    const updateShortAnswerOutcome = callbacks?.onUpdateShortAnswerOutcome
+    const updateGradingOutcome = callbacks?.onUpdateGradingOutcome
     if (
       correctionSaveLockRef.current ||
       !resultItem ||
       !resultItem.editable ||
-      !updateShortAnswerOutcome
+      !updateGradingOutcome
     ) return
     correctionSaveLockRef.current = true
     setSavingCorrection(true)
     setCorrectionError(undefined)
     try {
-      const latestResult = await updateShortAnswerOutcome({
+      const latestResult = await updateGradingOutcome({
         questionId: resultItem.questionId,
         outcome: correctionOutcome,
       })
@@ -596,7 +600,7 @@ export function QuizFlowPage({
             result={resultState}
             item={resultItem}
             title={flowKind === 'REVIEW' ? '다시 푼 문제 결과' : '채점 결과'}
-            correctionAvailable={Boolean(callbacks?.onUpdateShortAnswerOutcome)}
+            correctionAvailable={Boolean(callbacks?.onUpdateGradingOutcome)}
             onBack={() => callbacks?.onResultExit?.()}
             onOpenList={() => setSheet('RESULT_LIST')}
             onCorrect={() => openCorrection(resultItem)}
@@ -1624,7 +1628,7 @@ function ResultScreen({
                 채점 수정
               </ActionButton>
               <Text as="p" textStyle="t4Regular" color="fg.neutralMuted">
-                답을 작성한 단답형은 채점 결과를 직접 수정할 수 있어요.
+                답을 작성한 단답형과 빈칸 채우기는 채점 결과를 직접 수정할 수 있어요.
               </Text>
             </HStack>
           ) : item.type === 'MULTIPLE_CHOICE' ? (

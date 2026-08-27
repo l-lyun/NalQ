@@ -214,7 +214,7 @@ MVP는 이 다형 제출 원장을 유지한다. cross-question choice·blank �
 - `SELF_ASSESSMENT`: 자동 판정은 없고 최종 판정은 사용자 자기평가 결과다.
 - 제출·채점 전: 세 값이 모두 없다.
 
-MVP에서는 전체 사용자 수정 이력을 별도 테이블로 보존하지 않는다. 단답형 사용자 수정은 해당 사용자·attempt·문항의 `finalGradingResult`와 `gradingMethod`만 바꾸며 정답 원장이나 다른 attempt에 전파하지 않는다.
+MVP에서는 전체 사용자 수정 이력을 별도 테이블로 보존하지 않는다. 단답형·빈칸형 사용자 수정은 해당 사용자·attempt·문항의 `finalGradingResult`와 `gradingMethod`만 바꾸며 정답 원장이나 다른 attempt에 전파하지 않는다. 빈칸형은 제출 답안 행이 하나 이상 있을 때만 수정할 수 있다.
 
 ## 복습 대상과 해결
 

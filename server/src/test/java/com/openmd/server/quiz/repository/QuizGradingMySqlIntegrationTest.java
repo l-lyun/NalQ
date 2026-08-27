@@ -38,7 +38,7 @@ import com.openmd.server.quiz.service.QuizAttemptSubmissionService;
 import com.openmd.server.quiz.service.QuizGenerationPersistenceService;
 import com.openmd.server.quiz.service.QuizGenerationService;
 import com.openmd.server.quiz.service.QuizReviewService;
-import com.openmd.server.quiz.service.ShortAnswerGradingService;
+import com.openmd.server.quiz.service.GradingOverrideService;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -101,7 +101,7 @@ class QuizGradingMySqlIntegrationTest {
   @Autowired QuizGenerationService generationAcceptance;
   @Autowired QuizAttemptSubmissionService submissions;
   @Autowired QuizAttemptResultService results;
-  @Autowired ShortAnswerGradingService gradings;
+  @Autowired GradingOverrideService gradings;
   @Autowired EssayAssessmentService essayAssessments;
   @Autowired QuizReviewService reviews;
 
@@ -443,6 +443,50 @@ class QuizGradingMySqlIntegrationTest {
     assertEquals(GradingMethod.USER_OVERRIDE, stored.getGradingMethod());
     assertEquals(0, changed.summary().scoredGrading().correctQuestionCount());
     assertEquals(1, changed.summary().reviewQuestionCount());
+  }
+
+  @Test
+  void fillInTheBlankOverrideKeepsAutomaticResultAndRecalculatesTheSummary() {
+    ReadyQuiz quiz = ready(fixture(), fillBlank());
+    QuizSet set = sets.findByPublicIdAndUserId(quiz.setId(), quiz.userId()).orElseThrow();
+    QuizQuestion question =
+        questions.findByPublicIdAndQuizSetId(quiz.questionId(), set.getId()).orElseThrow();
+    String blankId =
+        blanks.findAllByQuestionIdOrderByNumber(question.getId()).getFirst().getPublicId();
+    submissions.submit(
+        quiz.userId(),
+        quiz.setId(),
+        uuid(11),
+        List.of(
+            new QuizResponseRequest(
+                quiz.questionId(),
+                null,
+                List.of(new BlankAnswerRequest(blankId, "fifo")),
+                null)));
+
+    var changed = gradings.update(quiz.userId(), uuid(11), quiz.questionId(), "INCORRECT");
+    var attempt = attempts.findByPublicId(uuid(11)).orElseThrow();
+    var stored =
+        attemptQuestions.findAllByAttemptIdOrderBySequenceNumber(attempt.getId()).getFirst();
+
+    assertEquals(GradingOutcome.CORRECT, stored.getAutomaticGradingResult());
+    assertEquals(GradingOutcome.INCORRECT, stored.getFinalGradingResult());
+    assertEquals(GradingMethod.USER_OVERRIDE, stored.getGradingMethod());
+    assertEquals(0, changed.summary().scoredGrading().correctQuestionCount());
+    assertEquals(1, changed.summary().reviewQuestionCount());
+  }
+
+  @Test
+  void completelyUnansweredFillInTheBlankCannotBeOverridden() {
+    ReadyQuiz quiz = ready(fixture(), fillBlank());
+    submissions.submit(quiz.userId(), quiz.setId(), uuid(12), List.of());
+
+    BusinessException error =
+        assertThrows(
+            BusinessException.class,
+            () -> gradings.update(quiz.userId(), uuid(12), quiz.questionId(), "CORRECT"));
+
+    assertEquals(QuizErrorCode.ATTEMPT_CONFLICT, error.getErrorCode());
   }
 
   @Test

@@ -74,13 +74,13 @@ export async function saveEssayAssessment(
   return unwrapApiResponse(response.data)
 }
 
-export async function updateShortAnswerGrading(
+export async function updateGradingOverride(
   attemptId: string,
   questionId: string,
   outcome: QuizBinaryOutcome,
 ) {
   const response = await protectedApi.put<ApiResponse<QuizResultResponse>>(
-    `/api/v1/quiz-attempts/${attemptId}/short-answer-gradings/${questionId}`,
+    `/api/v1/quiz-attempts/${attemptId}/grading-overrides/${questionId}`,
     { outcome },
   )
   return unwrapApiResponse(response.data)

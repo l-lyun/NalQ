@@ -121,7 +121,7 @@ export type QuizPresentationCallbacks = {
     assessment: QuizResultOutcome
   }) => QuizEssayAssessmentResult | Promise<QuizEssayAssessmentResult>
   onExitQuiz?: () => void
-  onUpdateShortAnswerOutcome?: (input: {
+  onUpdateGradingOutcome?: (input: {
     questionId: string
     outcome: QuizBinaryOutcome
   }) => QuizResult | Promise<QuizResult>

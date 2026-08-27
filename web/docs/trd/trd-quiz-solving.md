@@ -39,9 +39,11 @@ scope: web
 
 ## 실제 통합 라우트와 Query 경계
 
-- 퀴즈 생성·자기평가·복습 서버 API가 함께 배포되기 전에는 `VITE_QUIZ_API_ENABLED=false`를 기본값으로 사용한다. 이때 개발 preview는 유지하지만 프로덕션 인증 라우트와 최신 복습 Query는 등록·실행하지 않는다.
+- 퀴즈 생성·자기평가·복습 서버 API가 함께 배포되기 전에는 `VITE_QUIZ_API_ENABLED=false`를 기본값으로 사용한다. 이때 로컬 개발 서버는 인증된 학습 화면의 실제 버튼과 URL을 유지한 채 기존 fixture를 사용하는 명시적 `mock` 모드로 동작하며, 별도 preview URL 없이 조건 설정부터 생성·풀이·결과·복습까지 검토할 수 있다. `VITE_QUIZ_API_ENABLED=true`이면 같은 URL이 실제 API route page를 사용한다. 프로덕션은 API가 비활성일 때 fixture로 대체하지 않고 퀴즈 라우트와 최신 복습 Query를 등록·실행하지 않는다.
 - 인증 라우트는 생성 조건 진입 `/learning/:materialId/quiz`, QuizSet 상태·풀이 `/quiz-sets/:quizSetId`, 본 퀴즈 결과 `/quiz-attempts/:attemptId/result`, 최신 복습 진입 `/review`, 복습 실행 `/review-sessions/:reviewSessionId`로 연결한다.
+- 홈의 대표 복습 행동과 `복습할 문제` 요약 행은 최신 복습 Query가 대상을 반환할 때 `/review`로 진입해 활성 세션 재개 또는 새 세션 생성을 위임한다. 복습 섹션의 `전체 보기`는 화면 명세대로 `/learning`의 복습 요약으로 이동한다. 실제 API가 빈 최신 복습을 반환하면 홈에는 복습 빈 상태를 표시하고 풀이 버튼을 만들지 않으며, 개발 `mock` 모드는 같은 클릭 지점에서 fixture 기반 `/review` 흐름을 사용한다.
 - 서버 상태 Query key는 모두 `private` prefix 아래에 두어 기존 로그아웃·세션 종료 시 취소와 캐시 제거 범위에 포함한다.
+- 학습자료 목록·상세와 홈·학습이 공유하는 최신 복습 요약은 5분 동안 fresh로 재사용한다. 학습자료 생성, QuizSet 생성·생성 종료, 본 퀴즈 제출·서술형 자기평가·채점 판정 변경, 복습 세션 생성·제출·자기평가 성공 시 관련 feature Query key를 명시적으로 invalidate한다. 현재 풀이 화면이 직접 응답을 적용하는 attempt·review session/result Query는 즉시 재요청으로 화면 상태를 덮지 않도록 stale 표기만 하고 다음 조회에서 새로 가져오며, 홈·학습 요약은 성공 직후 다시 조회할 수 있게 한다.
 - 생성 접수 성공 뒤에는 응답의 `quizSetId` 라우트로 교체하고, 활성 생성 재진입도 서버가 반환한 `quizSetId` 라우트로 교체한다. 따라서 polling과 풀이 데이터의 기준은 URL의 서버 리소스 ID다.
 - `docs/contracts/contract-api-quiz-learning.md`의 복습 결과 절은 `summary`의 의미만 정의하고 JSON 필드명을 정의하지 않는다. 계약이 확정되기 전 adapter는 전송 필드를 추측하지 않고 `questionResults`에서 현재 화면에 이미 필요한 표시 수치만 계산한다.
 - 같은 계약의 복습 `SELF_ASSESSMENT_REQUIRED` 재조회에는 남은 서술형 문항 ID 또는 미평가 상태 표현이 없다. 현재 화면에서 제출 응답의 `pendingEssayQuestionIds`를 가진 흐름은 계속 처리하지만, 화면 상태를 잃은 재진입은 임의 추정하지 않고 일반 조회 실패 경계에서 멈춘다. 서버 계약에 남은 문항 식별 정보가 추가되면 기존 자기평가 화면으로 연결한다.
@@ -54,12 +56,12 @@ scope: web
 - 틀린 문제 다시 풀기는 본 퀴즈의 `QuizFlowPage`와 문항 입력·이동·전체 제출·서술형 자기평가·결과 표현을 그대로 재사용한다. 풀이 화면의 사용자 노출 차이는 상단 헤더에서 학습자료 제목 뒤에 ` · 복습`을 덧붙이는 것뿐이며, 복습용 풀이 화면이나 문항별 즉시 채점 UI를 따로 만들지 않는다.
 - 개발 서버에서만 `/quiz-preview`와 `/quiz-result-preview`를 열어 전체 흐름과 결과 수정을 검토한다. 프로덕션 라우트에는 등록하지 않는다.
 - 좁은 문제 진행 막대는 현재 위치를 읽는 `progressbar`로만 제공하고 직접 조작하지 않는다. 문항 이동은 `BottomSheet` 안의 44px 이상 번호 버튼으로 분리해 키보드·터치 목표를 보장한다.
-- 단답형 채점 수정은 마지막 저장 확인 판정과 요약을 화면의 기준으로 둔다. 저장 중에는 기존 결과를 유지하고, 성공 응답 뒤에만 현재 판정·점수·복습 수를 한 번에 교체하며 실패하면 이전 상태와 재시도 행동을 유지한다.
-- 결과 조회 adapter는 `response=null`이면 `답하지 않음`으로 표시하고 단답형 수정 행동을 만들지 않는다. 답을 작성한 `SHORT_ANSWER`만 수정 가능하며 현재 판정과 관계없이 `채점 수정` 행동을 제공한다. 화면에서 사용하지 않는 `automaticOutcome`, `gradingSource`, `correctedAt`, `reviewRequired`, 별도 `unanswered` 필드를 요구하지 않는다.
+- 단답형·빈칸 채우기 판정 수정은 마지막 저장 확인 판정과 요약을 화면의 기준으로 둔다. 저장 중에는 기존 결과를 유지하고, 성공 응답 뒤에만 현재 판정·점수·복습 수를 한 번에 교체하며 실패하면 이전 상태와 재시도 행동을 유지한다.
+- 결과 조회 adapter는 `response=null`이면 `답하지 않음`으로 표시하고 판정 수정 행동을 만들지 않는다. 답을 작성한 `SHORT_ANSWER` 또는 `FILL_IN_THE_BLANK`만 수정 가능하며 현재 판정과 관계없이 `채점 수정` 행동을 제공한다. 빈칸 채우기는 `response.blankAnswers`에 하나 이상의 답변이 있으면 일부 빈칸만 작성했더라도 수정할 수 있고, 완전 미응답이면 수정할 수 없다. 화면에서 사용하지 않는 `automaticOutcome`, `gradingSource`, `correctedAt`, `reviewRequired`, 별도 `unanswered` 필드를 요구하지 않는다.
 - 최종 제출 표현 경계는 제출 성공 응답의 `status`를 그대로 사용한다. `COMPLETED`는 결과로, `SELF_ASSESSMENT_REQUIRED`는 `pendingEssayQuestionIds` 순서의 자기평가로 이동하며, 제출 실패는 미응답 확인 시트로 되돌리지 않고 답안을 보존한 별도 재시도 상태로 이동한다.
 - 퀴즈 생성 POST에는 `Idempotency-Key`를 보내지 않는다. 접수 응답을 확인하지 못한 재시도에서는 자료의 활성 생성을 먼저 조회하고, `GENERATING` QuizSet이 없을 때만 같은 조건으로 새 생성 POST를 보낸다.
 - 서술형 자기평가는 결과 조회 모양의 내 답·모범 답안·핵심 포인트·해설·원문 근거를 읽고 문항별 `CORRECT`·`PARTIAL`·`INCORRECT`를 저장한다. 저장 응답의 `status`와 `remainingSelfAssessmentCount`를 확인한 뒤에만 다음 문항 또는 완료 결과로 이동한다.
-- 표현 callback은 실제 API adapter가 연결될 때 서버 성공 응답을 잃지 않도록 최종 제출 결과, 서술형 저장 결과와 단답형 수정 결과를 필수 반환한다. 단답형 수정은 한 화면에서 요청을 직렬화하고 저장 중 추가 수정 행동을 막는다. 성공하면 서버가 반환한 전체 최신 결과로 현재 결과 상태를 교체하며 로컬 delta로 문항 판정이나 요약을 추정하지 않는다. 공개 revision이나 충돌 해결 UI는 두지 않고 마지막으로 서버에 커밋된 판정을 현재 값으로 사용한다.
+- 표현 callback은 실제 API adapter가 연결될 때 서버 성공 응답을 잃지 않도록 최종 제출 결과, 서술형 저장 결과와 판정 수정 결과를 필수 반환한다. 단답형·빈칸 채우기 판정 수정 adapter는 공통 `PUT /api/v1/quiz-attempts/{attemptId}/grading-overrides/{questionId}`에 `{ outcome }`만 보내며, 기존 `short-answer-gradings` 경로는 서버의 기존 소비자 호환 별칭이므로 신규 웹 요청에는 사용하지 않는다. 한 화면에서 요청을 직렬화하고 저장 중 추가 수정 행동을 막는다. 성공하면 서버가 반환한 전체 최신 결과로 현재 결과 상태를 교체하며 로컬 delta로 문항 판정이나 요약을 추정하지 않고, 실패하면 기존 판정과 요약을 유지한 채 재시도 행동을 제공한다. 공개 revision이나 충돌 해결 UI는 두지 않고 마지막으로 서버에 커밋된 판정을 현재 값으로 사용한다.
 
 ## 구현 전 확인
 
@@ -78,4 +80,4 @@ scope: web
 - 최종 제출, 서술형 자기평가와 복습 요청 경로·필드는 API 계약과 일치하며 TRD에서 별도 별칭을 만들지 않는다.
 - 틀린 문제 다시 풀기 세 문제는 세 답을 모두 작성한 뒤 한 번 제출하며 문항 이동 중 서버 채점 요청이 발생하지 않는다.
 - 객관식 보기 3개, 4개, 5개 fixture가 풀이·결과·복습에서 모두 렌더링되고 선택한 `choiceId`가 변경 없이 제출된다.
-- 단답형 수정 요청 중에는 추가 요청이 발생하지 않고, 성공 응답의 전체 최신 결과가 현재 결과를 교체한다.
+- 답을 작성한 단답형·빈칸 채우기는 공통 `grading-overrides` 경로로 판정을 수정하고, `response=null`인 완전 미응답에는 수정 행동을 제공하지 않는다. 수정 요청 중에는 추가 요청이 발생하지 않고, 성공 응답의 전체 최신 결과가 현재 결과를 교체하며 실패하면 기존 판정과 요약을 유지한다.

@@ -24,7 +24,7 @@ import com.openmd.server.quiz.dto.response.SubmittedQuizAttempt;
 import com.openmd.server.quiz.service.EssayAssessmentService;
 import com.openmd.server.quiz.service.QuizAttemptResultService;
 import com.openmd.server.quiz.service.QuizAttemptSubmissionService;
-import com.openmd.server.quiz.service.ShortAnswerGradingService;
+import com.openmd.server.quiz.service.GradingOverrideService;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,7 +41,7 @@ class QuizAttemptControllerTest {
 
   private final QuizAttemptSubmissionService submissions = mock(QuizAttemptSubmissionService.class);
   private final QuizAttemptResultService results = mock(QuizAttemptResultService.class);
-  private final ShortAnswerGradingService gradings = mock(ShortAnswerGradingService.class);
+  private final GradingOverrideService gradings = mock(GradingOverrideService.class);
   private final EssayAssessmentService essayAssessments = mock(EssayAssessmentService.class);
   private MockMvc mockMvc;
 
@@ -118,6 +118,23 @@ class QuizAttemptControllerTest {
         .andExpect(jsonPath("$.data.summary.reviewQuestionCount").value(0))
         .andExpect(jsonPath("$.data.gradingRevision").doesNotExist())
         .andExpect(jsonPath("$.data.summary.revision").doesNotExist());
+
+    verify(gradings).update(7L, "attempt_1", "question_2", "CORRECT");
+  }
+
+  @Test
+  void acceptsAGradingOverrideForAnAutomaticallyGradedQuestion() throws Exception {
+    QuizAttemptResult result = result(GradingOutcome.CORRECT, false);
+    when(gradings.update(7L, "attempt_1", "question_2", "CORRECT")).thenReturn(result);
+
+    mockMvc
+        .perform(
+            put("/api/v1/quiz-attempts/attempt_1/grading-overrides/question_2")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"outcome\":\"CORRECT\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.attemptId").value("attempt_1"))
+        .andExpect(jsonPath("$.data.questionResults[0].outcome").value("CORRECT"));
 
     verify(gradings).update(7L, "attempt_1", "question_2", "CORRECT");
   }
