@@ -24,11 +24,6 @@ export function HomeLoading({ studyMethods }: Pick<HomePageProps, 'studyMethods'
       </VStack>
       <HomeSectionDivider />
       <StudyMethodsSection items={studyMethods} />
-      <HomeSectionDivider />
-      <VStack gap="x3">
-        <Skeleton tone="neutral" radius="8" width="x16" height="x6" />
-        <Skeleton tone="neutral" radius="8" width="70%" height="x6" />
-      </VStack>
     </VStack>
   )
 }

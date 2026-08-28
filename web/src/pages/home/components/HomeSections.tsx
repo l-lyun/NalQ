@@ -4,7 +4,6 @@ import type {
   HomeListItem,
   HomePageProps,
   HomeSectionState,
-  HomeTodaySummary,
 } from '../home.types'
 import { InlineError, InteractiveList, SectionHeader } from './HomePrimitives'
 
@@ -84,40 +83,6 @@ export function StudyMethodsSection({
         {compact ? '가져올 방법을 선택하세요' : '새 학습'}
       </Text>
       <InteractiveList label="새 학습 가져오기 방법" items={items} />
-    </VStack>
-  )
-}
-
-export function TodaySection({ state }: { state: HomeSectionState<HomeTodaySummary> }) {
-  return (
-    <VStack as="section" gap="x3" aria-labelledby="home-today-title">
-      <SectionHeader id="home-today-title" title="오늘의 학습" />
-      {state.status === 'ready' ? (
-        <Flex as="dl" className="home-metrics" gap="x6" wrap>
-          <VStack gap="x1">
-            <Text as="dt" textStyle="t4Regular" color="fg.neutralMuted">
-              푼 문제
-            </Text>
-            <Text as="dd" className="home-metric-value" textStyle="t7Bold" color="fg.neutral">
-              {state.data.solvedCount}문제
-            </Text>
-          </VStack>
-          <VStack gap="x1">
-            <Text as="dt" textStyle="t4Regular" color="fg.neutralMuted">
-              정답 현황
-            </Text>
-            <Text as="dd" className="home-metric-value" textStyle="t7Bold" color="fg.neutral">
-              정답 {state.data.correctCount} / 채점 {state.data.gradedCount}
-            </Text>
-          </VStack>
-        </Flex>
-      ) : state.status === 'error' ? (
-        <InlineError message={state.message} onRetry={state.onRetry} />
-      ) : (
-        <Text as="p" textStyle="t5Regular" color="fg.neutralMuted">
-          {state.message}
-        </Text>
-      )}
     </VStack>
   )
 }

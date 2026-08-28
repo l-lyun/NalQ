@@ -4,12 +4,6 @@ import type { HomePageProps } from './home.types'
 // for recommendation ordering, recent-item limits, or today's aggregation boundary.
 const noop = () => undefined
 
-const navigation: HomePageProps['navigation'] = [
-  { id: 'home', label: '홈', current: true, onClick: noop },
-  { id: 'learning', label: '학습', onClick: noop },
-  { id: 'profile', label: '프로필', onClick: noop },
-]
-
 const studyMethods: HomePageProps['studyMethods'] = [
   {
     id: 'notion',
@@ -32,14 +26,14 @@ const studyMethods: HomePageProps['studyMethods'] = [
 ]
 
 const baseFixture = {
-  navigation,
+  greeting: { nickname: '공부왕7' },
   studyMethods,
   onViewAllReviews: noop,
   onViewAllMaterials: noop,
   onRetryAll: noop,
 } satisfies Pick<
   HomePageProps,
-  | 'navigation'
+  | 'greeting'
   | 'studyMethods'
   | 'onViewAllReviews'
   | 'onViewAllMaterials'
@@ -87,10 +81,6 @@ export const homeReadyFixture: HomePageProps = {
       },
     ],
   },
-  today: {
-    status: 'ready',
-    data: { solvedCount: 7, correctCount: 5, gradedCount: 6 },
-  },
 }
 
 export const homeFirstVisitFixture: HomePageProps = {
@@ -98,7 +88,6 @@ export const homeFirstVisitFixture: HomePageProps = {
   status: 'firstVisit',
   review: { status: 'empty', message: '지금 복습할 문제는 없어요.' },
   recentMaterials: { status: 'empty', message: '최근 학습자료가 없어요.' },
-  today: { status: 'empty', message: '오늘은 아직 푼 문제가 없어요.' },
 }
 
 export const homeLoadingFixture: HomePageProps = {
@@ -106,7 +95,6 @@ export const homeLoadingFixture: HomePageProps = {
   status: 'loading',
   review: { status: 'empty', message: '' },
   recentMaterials: { status: 'empty', message: '' },
-  today: { status: 'empty', message: '' },
 }
 
 export const homePartialErrorFixture: HomePageProps = {
@@ -138,5 +126,4 @@ export const homeFullErrorFixture: HomePageProps = {
     message: '최근 학습자료를 불러오지 못했어요.',
     onRetry: noop,
   },
-  today: { status: 'error', message: '오늘의 학습을 불러오지 못했어요.', onRetry: noop },
 }

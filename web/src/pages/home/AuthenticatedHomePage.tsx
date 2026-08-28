@@ -1,165 +1,168 @@
-import { ActionButton, Text, VStack } from '@seed-design/react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 
-import { useLogoutMutation } from '@/features/auth/model/auth.mutations'
 import { useCurrentUser } from '@/features/auth/model/auth.queries'
-import {
-  quizApiEnabled,
-  quizMockEnabled,
-} from '@/features/quiz/model/quizFeature'
-import { learningReviewFixture } from '@/pages/learning/learning.fixtures'
+import { learningMaterialQueryOptions } from '@/features/learning-material/api/learningMaterial.api'
+import { quizApiEnabled, quizMockEnabled } from '@/features/quiz/model/quizFeature'
 import { latestReviewQueryOptions } from '@/features/quiz/model/quizQueries'
 
-import { homeReadyFixture } from './home.fixtures'
 import { HomePage } from './HomePage'
+import { homeVisitQueryOptions } from './homeVisit.adapter'
 import type { HomeNextAction, HomePageProps } from './home.types'
+
+const mockReview = {
+  sourceAttemptId: 'mock-source-attempt',
+  activeReviewSessionId: null,
+  quizTitle: '운영체제 중간고사 대비',
+  materialTitle: '운영체제 핵심 정리',
+  reviewQuestionCount: 4,
+} as const
 
 export function AuthenticatedHomePage() {
   const navigate = useNavigate()
   const currentUser = useCurrentUser()
-  const logout = useLogoutMutation()
+  const visitQuery = useQuery({ ...homeVisitQueryOptions, enabled: Boolean(currentUser.data) })
+  const materialsQuery = useQuery(learningMaterialQueryOptions.list({ page: 1, size: 3 }))
   const reviewQuery = useQuery({
     ...latestReviewQueryOptions(),
     enabled: quizApiEnabled && Boolean(currentUser.data),
   })
 
-  if (currentUser.isError && !currentUser.data) {
-    return (
-      <VStack minHeight="100dvh" align="center" justify="center" bg="bg.layerDefault" gap="x3">
-        <Text role="alert" textStyle="t5Regular" color="fg.critical">
-          사용자 정보를 불러오지 못했어요.
-        </Text>
-        <ActionButton
-          type="button"
-          size="medium"
-          variant="neutralWeak"
-          loading={currentUser.isFetching}
-          disabled={currentUser.isFetching}
-          onClick={() => void currentUser.refetch()}
-        >
-          다시 시도
-        </ActionButton>
-      </VStack>
-    )
-  }
-
-  if (!currentUser.data) {
-    return (
-      <VStack minHeight="100dvh" align="center" justify="center" bg="bg.layerDefault" gap="x3">
-        <Text role="status" textStyle="t5Regular" color="fg.neutralMuted">
-          사용자 정보를 불러오고 있어요.
-        </Text>
-      </VStack>
-    )
-  }
-
-  const openLearning = () => navigate('/learning')
   const openReview = (materialTitle?: string | null) =>
-    navigate('/review', {
-      state: materialTitle ? { materialTitle } : undefined,
-    })
-  const mockReview = learningReviewFixture
-  const apiReview = reviewQuery.data
-  const hasApiReview = Boolean(
-    apiReview?.sourceAttemptId &&
-      apiReview.quizSetId &&
-      apiReview.materialTitle &&
-      (apiReview.activeReviewSessionId || apiReview.reviewQuestionCount > 0),
+    navigate('/review', { state: materialTitle ? { materialTitle } : undefined })
+  const apiReview = reviewQuery.data as
+    | (NonNullable<typeof reviewQuery.data> & { quizTitle?: string | null })
+    | undefined
+  const selectedReview = quizMockEnabled ? mockReview : apiReview
+  const hasReview = Boolean(
+    selectedReview?.sourceAttemptId &&
+      selectedReview.quizTitle &&
+      (selectedReview.activeReviewSessionId || selectedReview.reviewQuestionCount > 0),
   )
-  const hasReview = quizMockEnabled || hasApiReview
-  const reviewCount = quizMockEnabled
-    ? mockReview.reviewQuestionCount
-    : (apiReview?.reviewQuestionCount ?? 0)
-  const reviewTitle = quizMockEnabled ? mockReview.materialTitle : apiReview?.materialTitle
-  const activeReviewSessionId = quizMockEnabled
-    ? mockReview.activeReviewSessionId
-    : apiReview?.activeReviewSessionId
-  const nextAction: HomeNextAction | undefined = hasReview
+  const recentMaterial = materialsQuery.data?.items[0]
+  const nextAction = createNextAction({ selectedReview, hasReview, recentMaterial, navigate, openReview })
+  const review = createReviewState({
+    apiReview,
+    selectedReview,
+    hasReview,
+    apiError: reviewQuery.isError && quizApiEnabled,
+    openReview,
+    retry: () => void reviewQuery.refetch(),
+  })
+  const recentMaterials: HomePageProps['recentMaterials'] = materialsQuery.isPending
+    ? { status: 'empty', message: '' }
+    : materialsQuery.isError
+      ? { status: 'error', message: '최근 학습자료를 불러오지 못했어요.', onRetry: () => void materialsQuery.refetch() }
+      : materialsQuery.data.items.length === 0
+        ? { status: 'empty', message: '최근 학습자료가 없어요.' }
+        : {
+            status: 'ready',
+            data: materialsQuery.data.items.slice(0, 3).map((material) => ({
+              id: material.materialId,
+              title: material.title,
+              detail: formatMaterialDetail(material.sourceType, material.updatedAt),
+              onClick: () => navigate(`/learning/materials/${material.materialId}`),
+            })),
+          }
+  const recommendationWarning = reviewQuery.isError && quizApiEnabled
     ? {
-        title: activeReviewSessionId
-          ? `${reviewTitle ?? '최근 퀴즈'} 복습을 이어서 풀어보세요`
-          : `다시 확인할 문제가 ${reviewCount}개 있어요`,
-        description: activeReviewSessionId
-          ? '진행 중인 복습을 첫 문제부터 다시 이어갈 수 있어요.'
-          : '최근에 완료한 퀴즈에서 아직 해결하지 못한 문제를 다시 풀어보세요.',
-        context: activeReviewSessionId
-          ? (reviewTitle ?? '최근 퀴즈')
-          : `${reviewTitle ?? '최근 퀴즈'} · ${reviewCount}문제`,
-        action: {
-          label: activeReviewSessionId ? '복습 이어서 풀기' : '복습 시작',
-          onClick: () => openReview(reviewTitle),
-        },
+        title: '추천을 완성하지 못했어요',
+        description: '복습 상태를 확인하지 못했어요. 새 학습은 계속 시작할 수 있어요.',
+        onRetry: () => void reviewQuery.refetch(),
+        onStartLearning: () => navigate('/learning/new'),
       }
     : undefined
-  const review: HomePageProps['review'] = reviewQuery.isError && quizApiEnabled
-    ? {
-        status: 'error',
-        message: '복습 정보를 불러오지 못했어요.',
-        onRetry: () => void reviewQuery.refetch(),
-      }
-    : hasReview
-      ? {
-          status: 'ready',
-          data: {
-            id: activeReviewSessionId ?? apiReview?.sourceAttemptId ?? mockReview.sourceAttemptId,
-            title: activeReviewSessionId
-              ? '복습 이어서 풀기'
-              : `복습할 문제 ${reviewCount}개`,
-            detail: reviewTitle ?? '최근 완료한 퀴즈',
-            onClick: () => openReview(reviewTitle),
-          },
-        }
-      : {
-          status: 'empty',
-          message: '지금 복습할 문제는 없어요. 새 문제를 풀면 여기에서 다시 확인할 수 있어요.',
-        }
-
-  const homeFixture = {
-    ...homeReadyFixture,
-    status: quizApiEnabled && reviewQuery.isPending ? 'loading' : 'ready',
-    nextAction,
-    review,
-    recentMaterials: homeReadyFixture.recentMaterials.status === 'ready'
-      ? {
-          ...homeReadyFixture.recentMaterials,
-          data: homeReadyFixture.recentMaterials.data.map((item) => ({
-            ...item,
-            onClick: openLearning,
-          })),
-        }
-      : homeReadyFixture.recentMaterials,
-    studyMethods: homeReadyFixture.studyMethods.map((item) => ({
-      ...item,
-      onClick: openLearning,
-    })),
-    recommendationWarning: reviewQuery.isError && quizApiEnabled
-      ? {
-          title: '추천을 완성하지 못했어요',
-          description: '복습 상태를 확인하지 못했어요. 새 학습은 계속 시작할 수 있어요.',
-          onRetry: () => void reviewQuery.refetch(),
-          onStartLearning: openLearning,
-        }
-      : undefined,
-    onViewAllReviews: openLearning,
-    onViewAllMaterials: openLearning,
-    onRetryAll: () => {
-      void currentUser.refetch()
-      if (quizApiEnabled) void reviewQuery.refetch()
-    },
-  } satisfies HomePageProps
 
   return (
     <HomePage
-      {...homeFixture}
-      navigation={homeReadyFixture.navigation.map((item) =>
-        item.id === 'learning' ? { ...item, onClick: () => navigate('/learning') } : item,
-      )}
-      session={{
-        email: currentUser.data.email,
-        logoutPending: logout.isPending,
-        onLogout: () => logout.mutate(),
+      status={(quizApiEnabled && reviewQuery.isPending) || materialsQuery.isPending ? 'loading' : 'ready'}
+      greeting={{ nickname: currentUser.data?.nickname, consecutiveVisitDays: visitQuery.data?.summary?.consecutiveVisitDays }}
+      nextAction={nextAction}
+      review={review}
+      recentMaterials={recentMaterials}
+      studyMethods={[
+        { id: 'new-quiz', title: '새 문제 만들기', detail: '학습자료를 선택하거나 새로 만들어요', onClick: () => navigate('/learning/new') },
+        { id: 'materials', title: '내 학습자료 관리', detail: '저장한 학습자료를 찾고 관리해요', onClick: () => navigate('/learning/materials') },
+      ]}
+      dataBoundaryNotice={quizMockEnabled ? '복습 요약은 실제 API가 아닌 개발용 mock fixture를 사용하고 있어요.' : undefined}
+      recommendationWarning={recommendationWarning}
+      onViewAllReviews={() => navigate('/learning/quizzes')}
+      onViewAllMaterials={() => navigate('/learning/materials')}
+      onRetryAll={() => {
+        void currentUser.refetch()
+        void materialsQuery.refetch()
+        void visitQuery.refetch()
+        if (quizApiEnabled) void reviewQuery.refetch()
       }}
     />
   )
+}
+
+type ReviewSummary = {
+  sourceAttemptId: string | null
+  activeReviewSessionId: string | null
+  quizTitle?: string | null
+  materialTitle: string | null
+  reviewQuestionCount: number
+}
+
+function createNextAction({ selectedReview, hasReview, recentMaterial, navigate, openReview }: {
+  selectedReview?: ReviewSummary
+  hasReview: boolean
+  recentMaterial?: { materialId: string; title: string; sourceType: 'PASTE' | 'NOTION'; updatedAt: string }
+  navigate: ReturnType<typeof useNavigate>
+  openReview: (materialTitle?: string | null) => void
+}): HomeNextAction {
+  if (hasReview && selectedReview?.quizTitle) {
+    return {
+      title: selectedReview.activeReviewSessionId ? `${selectedReview.quizTitle} 복습을 이어서 풀어보세요` : `${selectedReview.quizTitle}에서 다시 볼 문제가 ${selectedReview.reviewQuestionCount}개 있어요`,
+      description: '최근에 완료한 퀴즈의 미해결 문제를 다시 확인해보세요.',
+      context: `${selectedReview.materialTitle ?? '학습자료'} · ${selectedReview.reviewQuestionCount}문제`,
+      action: { label: selectedReview.activeReviewSessionId ? '이어서 풀기' : '복습 시작', onClick: () => openReview(selectedReview.materialTitle) },
+    }
+  }
+  if (recentMaterial) {
+    return {
+      title: `${recentMaterial.title}을 다시 살펴보세요`,
+      description: '최근 학습한 자료를 열어 내용을 확인할 수 있어요.',
+      context: formatMaterialDetail(recentMaterial.sourceType, recentMaterial.updatedAt),
+      action: { label: '학습자료 관리', onClick: () => navigate(`/learning/materials/${recentMaterial.materialId}`) },
+    }
+  }
+  return {
+    title: '첫 학습자료를 만들고 문제를 풀어보세요',
+    description: '저장한 글로 나만의 문제를 만들 수 있어요.',
+    context: '새 학습 시작',
+    action: { label: '학습자료 만들기', onClick: () => navigate('/learning/new') },
+  }
+}
+
+function createReviewState({ apiReview, selectedReview, hasReview, apiError, openReview, retry }: {
+  apiReview?: ReviewSummary
+  selectedReview?: ReviewSummary
+  hasReview: boolean
+  apiError: boolean
+  openReview: (materialTitle?: string | null) => void
+  retry: () => void
+}): HomePageProps['review'] {
+  if (apiError) return { status: 'error', message: '복습 정보를 불러오지 못했어요.', onRetry: retry }
+  if (hasReview && selectedReview?.quizTitle) {
+    return {
+      status: 'ready',
+      data: {
+        id: selectedReview.activeReviewSessionId ?? selectedReview.sourceAttemptId ?? 'review',
+        title: selectedReview.quizTitle,
+        detail: `${selectedReview.materialTitle ?? '학습자료'} · ${selectedReview.reviewQuestionCount}문제 · ${selectedReview.activeReviewSessionId ? '이어서 풀기' : '복습 시작'}`,
+        onClick: () => openReview(selectedReview.materialTitle),
+      },
+    }
+  }
+  if (apiReview?.sourceAttemptId && !apiReview.quizTitle) return { status: 'error', message: '퀴즈명을 확인하지 못했어요.', onRetry: retry }
+  return { status: 'empty', message: '지금 복습할 문제는 없어요. 새 문제를 풀면 여기에서 다시 확인할 수 있어요.' }
+}
+
+function formatMaterialDetail(sourceType: 'PASTE' | 'NOTION', updatedAt: string) {
+  const source = sourceType === 'NOTION' ? 'Notion에서 가져옴' : '직접 입력'
+  const date = new Intl.DateTimeFormat('ko-KR', { month: 'short', day: 'numeric' }).format(new Date(updatedAt))
+  return `${source} · ${date} 수정`
 }
