@@ -24,27 +24,17 @@ export type HomeNextAction = {
   action: HomeAction
 }
 
-export type HomeTodaySummary = {
-  solvedCount: number
-  correctCount: number
-  gradedCount: number
-}
-
-export type HomeNavigationItem = {
-  id: 'home' | 'learning' | 'profile'
-  label: string
-  current?: boolean
-  onClick: () => void
-}
-
 export type HomePageProps = {
   status: 'ready' | 'firstVisit' | 'loading' | 'fullError'
+  greeting: {
+    nickname?: string | null
+    consecutiveVisitDays?: number
+  }
   nextAction?: HomeNextAction
   review: HomeSectionState<HomeListItem>
   recentMaterials: HomeSectionState<HomeListItem[]>
   studyMethods: HomeListItem[]
-  today: HomeSectionState<HomeTodaySummary>
-  navigation: HomeNavigationItem[]
+  dataBoundaryNotice?: string
   recommendationWarning?: {
     title: string
     description: string
@@ -54,9 +44,4 @@ export type HomePageProps = {
   onViewAllReviews: () => void
   onViewAllMaterials: () => void
   onRetryAll: () => void
-  session?: {
-    email: string
-    logoutPending: boolean
-    onLogout: () => void
-  }
 }

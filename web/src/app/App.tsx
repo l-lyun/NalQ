@@ -4,12 +4,11 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { queryClient } from '@/app/providers/queryClient'
 import { AuthBootstrap } from '@/app/router/AuthBootstrap'
 import { AuthGate, PublicOnlyGate } from '@/app/router/AuthGate'
+import { AuthenticatedAppShell } from '@/app/shell/AuthenticatedAppShell'
 import {
   quizMockEnabled,
   quizRoutesEnabled,
 } from '@/features/quiz/model/quizFeature'
-import { AuthenticatedHomePage } from '@/pages/home/AuthenticatedHomePage'
-import { AuthenticatedLearningPage } from '@/pages/learning/AuthenticatedLearningPage'
 import { LoginPage } from '@/pages/login/LoginPage'
 import {
   QuizAttemptResultRoutePage,
@@ -50,8 +49,15 @@ export function App() {
               <Route path="/verify-email" element={<VerifyEmailPage />} />
             </Route>
             <Route element={<AuthGate />}>
-              <Route path="/" element={<AuthenticatedHomePage />} />
-              <Route path="/learning" element={<AuthenticatedLearningPage />} />
+              <Route element={<AuthenticatedAppShell />}>
+                <Route index element={null} />
+                <Route path="/learning" element={null} />
+                <Route path="/learning/materials" element={null} />
+                <Route path="/learning/materials/:materialId" element={null} />
+                <Route path="/learning/quizzes" element={null} />
+                <Route path="/learning/new" element={null} />
+                <Route path="/profile" element={null} />
+              </Route>
               {quizRoutesEnabled ? (
                 <>
                   <Route

@@ -1,6 +1,5 @@
-import { ActionButton, Box, PageBanner, Text, VStack } from '@seed-design/react'
+import { Box, PageBanner, Text, VStack } from '@seed-design/react'
 
-import { HomeBottomNavigation } from './components/HomeBottomNavigation'
 import { HomeSectionDivider } from './components/HomePrimitives'
 import {
   FirstVisitSection,
@@ -9,7 +8,6 @@ import {
   RecommendationFallbackSection,
   ReviewSection,
   StudyMethodsSection,
-  TodaySection,
 } from './components/HomeSections'
 import { FullError, HomeLoading } from './components/HomeStates'
 import type { HomePageProps } from './home.types'
@@ -18,14 +16,13 @@ import './home.css'
 export function HomePage(props: HomePageProps) {
   const {
     status,
+    greeting,
     nextAction,
     review,
     recentMaterials,
     studyMethods,
-    today,
-    navigation,
+    dataBoundaryNotice,
     recommendationWarning,
-    session,
     onViewAllReviews,
     onViewAllMaterials,
     onRetryAll,
@@ -45,24 +42,29 @@ export function HomePage(props: HomePageProps) {
             <Text as="h1" textStyle="t12Bold" color="fg.neutral">
               홈
             </Text>
-            {session ? (
-              <VStack gap="x1" align="flex-start">
-                <Text textStyle="t4Regular" color="fg.neutralMuted">
-                  현재 사용자: {session.email}
+            <VStack gap="x1">
+              <Text as="p" textStyle="t7Bold" color="fg.neutral">
+                <span aria-hidden>👋 </span>
+                {greeting.nickname ? `${greeting.nickname}님, ` : ''}오늘도 반가워요
+              </Text>
+              {greeting.consecutiveVisitDays && greeting.consecutiveVisitDays > 0 ? (
+                <Text as="p" textStyle="t4Regular" color="fg.neutralMuted">
+                  연속 방문 {greeting.consecutiveVisitDays}일째예요
                 </Text>
-                <ActionButton
-                  type="button"
-                  size="small"
-                  variant="ghost"
-                  loading={session.logoutPending}
-                  disabled={session.logoutPending}
-                  onClick={session.onLogout}
-                >
-                  로그아웃
-                </ActionButton>
-              </VStack>
-            ) : null}
+              ) : null}
+            </VStack>
           </VStack>
+
+          {dataBoundaryNotice ? (
+            <PageBanner.Root tone="warning" variant="weak">
+              <PageBanner.Content>
+                <PageBanner.Body>
+                  <PageBanner.Title>개발용 데이터</PageBanner.Title>
+                  <PageBanner.Description>{dataBoundaryNotice}</PageBanner.Description>
+                </PageBanner.Body>
+              </PageBanner.Content>
+            </PageBanner.Root>
+          ) : null}
 
           {recommendationWarning ? (
             <PageBanner.Root tone="warning" variant="weak">
@@ -101,13 +103,10 @@ export function HomePage(props: HomePageProps) {
               <RecentMaterialsSection state={recentMaterials} onViewAll={onViewAllMaterials} />
               {recentMaterials.status !== 'empty' ? <HomeSectionDivider /> : null}
               <StudyMethodsSection items={studyMethods} />
-              <HomeSectionDivider />
-              <TodaySection state={today} />
             </VStack>
           )}
         </VStack>
       </Box>
-      <HomeBottomNavigation items={navigation} />
     </VStack>
   )
 }
