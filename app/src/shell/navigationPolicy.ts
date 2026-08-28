@@ -38,3 +38,19 @@ export function classifyNavigation(
 
   return { action: 'blocked' };
 }
+
+export function selectInternalRetryUrl(
+  failedUrl: string | null,
+  initialUrl: string,
+  webOrigin: string,
+): string | null {
+  if (failedUrl) {
+    const failedNavigation = classifyNavigation(failedUrl, webOrigin);
+    if (failedNavigation.action === 'internal') {
+      return failedNavigation.url;
+    }
+  }
+
+  const initialNavigation = classifyNavigation(initialUrl, webOrigin);
+  return initialNavigation.action === 'internal' ? initialNavigation.url : null;
+}

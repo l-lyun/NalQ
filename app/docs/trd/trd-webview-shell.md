@@ -26,7 +26,7 @@ scope: app
 
 - 현재 반응형 웹 화면과 브라우저 HttpOnly Cookie 인증을 그대로 재사용한다.
 - 앱 시작부터 웹 첫 문서 표시까지 빈 화면 대신 명시적인 네이티브 로딩 상태를 제공한다.
-- 최초 문서 로드 실패, HTTP 실패와 WebView 렌더러 종료를 사용자가 재시도할 수 있게 한다.
+- 최초 및 이후 동일-origin 최상위 문서의 network·HTTP 실패와 WebView 렌더러 종료를 사용자가 재시도할 수 있게 한다.
 - 앱 내부 URL, 외부 URL과 지원하지 않는 스킴의 경계를 명시한다.
 - Android 시스템 뒤로 가기와 iOS WebView 탐색을 브라우저 history에 연결한다.
 - 앱별 URL과 보안에 민감하지 않은 빌드 설정을 환경에서 주입한다.
@@ -48,7 +48,7 @@ scope: app
 - `app/`은 Expo SDK 57, React Native 0.86과 `react-native-webview` 13.16.1을 사용한다.
 - `App.tsx`는 검증된 환경 URL을 단일 `OpenMdWebView`에 전달하고 구성 오류를 네이티브 상태로 표시한다.
 - 공개 웹 주소 자리인 `EXPO_PUBLIC_WEB_URL` 예시와 개발 기본값 `http://localhost:5173`을 사용한다.
-- `src/shell/`이 로딩·최초 문서 오류·재시도, 동일 origin URL 정책, 외부 링크, Android 뒤로 가기와 플랫폼별 WebView 복구를 소유한다.
+- `src/shell/`이 로딩·동일-origin 최상위 문서 오류·재시도, 동일 origin URL 정책, 외부 링크, Android 뒤로 가기와 플랫폼별 WebView 복구를 소유한다.
 - Expo Router와 네이티브-웹 메시지 브리지는 사용하지 않는다.
 
 ### Web
@@ -123,13 +123,13 @@ Expo Router는 네이티브 화면이 하나인 1차 셸에는 추가하지 않�
 | 상태 | 소유 계층 | 처리 |
 | --- | --- | --- |
 | 앱 시작과 첫 문서 로드 | Native | 스플래시 뒤 짧은 로딩 상태 |
-| 첫 메인 문서 network/HTTP 실패 | Native | 간단한 설명과 `다시 시도` |
+| 동일-origin 최상위 문서 network/HTTP 실패 | Native | 간단한 설명과 실패한 문서 URL의 `다시 시도` |
 | WebView renderer/content process 종료 | Native | 복구 안내 후 WebView 재생성 또는 reload |
 | 인증 bootstrap, API 401/5xx와 화면 데이터 오류 | Web | 기존 웹 상태와 재시도 사용 |
 | 사용자가 누른 외부 URL을 열 수 없음 | Native | 현재 WebView를 유지하고 짧은 오류 안내 |
 
-- 최초 로딩 실패에서만 전체 native error를 표시한다. 웹이 이미 표시된 뒤 subresource/API 하나가 실패했다고 전체 WebView를 덮지 않는다.
-- 재시도는 같은 검증된 초기 URL을 reload하거나 WebView 인스턴스를 새 key로 재생성한다.
+- 최초 로딩과 이후 동일-origin 최상위 문서 탐색 실패에는 전체 native error를 표시한다. 웹이 이미 표시된 뒤 subresource/API 하나가 실패했다고 전체 WebView를 덮지 않는다.
+- 재시도는 실패 URL을 동일-origin 정책으로 다시 검증한 뒤 그 최상위 문서 URL로 WebView 인스턴스를 새 key로 재생성한다. 실패 URL이 안전하지 않으면 검증된 초기 URL만 사용한다.
 - 별도 네트워크 감지 라이브러리는 1차 범위에 추가하지 않는다. 연결 상태 추정보다 실제 문서 로드 결과를 기준으로 복구한다.
 - 오프라인 문서 캐시는 제공하지 않으므로 캐시된 화면을 정상 최신 상태처럼 보장하지 않는다.
 
@@ -197,7 +197,7 @@ Android `BackHandler`와 WebView ref의 실제 결합은 렌더러가 필요한 
 - 로그인, refresh 회전과 logout 뒤 HttpOnly Cookie가 각 플랫폼에서 유지·갱신·삭제된다.
 - 홈 → 학습 → 하위 입력 → 시스템 뒤로 가기의 history와 작성 중 이탈 확인이 중복 실행되지 않는다.
 - 외부 HTTPS, `mailto:`와 `tel:`이 WebView를 이탈해 적절한 앱으로 열리고 복귀 시 기존 화면을 유지한다.
-- 최초 로드 중 네트워크 중단, HTTP 오류와 renderer 종료 뒤 재시도가 동작한다.
+- 최초 로드와 이후 동일-origin 최상위 문서 탐색의 네트워크 중단·HTTP 오류, renderer 종료 뒤 재시도가 동작한다.
 - 노치, Android edge-to-edge, 홈 인디케이터와 키보드에서 상단 제목·하단 탭·고정 행동이 가려지거나 이중 padding되지 않는다.
 - 320px 상당의 작은 viewport, 큰 글자와 긴 한국어 문구에서 웹 화면이 잘리거나 수평 스크롤되지 않는다.
 
@@ -207,7 +207,7 @@ Android `BackHandler`와 WebView ref의 실제 결합은 렌더러가 필요한 
 
 - 검증된 `EXPO_PUBLIC_WEB_URL`
 - 단일 WebView와 동일-origin allowlist
-- native loading·최초 로드 오류·재시도
+- native loading·동일-origin 최상위 문서 오류·재시도
 - 외부 URL 분리
 - Android back/history
 - WebView renderer 종료 복구

@@ -15,7 +15,10 @@ require.extensions['.ts'] = (module, filename) => {
   module._compile(output, filename);
 };
 
-const { classifyNavigation } = require('../src/shell/navigationPolicy.ts');
+const {
+  classifyNavigation,
+  selectInternalRetryUrl,
+} = require('../src/shell/navigationPolicy.ts');
 const { DEFAULT_WEB_URL, resolveWebUrl } = require('../src/shell/webUrl.ts');
 
 test('development defaults to localhost and accepts configured HTTP origins', () => {
@@ -66,4 +69,26 @@ test('supported external schemes leave the WebView and unsafe schemes are blocke
   assert.equal(classifyNavigation('file:///tmp/openmd.html', 'https://app.openmd.example').action, 'blocked');
   assert.equal(classifyNavigation('data:text/html,hello', 'https://app.openmd.example').action, 'blocked');
   assert.equal(classifyNavigation('openmd://profile', 'https://app.openmd.example').action, 'blocked');
+});
+
+test('retry keeps a failed internal document URL and rejects unsafe candidates', () => {
+  const origin = 'https://app.openmd.example';
+  const initialUrl = `${origin}/`;
+
+  assert.equal(
+    selectInternalRetryUrl(`${origin}/learning/42?tab=quiz`, initialUrl, origin),
+    `${origin}/learning/42?tab=quiz`,
+  );
+  assert.equal(
+    selectInternalRetryUrl('https://attacker.example/phishing', initialUrl, origin),
+    initialUrl,
+  );
+  assert.equal(
+    selectInternalRetryUrl('javascript:alert(1)', initialUrl, origin),
+    initialUrl,
+  );
+  assert.equal(
+    selectInternalRetryUrl(null, 'http://insecure.example', origin),
+    null,
+  );
 });

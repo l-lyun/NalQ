@@ -11,7 +11,7 @@ import type {
   WebViewOpenWindowEvent,
 } from 'react-native-webview/lib/WebViewTypes';
 
-import { classifyNavigation } from './navigationPolicy';
+import { classifyNavigation, selectInternalRetryUrl } from './navigationPolicy';
 import { ShellStateView, type ShellState } from './ShellStateView';
 
 interface OpenMdWebViewProps {
@@ -25,9 +25,11 @@ const EXTERNAL_LINK_ERROR_DURATION_MS = 4_000;
 
 export function OpenMdWebView({ webOrigin, webUrl }: OpenMdWebViewProps) {
   const webViewRef = useRef<WebView>(null);
-  const firstDocumentVisibleRef = useRef(false);
+  const documentVisibleRef = useRef(false);
+  const failedMainDocumentUrlRef = useRef<string | null>(null);
   const loadFailedRef = useRef(false);
   const pendingMainDocumentUrlRef = useRef(webUrl);
+  const visibleMainDocumentUrlRef = useRef(webUrl);
 
   const [canGoBack, setCanGoBack] = useState(false);
   const [documentUrl, setDocumentUrl] = useState(webUrl);
@@ -106,56 +108,79 @@ export function OpenMdWebView({ webOrigin, webUrl }: OpenMdWebViewProps) {
     [applyNavigationPolicy],
   );
 
-  const showInitialLoadError = useCallback(() => {
-    if (firstDocumentVisibleRef.current) {
+  const showMainDocumentLoadError = useCallback((failedUrl: string) => {
+    const failedNavigation = classifyNavigation(failedUrl, webOrigin);
+    if (failedNavigation.action !== 'internal') {
       return;
     }
 
+    failedMainDocumentUrlRef.current = failedNavigation.url;
     loadFailedRef.current = true;
     setShellState('load-error');
-  }, []);
+  }, [webOrigin]);
 
   const handleLoadStart = useCallback((event: WebViewNavigationEvent) => {
-    pendingMainDocumentUrlRef.current = event.nativeEvent.url;
+    const navigation = classifyNavigation(event.nativeEvent.url, webOrigin);
+    if (navigation.action !== 'internal') {
+      return;
+    }
+
+    pendingMainDocumentUrlRef.current = navigation.url;
     loadFailedRef.current = false;
 
-    if (!firstDocumentVisibleRef.current) {
+    if (!documentVisibleRef.current) {
       setShellState('loading');
     }
-  }, []);
+  }, [webOrigin]);
 
-  const handleLoad = useCallback(() => {
+  const handleLoad = useCallback((event: WebViewNavigationEvent) => {
     if (loadFailedRef.current) {
       return;
     }
 
-    firstDocumentVisibleRef.current = true;
+    const navigation = classifyNavigation(event.nativeEvent.url, webOrigin);
+    if (navigation.action === 'internal') {
+      visibleMainDocumentUrlRef.current = navigation.url;
+    }
+
+    documentVisibleRef.current = true;
+    failedMainDocumentUrlRef.current = null;
     setShellState('ready');
-  }, []);
+  }, [webOrigin]);
 
   const handleError = useCallback(
     (event: WebViewErrorEvent) => {
       event.preventDefault();
-      showInitialLoadError();
+      showMainDocumentLoadError(event.nativeEvent.url);
     },
-    [showInitialLoadError],
+    [showMainDocumentLoadError],
   );
 
   const handleHttpError = useCallback(
     (event: WebViewHttpErrorEvent) => {
-      const isPendingMainDocument =
-        event.nativeEvent.url === pendingMainDocumentUrlRef.current;
+      const failedNavigation = classifyNavigation(event.nativeEvent.url, webOrigin);
+      const isPendingMainDocument = failedNavigation.action === 'internal'
+        && failedNavigation.url === pendingMainDocumentUrlRef.current;
 
       if (isPendingMainDocument && event.nativeEvent.statusCode >= 400) {
-        showInitialLoadError();
+        showMainDocumentLoadError(failedNavigation.url);
       }
     },
-    [showInitialLoadError],
+    [showMainDocumentLoadError, webOrigin],
   );
 
   const handleNavigationStateChange = useCallback((navigation: WebViewNavigation) => {
     setCanGoBack(navigation.canGoBack);
-  }, []);
+
+    const currentNavigation = classifyNavigation(navigation.url, webOrigin);
+    if (currentNavigation.action === 'internal') {
+      if (navigation.loading) {
+        pendingMainDocumentUrlRef.current = currentNavigation.url;
+      } else {
+        visibleMainDocumentUrlRef.current = currentNavigation.url;
+      }
+    }
+  }, [webOrigin]);
 
   const handleRendererTerminated = useCallback(() => {
     loadFailedRef.current = true;
@@ -164,14 +189,26 @@ export function OpenMdWebView({ webOrigin, webUrl }: OpenMdWebViewProps) {
   }, []);
 
   const retry = useCallback(() => {
-    firstDocumentVisibleRef.current = false;
+    const retryUrl = selectInternalRetryUrl(
+      shellState === 'renderer-error'
+        ? visibleMainDocumentUrlRef.current
+        : failedMainDocumentUrlRef.current,
+      webUrl,
+      webOrigin,
+    );
+    if (!retryUrl) {
+      return;
+    }
+
+    documentVisibleRef.current = false;
+    failedMainDocumentUrlRef.current = null;
     loadFailedRef.current = false;
-    pendingMainDocumentUrlRef.current = webUrl;
+    pendingMainDocumentUrlRef.current = retryUrl;
     setCanGoBack(false);
-    setDocumentUrl(webUrl);
+    setDocumentUrl(retryUrl);
     setShellState('loading');
     setWebViewKey((currentKey) => currentKey + 1);
-  }, [webUrl]);
+  }, [shellState, webOrigin, webUrl]);
 
   const platformProps =
     Platform.OS === 'ios'

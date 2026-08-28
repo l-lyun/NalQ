@@ -21,7 +21,7 @@ const COPY: Record<
   },
   'load-error': {
     title: 'OpenMD를 불러오지 못했어요',
-    description: '네트워크 연결을 확인한 뒤 다시 시도해 주세요.',
+    description: '페이지를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.',
   },
   'renderer-error': {
     title: '화면을 다시 불러와야 해요',
