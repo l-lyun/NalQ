@@ -72,11 +72,12 @@ scope: web-server
 | 2026-08-28 | T007 완료 | route·행동·단방향 탭 전환 node test 9개 PASS, 320px 실제 브라우저에서 직접 URL·back·행동 route·가로 overflow 없음 확인 |
 | 2026-08-28 | 웹 검증 PASS | `pnpm verify`의 typecheck·lint·build PASS, chunk size 경고만 유지 |
 | 2026-08-28 | T008 완료 | 앱 셸·퀴즈 TRD 동기화와 루트 `./scripts/verify.sh fast`의 web·server fast 검증 PASS |
+| 2026-08-29 | 인수 검토 수정 | 관리 API를 공통 `VITE_QUIZ_API_ENABLED`에 통합하고, 전체 재풀이 route intent가 미완료 자기평가 자동 재개를 우회하도록 수정 |
 
 ## 완료 검증
 
 - `pnpm verify`: typecheck·lint·production build PASS
-- node 회귀 테스트 9개: route·행동 우선순위·단방향 탭 전환·기존 퀴즈 관리 행동 PASS
+- node 회귀 테스트 10개: route·행동 우선순위·전체 재풀이 intent·단방향 탭 전환·기존 퀴즈 관리 행동 PASS
 - 320px 실제 브라우저: 직접 URL·back·상태별 행동 route·하위 route 내비게이션 숨김·가로 overflow 없음 PASS
 - 루트 `./scripts/verify.sh fast`: web 정적 검증과 server fast test PASS
 

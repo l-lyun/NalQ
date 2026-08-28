@@ -229,7 +229,12 @@ export function LearningManagementPage() {
                 starting={startingAttemptId === recentQuiz.data.sourceAttemptId}
                 onRetryAction={() => void recentPending.refetch()}
                 onAction={runAction}
-                onRestart={() => navigate(`/quiz-sets/${recentQuiz.data.quizSetId}`)}
+                onRestart={() => navigate(`/quiz-sets/${recentQuiz.data.quizSetId}`, {
+                  state: {
+                    materialTitle: recentQuiz.data.materialTitle ?? undefined,
+                    restartMain: true,
+                  },
+                })}
               />
             ) : (
               <EmptyState>아직 만든 퀴즈가 없어요. 새 문제를 만들어 학습을 시작해보세요.</EmptyState>

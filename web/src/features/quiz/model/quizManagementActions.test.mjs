@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  resolvePendingSelfAssessmentForQuizEntry,
   resolveQuizManagementActions,
   resolveQuizManagementActionState,
 } from './quizManagementActions.ts'
@@ -35,6 +36,18 @@ test('미완료 서술형 회차만 자기평가 이어서 하기로 연결한�
   assert.deepEqual(actions, [
     { label: '자기평가 이어하기', path: '/quiz-sets/quiz-1', primary: true },
   ])
+})
+
+test('전체 문제 다시 풀기 진입은 미완료 자기평가 자동 재개를 우회한다', () => {
+  const pending = {
+    attemptId: 'attempt-1',
+    quizSetId: quiz.quizSetId,
+    status: 'SELF_ASSESSMENT_REQUIRED',
+    pendingEssayQuestionIds: ['question-4'],
+  }
+
+  assert.equal(resolvePendingSelfAssessmentForQuizEntry(pending, true), null)
+  assert.equal(resolvePendingSelfAssessmentForQuizEntry(pending, false), pending)
 })
 
 test('활성 복습은 결과 보기와 활성 세션 재개를 함께 제공한다', () => {

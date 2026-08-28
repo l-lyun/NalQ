@@ -16,6 +16,13 @@ export function resolveQuizManagementActionState(
   return 'ready'
 }
 
+export function resolvePendingSelfAssessmentForQuizEntry(
+  pending: PendingSelfAssessment | null,
+  restartMain: boolean,
+) {
+  return restartMain ? null : pending
+}
+
 export function resolveQuizManagementActions(
   quiz: QuizSetSummary,
   pending: PendingSelfAssessment | null,

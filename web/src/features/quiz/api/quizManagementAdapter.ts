@@ -17,14 +17,11 @@ import type {
   QuizSetSummary,
   RenameQuizSetResponse,
 } from './quiz.types'
-export type QuizManagementMode = 'api' | 'mock' | 'disabled'
+import { quizRuntimeMode, type QuizRuntimeMode } from '../model/quizFeature'
 
-export const quizManagementMode: QuizManagementMode =
-  import.meta.env.VITE_QUIZ_MANAGEMENT_API_ENABLED === 'true'
-  ? 'api'
-  : import.meta.env.DEV
-    ? 'mock'
-    : 'disabled'
+export type QuizManagementMode = QuizRuntimeMode
+
+export const quizManagementMode: QuizManagementMode = quizRuntimeMode
 
 const mockQuizSets: QuizSetSummary[] = [
   {
