@@ -120,6 +120,19 @@ HTTP 필드 모양과 공개 오류는 [학습자료·퀴즈·복습 API](contra
 
 `quiz_sets.status`는 `GENERATING`, `READY`, `FAILED`다.
 
+### 사용자 지정 퀴즈 이름 — 목표 데이터 계약
+
+이 항목은 홈·학습의 퀴즈 관리 UX를 위한 목표이며 현재 migration과 도메인 모델에는 아직 반영되지 않았다.
+
+- 각 QuizSet은 부모 학습자료 제목과 분리된 비어 있지 않은 `quizTitle`을 소유한다.
+- `quizTitle`은 사용자가 변경할 수 있는 QuizSet 메타데이터이며 사용자 범위에서도 중복을 허용한다.
+- 학습자료 제목 변경은 기존 QuizSet의 `quizTitle`을 연쇄 변경하지 않는다.
+- QuizSet 상태가 `GENERATING`, `READY`, `FAILED` 중 무엇이든 이름 변경을 허용한다. 이름 변경은 문제·정답·attempt·채점·복습 snapshot의 불변성을 깨지 않는다.
+- 저장 전 앞뒤 Unicode 공백을 제거하고 1~255 Unicode code point를 검증한다.
+- 생성 시 기본 이름은 접수 시점의 학습자료 제목에 ` 퀴즈`를 붙인 `{학습자료명} 퀴즈`다. 전체가 255 Unicode code point를 넘으면 학습자료 제목 부분을 앞에서부터 최대 252 code point로 줄여 공백과 `퀴즈` 접미사를 보존한다.
+- 기존 행은 새 migration 적용 시점에 연결된 학습자료의 현재 제목으로 같은 규칙을 적용해 backfill한다. backfill 완료 뒤 공개 조회에서 null·빈 문자열을 허용하지 않는다.
+- 물리 컬럼명, index와 동시 수정 방식은 서버 TRD와 migration이 책임진다. 현재 계약은 별도 revision이나 제목 변경 이력 원장을 요구하지 않는다.
+
 - 유형별 검증을 통과해 저장할 수 있는 문제가 하나 이상이면 `READY`다. 최대 문제 수보다 적거나 요청 유형 일부가 없어도 실패가 아니다.
 - 유효 문제가 0개면 `FAILED`이며 빈 문제 세트를 풀이 대상으로 공개하지 않는다.
 - 실패 뒤 재조회에서도 원인을 구분해야 하므로 `quiz_sets.failure_code`를 nullable 값으로 둔다. `FAILED`에서는 `SOURCE_INSUFFICIENT` 또는 `GENERATION_FAILED`, 그 외 상태에서는 `null`이다.
@@ -257,7 +270,7 @@ MVP에서는 전체 사용자 수정 이력을 별도 테이블로 보존하지 
 
 migration, Java entity·repository·service와 테스트는 같은 목표 구조를 사용해야 한다. 기존 서버 TRD나 migration에 `quiz_question_answers`가 정답 원장으로 남아 있다면 이 계약과 충돌하므로 구현 전에 함께 동기화한다. 공개 API의 `FILL_BLANK` 소비자는 계약 변경 뒤 `FILL_IN_THE_BLANK`로 전환한다.
 
-이번 PR은 아직 병합되지 않았으므로 `V5__create_quiz_grading.sql`을 목표 구조에 맞게 직접 수정한다. 이전 V5를 적용한 개인 개발 DB는 개발 데이터를 초기화한 뒤 다시 적용한다.
+`V5__create_quiz_grading.sql`은 이미 공유 이력에 적용된 migration이므로 수정하지 않는다. `quizTitle` 저장과 기존 QuizSet backfill은 구현 시점의 다음 신규 migration으로 추가하고, 운영·개발 환경 모두 같은 순방향 migration을 적용한다.
 
 ## 확정·제안·열린 질문
 

@@ -3,481 +3,183 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>OpenMD 학습 메인 UX 검토</title>
+  <title>OpenMD 학습 영역 UX 검토</title>
   <style>
     :root {
       color-scheme: light dark;
       font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      --canvas: #eef1f4;
-      --surface: #ffffff;
-      --quiet: #f2f4f6;
-      --quiet-pressed: #e7eaee;
-      --text: #191f28;
-      --muted: #6b7684;
-      --subtle: #8b95a1;
-      --divider: #e5e8eb;
-      --brand: #287cff;
-      --brand-pressed: #1768d9;
-      --brand-text: #ffffff;
-      --positive: #16883f;
-      --critical: #d93036;
-      --focus: #287cff;
-      --nav: rgba(255,255,255,.96);
+      --canvas:#eef1f4; --surface:#fff; --quiet:#f2f4f6; --pressed:#e7eaee;
+      --text:#191f28; --muted:#6b7684; --subtle:#8b95a1; --line:#e5e8eb;
+      --brand:#287cff; --brand-pressed:#1768d9; --brand-text:#fff; --danger:#d93036;
     }
-
     @media (prefers-color-scheme: dark) {
-      :root {
-        --canvas: #111316;
-        --surface: #1b1e22;
-        --quiet: #25292e;
-        --quiet-pressed: #30353b;
-        --text: #f2f4f6;
-        --muted: #b0b8c1;
-        --subtle: #8b95a1;
-        --divider: #343a40;
-        --brand: #4593ff;
-        --brand-pressed: #73adff;
-        --brand-text: #08111e;
-        --positive: #56cc7a;
-        --critical: #ff6b6f;
-        --focus: #73adff;
-        --nav: rgba(27,30,34,.96);
-      }
+      :root { --canvas:#111316; --surface:#1b1e22; --quiet:#25292e; --pressed:#30353b;
+        --text:#f2f4f6; --muted:#b0b8c1; --subtle:#8b95a1; --line:#343a40;
+        --brand:#4593ff; --brand-pressed:#73adff; --brand-text:#08111e; --danger:#ff6b6f; }
     }
-
-    * { box-sizing: border-box; }
-    body { margin: 0; background: var(--canvas); color: var(--text); }
-    button, input, select { font: inherit; }
-    button, a, input, select { min-height: 44px; }
-    :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
-
-    .prototype-shell {
-      display: grid;
-      justify-items: center;
-      gap: 16px;
-      padding: 16px;
-    }
-
-    .prototype-controls {
-      width: min(100%, 560px);
-      display: flex;
-      align-items: end;
-      justify-content: space-between;
-      gap: 12px;
-      flex-wrap: wrap;
-      color: var(--text);
-    }
-
-    .prototype-controls label {
-      display: grid;
-      gap: 6px;
-      font-size: 13px;
-      color: var(--muted);
-    }
-
-    .prototype-controls select {
-      border: 1px solid var(--divider);
-      border-radius: 10px;
-      padding: 0 12px;
-      background: var(--surface);
-      color: var(--text);
-    }
-
-    .prototype-note { margin: 0; font-size: 13px; color: var(--muted); }
-
-    .app-shell {
-      width: min(100%, 560px);
-      min-height: 720px;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      background: var(--surface);
-      border-radius: 20px;
-      border: 1px solid var(--divider);
-    }
-
-    .app-main { flex: 1; padding: 28px 20px 40px; }
-    .app-header { display: grid; gap: 20px; }
-    h1, h2, p { margin: 0; }
-    h1 { font-size: 30px; line-height: 1.28; letter-spacing: -.02em; }
-    h2 { font-size: 20px; line-height: 1.35; }
-
-    .primary-button {
-      width: 100%;
-      border: 0;
-      border-radius: 12px;
-      padding: 0 18px;
-      background: var(--brand);
-      color: var(--brand-text);
-      font-weight: 700;
-      cursor: pointer;
-    }
-    .primary-button:active { background: var(--brand-pressed); }
-
-    .section { margin-top: 40px; }
-    .section-heading {
-      min-height: 44px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-    }
-
-    .ghost-button {
-      border: 0;
-      background: transparent;
-      color: var(--muted);
-      padding: 0 6px;
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    .quiz-context {
-      margin-top: 10px;
-      padding: 18px;
-      border-radius: 16px;
-      background: var(--quiet);
-    }
-
-    .quiz-title { font-size: 18px; line-height: 1.45; font-weight: 700; }
-    .quiz-meta { margin-top: 4px; font-size: 14px; line-height: 1.45; color: var(--muted); }
-    .quiz-status { margin-top: 12px; font-size: 14px; line-height: 1.5; color: var(--positive); font-weight: 600; }
-
-    .action-list { margin-top: 12px; border-top: 1px solid var(--divider); }
-    .action-row {
-      width: 100%;
-      min-height: 76px;
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      align-items: center;
-      gap: 12px;
-      padding: 12px 0;
-      border: 0;
-      border-bottom: 1px solid var(--divider);
-      background: transparent;
-      color: var(--text);
-      text-align: left;
-      cursor: pointer;
-    }
-    .action-row:last-child { border-bottom: 0; }
-    .action-row:active { background: var(--quiet-pressed); }
-    .action-title { display: block; font-size: 16px; line-height: 1.45; font-weight: 700; }
-    .action-detail { display: block; margin-top: 3px; font-size: 14px; line-height: 1.45; color: var(--muted); }
-    .chevron { color: var(--subtle); font-size: 22px; }
-
-    .empty-copy, .error-copy { margin-top: 10px; font-size: 15px; line-height: 1.6; color: var(--muted); }
-    .error-copy strong { display: block; margin-bottom: 3px; color: var(--text); }
-    .retry-button {
-      margin-top: 8px;
-      border: 0;
-      background: transparent;
-      color: var(--brand);
-      padding: 0;
-      font-weight: 700;
-      cursor: pointer;
-    }
-
-    .search-region { margin: 8px 0 4px; }
-    .search-label { display: block; margin-bottom: 7px; font-size: 13px; color: var(--muted); }
-    .search-input {
-      width: 100%;
-      border: 1px solid var(--divider);
-      border-radius: 12px;
-      padding: 0 14px;
-      background: var(--surface);
-      color: var(--text);
-      font-size: 16px;
-    }
-
-    .material-list { margin: 4px 0 0; padding: 0; list-style: none; }
-    .material-item { border-bottom: 1px solid var(--divider); }
-    .material-link {
-      width: 100%;
-      min-height: 76px;
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      align-items: center;
-      gap: 12px;
-      border: 0;
-      padding: 12px 0;
-      background: transparent;
-      color: var(--text);
-      text-align: left;
-      cursor: pointer;
-    }
-    .material-title { display: block; font-size: 16px; line-height: 1.45; font-weight: 700; }
-    .material-meta { display: block; margin-top: 3px; font-size: 13px; line-height: 1.45; color: var(--muted); }
-    .locked { color: var(--critical); }
-
-    .pagination {
-      min-height: 52px;
-      display: grid;
-      grid-template-columns: 1fr auto 1fr;
-      align-items: center;
-      gap: 12px;
-      margin-top: 10px;
-    }
-    .page-button { border: 0; background: transparent; color: var(--muted); cursor: pointer; }
-    .page-button:first-child { justify-self: start; }
-    .page-button:last-child { justify-self: end; }
-    .page-button:disabled { color: var(--subtle); cursor: default; }
-    .page-count { font-size: 14px; color: var(--muted); }
-
-    .skeleton { overflow: hidden; }
-    .skeleton-line {
-      height: 17px;
-      border-radius: 8px;
-      background: var(--quiet);
-      margin-top: 10px;
-    }
-    .skeleton-line.short { width: 55%; }
-    .skeleton-line.medium { width: 72%; }
-    .skeleton-block { height: 154px; border-radius: 16px; background: var(--quiet); margin-top: 10px; }
-
-    .bottom-nav {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      border-top: 1px solid var(--divider);
-      background: var(--nav);
-      padding: 8px 10px max(8px, env(safe-area-inset-bottom));
-    }
-    .nav-item {
-      min-height: 54px;
-      display: grid;
-      place-items: center;
-      gap: 2px;
-      border: 0;
-      background: transparent;
-      color: var(--muted);
-      font-size: 13px;
-    }
-    .nav-item[aria-current="page"] { color: var(--brand); font-weight: 700; }
-    .nav-dot { font-size: 18px; line-height: 1; }
-
-    .live-region { min-height: 20px; margin: 10px 0 0; font-size: 13px; color: var(--muted); }
-
-    @media (max-width: 420px) {
-      .prototype-shell { padding: 0; gap: 0; }
-      .prototype-controls { padding: 12px 16px; background: var(--canvas); }
-      .app-shell { min-height: 736px; border: 0; border-radius: 0; }
-      .app-main { padding: 24px 18px 36px; }
-      h1 { font-size: 28px; }
-      .section { margin-top: 36px; }
-      .quiz-context { padding: 16px; }
-    }
-
-    @media (prefers-reduced-motion: no-preference) {
-      .search-region { animation: reveal .16s ease-out; }
-      @keyframes reveal { from { opacity: 0; transform: translateY(-4px); } }
-    }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--canvas); color:var(--text); }
+    button,input { font:inherit; }
+    button,input,a { min-height:44px; }
+    :focus-visible { outline:3px solid var(--brand); outline-offset:2px; }
+    .prototype { display:grid; justify-items:center; gap:12px; padding:16px; }
+    .note { width:min(100%,560px); margin:0; color:var(--muted); font-size:13px; line-height:1.5; }
+    .phone { width:min(100%,560px); min-height:760px; display:flex; flex-direction:column;
+      overflow:hidden; background:var(--surface); border:1px solid var(--line); border-radius:20px; }
+    main { flex:1; padding:24px 20px 48px; }
+    h1,h2,p { margin:0; }
+    h1 { font-size:29px; line-height:1.3; }
+    h2 { font-size:20px; line-height:1.4; }
+    .topbar { min-height:52px; display:grid; grid-template-columns:44px 1fr 44px; align-items:center; }
+    .topbar h1 { font-size:22px; text-align:center; }
+    .icon-button,.text-button,.row,.disclosure,.secondary,.page-button { border:0; background:transparent; color:inherit; cursor:pointer; }
+    .icon-button { width:44px; padding:0; font-size:26px; }
+    .section { margin-top:32px; }
+    .section:first-of-type { margin-top:24px; }
+    .section-head { min-height:44px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .text-button { color:var(--brand); font-weight:700; padding:0 4px; }
+    .primary { width:100%; min-height:52px; border:0; border-radius:12px; padding:0 16px;
+      background:var(--brand); color:var(--brand-text); font-weight:700; cursor:pointer; }
+    .primary:active { background:var(--brand-pressed); }
+    .recent { padding:18px; border-radius:16px; background:var(--quiet); }
+    .title { font-size:17px; line-height:1.45; font-weight:700; }
+    .meta { margin-top:4px; color:var(--muted); font-size:14px; line-height:1.45; }
+    .recent-action { width:100%; min-height:64px; margin-top:14px; padding:10px 0 0; border:0; border-top:1px solid var(--line);
+      display:grid; grid-template-columns:1fr auto; align-items:center; gap:12px; background:transparent; color:inherit; text-align:left; font-weight:700; cursor:pointer; }
+    .chevron { align-self:center; color:var(--subtle); font-size:24px; line-height:1; }
+    .list { list-style:none; margin:4px 0 0; padding:0; }
+    .row { width:100%; min-height:72px; padding:12px 0; border-bottom:1px solid var(--line);
+      display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:12px; text-align:left; }
+    .row .title,.row .meta,.disclosure .title,.disclosure .meta { display:block; }
+    .row:active,.disclosure:active { background:var(--pressed); }
+    .bottom-nav { display:grid; grid-template-columns:repeat(3,1fr); padding:8px 10px max(8px,env(safe-area-inset-bottom)); border-top:1px solid var(--line); }
+    .nav { min-height:54px; border:0; background:transparent; color:var(--muted); display:grid; place-items:center; gap:2px; font-size:13px; }
+    .nav[aria-current="page"] { color:var(--brand); font-weight:700; }
+    .search { display:grid; gap:7px; margin-top:20px; }
+    .search label { color:var(--muted); font-size:13px; }
+    .search input,.rename-input { width:100%; border:1px solid var(--line); border-radius:12px; padding:0 14px; background:var(--surface); color:var(--text); }
+    .result-count { margin-top:10px; color:var(--muted); font-size:13px; }
+    .card-list { display:grid; gap:12px; margin-top:16px; }
+    .card { overflow:hidden; border:1px solid var(--line); border-radius:14px; background:var(--surface); }
+    .disclosure { width:100%; min-height:78px; padding:14px 16px; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:12px; text-align:left; }
+    .disclosure[aria-expanded="true"] .chevron { transform:rotate(180deg); }
+    .expanded { padding:0 16px 16px; border-top:1px solid var(--line); }
+    .preview { padding:14px 0; color:var(--muted); font-size:14px; line-height:1.55; }
+    .actions { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .secondary { min-height:48px; border:1px solid var(--line); border-radius:10px; padding:0 10px; font-weight:700; }
+    .secondary.strong { color:var(--brand); border-color:var(--brand); }
+    .quiz-card { padding:16px; border:1px solid var(--line); border-radius:14px; background:var(--quiet); }
+    .quiz-actions { display:flex; justify-content:space-between; gap:10px; margin-top:14px; padding-top:12px; border-top:1px solid var(--line); }
+    .quiz-actions .secondary { flex:1; }
+    .rename { display:grid; gap:10px; }
+    .rename-actions { display:flex; justify-content:flex-end; gap:8px; }
+    .rename-actions .secondary { min-width:76px; }
+    .pagination { min-height:54px; display:grid; grid-template-columns:1fr auto 1fr; align-items:center; margin-top:16px; color:var(--muted); }
+    .page-button:first-child { justify-self:start; } .page-button:last-child { justify-self:end; }
+    .page-button:disabled { color:var(--subtle); cursor:default; }
+    .live { min-height:22px; margin-top:14px; color:var(--muted); font-size:13px; }
+    .hidden { display:none !important; }
+    @media (max-width:420px) { .prototype{padding:0}.note{padding:12px 16px}.phone{min-height:100dvh;border:0;border-radius:0} main{padding:20px 18px 40px} }
+    @media (max-width:340px),(prefers-reduced-motion:reduce) { .actions{grid-template-columns:1fr} }
   </style>
 </head>
 <body>
-  <div class="prototype-shell">
-    <div class="prototype-controls" aria-label="프로토타입 상태 선택">
-      <label>
-        검토할 상태
-        <select id="scenario">
-          <option value="wrong">최신 퀴즈 · 오답 있음</option>
-          <option value="active">틀린 문제 풀이 진행 중</option>
-          <option value="correct">최신 퀴즈 · 전부 해결</option>
-          <option value="no-quiz">완료한 퀴즈 없음</option>
-          <option value="search-empty">자료 검색 결과 없음</option>
-          <option value="loading">최초 로딩</option>
-          <option value="error">영역별 오류</option>
-        </select>
-      </label>
-      <p class="prototype-note">비생산 UX 검토용 · 상태를 바꿔 비교하세요</p>
-    </div>
-
-    <div class="app-shell">
-      <main class="app-main">
-        <header class="app-header">
-          <h1>학습</h1>
-          <button type="button" class="primary-button" id="newQuiz">새 문제 만들기</button>
-        </header>
-
-        <section class="section" aria-labelledby="recent-title">
-          <div class="section-heading">
-            <h2 id="recent-title">최근 퀴즈</h2>
-          </div>
-          <div id="recentQuiz"></div>
-        </section>
-
-        <section class="section" aria-labelledby="materials-title">
-          <div class="section-heading">
-            <h2 id="materials-title">내 학습자료</h2>
-            <button type="button" class="ghost-button" id="searchToggle" aria-expanded="false">검색</button>
-          </div>
-          <div id="searchRegion"></div>
-          <div id="materials"></div>
-        </section>
-
-        <p class="live-region" id="live" aria-live="polite"></p>
-      </main>
-
-      <nav class="bottom-nav" aria-label="주요 메뉴">
-        <button type="button" class="nav-item"><span class="nav-dot" aria-hidden="true">⌂</span>홈</button>
-        <button type="button" class="nav-item" aria-current="page"><span class="nav-dot" aria-hidden="true">●</span>학습</button>
-        <button type="button" class="nav-item"><span class="nav-dot" aria-hidden="true">○</span>프로필</button>
+  <div class="prototype">
+    <p class="note">비생산 UX 검토용입니다. 메인의 전체 보기, 학습자료 펼치기, 퀴즈 이름 변경을 직접 눌러 보세요.</p>
+    <div class="phone">
+      <main id="app"></main>
+      <nav class="bottom-nav" id="bottomNav" aria-label="주요 메뉴">
+        <button class="nav" type="button">⌂<span>홈</span></button>
+        <button class="nav" type="button" aria-current="page">●<span>학습</span></button>
+        <button class="nav" type="button">○<span>프로필</span></button>
       </nav>
     </div>
   </div>
-
   <script>
-    const scenarioSelect = document.getElementById('scenario');
-    const recentQuiz = document.getElementById('recentQuiz');
-    const materials = document.getElementById('materials');
-    const searchToggle = document.getElementById('searchToggle');
-    const searchRegion = document.getElementById('searchRegion');
-    const live = document.getElementById('live');
-    const newQuiz = document.getElementById('newQuiz');
-
-    const fixtureMaterials = [
-      { title: '자료구조 핵심 개념', meta: '직접 입력 · 오늘 수정' },
-      { title: '운영체제 정리: 프로세스와 스케줄링', meta: 'Notion에서 가져옴 · 어제 수정' },
-      { title: '네트워크 기초', meta: '문제 생성 중 · 본문 임시 잠금', locked: true },
+    const app = document.getElementById('app');
+    const bottomNav = document.getElementById('bottomNav');
+    let screen = 'main';
+    let materialQuery = '';
+    let quizQuery = '';
+    const openMaterials = new Set(['material-1']);
+    let editingQuiz = null;
+    const materials = [
+      { id:'material-1', title:'운영체제 정리', meta:'직접 입력 · 오늘 수정', preview:'프로세스와 스케줄링, 교착 상태를 정리한 학습자료예요.', count:'3,240자' },
+      { id:'material-2', title:'자료구조 핵심 개념', meta:'Notion에서 가져옴 · 어제 수정', preview:'스택, 큐, 트리의 핵심 개념과 예시를 담았어요.', count:'2,180자' },
+      { id:'material-3', title:'네트워크 기초', meta:'문제 생성 중 · 본문 임시 잠금', preview:'TCP/IP와 HTTP 동작 원리를 정리했어요.', count:'4,012자' },
     ];
-
-    let searchOpen = false;
-    let query = '';
-
-    function actionRow(title, detail, message) {
-      return `<button type="button" class="action-row" data-message="${message}">
-        <span><span class="action-title">${title}</span><span class="action-detail">${detail}</span></span>
-        <span class="chevron" aria-hidden="true">›</span>
-      </button>`;
+    const quizzes = [
+      { id:'quiz-1', title:'프로세스 스케줄링 퀴즈', material:'운영체제 정리', meta:'10문제 · 오늘 풀이', action:'결과 보기' },
+      { id:'quiz-2', title:'스택과 큐 복습', material:'자료구조 핵심 개념', meta:'8문제 · 풀기 전', action:'퀴즈 풀기' },
+      { id:'quiz-3', title:'TCP/IP 기본 퀴즈', material:'네트워크 기초', meta:'문제 생성 중', action:'상태 확인' },
+    ];
+    const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+    function announce(message) { const live=document.getElementById('live'); if(live) live.textContent=message; }
+    function mainRow(item, type) {
+      return `<li><button class="row" type="button" data-direct="${type}" data-id="${item.id}"><span><span class="title">${escapeHtml(item.title)}</span><span class="meta">${escapeHtml(type==='material'?item.meta:item.material+' · '+item.meta)}</span></span><span class="chevron" aria-hidden="true">›</span></button></li>`;
     }
-
-    function renderRecent(scenario) {
-      if (scenario === 'loading') {
-        recentQuiz.innerHTML = '<div class="skeleton" aria-busy="true" aria-label="최근 퀴즈를 불러오는 중"><div class="skeleton-block"></div></div>';
-        return;
-      }
-      if (scenario === 'error') {
-        recentQuiz.innerHTML = `<div class="error-copy" role="status"><strong>최근 퀴즈를 확인하지 못했어요</strong>완료한 기록은 그대로 있어요. 잠시 후 다시 확인해 주세요.</div><button type="button" class="retry-button" data-retry="recent">다시 시도</button>`;
-        return;
-      }
-      if (scenario === 'no-quiz') {
-        recentQuiz.innerHTML = '<p class="empty-copy">아직 완료한 퀴즈가 없어요. 새 문제를 만들고 풀면 여기에서 다시 풀 수 있어요.</p>';
-        return;
-      }
-
-      let status = '';
-      let actions = '';
-      if (scenario === 'active') {
-        status = '<p class="quiz-status">틀린 문제 풀이가 진행 중이에요</p>';
-        actions += actionRow('틀린 문제 이어서 풀기', '진행 중인 문제를 첫 문제부터 다시 풀어요', '진행 중인 틀린 문제 풀이로 이동해요.');
-      } else if (scenario === 'correct') {
-        status = '<p class="quiz-status">틀린 문제를 모두 해결했어요</p>';
-      } else {
-        actions += actionRow('틀린 문제 3개만 풀기', '최근 회차의 미해결 문제만 풀어요', '틀린 문제 3개 풀이를 시작해요.');
-      }
-      actions += actionRow('전체 10문제 다시 풀기', '같은 문제 전체를 새 회차로 풀어요', '같은 퀴즈 10문제를 새 회차로 시작해요.');
-
-      recentQuiz.innerHTML = `<div class="quiz-context">
-        <p class="quiz-title">운영체제 핵심 정리</p>
-        <p class="quiz-meta">오늘 오전 9:20 · 10문제 · 2회차</p>
-        ${status}
-        <div class="action-list">${actions}</div>
-      </div>`;
+    function renderMain() {
+      bottomNav.classList.remove('hidden');
+      app.innerHTML = `<h1>학습</h1>
+        <section class="section" aria-labelledby="recent"><div class="section-head"><h2 id="recent">최근 퀴즈</h2></div>
+          <div class="recent"><p class="title">프로세스 스케줄링 퀴즈</p><p class="meta">운영체제 정리 · 10문제 · 2회차</p>
+            <button class="recent-action" type="button" data-message="틀린 문제 3개 풀이로 이동해요."><span>틀린 문제 3개 풀기</span><span class="chevron" aria-hidden="true">›</span></button></div></section>
+        <section class="section"><button class="primary" type="button" data-message="새 문제 만들기 화면으로 이동해요.">새 문제 만들기</button></section>
+        <section class="section" aria-labelledby="materials"><div class="section-head"><h2 id="materials">내 학습자료</h2><button class="text-button" type="button" data-screen="materials" aria-label="내 학습자료 전체 보기">전체 보기</button></div><ul class="list">${materials.slice(0,2).map(i=>mainRow(i,'material')).join('')}</ul></section>
+        <section class="section" aria-labelledby="quizzes"><div class="section-head"><h2 id="quizzes">내 퀴즈</h2><button class="text-button" type="button" data-screen="quizzes" aria-label="내 퀴즈 전체 보기">전체 보기</button></div><ul class="list">${quizzes.slice(0,2).map(i=>mainRow(i,'quiz')).join('')}</ul></section>
+        <p class="live" id="live" aria-live="polite"></p>`;
     }
-
-    function renderSearch() {
-      searchToggle.setAttribute('aria-expanded', String(searchOpen));
-      searchToggle.textContent = searchOpen ? '닫기' : '검색';
-      if (!searchOpen) {
-        searchRegion.innerHTML = '';
-        return;
-      }
-      searchRegion.innerHTML = `<div class="search-region">
-        <label class="search-label" for="materialQuery">학습자료 제목</label>
-        <input class="search-input" id="materialQuery" type="search" value="${query}" placeholder="제목으로 검색">
-      </div>`;
-      const input = document.getElementById('materialQuery');
-      input.addEventListener('input', (event) => {
-        query = event.currentTarget.value;
-        renderMaterials(scenarioSelect.value);
-      });
-      requestAnimationFrame(() => input.focus());
+    function materialCard(item) {
+      const open=openMaterials.has(item.id);
+      return `<article class="card"><button class="disclosure" type="button" data-material="${item.id}" aria-expanded="${open}" aria-controls="panel-${item.id}"><span><span class="title">${escapeHtml(item.title)}</span><span class="meta">${escapeHtml(item.meta)}</span></span><span class="chevron" aria-hidden="true">⌄</span></button>
+        <div class="expanded ${open?'':'hidden'}" id="panel-${item.id}"><p class="preview">${escapeHtml(item.preview)}<br>${item.count}</p><div class="actions"><button class="secondary strong" type="button" data-message="${escapeHtml(item.title)}로 퀴즈 만들기를 시작해요.">퀴즈 만들기</button><button class="secondary" type="button" data-message="${escapeHtml(item.title)} 변경 화면으로 이동해요.">학습자료 변경</button></div></div></article>`;
     }
-
-    function renderMaterials(scenario) {
-      if (scenario === 'loading') {
-        materials.innerHTML = '<div class="skeleton" aria-busy="true" aria-label="학습자료를 불러오는 중"><div class="skeleton-line medium"></div><div class="skeleton-line short"></div><div class="skeleton-line medium"></div><div class="skeleton-line short"></div><div class="skeleton-line medium"></div></div>';
-        return;
-      }
-      if (scenario === 'error') {
-        materials.innerHTML = `<div class="error-copy" role="status"><strong>학습자료를 불러오지 못했어요</strong>저장한 자료가 사라진 것은 아니에요.</div><button type="button" class="retry-button" data-retry="materials">다시 시도</button>`;
-        return;
-      }
-
-      const normalized = query.trim().toLocaleLowerCase('ko-KR');
-      const filtered = fixtureMaterials.filter((item) => item.title.toLocaleLowerCase('ko-KR').includes(normalized));
-      if (scenario === 'search-empty' || filtered.length === 0) {
-        materials.innerHTML = '<p class="empty-copy"><strong>“알고리즘”과 일치하는 자료가 없어요.</strong><br>다른 제목으로 검색해 보세요.</p><button type="button" class="retry-button" data-clear-search>검색어 지우기</button>';
-        return;
-      }
-
-      materials.innerHTML = `<ul class="material-list" aria-label="학습자료 목록">
-        ${filtered.map((item) => `<li class="material-item"><button type="button" class="material-link" data-message="${item.title} 상세로 이동해요.">
-          <span><span class="material-title">${item.title}</span><span class="material-meta ${item.locked ? 'locked' : ''}">${item.meta}</span></span>
-          <span class="chevron" aria-hidden="true">›</span>
-        </button></li>`).join('')}
-      </ul>
-      <nav class="pagination" aria-label="학습자료 페이지">
-        <button type="button" class="page-button" disabled aria-label="이전 페이지">이전</button>
-        <span class="page-count" aria-current="page">1 / 4</span>
-        <button type="button" class="page-button" data-message="학습자료 2페이지를 불러와요." aria-label="다음 2페이지">다음</button>
-      </nav>`;
+    function renderMaterials() {
+      bottomNav.classList.add('hidden');
+      const q=materialQuery.trim().toLocaleLowerCase('ko-KR');
+      const filtered=materials.filter(i=>i.title.toLocaleLowerCase('ko-KR').includes(q));
+      app.innerHTML=`<div class="topbar"><button class="icon-button" type="button" data-screen="main" aria-label="학습으로 돌아가기">‹</button><h1>내 학습자료</h1><span></span></div>
+        <div class="search"><label for="materialSearch">학습자료 제목 검색</label><input id="materialSearch" type="search" value="${escapeHtml(materialQuery)}" placeholder="제목을 입력하세요"></div>
+        <p class="result-count">${filtered.length}개의 학습자료</p><div class="card-list">${filtered.length?filtered.map(materialCard).join(''):'<p class="meta">검색어와 일치하는 학습자료가 없어요.</p>'}</div>
+        <nav class="pagination" aria-label="학습자료 페이지"><button class="page-button" disabled>이전</button><span>1 / 1</span><button class="page-button" disabled>다음</button></nav><p class="live" id="live" aria-live="polite"></p>`;
+      document.getElementById('materialSearch').addEventListener('input', e=>{ materialQuery=e.target.value; renderMaterials(); });
     }
-
-    function render() {
-      const scenario = scenarioSelect.value;
-      if (scenario === 'search-empty') {
-        searchOpen = true;
-        query = '알고리즘';
-      } else if (scenario === 'loading' || scenario === 'error') {
-        searchOpen = false;
-        query = '';
-      }
-      renderRecent(scenario);
-      renderSearch();
-      renderMaterials(scenario);
-      live.textContent = '';
+    function quizCard(item) {
+      if(editingQuiz===item.id) return `<article class="quiz-card"><div class="rename"><label class="meta" for="rename-${item.id}">퀴즈 이름</label><input class="rename-input" id="rename-${item.id}" value="${escapeHtml(item.title)}" maxlength="255"><p class="meta">${escapeHtml(item.material)} · ${escapeHtml(item.meta)}</p><div class="rename-actions"><button class="secondary" type="button" data-cancel="${item.id}">취소</button><button class="secondary strong" type="button" data-save="${item.id}">저장</button></div></div></article>`;
+      return `<article class="quiz-card"><p class="title">${escapeHtml(item.title)}</p><p class="meta">${escapeHtml(item.material)} · ${escapeHtml(item.meta)}</p><div class="quiz-actions"><button class="secondary" type="button" data-rename="${item.id}">이름 변경</button><button class="secondary strong" type="button" data-message="${escapeHtml(item.action)} 화면으로 이동해요.">${escapeHtml(item.action)}</button></div></article>`;
     }
-
-    scenarioSelect.addEventListener('change', render);
-    searchToggle.addEventListener('click', () => {
-      searchOpen = !searchOpen;
-      if (!searchOpen) query = '';
-      renderSearch();
-      renderMaterials(scenarioSelect.value);
-      live.textContent = searchOpen ? '학습자료 검색을 열었어요.' : '검색을 닫고 전체 자료를 보여줘요.';
+    function renderQuizzes() {
+      bottomNav.classList.add('hidden');
+      const q=quizQuery.trim().toLocaleLowerCase('ko-KR');
+      const filtered=quizzes.filter(i=>i.title.toLocaleLowerCase('ko-KR').includes(q));
+      app.innerHTML=`<div class="topbar"><button class="icon-button" type="button" data-screen="main" aria-label="학습으로 돌아가기">‹</button><h1>내 퀴즈</h1><span></span></div>
+        <div class="search"><label for="quizSearch">퀴즈 제목 검색</label><input id="quizSearch" type="search" value="${escapeHtml(quizQuery)}" placeholder="제목을 입력하세요"></div>
+        <p class="result-count">${filtered.length}개의 퀴즈</p><div class="card-list">${filtered.length?filtered.map(quizCard).join(''):'<p class="meta">검색어와 일치하는 퀴즈가 없어요.</p>'}</div>
+        <nav class="pagination" aria-label="퀴즈 페이지"><button class="page-button" disabled>이전</button><span>1 / 1</span><button class="page-button" disabled>다음</button></nav><p class="live" id="live" aria-live="polite"></p>`;
+      document.getElementById('quizSearch').addEventListener('input', e=>{ quizQuery=e.target.value; renderQuizzes(); });
+      if(editingQuiz){ requestAnimationFrame(()=>document.getElementById(`rename-${editingQuiz}`)?.focus()); }
+    }
+    function render(){ screen==='main'?renderMain():screen==='materials'?renderMaterials():renderQuizzes(); }
+    document.addEventListener('click', e=>{
+      const screenTarget=e.target.closest('[data-screen]');
+      if(screenTarget){ screen=screenTarget.dataset.screen; editingQuiz=null; render(); return; }
+      const direct=e.target.closest('[data-direct]');
+      if(direct){ screen=direct.dataset.direct==='material'?'materials':'quizzes'; if(screen==='materials')openMaterials.add(direct.dataset.id); render(); return; }
+      const disclosure=e.target.closest('[data-material]');
+      if(disclosure){ const id=disclosure.dataset.material; openMaterials.has(id)?openMaterials.delete(id):openMaterials.add(id); renderMaterials(); document.querySelector(`[data-material="${id}"]`)?.focus(); return; }
+      const rename=e.target.closest('[data-rename]');
+      if(rename){ editingQuiz=rename.dataset.rename; renderQuizzes(); return; }
+      const cancel=e.target.closest('[data-cancel]');
+      if(cancel){ editingQuiz=null; renderQuizzes(); document.querySelector(`[data-rename="${cancel.dataset.cancel}"]`)?.focus(); return; }
+      const save=e.target.closest('[data-save]');
+      if(save){ const input=document.getElementById(`rename-${save.dataset.save}`); const value=input.value.trim(); if(!value){ announce('퀴즈 이름을 입력해 주세요.'); input.focus(); return; } const item=quizzes.find(i=>i.id===save.dataset.save); item.title=value; editingQuiz=null; renderQuizzes(); announce('퀴즈 이름을 변경했어요.'); return; }
+      const message=e.target.closest('[data-message]'); if(message)announce(message.dataset.message);
     });
-    newQuiz.addEventListener('click', () => { live.textContent = '새 문제 만들기 화면으로 이동해요.'; });
-
-    document.addEventListener('click', (event) => {
-      const messageTarget = event.target.closest('[data-message]');
-      if (messageTarget) live.textContent = messageTarget.dataset.message;
-
-      const retryTarget = event.target.closest('[data-retry]');
-      if (retryTarget) {
-        scenarioSelect.value = 'wrong';
-        render();
-        live.textContent = '정보를 다시 불러왔어요.';
-      }
-
-      const clearTarget = event.target.closest('[data-clear-search]');
-      if (clearTarget) {
-        scenarioSelect.value = 'wrong';
-        searchOpen = false;
-        query = '';
-        render();
-        live.textContent = '검색어를 지우고 전체 자료를 보여줘요.';
-      }
+    document.addEventListener('keydown', e=>{
+      if(!editingQuiz)return;
+      if(e.key==='Escape'){ editingQuiz=null; renderQuizzes(); }
+      if(e.key==='Enter'&&e.target.matches('.rename-input')){ e.preventDefault(); document.querySelector(`[data-save="${editingQuiz}"]`)?.click(); }
     });
-
     render();
   </script>
 </body>

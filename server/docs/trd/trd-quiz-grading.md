@@ -259,7 +259,7 @@ DB는 PK, FK, public ID unique, 회차 안의 문항·순서 unique와 enum 범�
 
 ## 9. migration과 구현 전환
 
-이번 PR은 아직 병합되지 않았으므로 보정 migration을 만들지 않고 `V5`를 목표 구조로 직접 갱신한다. 이미 이전 V5를 적용한 개인 개발 DB는 개발 데이터를 초기화한 뒤 다시 적용한다.
+`V5`는 이미 공유 이력에 적용된 migration이므로 이후 스키마 변경을 위해 직접 수정하지 않는다. `quizTitle` 저장과 기존 QuizSet backfill을 포함한 후속 스키마 변경은 구현 시점의 다음 신규 migration으로 추가한다.
 
 후속 Java 구현에서는 다음 기존 모델을 새 SQL에 맞춰 제거·교체해야 한다.
 
