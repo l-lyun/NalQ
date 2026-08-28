@@ -70,7 +70,7 @@ export function AuthenticatedAppShell() {
     <VStack className="app-shell" minHeight="100dvh" bg="bg.layerBasement">
       <Box className="app-tab-viewport">
         {visitedTabs.home ? <TabPanel tab="home" activeTab={activeTab} transition={transition}><AuthenticatedHomePage /></TabPanel> : null}
-        {visitedTabs.learning ? <TabPanel tab="learning" activeTab={activeTab} transition={transition}><LearningTabRouteHost pathname={location.pathname} /></TabPanel> : null}
+        {visitedTabs.learning ? <TabPanel tab="learning" activeTab={activeTab} transition={transition}><LearningTabRouteHost pathname={location.pathname} locationKey={location.key} /></TabPanel> : null}
         {visitedTabs.profile ? <TabPanel tab="profile" activeTab={activeTab} transition={transition}><AuthenticatedProfilePage /></TabPanel> : null}
         <Outlet />
       </Box>
@@ -79,14 +79,30 @@ export function AuthenticatedAppShell() {
   )
 }
 
-function LearningTabRouteHost({ pathname }: { pathname: string }) {
+function LearningTabRouteHost({ pathname, locationKey }: { pathname: string; locationKey: string }) {
   const [ready, setReady] = useState(false)
 
   useLayoutEffect(() => {
     const learningEntry = getLearningHistoryEntry(pathname)
     if (!learningEntry) return
     const currentState = window.history.state as Record<string, unknown> | null
-    window.history.replaceState({ ...currentState, openmdLearning: learningEntry }, '')
+    if (locationKey === 'default' && learningEntry.depth > 0) {
+      const rootState = { ...currentState, openmdLearning: getLearningHistoryEntry('/learning') }
+      const currentIndex = typeof currentState?.idx === 'number' ? currentState.idx : 0
+      window.history.replaceState(rootState, '', '/learning')
+      window.history.pushState(
+        {
+          ...currentState,
+          idx: currentIndex + 1,
+          key: crypto.randomUUID(),
+          openmdLearning: learningEntry,
+        },
+        '',
+        pathname,
+      )
+    } else {
+      window.history.replaceState({ ...currentState, openmdLearning: learningEntry }, '')
+    }
     setReady(true)
   }, [])
 
@@ -104,15 +120,16 @@ function LearningTabRouteHost({ pathname }: { pathname: string }) {
 }
 
 function getLearningHistoryEntry(pathname: string) {
-  const materialMatch = pathname.match(/^\/learning\/materials\/([^/]+)$/)
+  const normalizedPathname = pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname
+  const materialMatch = normalizedPathname.match(/^\/learning\/materials\/([^/]+)$/)
   if (materialMatch?.[1]) {
     return {
       screen: { id: 'material-detail', materialId: decodeURIComponent(materialMatch[1]) },
       depth: 1,
     }
   }
-  if (pathname === '/learning/new') return { screen: { id: 'new-quiz' }, depth: 1 }
-  if (pathname === '/learning' || pathname === '/learning/materials' || pathname === '/learning/quizzes') {
+  if (normalizedPathname === '/learning/new') return { screen: { id: 'new-quiz' }, depth: 1 }
+  if (normalizedPathname === '/learning' || normalizedPathname === '/learning/materials' || normalizedPathname === '/learning/quizzes') {
     return { screen: { id: 'main' }, depth: 0 }
   }
   return null

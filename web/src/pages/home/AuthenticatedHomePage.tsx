@@ -40,7 +40,14 @@ export function AuthenticatedHomePage() {
       (selectedReview.activeReviewSessionId || selectedReview.reviewQuestionCount > 0),
   )
   const recentMaterial = materialsQuery.data?.items[0]
-  const nextAction = createNextAction({ selectedReview, hasReview, recentMaterial, navigate, openReview })
+  const nextAction = createNextAction({
+    selectedReview,
+    hasReview,
+    recentMaterial,
+    materialsResolved: materialsQuery.isSuccess,
+    navigate,
+    openReview,
+  })
   const review = createReviewState({
     apiReview,
     selectedReview,
@@ -64,11 +71,15 @@ export function AuthenticatedHomePage() {
               onClick: () => navigate(`/learning/materials/${material.materialId}`),
             })),
           }
-  const recommendationWarning = reviewQuery.isError && quizApiEnabled
+  const recommendationQueriesFailed = materialsQuery.isError || (reviewQuery.isError && quizApiEnabled)
+  const recommendationWarning = recommendationQueriesFailed
     ? {
         title: '추천을 완성하지 못했어요',
-        description: '복습 상태를 확인하지 못했어요. 새 학습은 계속 시작할 수 있어요.',
-        onRetry: () => void reviewQuery.refetch(),
+        description: '최근 학습 상태를 모두 확인하지 못했어요. 새 학습은 계속 시작할 수 있어요.',
+        onRetry: () => {
+          if (materialsQuery.isError) void materialsQuery.refetch()
+          if (reviewQuery.isError && quizApiEnabled) void reviewQuery.refetch()
+        },
         onStartLearning: () => navigate('/learning/new'),
       }
     : undefined
@@ -106,13 +117,14 @@ type ReviewSummary = {
   reviewQuestionCount: number
 }
 
-function createNextAction({ selectedReview, hasReview, recentMaterial, navigate, openReview }: {
+function createNextAction({ selectedReview, hasReview, recentMaterial, materialsResolved, navigate, openReview }: {
   selectedReview?: ReviewSummary
   hasReview: boolean
   recentMaterial?: { materialId: string; title: string; sourceType: 'PASTE' | 'NOTION'; updatedAt: string }
+  materialsResolved: boolean
   navigate: ReturnType<typeof useNavigate>
   openReview: (materialTitle?: string | null) => void
-}): HomeNextAction {
+}): HomeNextAction | undefined {
   if (hasReview && selectedReview?.quizTitle) {
     return {
       title: selectedReview.activeReviewSessionId ? `${selectedReview.quizTitle} 복습을 이어서 풀어보세요` : `${selectedReview.quizTitle}에서 다시 볼 문제가 ${selectedReview.reviewQuestionCount}개 있어요`,
@@ -129,6 +141,7 @@ function createNextAction({ selectedReview, hasReview, recentMaterial, navigate,
       action: { label: '학습자료 관리', onClick: () => navigate(`/learning/materials/${recentMaterial.materialId}`) },
     }
   }
+  if (!materialsResolved) return undefined
   return {
     title: '첫 학습자료를 만들고 문제를 풀어보세요',
     description: '저장한 글로 나만의 문제를 만들 수 있어요.',

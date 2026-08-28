@@ -14,6 +14,10 @@
  * navigation is suppressed while the page is hosted by the shared shell. */
 .app-tab-panel .learning-bottom-navigation { display: none; }
 
+/* Legacy learning sub-screens keep their route in history state. Their back button
+ * is the observable immersive-screen boundary until the route-first pages land. */
+.app-shell:has(.app-tab-panel[data-app-tab='learning'][aria-hidden='false'] .learning-back-button) > .app-bottom-navigation { display: none; }
+
 .app-bottom-navigation { box-sizing: border-box; flex-shrink: 0; z-index: 2; }
 .app-navigation-list { max-width: 640px; margin: 0 auto; padding: 0; list-style: none; }
 .app-navigation-button { appearance: none; box-sizing: border-box; min-height: 56px; width: 100%; padding: var(--seed-dimension-x1) var(--seed-dimension-x2); border: 0; background: transparent; font: inherit; cursor: pointer; }

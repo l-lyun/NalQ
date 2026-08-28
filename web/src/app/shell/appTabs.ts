@@ -13,11 +13,17 @@ export const appTabOrder: Record<AppTabId, number> = {
 }
 
 export function getAppTab(pathname: string): AppTabId {
-  if (pathname === '/profile') return 'profile'
-  if (pathname === '/learning' || pathname.startsWith('/learning/')) return 'learning'
+  const normalizedPathname = normalizeAppPath(pathname)
+  if (normalizedPathname === '/profile') return 'profile'
+  if (normalizedPathname === '/learning' || normalizedPathname.startsWith('/learning/')) return 'learning'
   return 'home'
 }
 
 export function isTopLevelTabPath(pathname: string) {
-  return Object.values(appTabPaths).some((path) => path === pathname)
+  const normalizedPathname = normalizeAppPath(pathname)
+  return Object.values(appTabPaths).some((path) => path === normalizedPathname)
+}
+
+function normalizeAppPath(pathname: string) {
+  return pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname
 }
