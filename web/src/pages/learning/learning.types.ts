@@ -30,6 +30,7 @@ export type LearningSectionState<T> =
   | { status: 'error'; message: string; data?: T }
 
 export type LearningPageCallbacks = {
+  onExit?: () => void
   onNavigate?: (destination: LearningNavigationDestination) => void
   onStartReview?: (review: LearningReviewSummary) => void
   onRestartQuiz?: (review: LearningReviewSummary) => void
@@ -46,6 +47,7 @@ export type LearningPageCallbacks = {
 }
 
 export type LearningPageProps = {
+  initialScreen?: 'main' | 'new-quiz'
   review?: LearningReviewSummary | null
   reviewState?: LearningSectionState<LearningReviewSummary | null>
   materialsState: LearningSectionState<LearningMaterialPage>

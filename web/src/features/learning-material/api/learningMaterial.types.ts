@@ -43,3 +43,8 @@ export type GetLearningMaterialsParams = {
   size?: number
   query?: string
 }
+
+export type UpdateLearningMaterialRequest = {
+  title?: string
+  content?: string
+}

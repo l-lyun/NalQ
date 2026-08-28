@@ -8,11 +8,14 @@ import type {
   CreateQuizSetResponse,
   EssayAssessmentResponse,
   LatestReview,
+  GetQuizSetsParams,
   PendingSelfAssessment,
   QuizResultResponse,
+  QuizSetPage,
   QuizSetState,
   QuizSubmissionPayload,
   QuizSubmissionResponse,
+  RenameQuizSetResponse,
   ReviewEssayAssessmentResponse,
   ReviewResultResponse,
   ReviewSession,
@@ -41,6 +44,27 @@ export const getActiveQuizSet = (materialId: string, signal?: AbortSignal) =>
   getData<ActiveQuizSet | null>(`/api/v1/learning-materials/${materialId}/quiz-sets/active`, signal)
 export const getQuizSet = (quizSetId: string, signal?: AbortSignal) =>
   getData<QuizSetState>(`/api/v1/quiz-sets/${quizSetId}`, signal)
+
+export async function getQuizSets(params: GetQuizSetsParams, signal?: AbortSignal) {
+  const query = params.query?.trim()
+  const response = await protectedApi.get<ApiResponse<QuizSetPage>>('/api/v1/quiz-sets', {
+    signal,
+    params: {
+      page: params.page,
+      size: params.size ?? 6,
+      ...(query ? { query } : {}),
+    },
+  })
+  return unwrapApiResponse(response.data)
+}
+
+export async function renameQuizSet(quizSetId: string, quizTitle: string) {
+  const response = await protectedApi.patch<ApiResponse<RenameQuizSetResponse>>(
+    `/api/v1/quiz-sets/${quizSetId}`,
+    { quizTitle },
+  )
+  return unwrapApiResponse(response.data)
+}
 
 export async function submitQuiz(
   quizSetId: string,

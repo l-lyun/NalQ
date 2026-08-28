@@ -91,6 +91,110 @@
   white-space: pre-wrap;
 }
 
+.learning-management-page {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.learning-management-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.learning-management-row,
+.learning-disclosure-trigger {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--seed-dimension-x3);
+  width: 100%;
+  min-width: 0;
+  min-height: 56px;
+  padding: var(--seed-dimension-x3) 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.learning-disclosure-trigger {
+  padding: var(--seed-dimension-x4);
+}
+
+.learning-management-row:focus-visible,
+.learning-disclosure-trigger:focus-visible,
+.learning-quiz-card:focus-visible {
+  outline: var(--seed-dimension-x0_5) solid var(--seed-color-stroke-focus-ring);
+  outline-offset: var(--seed-dimension-x0_5);
+  border-radius: var(--seed-radius-r2);
+}
+
+.learning-management-row:active,
+.learning-disclosure-trigger:active:not(:disabled) {
+  background: var(--seed-color-bg-layer-default-pressed);
+}
+
+.learning-disclosure-trigger:disabled {
+  cursor: wait;
+}
+
+.learning-disclosure-icon {
+  flex-shrink: 0;
+  transition: transform 160ms ease-out;
+}
+
+.learning-disclosure-icon-open {
+  transform: rotate(90deg);
+}
+
+.learning-disclosure-detail {
+  border-top: 1px solid var(--seed-color-stroke-neutral-subtle);
+}
+
+.learning-material-preview {
+  display: -webkit-box;
+  overflow: hidden;
+  white-space: pre-wrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.learning-management-actions {
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.learning-management-actions > * {
+  min-width: 0;
+  flex: 1 1 132px;
+}
+
+.learning-long-title {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.learning-quiz-card:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.learning-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .learning-textarea {
   min-height: 220px;
 }
@@ -137,10 +241,24 @@
   .learning-textarea {
     min-height: 180px;
   }
+
+  .learning-management-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .learning-management-actions > * {
+    width: 100%;
+    flex-basis: auto;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .learning-route-panel {
     animation: none;
+  }
+
+  .learning-disclosure-icon {
+    transition: none;
   }
 }
