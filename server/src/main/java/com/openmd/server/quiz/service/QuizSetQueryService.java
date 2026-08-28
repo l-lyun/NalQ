@@ -7,6 +7,7 @@ import com.openmd.server.quiz.domain.entity.*;
 import com.openmd.server.quiz.domain.type.*;
 import com.openmd.server.quiz.dto.response.*;
 import com.openmd.server.quiz.repository.*;
+import java.time.Instant;
 import java.util.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -60,7 +61,8 @@ public class QuizSetQueryService {
             ? sets.findAllByUserId(userId, pageable)
             : sets.findAllByUserIdAndQuizTitleContainingIgnoreCase(
                 userId, normalizedQuery, pageable);
-    List<QuizSetListItem> items = result.getContent().stream().map(set -> item(userId, set)).toList();
+    List<QuizSet> pageSets = result.getContent();
+    List<QuizSetListItem> items = listItems(userId, pageSets);
     return new QuizSetPage(items, page, size, result.getTotalElements(), result.getTotalPages());
   }
 
@@ -110,39 +112,89 @@ public class QuizSetQueryService {
         : new QuizFailureView(code, "문제 생성에 실패했어요. 다시 시도해 주세요.", true);
   }
 
-  private QuizSetListItem item(long userId, QuizSet set) {
+  private List<QuizSetListItem> listItems(long userId, List<QuizSet> pageSets) {
+    if (pageSets.isEmpty()) return List.of();
+
+    List<Long> setIds = pageSets.stream().map(QuizSet::getId).toList();
+    List<Long> materialIds =
+        pageSets.stream().map(QuizSet::getLearningMaterialId).distinct().toList();
+    Map<Long, LearningMaterial> materialsById = new HashMap<>();
+    for (LearningMaterial material : materials.findAllByIdInAndUserId(materialIds, userId)) {
+      materialsById.put(material.getId(), material);
+    }
+
+    Map<Long, QuizAttempt> completedBySet = new HashMap<>();
+    Map<Long, QuizAttempt> pendingBySet = new HashMap<>();
+    Map<Long, QuizAttempt> activeReviewBySet = new HashMap<>();
+    Map<Long, QuizAttempt> lastActivityBySet = new HashMap<>();
+    for (QuizAttempt attempt : attempts.findAllByQuizSetIdInAndUserId(setIds, userId)) {
+      lastActivityBySet.merge(attempt.getQuizSetId(), attempt, this::newerByUpdatedAt);
+      if (attempt.getType() == QuizAttemptType.MAIN
+          && attempt.getStatus() == QuizAttemptStatus.COMPLETED) {
+        completedBySet.merge(attempt.getQuizSetId(), attempt, this::newerByCompletedAt);
+      }
+      if (attempt.getType() == QuizAttemptType.MAIN
+          && attempt.getStatus() == QuizAttemptStatus.SELF_ASSESSMENT_REQUIRED) {
+        pendingBySet.merge(attempt.getQuizSetId(), attempt, this::newerByUpdatedAt);
+      }
+      if (attempt.getType() == QuizAttemptType.REVIEW
+          && attempt.getStatus() != QuizAttemptStatus.COMPLETED) {
+        activeReviewBySet.merge(attempt.getQuizSetId(), attempt, this::newerByUpdatedAt);
+      }
+    }
+
+    Map<Long, Integer> questionCountsBySet = new HashMap<>();
+    for (QuizSetQuestionCount count : questions.countByQuizSetIdIn(setIds)) {
+      questionCountsBySet.put(count.getQuizSetId(), Math.toIntExact(count.getQuestionCount()));
+    }
+
+    List<Long> completedAttemptIds =
+        completedBySet.values().stream().map(QuizAttempt::getId).toList();
+    Map<Long, Integer> reviewCountsByAttempt = new HashMap<>();
+    if (!completedAttemptIds.isEmpty()) {
+      for (ReviewCandidateCount count :
+          attemptQuestions.countReviewCandidatesByAttemptIdIn(
+              completedAttemptIds, List.of(GradingOutcome.INCORRECT, GradingOutcome.PARTIAL))) {
+        reviewCountsByAttempt.put(
+            count.getAttemptId(), Math.toIntExact(count.getReviewQuestionCount()));
+      }
+    }
+
+    return pageSets.stream()
+        .map(
+            set ->
+                item(
+                    set,
+                    materialsById,
+                    completedBySet,
+                    pendingBySet,
+                    activeReviewBySet,
+                    lastActivityBySet,
+                    questionCountsBySet,
+                    reviewCountsByAttempt))
+        .toList();
+  }
+
+  private QuizSetListItem item(
+      QuizSet set,
+      Map<Long, LearningMaterial> materialsById,
+      Map<Long, QuizAttempt> completedBySet,
+      Map<Long, QuizAttempt> pendingBySet,
+      Map<Long, QuizAttempt> activeReviewBySet,
+      Map<Long, QuizAttempt> lastActivityBySet,
+      Map<Long, Integer> questionCountsBySet,
+      Map<Long, Integer> reviewCountsByAttempt) {
     LearningMaterial material =
-        materials.findByIdAndUserId(set.getLearningMaterialId(), userId).orElseThrow();
-    QuizAttempt completed =
-        attempts
-            .findFirstByQuizSetIdAndUserIdAndTypeAndStatusOrderByCompletedAtDesc(
-                set.getId(), userId, QuizAttemptType.MAIN, QuizAttemptStatus.COMPLETED)
-            .orElse(null);
-    QuizAttempt pending =
-        attempts
-            .findFirstByQuizSetIdAndUserIdAndTypeAndStatusOrderByUpdatedAtDesc(
-                set.getId(),
-                userId,
-                QuizAttemptType.MAIN,
-                QuizAttemptStatus.SELF_ASSESSMENT_REQUIRED)
-            .orElse(null);
-    QuizAttempt activeReview =
-        attempts
-            .findFirstByQuizSetIdAndUserIdAndTypeAndStatusNotOrderByUpdatedAtDesc(
-                set.getId(), userId, QuizAttemptType.REVIEW, QuizAttemptStatus.COMPLETED)
-            .orElse(null);
-    QuizAttempt lastActivity =
-        attempts.findFirstByQuizSetIdAndUserIdOrderByUpdatedAtDesc(set.getId(), userId).orElse(null);
+        Optional.ofNullable(materialsById.get(set.getLearningMaterialId())).orElseThrow();
+    QuizAttempt completed = completedBySet.get(set.getId());
+    QuizAttempt pending = pendingBySet.get(set.getId());
+    QuizAttempt activeReview = activeReviewBySet.get(set.getId());
+    QuizAttempt lastActivity = lastActivityBySet.get(set.getId());
     int reviewCount =
-        completed == null
-            ? 0
-            : attemptQuestions
-                .findReviewCandidates(
-                    completed.getId(), List.of(GradingOutcome.INCORRECT, GradingOutcome.PARTIAL))
-                .size();
+        completed == null ? 0 : reviewCountsByAttempt.getOrDefault(completed.getId(), 0);
     Integer questionCount =
         set.getStatus() == QuizSetStatus.READY
-            ? Math.toIntExact(questions.countByQuizSetId(set.getId()))
+            ? questionCountsBySet.getOrDefault(set.getId(), 0)
             : null;
     return new QuizSetListItem(
         set.getPublicId(),
@@ -158,6 +210,25 @@ public class QuizSetQueryService {
         activeReview == null ? null : activeReview.getPublicId(),
         reviewCount,
         lastActivity == null ? null : lastActivity.getUpdatedAt());
+  }
+
+  private QuizAttempt newerByUpdatedAt(QuizAttempt current, QuizAttempt candidate) {
+    return newer(current, candidate, current.getUpdatedAt(), candidate.getUpdatedAt());
+  }
+
+  private QuizAttempt newerByCompletedAt(QuizAttempt current, QuizAttempt candidate) {
+    return newer(current, candidate, current.getCompletedAt(), candidate.getCompletedAt());
+  }
+
+  private QuizAttempt newer(
+      QuizAttempt current,
+      QuizAttempt candidate,
+      Instant currentAt,
+      Instant candidateAt) {
+    int timeComparison = candidateAt.compareTo(currentAt);
+    if (timeComparison > 0) return candidate;
+    if (timeComparison < 0) return current;
+    return candidate.getId() > current.getId() ? candidate : current;
   }
 
   private String trimUnicodeWhitespace(String value) {

@@ -86,8 +86,8 @@ public class LearningMaterialService {
 		}
 		return new CreatedLearningMaterial(
 			Long.toString(stored.id()),
-			stored.title(),
-			codePointCount(stored.content()),
+			title,
+			codePointCount(content),
 			ContentEditStatus.EDITABLE,
 			stored.createdAt()
 		);

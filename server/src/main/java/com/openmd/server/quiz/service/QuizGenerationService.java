@@ -70,6 +70,7 @@ public class QuizGenerationService {
     return new AcceptedQuizGeneration(
         quizSet.getPublicId(),
         materialPublicId,
+        quizSet.getQuizTitle(),
         quizSet.getStatus(),
         POLL_AFTER_SECONDS,
         new RequestedQuizConfig(

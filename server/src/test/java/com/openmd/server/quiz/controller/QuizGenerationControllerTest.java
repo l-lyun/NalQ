@@ -57,6 +57,7 @@ class QuizGenerationControllerTest {
             new AcceptedQuizGeneration(
                 "set-1",
                 "123",
+                "운영체제 퀴즈",
                 QuizSetStatus.GENERATING,
                 3,
                 config,
@@ -73,6 +74,7 @@ class QuizGenerationControllerTest {
                     """))
         .andExpect(status().isAccepted())
         .andExpect(jsonPath("$.data.quizSetId").value("set-1"))
+        .andExpect(jsonPath("$.data.quizTitle").value("운영체제 퀴즈"))
         .andExpect(jsonPath("$.data.requestedConfig.selectedTypes[1]").value("ESSAY"))
         .andExpect(jsonPath("$.data.idempotencyKey").doesNotExist());
     verify(service).accept(7L, "123", command);

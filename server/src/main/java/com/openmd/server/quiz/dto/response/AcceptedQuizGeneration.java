@@ -6,6 +6,7 @@ import java.time.Instant;
 public record AcceptedQuizGeneration(
     String quizSetId,
     String materialId,
+    String quizTitle,
     QuizSetStatus status,
     int pollAfterSeconds,
     RequestedQuizConfig requestedConfig,

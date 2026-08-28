@@ -218,6 +218,25 @@ class LearningMaterialMySqlIntegrationTest {
 		}
 	}
 
+	@Test
+	void replayReturnsTheOriginalCreationBodyAfterTheMaterialWasEdited() {
+		long userId = activeUser("replay@example.com").getId();
+		CreateLearningMaterialCommand command =
+			new CreateLearningMaterialCommand(" 원래 제목 ", "원문😀", "PASTE");
+		CreatedLearningMaterial created = service.create(userId, "replay-key", command);
+
+		jdbcTemplate.update(
+			"UPDATE learning_materials SET title = ?, content = ? WHERE id = ?",
+			"수정된 제목",
+			"수정 뒤에는 더 길어진 본문",
+			Long.valueOf(created.materialId())
+		);
+
+		CreatedLearningMaterial replay = service.create(userId, "replay-key", command);
+
+		assertEquals(created, replay);
+	}
+
 	private CreatedLearningMaterial createAfterSignal(
 		long userId,
 		CreateLearningMaterialCommand command,
