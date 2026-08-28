@@ -376,7 +376,7 @@ export function LearningMaterialsPage() {
       if (value) next.set(key, value)
       else next.delete(key)
     })
-    setSearchParams(next)
+    setSearchParams(next, { replace: true })
   }
 
   const toggleExpanded = (materialId: string) => {
@@ -560,6 +560,8 @@ export function LearningMaterialEditPage() {
     ...managedLearningMaterialQueryOptions.detail(materialId),
     enabled: Boolean(materialId),
     refetchOnWindowFocus: false,
+    refetchInterval: (query) =>
+      query.state.data?.contentEditStatus === 'LOCKED_GENERATING' ? 5_000 : false,
   })
   const [draft, setDraft] = useState<{ title: string; content: string } | null>(null)
   const [errors, setErrors] = useState<{ title?: string; content?: string }>({})
@@ -602,6 +604,22 @@ export function LearningMaterialEditPage() {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => event.preventDefault()
     window.addEventListener('beforeunload', handleBeforeUnload)
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [dirty])
+
+  const restoringHistoryRef = useRef(false)
+  useEffect(() => {
+    if (!dirty) return
+    const handlePopState = () => {
+      if (restoringHistoryRef.current) {
+        restoringHistoryRef.current = false
+        return
+      }
+      if (window.confirm('변경사항을 버리고 나갈까요?')) return
+      restoringHistoryRef.current = true
+      window.history.forward()
+    }
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
   }, [dirty])
 
   const goBack = () => {
@@ -762,7 +780,7 @@ export function QuizManagementPage() {
       if (value) next.set(key, value)
       else next.delete(key)
     })
-    setSearchParams(next)
+    setSearchParams(next, { replace: true })
   }
 
   const beginRename = (quiz: QuizSetSummary) => {
@@ -838,18 +856,23 @@ export function QuizManagementPage() {
           </EmptyState>
         ) : (
           <VStack as="ul" className="learning-management-list" gap="x3">
-            {quizzes.data.items.map((quiz) => (
-              <QuizManagementCard
+            {quizzes.data.items.map((quiz, index) => {
+              const pendingQuery = pendingQueries[index]
+              const pendingState = quiz.status !== 'READY'
+                ? 'ready'
+                : pendingQuery?.isError
+                  ? 'error'
+                  : pendingQuery?.isPending
+                    ? 'loading'
+                    : 'ready'
+              return (
+                <QuizManagementCard
                 key={quiz.quizSetId}
                 quiz={quiz}
                 latestReview={latestReview.data}
                 pending={pendingByQuizSet.get(quiz.quizSetId) ?? null}
                 actionState={resolveQuizManagementActionState(
-                  pendingQueries[quizzes.data.items.findIndex((item) => item.quizSetId === quiz.quizSetId)]?.isError
-                    ? 'error'
-                    : pendingQueries[quizzes.data.items.findIndex((item) => item.quizSetId === quiz.quizSetId)]?.isPending
-                      ? 'loading'
-                      : 'ready',
+                  pendingState,
                   latestReview.isError
                     ? 'error'
                     : latestReview.isPending
@@ -870,13 +893,13 @@ export function QuizManagementPage() {
                 onCancelRename={() => cancelRename(quiz.quizSetId)}
                 onSaveRename={() => saveRename(quiz.quizSetId)}
                 onRetryAction={() => {
-                  const index = quizzes.data.items.findIndex((item) => item.quizSetId === quiz.quizSetId)
-                  void pendingQueries[index]?.refetch()
+                  if (quiz.status === 'READY') void pendingQuery?.refetch()
                   void latestReview.refetch()
                 }}
                 onNavigate={(path) => navigate(path)}
               />
-            ))}
+              )
+            })}
           </VStack>
         )}
         {quizzes.data ? (
