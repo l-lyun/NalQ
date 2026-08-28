@@ -38,7 +38,7 @@ export function ShellStateView({ onRetry, state }: ShellStateViewProps) {
         accessibilityRole="progressbar"
         style={styles.container}
       >
-        <ActivityIndicator color="#2459D3" size="large" />
+        <ActivityIndicator color="#FF6600" size="large" />
         <Text style={styles.loadingText}>OpenMD를 불러오는 중이에요</Text>
       </View>
     );
@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
   },
   retryButton: {
     alignItems: 'center',
-    backgroundColor: '#2459D3',
+    backgroundColor: '#FF6600',
     borderRadius: 10,
     justifyContent: 'center',
     marginTop: 24,
@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   retryButtonPressed: {
-    backgroundColor: '#1948B7',
+    backgroundColor: '#E14D00',
   },
   retryButtonText: {
     color: '#FFFFFF',
