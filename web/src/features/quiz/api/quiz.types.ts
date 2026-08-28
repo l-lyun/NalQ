@@ -96,11 +96,46 @@ export type LatestReview = {
   sourceAttemptId: string | null
   quizSetId: string | null
   attemptNumber: number | null
+  quizTitle: string | null
   materialTitle: string | null
   completedAt: string | null
   totalQuestionCount: number
   reviewQuestionCount: number
   activeReviewSessionId: string | null
+}
+
+export type QuizSetManagementStatus = 'GENERATING' | 'READY' | 'FAILED'
+
+export type QuizSetSummary = {
+  quizSetId: string
+  quizTitle: string
+  materialId: string
+  materialTitle: string
+  status: QuizSetManagementStatus
+  questionCount: number | null
+  createdAt: string
+  updatedAt: string
+  lastAttemptAt: string | null
+}
+
+export type QuizSetPage = {
+  items: QuizSetSummary[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
+}
+
+export type GetQuizSetsParams = {
+  page: number
+  size?: number
+  query?: string
+}
+
+export type RenameQuizSetResponse = {
+  quizSetId: string
+  quizTitle: string
+  updatedAt: string
 }
 export type ReviewSession = {
   reviewSessionId: string

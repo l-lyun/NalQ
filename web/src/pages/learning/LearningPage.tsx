@@ -50,6 +50,7 @@ function getLearningHistoryEntry(state: unknown): LearningHistoryEntry | null {
 const sourceLabel = { PASTE: '직접 입력', NOTION: 'Notion에서 가져옴' } as const
 
 export function LearningPage({
+  initialScreen = 'main',
   review = null,
   reviewState,
   materialsState,
@@ -58,7 +59,8 @@ export function LearningPage({
   callbacks,
 }: LearningPageProps) {
   const initialHistoryEntry = getLearningHistoryEntry(window.history.state)
-  const [screen, setScreen] = useState<Screen>(initialHistoryEntry?.screen ?? { id: 'main' })
+  const initialRouteScreen: Screen = { id: initialScreen }
+  const [screen, setScreen] = useState<Screen>(initialHistoryEntry?.screen ?? initialRouteScreen)
   const [draft, setDraft] = useState<LearningMaterialDraft>({ title: '', body: '' })
   const [mainSearchOpen, setMainSearchOpen] = useState(Boolean(materialsQuery.trim()))
   const [mainSearchShouldFocus, setMainSearchShouldFocus] = useState(false)
@@ -81,7 +83,7 @@ export function LearningPage({
       window.history.replaceState(
         {
           ...window.history.state,
-          [LEARNING_HISTORY_KEY]: { screen: { id: 'main' }, depth: 0 },
+          [LEARNING_HISTORY_KEY]: { screen: initialRouteScreen, depth: 0 },
         },
         '',
       )
@@ -151,6 +153,7 @@ export function LearningPage({
   const goBack = () => window.history.back()
   const goMain = () => {
     if (historyDepthRef.current > 0) window.history.go(-historyDepthRef.current)
+    else callbacks?.onExit?.()
   }
 
   const openQuizConditions = (material: Pick<LearningMaterialSummary, 'materialId' | 'title'>) => {

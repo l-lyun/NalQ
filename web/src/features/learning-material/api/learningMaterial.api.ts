@@ -9,6 +9,7 @@ import type {
   GetLearningMaterialsParams,
   LearningMaterialDetail,
   LearningMaterialPage,
+  UpdateLearningMaterialRequest,
 } from './learningMaterial.types'
 
 export const LEARNING_MATERIAL_PAGE_SIZE = 6
@@ -70,6 +71,17 @@ export async function createLearningMaterial(
     '/api/v1/learning-materials',
     payload,
     { headers: { 'Idempotency-Key': idempotencyKey } },
+  )
+  return unwrapApiResponse(response.data)
+}
+
+export async function updateLearningMaterial(
+  materialId: string,
+  payload: UpdateLearningMaterialRequest,
+) {
+  const response = await protectedApi.patch<ApiResponse<LearningMaterialDetail>>(
+    `/api/v1/learning-materials/${materialId}`,
+    payload,
   )
   return unwrapApiResponse(response.data)
 }
