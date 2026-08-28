@@ -4,6 +4,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -12,8 +13,12 @@ import com.openmd.server.global.error.BusinessException;
 import com.openmd.server.global.error.CommonErrorCode;
 import com.openmd.server.learningmaterial.dto.command.CreateLearningMaterialCommand;
 import com.openmd.server.learningmaterial.dto.response.CreatedLearningMaterial;
+import com.openmd.server.learningmaterial.dto.response.LearningMaterialDetail;
+import com.openmd.server.learningmaterial.dto.request.UpdateLearningMaterialRequest;
+import com.openmd.server.learningmaterial.domain.SourceType;
 import com.openmd.server.learningmaterial.service.LearningMaterialService;
 import com.openmd.server.learningmaterial.service.LearningMaterialQueryService;
+import com.openmd.server.learningmaterial.service.LearningMaterialUpdateService;
 import com.openmd.server.learningmaterial.domain.ContentEditStatus;
 import java.time.Instant;
 import java.util.List;
@@ -31,11 +36,12 @@ class LearningMaterialControllerTest {
 
 	private final LearningMaterialService service = mock(LearningMaterialService.class);
 	private final LearningMaterialQueryService queries = mock(LearningMaterialQueryService.class);
+	private final LearningMaterialUpdateService updates = mock(LearningMaterialUpdateService.class);
 	private MockMvc mockMvc;
 
 	@BeforeEach
 	void setUp() {
-		mockMvc = MockMvcBuilders.standaloneSetup(new LearningMaterialController(service, queries))
+		mockMvc = MockMvcBuilders.standaloneSetup(new LearningMaterialController(service, queries, updates))
 			.setControllerAdvice(new com.openmd.server.global.error.GlobalExceptionHandler())
 			.setCustomArgumentResolvers(accessPrincipalResolver())
 			.build();
@@ -89,6 +95,24 @@ class LearningMaterialControllerTest {
 				.content("{"))
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.error.code").value("COMMON_002"));
+	}
+
+	@Test
+	void patchesOnlyTheFieldsTheClientSends() throws Exception {
+		UpdateLearningMaterialRequest request = new UpdateLearningMaterialRequest("새 제목", null);
+		when(updates.update(7L, 31L, request)).thenReturn(new LearningMaterialDetail(
+			"31", "새 제목", "기존 본문", 5, SourceType.PASTE, ContentEditStatus.LOCKED_GENERATING,
+			Instant.parse("2026-08-20T01:02:03Z"), Instant.parse("2026-08-28T01:02:03Z")
+		));
+
+		mockMvc.perform(patch("/api/v1/learning-materials/31")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"title\":\"새 제목\"}"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.title").value("새 제목"))
+			.andExpect(jsonPath("$.data.content").value("기존 본문"))
+			.andExpect(jsonPath("$.data.contentEditStatus").value("LOCKED_GENERATING"));
+		verify(updates).update(7L, 31L, request);
 	}
 
 	private HandlerMethodArgumentResolver accessPrincipalResolver() {

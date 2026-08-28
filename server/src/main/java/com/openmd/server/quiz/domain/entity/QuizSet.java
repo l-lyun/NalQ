@@ -1,6 +1,7 @@
 package com.openmd.server.quiz.domain.entity;
 
 import com.openmd.server.global.entity.BaseEntity;
+import com.openmd.server.quiz.domain.QuizTitlePolicy;
 import com.openmd.server.quiz.domain.type.QuizSetFailureCode;
 import com.openmd.server.quiz.domain.type.QuizSetStatus;
 import jakarta.persistence.Column;
@@ -23,6 +24,9 @@ public class QuizSet extends BaseEntity {
   @Column(name = "learning_material_id", nullable = false)
   private long learningMaterialId;
 
+  @Column(name = "quiz_title", nullable = false, length = 255)
+  private String quizTitle;
+
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 16)
   private QuizSetStatus status;
@@ -33,19 +37,21 @@ public class QuizSet extends BaseEntity {
 
   protected QuizSet() {}
 
-  private QuizSet(long userId, long learningMaterialId, QuizSetStatus status) {
+  private QuizSet(
+      long userId, long learningMaterialId, String quizTitle, QuizSetStatus status) {
     this.publicId = UUID.randomUUID().toString();
     this.userId = userId;
     this.learningMaterialId = learningMaterialId;
+    this.quizTitle = QuizTitlePolicy.normalize(quizTitle);
     this.status = status;
   }
 
-  public static QuizSet ready(long userId, long learningMaterialId) {
-    return new QuizSet(userId, learningMaterialId, QuizSetStatus.READY);
+  public static QuizSet ready(long userId, long learningMaterialId, String quizTitle) {
+    return new QuizSet(userId, learningMaterialId, quizTitle, QuizSetStatus.READY);
   }
 
-  public static QuizSet generating(long userId, long learningMaterialId) {
-    return new QuizSet(userId, learningMaterialId, QuizSetStatus.GENERATING);
+  public static QuizSet generating(long userId, long learningMaterialId, String quizTitle) {
+    return new QuizSet(userId, learningMaterialId, quizTitle, QuizSetStatus.GENERATING);
   }
 
   public void ready() {
@@ -59,6 +65,10 @@ public class QuizSet extends BaseEntity {
     failureCode = code;
   }
 
+  public void rename(String quizTitle) {
+    this.quizTitle = QuizTitlePolicy.normalize(quizTitle);
+  }
+
   public String getPublicId() {
     return publicId;
   }
@@ -69,6 +79,10 @@ public class QuizSet extends BaseEntity {
 
   public long getLearningMaterialId() {
     return learningMaterialId;
+  }
+
+  public String getQuizTitle() {
+    return quizTitle;
   }
 
   public QuizSetStatus getStatus() {

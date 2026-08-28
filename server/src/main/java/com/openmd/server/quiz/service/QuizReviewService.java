@@ -70,7 +70,7 @@ public class QuizReviewService {
             .findFirstByUserIdAndTypeAndStatusOrderByCompletedAtDesc(
                 userId, QuizAttemptType.MAIN, QuizAttemptStatus.COMPLETED)
             .orElse(null);
-    if (main == null) return new ReviewLatestView(null, null, null, null, null, 0, 0, null);
+    if (main == null) return new ReviewLatestView(null, null, null, null, null, null, 0, 0, null);
     QuizSet set = sets.findById(main.getQuizSetId()).orElseThrow();
     LearningMaterial material =
         materials.findByIdAndUserId(set.getLearningMaterialId(), userId).orElseThrow();
@@ -90,6 +90,7 @@ public class QuizReviewService {
         main.getPublicId(),
         set.getPublicId(),
         attemptNumber,
+        set.getQuizTitle(),
         material.getTitle(),
         main.getCompletedAt(),
         totalQuestionCount,

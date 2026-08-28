@@ -10,9 +10,16 @@ import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.repository.query.Param;
 
 public interface QuizSetRepository extends JpaRepository<QuizSet, Long> {
+  Page<QuizSet> findAllByUserId(long userId, Pageable pageable);
+
+  Page<QuizSet> findAllByUserIdAndQuizTitleContainingIgnoreCase(
+      long userId, String quizTitle, Pageable pageable);
+
   List<QuizSet> findAllByStatus(QuizSetStatus status);
 
   Optional<QuizSet> findByPublicIdAndUserId(String publicId, long userId);

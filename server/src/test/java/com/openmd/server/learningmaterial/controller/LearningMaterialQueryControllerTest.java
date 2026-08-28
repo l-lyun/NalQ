@@ -14,6 +14,7 @@ import com.openmd.server.learningmaterial.dto.response.LearningMaterialDetail;
 import com.openmd.server.learningmaterial.dto.response.LearningMaterialPage;
 import com.openmd.server.learningmaterial.dto.response.LearningMaterialSummary;
 import com.openmd.server.learningmaterial.service.LearningMaterialQueryService;
+import com.openmd.server.learningmaterial.service.LearningMaterialUpdateService;
 import com.openmd.server.learningmaterial.service.LearningMaterialService;
 import java.time.Instant;
 import java.util.List;
@@ -34,7 +35,8 @@ class LearningMaterialQueryControllerTest {
 
 	@BeforeEach
 	void setUp() {
-		mockMvc = MockMvcBuilders.standaloneSetup(new LearningMaterialController(creation, queries))
+		mockMvc = MockMvcBuilders.standaloneSetup(
+			new LearningMaterialController(creation, queries, mock(LearningMaterialUpdateService.class)))
 			.setControllerAdvice(new com.openmd.server.global.error.GlobalExceptionHandler())
 			.setCustomArgumentResolvers(accessPrincipalResolver())
 			.build();

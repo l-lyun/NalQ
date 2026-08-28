@@ -3,11 +3,13 @@ package com.openmd.server.learningmaterial.controller;
 import com.openmd.server.auth.security.AccessPrincipal;
 import com.openmd.server.global.api.ApiResponse;
 import com.openmd.server.learningmaterial.dto.request.CreateLearningMaterialRequest;
+import com.openmd.server.learningmaterial.dto.request.UpdateLearningMaterialRequest;
 import com.openmd.server.learningmaterial.dto.response.CreatedLearningMaterial;
 import com.openmd.server.learningmaterial.dto.response.LearningMaterialDetail;
 import com.openmd.server.learningmaterial.dto.response.LearningMaterialPage;
 import com.openmd.server.learningmaterial.service.LearningMaterialQueryService;
 import com.openmd.server.learningmaterial.service.LearningMaterialService;
+import com.openmd.server.learningmaterial.service.LearningMaterialUpdateService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -19,6 +21,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -35,10 +38,16 @@ public class LearningMaterialController {
 
 	private final LearningMaterialService service;
 	private final LearningMaterialQueryService queries;
+	private final LearningMaterialUpdateService updates;
 
-	public LearningMaterialController(LearningMaterialService service, LearningMaterialQueryService queries) {
+	public LearningMaterialController(
+		LearningMaterialService service,
+		LearningMaterialQueryService queries,
+		LearningMaterialUpdateService updates
+	) {
 		this.service = service;
 		this.queries = queries;
+		this.updates = updates;
 	}
 
 	@GetMapping
@@ -101,6 +110,15 @@ public class LearningMaterialController {
 		@PathVariable long materialId
 	) {
 		return ApiResponse.success(queries.detail(principal.userId(), materialId));
+	}
+
+	@PatchMapping("/{materialId}")
+	public ApiResponse<LearningMaterialDetail> update(
+		@AuthenticationPrincipal AccessPrincipal principal,
+		@PathVariable long materialId,
+		@RequestBody UpdateLearningMaterialRequest request
+	) {
+		return ApiResponse.success(updates.update(principal.userId(), materialId, request));
 	}
 
 	@PostMapping

@@ -132,6 +132,31 @@ class LearningMaterialServiceTest {
 		assertEquals("Idempotency-Key", conflict.getFields().getFirst().field());
 	}
 
+	@Test
+	void replayKeepsTheOriginalCreationResponseAfterTheMaterialWasEdited() {
+		when(store.create(any())).thenAnswer(invocation -> {
+			NewLearningMaterial requested = invocation.getArgument(0);
+			return new StoredLearningMaterial(
+				31L,
+				requested.userId(),
+				"수정된 제목",
+				"수정 뒤에는 더 길어진 본문",
+				requested.sourceType(),
+				requested.requestFingerprint(),
+				Instant.parse("2026-08-20T01:02:03Z")
+			);
+		});
+
+		CreatedLearningMaterial replay = service.create(
+			7L,
+			"same-key",
+			new CreateLearningMaterialCommand("  원래 제목  ", "원문😀", "PASTE")
+		);
+
+		assertEquals("원래 제목", replay.title());
+		assertEquals(3, replay.contentLength());
+	}
+
 	private StoredLearningMaterial stored(NewLearningMaterial input) {
 		return new StoredLearningMaterial(
 			31L, input.userId(), input.title(), input.content(), input.sourceType(),

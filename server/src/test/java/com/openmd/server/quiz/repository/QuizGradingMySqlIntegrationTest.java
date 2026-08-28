@@ -144,6 +144,11 @@ class QuizGradingMySqlIntegrationTest {
     assertEquals(QuizSetStatus.GENERATING, accepted.status());
     assertEquals(config.selectedTypes(), accepted.requestedConfig().selectedTypes());
     assertEquals(
+        "자료 퀴즈",
+        generationAcceptance
+            .active(owner.userId(), Long.toString(owner.materialId()))
+            .quizTitle());
+    assertEquals(
         accepted.quizSetId(),
         generationAcceptance.active(owner.userId(), Long.toString(owner.materialId())).quizSetId());
     assertEquals(
@@ -200,7 +205,7 @@ class QuizGradingMySqlIntegrationTest {
   void marksGeneratingQuizSetsFailedWhenRecoveringAfterAServerRestart() {
     Fixture fixture = fixture();
     QuizSet interrupted =
-        sets.saveAndFlush(QuizSet.generating(fixture.userId(), fixture.materialId()));
+        sets.saveAndFlush(QuizSet.generating(fixture.userId(), fixture.materialId(), "자료 퀴즈"));
 
     assertEquals(1, generation.failInterruptedGenerations());
 
@@ -240,7 +245,8 @@ class QuizGradingMySqlIntegrationTest {
   @Test
   void validatesPersistsRenumbersAndGradesAllAutomaticTypes() {
     Fixture fixture = fixture();
-    QuizSet set = sets.saveAndFlush(QuizSet.generating(fixture.userId(), fixture.materialId()));
+    QuizSet set =
+        sets.saveAndFlush(QuizSet.generating(fixture.userId(), fixture.materialId(), "자료 퀴즈"));
     assertEquals(
         4,
         generation.complete(
@@ -336,7 +342,8 @@ class QuizGradingMySqlIntegrationTest {
   @Test
   void generationPersistsOnlyTheFirstValidCandidatesUpToTheRequestedMaximum() {
     Fixture fixture = fixture();
-    QuizSet set = sets.saveAndFlush(QuizSet.generating(fixture.userId(), fixture.materialId()));
+    QuizSet set =
+        sets.saveAndFlush(QuizSet.generating(fixture.userId(), fixture.materialId(), "자료 퀴즈"));
 
     int count =
         generation.complete(
@@ -364,7 +371,8 @@ class QuizGradingMySqlIntegrationTest {
 
     QuizSet originalSet = sets.findByPublicIdAndUserId(owner.setId(), owner.userId()).orElseThrow();
     QuizSet set =
-        sets.saveAndFlush(QuizSet.generating(owner.userId(), originalSet.getLearningMaterialId()));
+        sets.saveAndFlush(
+            QuizSet.generating(owner.userId(), originalSet.getLearningMaterialId(), "자료 퀴즈"));
     BusinessException notReady =
         assertThrows(
             BusinessException.class,
@@ -616,7 +624,8 @@ class QuizGradingMySqlIntegrationTest {
   }
 
   private ReadyQuiz ready(Fixture fixture, QuizGenerationCandidate candidate) {
-    QuizSet set = sets.saveAndFlush(QuizSet.generating(fixture.userId(), fixture.materialId()));
+    QuizSet set =
+        sets.saveAndFlush(QuizSet.generating(fixture.userId(), fixture.materialId(), "자료 퀴즈"));
     generation.complete(fixture.userId(), set.getPublicId(), List.of(candidate), 15);
     return new ReadyQuiz(
         fixture.userId(),

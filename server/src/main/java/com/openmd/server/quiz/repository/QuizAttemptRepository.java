@@ -4,6 +4,8 @@ import com.openmd.server.quiz.domain.entity.QuizAttempt;
 import com.openmd.server.quiz.domain.type.QuizAttemptStatus;
 import com.openmd.server.quiz.domain.type.QuizAttemptType;
 import jakarta.persistence.LockModeType;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -31,6 +33,21 @@ public interface QuizAttemptRepository extends JpaRepository<QuizAttempt, Long> 
 
   Optional<QuizAttempt> findFirstByQuizSetIdAndUserIdAndTypeAndStatus(
       long quizSetId, long userId, QuizAttemptType type, QuizAttemptStatus status);
+
+  Optional<QuizAttempt> findFirstByQuizSetIdAndUserIdAndTypeAndStatusOrderByCompletedAtDesc(
+      long quizSetId, long userId, QuizAttemptType type, QuizAttemptStatus status);
+
+  Optional<QuizAttempt> findFirstByQuizSetIdAndUserIdAndTypeAndStatusOrderByUpdatedAtDesc(
+      long quizSetId, long userId, QuizAttemptType type, QuizAttemptStatus status);
+
+  Optional<QuizAttempt> findFirstByQuizSetIdAndUserIdAndTypeAndStatusNotOrderByUpdatedAtDesc(
+      long quizSetId, long userId, QuizAttemptType type, QuizAttemptStatus status);
+
+  Optional<QuizAttempt> findFirstByQuizSetIdAndUserIdOrderByUpdatedAtDesc(
+      long quizSetId, long userId);
+
+  List<QuizAttempt> findAllByQuizSetIdInAndUserId(
+      Collection<Long> quizSetIds, long userId);
 
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("select a from QuizAttempt a where a.id = :id and a.userId = :userId")

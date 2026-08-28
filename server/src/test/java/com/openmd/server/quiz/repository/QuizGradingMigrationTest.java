@@ -176,8 +176,8 @@ class QuizGradingMigrationTest {
 	private static void insertQuizSet(long id, String publicId, String status, String failureCode) {
 		jdbc.update("""
 			INSERT INTO quiz_sets
-				(id, public_id, user_id, learning_material_id, status, failure_code, created_at, updated_at)
-			VALUES (?, ?, 1, 1, ?, ?, NOW(6), NOW(6))
+				(id, public_id, user_id, learning_material_id, quiz_title, status, failure_code, created_at, updated_at)
+			VALUES (?, ?, 1, 1, '자료 퀴즈', ?, ?, NOW(6), NOW(6))
 			""", id, publicId, status, failureCode);
 	}
 

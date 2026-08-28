@@ -16,4 +16,13 @@ public interface QuizAttemptQuestionRepository extends JpaRepository<QuizAttempt
           + " :outcomes and q.reviewResolvedAt is null order by q.sequenceNumber")
   List<QuizAttemptQuestion> findReviewCandidates(
       @Param("attemptId") long attemptId, @Param("outcomes") Collection<GradingOutcome> outcomes);
+
+  @Query(
+      "select q.attemptId as attemptId, count(q) as reviewQuestionCount"
+          + " from QuizAttemptQuestion q where q.attemptId in :attemptIds"
+          + " and q.finalGradingResult in :outcomes and q.reviewResolvedAt is null"
+          + " group by q.attemptId")
+  List<ReviewCandidateCount> countReviewCandidatesByAttemptIdIn(
+      @Param("attemptIds") Collection<Long> attemptIds,
+      @Param("outcomes") Collection<GradingOutcome> outcomes);
 }

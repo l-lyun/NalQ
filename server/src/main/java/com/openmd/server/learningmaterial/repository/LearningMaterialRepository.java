@@ -2,6 +2,8 @@ package com.openmd.server.learningmaterial.repository;
 
 import com.openmd.server.learningmaterial.domain.LearningMaterial;
 import jakarta.persistence.LockModeType;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -21,6 +23,8 @@ public interface LearningMaterialRepository extends JpaRepository<LearningMateri
       long userId, byte[] idempotencyKeyHash);
 
   Optional<LearningMaterial> findByIdAndUserId(long id, long userId);
+
+  List<LearningMaterial> findAllByIdInAndUserId(Collection<Long> ids, long userId);
 
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query(

@@ -6,6 +6,7 @@ public record ReviewLatestView(
     String sourceAttemptId,
     String quizSetId,
     Integer attemptNumber,
+    String quizTitle,
     String materialTitle,
     Instant completedAt,
     int totalQuestionCount,
