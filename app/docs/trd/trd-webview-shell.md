@@ -6,7 +6,7 @@ scope: app
 
 # [TRD · App] Expo WebView 앱 셸 설계
 
-- 상태: 초안 — 구현 전 검토 필요
+- 상태: 1단계 구현 동기화 — 실기기 검증 필요
 - 소유 애플리케이션: `app/`
 - 관련 제품 기반: [OpenMD 제품 기반](../../../docs/product.md)
 - 관련 UX: [홈 화면](../../../docs/ux/screen-home.md), [학습 화면](../../../docs/ux/screen-learning.md), [인증 흐름](../../../docs/ux/flow-authentication.md)
@@ -46,9 +46,10 @@ scope: app
 ### App
 
 - `app/`은 Expo SDK 57, React Native 0.86과 `react-native-webview` 13.16.1을 사용한다.
-- `App.tsx`는 현재 흰색 루트 View와 StatusBar만 렌더링한다.
-- 공개 웹 주소 자리인 `EXPO_PUBLIC_WEB_URL` 예시만 존재한다.
-- 네이티브 라우터, 로딩·오류 상태, URL 정책, 뒤로 가기와 WebView 설정은 아직 없다.
+- `App.tsx`는 검증된 환경 URL을 단일 `OpenMdWebView`에 전달하고 구성 오류를 네이티브 상태로 표시한다.
+- 공개 웹 주소 자리인 `EXPO_PUBLIC_WEB_URL` 예시와 개발 기본값 `http://localhost:5173`을 사용한다.
+- `src/shell/`이 로딩·최초 문서 오류·재시도, 동일 origin URL 정책, 외부 링크, Android 뒤로 가기와 플랫폼별 WebView 복구를 소유한다.
+- Expo Router와 네이티브-웹 메시지 브리지는 사용하지 않는다.
 
 ### Web
 
@@ -90,9 +91,9 @@ Expo Router는 네이티브 화면이 하나인 1차 셸에는 추가하지 않�
 
 ### 2. 환경 URL
 
-- 앱은 `process.env.EXPO_PUBLIC_WEB_URL`을 읽는다. `EXPO_PUBLIC_` 값은 번들에 포함되는 공개 설정이므로 비밀을 넣지 않는다.
+- 앱은 `process.env.EXPO_PUBLIC_WEB_URL`을 읽고 값이 없으면 개발 기본값 `http://localhost:5173`을 사용한다. `EXPO_PUBLIC_` 값은 번들에 포함되는 공개 설정이므로 비밀을 넣지 않는다.
 - 시작 시 URL을 파싱하고 scheme과 host를 검증한다. 운영 빌드는 `https:`만 허용하고, 개발 빌드만 명시된 HTTP host를 허용한다.
-- 값이 없거나 유효하지 않으면 WebView를 열지 않고 구성 오류 상태를 표시한다.
+- 값이 유효하지 않거나 운영 빌드에서 기본 HTTP 주소를 덮어쓰지 않으면 WebView를 열지 않고 구성 오류 상태를 표시한다.
 - 허용 여부는 문자열 prefix가 아니라 파싱한 `URL.origin`의 정확한 일치로 판단한다.
 
 ### 3. 탐색과 외부 URL
@@ -150,9 +151,9 @@ Expo Router는 네이티브 화면이 하나인 1차 셸에는 추가하지 않�
 - runtime에 임의 JavaScript를 뒤늦게 주입해 safe area를 바꾸는 방식은 첫 화면 점프와 이중 적용 가능성 때문에 기본안으로 쓰지 않는다.
 - 키보드가 열린 상태에서 가입 폼, 붙여넣기 textarea와 퀴즈 하단 행동이 가려지지 않는지 두 플랫폼에서 확인한다.
 
-### 8. 파일 구조 제안
+### 8. 구현 파일 구조
 
-구현 시 실제 책임이 생길 때만 다음 최소 구조를 만든다.
+1단계 구현은 다음 최소 구조를 사용한다.
 
 ```text
 app/
@@ -178,15 +179,17 @@ app/
 ### 정적 검증
 
 - `cd app && pnpm exec tsc --noEmit`
+- `cd app && pnpm test`
 - `git diff --check`
 
-### 자동화 가능한 단위
+### 자동화된 정책 단위
 
-- 환경 URL 없음, 잘못된 URL, 운영 HTTP URL을 거절한다.
+- 개발 환경 URL 없음은 localhost 기본값으로 복구하고, 잘못된 URL과 운영 HTTP URL은 거절한다.
 - 같은 origin의 route만 내부 탐색으로 분류한다.
 - 외부 HTTPS, `mailto:`와 `tel:`은 외부 열기로 분류한다.
 - `javascript:`, `file:`, `data:`와 미등록 custom scheme을 차단한다.
-- Android history가 있으면 뒤로 가기가 `goBack()`을 한 번 호출하고, root에서는 이벤트를 소비하지 않는다.
+
+Android `BackHandler`와 WebView ref의 실제 결합은 렌더러가 필요한 동작이므로 실기기 수동 검증에서 확인한다.
 
 ### 실기기 수동 검증
 
@@ -224,7 +227,7 @@ app/
 - 1차 출시를 iOS와 Android에 동시에 할지, 한 플랫폼부터 실기기 검증할지
 - 운영 웹/API를 완전한 same-origin으로 배포할지, same-site의 별도 host로 배포할지
 - iPad를 지원할지와 현재 `supportsTablet=true`를 유지할지
-- native loading·error 화면의 최종 문구와 브랜드 자산
+- 현재 중립적인 native loading·error 문구를 최종 문구로 확정할지와 별도 브랜드 자산이 필요한지
 - iOS back/forward gesture를 가입·작성 중 이탈 흐름에도 활성화할지
 - Android에서 웹 safe-area 소유가 충분한지, native 소유로 전환할지
 - 앱 이름, slug, iOS bundle identifier와 Android package identifier
