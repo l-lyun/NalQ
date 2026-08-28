@@ -252,6 +252,8 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 }
 ```
 
+성공 응답의 `data`는 수정 후 [상세 조회](#상세-조회)와 같은 학습자료 상세 모양이다. 따라서 소비자는 별도 재조회 없이 저장된 `title`, `content`, `contentLength`, `contentEditStatus`, `updatedAt`을 반영할 수 있다.
+
 - 보낸 필드만 수정한다. 빈 요청은 `COMMON_001`이다.
 - `title`은 본문 잠금과 관계없이 수정할 수 있다.
 - `contentEditStatus=EDITABLE`일 때만 `content`를 수정할 수 있다. 같은 학습자료의 QuizSet이 `GENERATING`인 동안에만 `LOCKED_GENERATING`이며 생성이 `READY` 또는 `FAILED`로 끝나면 `EDITABLE`이다.
@@ -468,7 +470,7 @@ Headers: `Authorization`, `Content-Type: application/json`
 
 ## 퀴즈 관리 확장 계약
 
-이 절은 홈·학습의 퀴즈명 표시와 검색 가능한 `내 퀴즈` 관리 화면을 위한 **목표 계약이며 아직 서버·웹에 구현되지 않았다.** 기존 구현은 QuizSet의 독립 제목, 전체 목록과 이름 변경 endpoint를 제공하지 않는다. 구현 전까지 학습자료 제목을 `quizTitle`로 위장하거나 이름 변경이 저장되는 것처럼 표시하지 않는다.
+이 절은 홈·학습의 퀴즈명 표시와 검색 가능한 `내 퀴즈` 관리 화면을 위한 계약이며 서버에 구현되었다. 웹·앱 소비자는 학습자료 제목을 `quizTitle`로 대신하지 않고 아래 이동 판단 필드를 사용한다.
 
 ### 퀴즈 이름
 
@@ -501,7 +503,11 @@ Headers: `Authorization`, `Content-Type: application/json`
         "questionCount": 10,
         "createdAt": "2026-08-26T00:10:00Z",
         "updatedAt": "2026-08-28T01:00:00Z",
-        "lastAttemptAt": "2026-08-27T03:00:00Z"
+        "latestCompletedAttemptId": "550e8400-e29b-41d4-a716-446655440000",
+        "pendingSelfAssessmentAttemptId": null,
+        "activeReviewSessionId": "review_123",
+        "reviewQuestionCount": 2,
+        "lastLearningActivityAt": "2026-08-28T00:30:00Z"
       }
     ],
     "page": 1,
@@ -515,7 +521,11 @@ Headers: `Authorization`, `Content-Type: application/json`
 
 - `status`는 `GENERATING | READY | FAILED`다.
 - `questionCount`는 `READY`에서 1 이상이고 그 외 상태에서는 `null`이다.
-- `lastAttemptAt`은 해당 사용자의 가장 최근 MAIN attempt 활동 시각이며 아직 푼 적이 없으면 `null`이다.
+- `latestCompletedAttemptId`는 해당 QuizSet에서 가장 최근에 완료된 현재 사용자의 `MAIN` attempt ID이며 완료 회차가 없으면 `null`이다. 전체 결과 또는 다시 풀기 맥락에 사용한다.
+- `pendingSelfAssessmentAttemptId`는 해당 QuizSet에서 가장 최근의 `SELF_ASSESSMENT_REQUIRED` `MAIN` attempt ID이며 없으면 `null`이다. 서술형 자기평가 재진입에 사용한다.
+- `activeReviewSessionId`는 해당 QuizSet에서 `COMPLETED`가 아닌 가장 최근 `REVIEW` attempt의 공개 ID이며 없으면 `null`이다. 활성 복습 재개에 사용한다.
+- `reviewQuestionCount`는 `latestCompletedAttemptId`에서 현재 판정이 `INCORRECT|PARTIAL`이고 아직 복습으로 해결되지 않은 문항 수다. 완료 본 퀴즈가 없거나 대상이 없으면 `0`이다.
+- `lastLearningActivityAt`은 해당 QuizSet에서 현재 사용자의 `MAIN|REVIEW` attempt 중 가장 최근 `updatedAt`이며 시도 이력이 없으면 `null`이다. QuizSet 이름 변경 시각과 혼용하지 않는다.
 - 목록은 문제 본문, 정답, 제출 답안과 전체 학습자료 본문을 포함하지 않는다.
 - 검색 결과 없음은 같은 page 모양에서 `items=[]`, `totalElements=0`, `totalPages=0`으로 반환한다.
 

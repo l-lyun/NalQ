@@ -81,10 +81,13 @@ class QuizGenerationControllerTest {
   @Test
   void returnsTheActiveGenerationOrAnExplicitNull() throws Exception {
     when(service.active(7L, "123"))
-        .thenReturn(new ActiveQuizGeneration("set-1", "123", QuizSetStatus.GENERATING, 3));
+        .thenReturn(
+            new ActiveQuizGeneration(
+                "set-1", "123", "운영체제 퀴즈", QuizSetStatus.GENERATING, 3));
     mvc.perform(get("/api/v1/learning-materials/123/quiz-sets/active"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.quizSetId").value("set-1"))
+        .andExpect(jsonPath("$.data.quizTitle").value("운영체제 퀴즈"))
         .andExpect(jsonPath("$.data.requestedConfig").doesNotExist());
 
     when(service.active(7L, "123")).thenReturn(null);

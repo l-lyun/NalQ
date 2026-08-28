@@ -7,6 +7,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 	"openmd.auth.enabled=false",
 	"openmd.learning-material.enabled=false",
 	"openmd.quiz.enabled=false",
+	"openmd.home-visit.enabled=false",
 	"spring.data.jpa.auditing.enabled=false",
 	"spring.autoconfigure.exclude="
 		+ "org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration,"

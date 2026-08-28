@@ -16,6 +16,7 @@ import com.openmd.server.learningmaterial.dto.response.CreatedLearningMaterial;
 import com.openmd.server.learningmaterial.dto.response.LearningMaterialPage;
 import com.openmd.server.learningmaterial.service.LearningMaterialService;
 import com.openmd.server.learningmaterial.service.LearningMaterialQueryService;
+import com.openmd.server.learningmaterial.service.LearningMaterialUpdateService;
 import com.openmd.server.learningmaterial.domain.ContentEditStatus;
 import java.time.Instant;
 import java.util.List;
@@ -50,6 +51,7 @@ class LearningMaterialSecurityTest {
 	@Autowired MockMvc mockMvc;
 	@MockitoBean LearningMaterialService service;
 	@MockitoBean LearningMaterialQueryService queryService;
+	@MockitoBean LearningMaterialUpdateService updateService;
 	@MockitoBean AccessTokenService accessTokenService;
 
 	@SpringBootConfiguration

@@ -4,6 +4,8 @@ import com.openmd.server.global.api.FieldError;
 import com.openmd.server.global.error.BusinessException;
 import com.openmd.server.global.error.CommonErrorCode;
 import com.openmd.server.learningmaterial.repository.LearningMaterialRepository;
+import com.openmd.server.learningmaterial.domain.LearningMaterial;
+import com.openmd.server.quiz.domain.QuizTitlePolicy;
 import com.openmd.server.quiz.domain.entity.QuizSet;
 import com.openmd.server.quiz.domain.type.QuestionType;
 import com.openmd.server.quiz.domain.type.QuizSetStatus;
@@ -46,7 +48,7 @@ public class QuizGenerationService {
       long userId, String materialPublicId, QuizGenerationConfig requestedConfig) {
     long materialId = materialId(materialPublicId);
     QuizGenerationConfig config = validated(requestedConfig);
-    materials
+    LearningMaterial material = materials
         .findOwnedForUpdate(materialId, userId)
         .orElseThrow(() -> new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND));
     if (activeSet(userId, materialId) != null) {
@@ -54,7 +56,8 @@ public class QuizGenerationService {
     }
     QuizSet quizSet;
     try {
-      quizSet = quizSets.saveAndFlush(QuizSet.generating(userId, materialId));
+      quizSet = quizSets.saveAndFlush(
+          QuizSet.generating(userId, materialId, QuizTitlePolicy.defaultTitle(material.getTitle())));
     } catch (DataAccessException exception) {
       throw new BusinessException(QuizErrorCode.GENERATION_UNAVAILABLE);
     }
@@ -84,7 +87,11 @@ public class QuizGenerationService {
     return quizSet == null
         ? null
         : new ActiveQuizGeneration(
-            quizSet.getPublicId(), materialPublicId, quizSet.getStatus(), POLL_AFTER_SECONDS);
+            quizSet.getPublicId(),
+            materialPublicId,
+            quizSet.getQuizTitle(),
+            quizSet.getStatus(),
+            POLL_AFTER_SECONDS);
   }
 
   private QuizSet activeSet(long userId, long materialId) {

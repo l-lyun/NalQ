@@ -120,9 +120,9 @@ HTTP 필드 모양과 공개 오류는 [학습자료·퀴즈·복습 API](contra
 
 `quiz_sets.status`는 `GENERATING`, `READY`, `FAILED`다.
 
-### 사용자 지정 퀴즈 이름 — 목표 데이터 계약
+### 사용자 지정 퀴즈 이름
 
-이 항목은 홈·학습의 퀴즈 관리 UX를 위한 목표이며 현재 migration과 도메인 모델에는 아직 반영되지 않았다.
+이 항목은 홈·학습의 퀴즈 관리 UX를 위한 계약이며 신규 migration과 서버 도메인 모델에 반영되었다.
 
 - 각 QuizSet은 부모 학습자료 제목과 분리된 비어 있지 않은 `quizTitle`을 소유한다.
 - `quizTitle`은 사용자가 변경할 수 있는 QuizSet 메타데이터이며 사용자 범위에서도 중복을 허용한다.

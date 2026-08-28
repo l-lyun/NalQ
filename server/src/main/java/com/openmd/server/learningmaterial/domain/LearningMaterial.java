@@ -60,6 +60,14 @@ public class LearningMaterial extends BaseEntity {
 		return new LearningMaterial(userId, title, content, sourceType, idempotencyKeyHash, requestFingerprint);
 	}
 
+	public void updateTitle(String title) {
+		this.title = title;
+	}
+
+	public void updateContent(String content) {
+		this.content = content;
+	}
+
 	public long getUserId() { return userId; }
 	public String getTitle() { return title; }
 	public String getContent() { return content; }

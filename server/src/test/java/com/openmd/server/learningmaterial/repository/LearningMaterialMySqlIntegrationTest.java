@@ -150,7 +150,8 @@ class LearningMaterialMySqlIntegrationTest {
 		jdbcTemplate.update(
 			"UPDATE learning_materials SET updated_at = ? WHERE id = ?",
 			java.sql.Timestamp.from(Instant.parse("2026-08-26T01:00:00Z")), Long.valueOf(newer.materialId()));
-		quizSets.saveAndFlush(QuizSet.generating(ownerId, Long.parseLong(older.materialId())));
+		quizSets.saveAndFlush(
+			QuizSet.generating(ownerId, Long.parseLong(older.materialId()), "자료 퀴즈"));
 
 		LearningMaterialPage firstPage = queries.list(ownerId, 1, 1, "\u2003운영체제\u00a0");
 		LearningMaterialPage secondPage = queries.list(ownerId, 2, 1, "운영체제");

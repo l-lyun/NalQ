@@ -6,6 +6,7 @@ import java.util.List;
 public record QuizSetView(
     String quizSetId,
     String materialId,
+    String quizTitle,
     QuizSetStatus status,
     Integer pollAfterSeconds,
     List<QuizQuestionView> questions,

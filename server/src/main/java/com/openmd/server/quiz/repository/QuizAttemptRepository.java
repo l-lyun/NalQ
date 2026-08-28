@@ -32,6 +32,18 @@ public interface QuizAttemptRepository extends JpaRepository<QuizAttempt, Long> 
   Optional<QuizAttempt> findFirstByQuizSetIdAndUserIdAndTypeAndStatus(
       long quizSetId, long userId, QuizAttemptType type, QuizAttemptStatus status);
 
+  Optional<QuizAttempt> findFirstByQuizSetIdAndUserIdAndTypeAndStatusOrderByCompletedAtDesc(
+      long quizSetId, long userId, QuizAttemptType type, QuizAttemptStatus status);
+
+  Optional<QuizAttempt> findFirstByQuizSetIdAndUserIdAndTypeAndStatusOrderByUpdatedAtDesc(
+      long quizSetId, long userId, QuizAttemptType type, QuizAttemptStatus status);
+
+  Optional<QuizAttempt> findFirstByQuizSetIdAndUserIdAndTypeAndStatusNotOrderByUpdatedAtDesc(
+      long quizSetId, long userId, QuizAttemptType type, QuizAttemptStatus status);
+
+  Optional<QuizAttempt> findFirstByQuizSetIdAndUserIdOrderByUpdatedAtDesc(
+      long quizSetId, long userId);
+
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("select a from QuizAttempt a where a.id = :id and a.userId = :userId")
   Optional<QuizAttempt> findByIdAndUserIdForUpdate(

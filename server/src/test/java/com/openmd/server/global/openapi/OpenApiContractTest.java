@@ -19,6 +19,7 @@ import com.openmd.server.auth.security.AccessTokenService;
 import com.openmd.server.learningmaterial.controller.LearningMaterialController;
 import com.openmd.server.learningmaterial.service.LearningMaterialService;
 import com.openmd.server.learningmaterial.service.LearningMaterialQueryService;
+import com.openmd.server.learningmaterial.service.LearningMaterialUpdateService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootConfiguration;
@@ -53,6 +54,7 @@ class OpenApiContractTest {
 	@MockitoBean BrowserRefreshCookie browserRefreshCookie;
 	@MockitoBean LearningMaterialService learningMaterialService;
 	@MockitoBean LearningMaterialQueryService learningMaterialQueryService;
+	@MockitoBean LearningMaterialUpdateService learningMaterialUpdateService;
 
 	@SpringBootConfiguration
 	@EnableAutoConfiguration

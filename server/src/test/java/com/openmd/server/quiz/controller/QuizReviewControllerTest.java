@@ -102,6 +102,7 @@ class QuizReviewControllerTest {
                 "source-1",
                 "quiz-set-1",
                 2,
+                "운영체제 중간고사 대비",
                 "운영체제 핵심 정리",
                 Instant.parse("2026-08-26T00:20:00Z"),
                 10,
@@ -110,6 +111,7 @@ class QuizReviewControllerTest {
 
     mvc.perform(get("/api/v1/quiz-reviews/latest"))
         .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.quizTitle").value("운영체제 중간고사 대비"))
         .andExpect(jsonPath("$.data.materialTitle").value("운영체제 핵심 정리"))
         .andExpect(jsonPath("$.data.completedAt").value("2026-08-26T00:20:00Z"))
         .andExpect(jsonPath("$.data.totalQuestionCount").value(10))
