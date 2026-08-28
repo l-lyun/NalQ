@@ -38,6 +38,13 @@ public class QuizReviewController {
     return ResponseEntity.ok(ApiResponse.success(reviews.latest(p.userId())));
   }
 
+  @GetMapping("/quiz-reviews/candidates")
+  public ApiResponse<ReviewCandidateList> candidates(
+      @AuthenticationPrincipal AccessPrincipal principal,
+      @RequestParam(defaultValue = "3") int limit) {
+    return ApiResponse.success(reviews.candidates(principal.userId(), limit));
+  }
+
   @PostMapping("/review-sessions")
   public ResponseEntity<ApiResponse<ReviewSessionEnvelope>> start(
       @AuthenticationPrincipal AccessPrincipal principal,

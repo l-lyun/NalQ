@@ -16,6 +16,8 @@ import com.openmd.server.quiz.domain.type.QuizAttemptType;
 import com.openmd.server.quiz.dto.response.BlankView;
 import com.openmd.server.quiz.dto.response.ChoiceView;
 import com.openmd.server.quiz.dto.response.QuizQuestionView;
+import com.openmd.server.quiz.dto.response.ReviewCandidateItem;
+import com.openmd.server.quiz.dto.response.ReviewCandidateList;
 import com.openmd.server.quiz.dto.response.ReviewLatestView;
 import com.openmd.server.quiz.dto.response.ReviewSessionStart;
 import com.openmd.server.quiz.dto.response.ReviewSessionView;
@@ -26,8 +28,13 @@ import com.openmd.server.quiz.repository.QuizFillInTheBlankRepository;
 import com.openmd.server.quiz.repository.QuizQuestionChoiceRepository;
 import com.openmd.server.quiz.repository.QuizQuestionRepository;
 import com.openmd.server.quiz.repository.QuizSetRepository;
+import com.openmd.server.quiz.repository.ReviewCandidateCount;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -67,7 +74,7 @@ public class QuizReviewService {
   public ReviewLatestView latest(long userId) {
     QuizAttempt main =
         attempts
-            .findFirstByUserIdAndTypeAndStatusOrderByCompletedAtDesc(
+            .findFirstByUserIdAndTypeAndStatusOrderByCompletedAtDescIdDesc(
                 userId, QuizAttemptType.MAIN, QuizAttemptStatus.COMPLETED)
             .orElse(null);
     if (main == null) return new ReviewLatestView(null, null, null, null, null, null, 0, 0, null);
@@ -98,6 +105,113 @@ public class QuizReviewService {
         active);
   }
 
+  @Transactional(readOnly = true)
+  public ReviewCandidateList candidates(long userId, int limit) {
+    if (limit < 1 || limit > 3) {
+      throw new BusinessException(
+          CommonErrorCode.INVALID_INPUT,
+          List.of(new FieldError("limit", "limit은 1 이상 3 이하여야 합니다.")));
+    }
+
+    List<QuizSet> ownedSets = sets.findAllByUserId(userId);
+    if (ownedSets.isEmpty()) return new ReviewCandidateList(List.of());
+
+    List<Long> setIds = ownedSets.stream().map(QuizSet::getId).toList();
+    Map<Long, QuizAttempt> completedBySet = new HashMap<>();
+    Map<Long, QuizAttempt> pendingBySet = new HashMap<>();
+    Map<Long, QuizAttempt> activeReviewBySource = new HashMap<>();
+    Map<Long, QuizAttempt> lastActivityBySet = new HashMap<>();
+    for (QuizAttempt attempt : attempts.findAllByQuizSetIdInAndUserId(setIds, userId)) {
+      lastActivityBySet.merge(attempt.getQuizSetId(), attempt, this::newerByUpdatedAt);
+      if (attempt.getType() == QuizAttemptType.MAIN
+          && attempt.getStatus() == QuizAttemptStatus.COMPLETED) {
+        completedBySet.merge(attempt.getQuizSetId(), attempt, this::newerByCompletedAt);
+      }
+      if (attempt.getType() == QuizAttemptType.MAIN
+          && attempt.getStatus() == QuizAttemptStatus.SELF_ASSESSMENT_REQUIRED) {
+        pendingBySet.merge(attempt.getQuizSetId(), attempt, this::newerByUpdatedAt);
+      }
+      if (attempt.getType() == QuizAttemptType.REVIEW
+          && attempt.getStatus() != QuizAttemptStatus.COMPLETED) {
+        activeReviewBySource.merge(
+            attempt.getSourceAttemptId(), attempt, this::newerByUpdatedAt);
+      }
+    }
+
+    QuizAttempt globalLatest =
+        completedBySet.values().stream().reduce(this::newerByCompletedAt).orElse(null);
+    if (globalLatest == null) return new ReviewCandidateList(List.of());
+
+    List<Long> completedAttemptIds =
+        ownedSets.stream()
+            .map(set -> completedBySet.get(set.getId()))
+            .filter(java.util.Objects::nonNull)
+            .map(QuizAttempt::getId)
+            .toList();
+    Map<Long, Integer> reviewCountsByAttempt = new HashMap<>();
+    if (!completedAttemptIds.isEmpty()) {
+      for (ReviewCandidateCount count :
+          attemptQuestions.countReviewCandidatesByAttemptIdIn(
+              completedAttemptIds, REVIEW_OUTCOMES)) {
+        reviewCountsByAttempt.put(
+            count.getAttemptId(), Math.toIntExact(count.getReviewQuestionCount()));
+      }
+    }
+
+    List<QuizSet> candidateSets =
+        ownedSets.stream()
+            .filter(set -> set.getId() != globalLatest.getQuizSetId())
+            .filter(
+                set -> {
+                  QuizAttempt completed = completedBySet.get(set.getId());
+                  return completed != null
+                      && reviewCountsByAttempt.getOrDefault(completed.getId(), 0) > 0;
+                })
+            .toList();
+    if (candidateSets.isEmpty()) return new ReviewCandidateList(List.of());
+
+    List<Long> materialIds =
+        candidateSets.stream().map(QuizSet::getLearningMaterialId).distinct().toList();
+    Map<Long, LearningMaterial> materialsById = new HashMap<>();
+    for (LearningMaterial material : materials.findAllByIdInAndUserId(materialIds, userId)) {
+      materialsById.put(material.getId(), material);
+    }
+
+    Comparator<ReviewCandidateItem> order =
+        Comparator.comparing(
+                (ReviewCandidateItem candidate) -> candidate.activeReviewSessionId() != null)
+            .reversed()
+            .thenComparing(
+                ReviewCandidateItem::lastLearningActivityAt,
+                Comparator.nullsLast(Comparator.reverseOrder()))
+            .thenComparing(ReviewCandidateItem::quizSetId);
+    List<ReviewCandidateItem> items =
+        candidateSets.stream()
+            .map(
+                set -> {
+                  QuizAttempt completed = completedBySet.get(set.getId());
+                  QuizAttempt pending = pendingBySet.get(set.getId());
+                  QuizAttempt active = activeReviewBySource.get(completed.getId());
+                  QuizAttempt lastActivity = lastActivityBySet.get(set.getId());
+                  LearningMaterial material =
+                      Optional.ofNullable(materialsById.get(set.getLearningMaterialId()))
+                          .orElseThrow();
+                  return new ReviewCandidateItem(
+                      set.getPublicId(),
+                      set.getQuizTitle(),
+                      material.getTitle(),
+                      completed.getPublicId(),
+                      pending == null ? null : pending.getPublicId(),
+                      active == null ? null : active.getPublicId(),
+                      reviewCountsByAttempt.get(completed.getId()),
+                      lastActivity == null ? null : lastActivity.getUpdatedAt());
+                })
+            .sorted(order)
+            .limit(limit)
+            .toList();
+    return new ReviewCandidateList(items);
+  }
+
   @Transactional
   public ReviewSessionStart start(long userId, String requestedSourceAttemptId) {
     if (requestedSourceAttemptId == null || requestedSourceAttemptId.isBlank()) {
@@ -107,10 +221,16 @@ public class QuizReviewService {
     }
     QuizAttempt main =
         attempts
-            .findTopByUserIdAndTypeAndStatusOrderByCompletedAtDesc(
-                userId, QuizAttemptType.MAIN, QuizAttemptStatus.COMPLETED)
+            .findOwnedForUpdate(requestedSourceAttemptId, userId)
+            .filter(attempt -> attempt.getType() == QuizAttemptType.MAIN)
+            .filter(attempt -> attempt.getStatus() == QuizAttemptStatus.COMPLETED)
             .orElseThrow(() -> new BusinessException(QuizErrorCode.REVIEW_UNAVAILABLE));
-    if (!requestedSourceAttemptId.equals(main.getPublicId())) {
+    QuizAttempt latest =
+        attempts
+            .findFirstByQuizSetIdAndUserIdAndTypeAndStatusOrderByCompletedAtDescIdDesc(
+                main.getQuizSetId(), userId, QuizAttemptType.MAIN, QuizAttemptStatus.COMPLETED)
+            .orElseThrow(() -> new BusinessException(QuizErrorCode.REVIEW_UNAVAILABLE));
+    if (!main.getId().equals(latest.getId())) {
       throw new BusinessException(QuizErrorCode.REVIEW_UNAVAILABLE);
     }
     QuizAttempt active =
@@ -132,6 +252,25 @@ public class QuizReviewService {
               review.getId(), source.getQuestionId(), source.getId(), index + 1));
     }
     return new ReviewSessionStart(true, view(review));
+  }
+
+  private QuizAttempt newerByUpdatedAt(QuizAttempt current, QuizAttempt candidate) {
+    return newer(current, candidate, current.getUpdatedAt(), candidate.getUpdatedAt());
+  }
+
+  private QuizAttempt newerByCompletedAt(QuizAttempt current, QuizAttempt candidate) {
+    return newer(current, candidate, current.getCompletedAt(), candidate.getCompletedAt());
+  }
+
+  private QuizAttempt newer(
+      QuizAttempt current,
+      QuizAttempt candidate,
+      java.time.Instant currentAt,
+      java.time.Instant candidateAt) {
+    int timeComparison = candidateAt.compareTo(currentAt);
+    if (timeComparison > 0) return candidate;
+    if (timeComparison < 0) return current;
+    return candidate.getId() > current.getId() ? candidate : current;
   }
 
   @Transactional(readOnly = true)

@@ -102,7 +102,8 @@ scope: shared
 | 단답형·빈칸 현재 판정 수정 | `PUT /api/v1/quiz-attempts/{attemptId}/grading-overrides/{questionId}` | `200 OK` |
 | 단답형 현재 판정 수정(호환 경로) | `PUT /api/v1/quiz-attempts/{attemptId}/short-answer-gradings/{questionId}` | `200 OK` |
 | 최신 복습 현황 조회 | `GET /api/v1/quiz-reviews/latest` | `200 OK` |
-| 최신 대상 복습 세션 생성 | `POST /api/v1/review-sessions` | `201 Created` 또는 `200 OK` |
+| 학습 메인 복습 후보 조회 | `GET /api/v1/quiz-reviews/candidates` | `200 OK` |
+| 선택한 QuizSet의 복습 세션 생성 | `POST /api/v1/review-sessions` | `201 Created` 또는 `200 OK` |
 | 복습 세션 조회·재개 | `GET /api/v1/review-sessions/{reviewSessionId}` | `200 OK` |
 | 복습 전체 답안 제출 | `PUT /api/v1/review-sessions/{reviewSessionId}/submission` | `200 OK` |
 | 복습 결과 조회 | `GET /api/v1/review-sessions/{reviewSessionId}/result` | `200 OK` |
@@ -802,12 +803,12 @@ API의 `reviewSession`은 클라이언트가 복습 실행을 식별하는 공�
 
 `GET /api/v1/quiz-reviews/latest`
 
-- 현재 사용자의 가장 최근 `COMPLETED` 본 퀴즈 회차 하나만 조회한다. 그 회차에서 현재 최종 판정이 `INCORRECT|PARTIAL`이고 `reviewResolvedAt=null`인 문항이 복습 대상이다.
+- 현재 사용자의 가장 최근 `COMPLETED` 본 퀴즈 회차 하나만 조회한다. 최신은 `completedAt DESC, 내부 attempt id DESC`로 결정하며 완료 시각이 같으면 나중에 저장된 회차가 우선한다. 그 회차에서 현재 최종 판정이 `INCORRECT|PARTIAL`이고 `reviewResolvedAt=null`인 문항이 복습 대상이다.
 - `attemptNumber`는 해당 `quizSetId` 안에서 현재 사용자가 완료한 본 퀴즈 회차의 1부터 시작하는 순번이다.
 - `quizTitle`은 해당 QuizSet의 현재 사용자 지정 이름이다. 홈·학습의 주 제목은 이 값을 사용한다.
 - `materialTitle`은 해당 QuizSet이 참조하는 학습자료의 현재 제목이다. 클라이언트는 이 값을 하드코딩한 일반 제목으로 대체하거나 `attemptNumber`를 완료 시각처럼 표시하지 않는다.
 - `completedAt`은 최신 완료 본 퀴즈 회차가 완료된 시각이며 공통 계약에 따라 ISO 8601 UTC 문자열이다.
-- `totalQuestionCount`는 해당 `quizSetId`의 전체 문항 수다. `전체 다시 풀기`의 대상 수와 레이블은 이 값을 사용하며 `reviewQuestionCount`와 혼용하지 않는다.
+- `totalQuestionCount`는 해당 `quizSetId`의 전체 문항 수다. `전체 문제 다시 풀기`의 대상 수와 레이블은 이 값을 사용하며 `reviewQuestionCount`와 혼용하지 않는다.
 - `reviewQuestionCount`는 그 회차의 현재 미해결 문항 수다.
 - 그 회차를 원본으로 한 활성 복습 세션이 있으면 `activeReviewSessionId`를 반환한다.
 
@@ -853,7 +854,41 @@ API의 `reviewSession`은 클라이언트가 복습 실행을 식별하는 공�
 
 이 응답 보강은 학습 메인의 `최근 퀴즈` UI가 전체 재풀이와 틀린 문제 풀이를 같은 QuizSet 맥락으로 정확히 표시하기 위한 공유 계약이며 서버 DTO와 웹 `LatestReview` 타입에 동기화되어 있다. 여러 API를 연쇄 조회하거나 일반 문구를 하드코딩하는 방식은 이 계약의 대체 구현으로 보지 않는다.
 
-### 최신 대상 세션 생성
+### 학습 메인 복습 후보
+
+`GET /api/v1/quiz-reviews/candidates?limit=3`
+
+- 현재 사용자의 QuizSet별 최신 `COMPLETED MAIN` 회차를 기준으로 `reviewQuestionCount > 0`인 항목만 반환한다. QuizSet 안의 최신도 `completedAt DESC, 내부 attempt id DESC`로 결정한다. 과거 회차를 선택하거나 여러 회차의 미해결 문항을 합치지 않는다.
+- [최신 복습 현황](#최신-복습-현황)의 전역 최신 완료 `MAIN`과 같은 `quizSetId`는 학습 메인의 최근 퀴즈와 중복되므로 후보에서 제외한다.
+- 활성 복습 세션이 있는 후보를 먼저, 그 안과 나머지 후보는 `lastLearningActivityAt DESC`, 동일 시각에는 `quizSetId ASC`로 정렬한다.
+- `limit`은 선택이며 기본값은 `3`, 허용 범위는 `1..3`이다. 범위를 벗어나면 `400 COMMON_001`과 `fields.field=limit`을 반환한다.
+- `activeReviewSessionId`는 후보의 `sourceAttemptId`를 원본으로 하고 `COMPLETED`가 아닌 가장 최근 REVIEW attempt의 공개 ID다. 다른 원본 회차의 활성 복습은 이 필드에 포함하지 않는다.
+- `pendingSelfAssessmentAttemptId`는 해당 QuizSet에서 가장 최근의 `SELF_ASSESSMENT_REQUIRED MAIN` attempt ID이며 없으면 `null`이다. 소비자는 이 값이 있으면 복습 행동보다 자기평가 재개를 우선한다.
+- `lastLearningActivityAt`은 해당 QuizSet에서 현재 사용자의 `MAIN|REVIEW` attempt 중 가장 최근 `updatedAt`이다. QuizSet 이름 변경 시각은 포함하지 않는다.
+- 후보가 없으면 `items=[]`인 `200 OK`를 반환한다. 문제 본문, 정답, 제출 답안과 전체 학습자료 본문은 반환하지 않는다.
+
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "quizSetId": "qset_456",
+        "quizTitle": "네트워크 기초 퀴즈",
+        "materialTitle": "TCP/IP 핵심 정리",
+        "sourceAttemptId": "550e8400-e29b-41d4-a716-446655440001",
+        "pendingSelfAssessmentAttemptId": null,
+        "activeReviewSessionId": "review_456",
+        "reviewQuestionCount": 2,
+        "lastLearningActivityAt": "2026-08-28T01:30:00Z"
+      }
+    ]
+  },
+  "error": null
+}
+```
+
+### 선택한 QuizSet의 최신 대상 세션 생성
 
 `POST /api/v1/review-sessions`
 
@@ -865,10 +900,10 @@ Headers: `Authorization`, `Content-Type: application/json`
 }
 ```
 
-- `sourceAttemptId`는 [최신 복습 현황](#최신-복습-현황)에서 받은 가장 최근 완료 회차여야 한다.
+- `sourceAttemptId`는 현재 사용자가 소유하며 해당 QuizSet에서 가장 최근에 완료한 `MAIN` 회차여야 한다. [최신 복습 현황](#최신-복습-현황) 또는 [학습 메인 복습 후보](#학습-메인-복습-후보)의 값을 사용한다.
 - 해당 회차에서 현재 최종 판정이 `INCORRECT|PARTIAL`이고 아직 해결되지 않은 문항을 번호 오름차순으로 snapshot해 서버 복습 세션을 만든다. 별도 저장 `reviewRequired` 플래그는 두지 않는다.
 - 생성된 활성 세션의 snapshot은 원본 회차 단답형·빈칸형 판정 수정 뒤에도 중간 변경하지 않는다. 원본 회차의 최신 `reviewQuestionCount`와 활성 세션의 남은 문항 수는 별도 값이며, 수정된 대상 여부는 다음 세션 생성부터 반영한다.
-- 과거 회차를 임의 선택하거나 여러 회차를 합치지 않는다. 최신 회차가 바뀌었거나 대상이 없으면 `REVIEW_001`이다.
+- 소유하지 않은 회차, `MAIN|COMPLETED`가 아닌 회차, 해당 QuizSet의 과거 완료 회차, 대상이 없는 회차는 모두 `REVIEW_001`이다.
 - 새 세션을 만들면 `201 Created`, 같은 `sourceAttemptId`의 활성 세션이 이미 있으면 새로 만들지 않고 `200 OK`로 기존 세션을 반환한다.
 - source MAIN을 짧게 잠근 서비스 트랜잭션에서 기존 활성 세션을 먼저 확인해 같은 원본의 활성 세션을 하나만 유지한다. 별도 멱등 키나 payload fingerprint를 만들지 않는다.
 - 더 오래된 회차의 미완료 복습 세션은 최신 회차의 새 복습을 막지 않으며 복습 탭 대상에 합치지 않는다.

@@ -15,6 +15,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.repository.query.Param;
 
 public interface QuizSetRepository extends JpaRepository<QuizSet, Long> {
+  List<QuizSet> findAllByUserId(long userId);
+
   Page<QuizSet> findAllByUserId(long userId, Pageable pageable);
 
   Page<QuizSet> findAllByUserIdAndQuizTitleContainingIgnoreCase(

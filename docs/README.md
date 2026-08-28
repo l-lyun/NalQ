@@ -85,6 +85,7 @@ TRD는 각 애플리케이션의 `docs/trd/trd-*.md`에 두며, 파일명과 제
 | 관심사 | 원장 | 유형 | 상태 |
 | --- | --- | --- | --- |
 | 웹·서버 정적 검증 하네스와 단계별 강화 | [정적 검증 하네스 실행 계획](plans/plan-static-verification-harness.md) | Execution Plan | 1단계 구현, 2·3단계 제안 |
+| 학습 메인 복습 목록과 route 뎁스 정상화 | [학습 메인 복습·라우팅 실행 계획](plans/plan-learning-main-review-routing.md) | Execution Plan | T001~T003 완료, 웹 후속 대기 |
 
 ## 문서 템플릿
 

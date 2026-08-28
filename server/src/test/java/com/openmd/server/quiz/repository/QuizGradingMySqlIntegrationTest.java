@@ -535,6 +535,35 @@ class QuizGradingMySqlIntegrationTest {
   }
 
   @Test
+  void listsAnOlderQuizSetCandidateAndStartsItsLatestCompletedMain() throws InterruptedException {
+    Fixture owner = fixture();
+    ReadyQuiz candidate = readyShortAnswer(owner);
+    submissions.submit(
+        owner.userId(),
+        candidate.setId(),
+        uuid(13),
+        List.of(new QuizResponseRequest(candidate.questionId(), null, null, "wrong")));
+
+    Thread.sleep(10);
+    ReadyQuiz recent = readyShortAnswer(owner);
+    submissions.submit(
+        owner.userId(),
+        recent.setId(),
+        uuid(14),
+        List.of(new QuizResponseRequest(recent.questionId(), null, null, "wrong")));
+
+    var candidates = reviews.candidates(owner.userId(), 3).items();
+
+    assertEquals(1, candidates.size());
+    assertEquals(candidate.setId(), candidates.getFirst().quizSetId());
+    assertEquals(uuid(13), candidates.getFirst().sourceAttemptId());
+    assertEquals(1, candidates.getFirst().reviewQuestionCount());
+    assertEquals(
+        uuid(13),
+        reviews.start(owner.userId(), uuid(13)).reviewSession().sourceAttemptId());
+  }
+
+  @Test
   void solvingReviewResultsAndReviewAttemptsAreExcludedFromMainBoundaries() {
     ReadyQuiz quiz = ready(fixture(), essay());
     submissions.submit(
