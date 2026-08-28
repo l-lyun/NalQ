@@ -75,6 +75,7 @@ TRD는 각 애플리케이션의 `docs/trd/trd-*.md`에 두며, 파일명과 제
 | Web | 인증 상태·토큰·API 통합 | [웹 인증 TRD](../web/docs/trd/trd-authentication.md) | 구현 동기화 |
 | Web | 학습자료 생성·조회 통합 | [웹 학습자료 TRD](../web/docs/trd/trd-learning-materials.md) | 구현 동기화 |
 | Web | 퀴즈 화면 상태 | [웹 퀴즈 TRD](../web/docs/trd/trd-quiz-solving.md) | 검토 중 |
+| App | Expo WebView 앱 셸 | [앱 셸 TRD](../app/docs/trd/trd-webview-shell.md) | 초안 |
 | App | WebView 퀴즈 상태 | [앱 퀴즈 TRD](../app/docs/trd/trd-quiz-solving.md) | 검토 중 |
 
 ## 실행 계획과 저장소 검증
