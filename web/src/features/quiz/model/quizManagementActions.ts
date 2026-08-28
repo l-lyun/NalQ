@@ -5,6 +5,16 @@ import type {
 } from '../api/quiz.types'
 
 export type QuizManagementAction = { label: string; path: string; primary?: boolean }
+export type QuizManagementActionState = 'loading' | 'ready' | 'error'
+
+export function resolveQuizManagementActionState(
+  pendingState: QuizManagementActionState,
+  latestReviewState: QuizManagementActionState,
+): QuizManagementActionState {
+  if (pendingState === 'error' || latestReviewState === 'error') return 'error'
+  if (pendingState === 'loading' || latestReviewState === 'loading') return 'loading'
+  return 'ready'
+}
 
 export function resolveQuizManagementActions(
   quiz: QuizSetSummary,

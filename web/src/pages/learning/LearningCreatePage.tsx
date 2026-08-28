@@ -9,6 +9,7 @@ import {
   learningMaterialQueryOptions,
 } from '@/features/learning-material/api/learningMaterial.api'
 import type { LearningMaterialPage } from '@/features/learning-material/api/learningMaterial.types'
+import { quizRoutesEnabled } from '@/features/quiz/model/quizFeature'
 import { createUuidV4 } from '@/features/quiz/model/randomUuid'
 
 import { LearningPage } from './LearningPage'
@@ -56,8 +57,12 @@ export function LearningCreatePage() {
       materialsFetching={materials.isFetching && !materials.isPending}
       callbacks={{
         onExit: () => navigate('/learning'),
-        onOpenQuizConditions: (material) =>
-          navigate(`/learning/${material.materialId}/quiz`, { state: { materialTitle: material.title } }),
+        onOpenQuizConditions: quizRoutesEnabled
+          ? (material) =>
+              navigate(`/learning/${material.materialId}/quiz`, {
+                state: { materialTitle: material.title },
+              })
+          : undefined,
         onLoadMaterialDetail: (materialId) =>
           queryClient.fetchQuery(learningMaterialQueryOptions.detail(materialId)),
         onMaterialsQueryChange: (nextQuery) => {

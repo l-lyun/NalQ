@@ -51,7 +51,10 @@ import {
   quizManagementQueryOptions,
 } from '@/features/quiz/model/quizManagementQueries'
 import { quizManagementKeys } from '@/features/quiz/model/quizManagementQueries'
-import { resolveQuizManagementActions } from '@/features/quiz/model/quizManagementActions'
+import {
+  resolveQuizManagementActions,
+  resolveQuizManagementActionState,
+} from '@/features/quiz/model/quizManagementActions'
 
 import { LearningBottomNavigation } from './components/LearningBottomNavigation'
 import {
@@ -841,13 +844,18 @@ export function QuizManagementPage() {
                 quiz={quiz}
                 latestReview={latestReview.data}
                 pending={pendingByQuizSet.get(quiz.quizSetId) ?? null}
-                actionState={
+                actionState={resolveQuizManagementActionState(
                   pendingQueries[quizzes.data.items.findIndex((item) => item.quizSetId === quiz.quizSetId)]?.isError
                     ? 'error'
                     : pendingQueries[quizzes.data.items.findIndex((item) => item.quizSetId === quiz.quizSetId)]?.isPending
                       ? 'loading'
-                      : 'ready'
-                }
+                      : 'ready',
+                  latestReview.isError
+                    ? 'error'
+                    : latestReview.isPending
+                      ? 'loading'
+                      : 'ready',
+                )}
                 editing={editingId === quiz.quizSetId}
                 draftTitle={draftTitle}
                 renameError={editingId === quiz.quizSetId ? renameError : undefined}
@@ -864,6 +872,7 @@ export function QuizManagementPage() {
                 onRetryAction={() => {
                   const index = quizzes.data.items.findIndex((item) => item.quizSetId === quiz.quizSetId)
                   void pendingQueries[index]?.refetch()
+                  void latestReview.refetch()
                 }}
                 onNavigate={(path) => navigate(path)}
               />

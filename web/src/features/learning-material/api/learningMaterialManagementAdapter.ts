@@ -55,9 +55,9 @@ const mockMaterials: LearningMaterialDetail[] = [
   },
 ]
 
-function ensureAvailable() {
+function ensureUpdateAvailable() {
   if (learningMaterialManagementMode === 'disabled') {
-    throw new Error('학습자료 관리 API가 아직 배포되지 않았어요.')
+    throw new Error('학습자료 수정 API가 아직 배포되지 않았어요.')
   }
 }
 
@@ -69,8 +69,7 @@ export async function listManagedLearningMaterials(
   params: GetLearningMaterialsParams,
   signal?: AbortSignal,
 ): Promise<LearningMaterialPage> {
-  ensureAvailable()
-  if (learningMaterialManagementMode === 'api') return getLearningMaterials(params, signal)
+  if (learningMaterialManagementMode !== 'mock') return getLearningMaterials(params, signal)
   throwIfAborted(signal)
   const query = params.query?.trim().toLocaleLowerCase('ko-KR') ?? ''
   const size = params.size ?? 6
@@ -91,8 +90,7 @@ export async function getManagedLearningMaterial(
   materialId: string,
   signal?: AbortSignal,
 ): Promise<LearningMaterialDetail> {
-  ensureAvailable()
-  if (learningMaterialManagementMode === 'api') return getLearningMaterial(materialId, signal)
+  if (learningMaterialManagementMode !== 'mock') return getLearningMaterial(materialId, signal)
   throwIfAborted(signal)
   const material = mockMaterials.find((item) => item.materialId === materialId)
   if (!material) throw new Error('학습자료를 찾지 못했어요.')
@@ -103,7 +101,7 @@ export async function updateManagedLearningMaterial(
   materialId: string,
   payload: UpdateLearningMaterialRequest,
 ): Promise<LearningMaterialDetail> {
-  ensureAvailable()
+  ensureUpdateAvailable()
   if (learningMaterialManagementMode === 'api') {
     return updateLearningMaterial(materialId, payload)
   }

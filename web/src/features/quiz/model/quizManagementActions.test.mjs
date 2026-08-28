@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { resolveQuizManagementActions } from './quizManagementActions.ts'
+import {
+  resolveQuizManagementActions,
+  resolveQuizManagementActionState,
+} from './quizManagementActions.ts'
 
 const quiz = {
   quizSetId: 'quiz-1',
@@ -58,4 +61,10 @@ test('완료 이력만 있는 일반 MAIN은 전체 다시 풀기로 표현한�
   )
   assert.deepEqual(actions.map((action) => action.label), ['전체 다시 풀기'])
   assert.equal(actions.some((action) => action.label.includes('이어서')), false)
+})
+
+test('최신 복습 조회가 끝나기 전에는 퀴즈 행동을 보류한다', () => {
+  assert.equal(resolveQuizManagementActionState('ready', 'loading'), 'loading')
+  assert.equal(resolveQuizManagementActionState('ready', 'error'), 'error')
+  assert.equal(resolveQuizManagementActionState('ready', 'ready'), 'ready')
 })
