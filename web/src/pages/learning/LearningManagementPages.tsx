@@ -39,10 +39,12 @@ import { managedLearningMaterialQueryOptions } from '@/features/learning-materia
 import {
   quizManagementMode,
   renameManagedQuizSet,
+  startManagedReviewSession,
 } from '@/features/quiz/api/quizManagementAdapter'
 import type {
   LatestReview,
   PendingSelfAssessment,
+  ReviewCandidate,
   QuizSetSummary,
 } from '@/features/quiz/api/quiz.types'
 import {
@@ -55,8 +57,12 @@ import {
   resolveQuizManagementActions,
   resolveQuizManagementActionState,
 } from '@/features/quiz/model/quizManagementActions'
+import {
+  type LearningReviewAction,
+  resolveRecentQuizAction,
+  resolveReviewCandidateAction,
+} from '@/features/quiz/model/learningReviewActions'
 
-import { LearningBottomNavigation } from './components/LearningBottomNavigation'
 import {
   LearningField,
   LearningNotice,
@@ -68,7 +74,7 @@ import { countUnicodeCodePoints } from './learning.text'
 import './learning.css'
 
 const MATERIAL_PAGE_SIZE = 6
-const PREVIEW_PAGE_SIZE = 3
+const REVIEW_CANDIDATE_LIMIT = 3
 
 function formatDate(value: string | null) {
   if (!value) return null
@@ -136,16 +142,18 @@ function SectionHeading({ id, title, action }: { id: string; title: string; acti
   )
 }
 
-function PreviewRow({ title, detail, onClick }: { title: string; detail: string; onClick: () => void }) {
+function PreviewRow({ title, detail, onClick }: { title: string; detail?: string; onClick: () => void }) {
   return (
     <button className="learning-management-row" type="button" onClick={onClick}>
       <VStack minWidth="0px" gap="x1" align="flex-start">
         <Text className="learning-long-title" textStyle="t6Medium" color="fg.neutral">
           {title}
         </Text>
-        <Text textStyle="t3Regular" color="fg.neutralMuted">
-          {detail}
-        </Text>
+        {detail ? (
+          <Text textStyle="t3Regular" color="fg.neutralMuted">
+            {detail}
+          </Text>
+        ) : null}
       </VStack>
       <Icon svg={<IconChevronRightLine />} size="x4_5" aria-hidden />
     </button>
@@ -154,18 +162,39 @@ function PreviewRow({ title, detail, onClick }: { title: string; detail: string;
 
 export function LearningManagementPage() {
   const navigate = useNavigate()
-  const materials = useQuery({
-    ...managedLearningMaterialQueryOptions.list({ page: 1, size: PREVIEW_PAGE_SIZE }),
-    refetchOnWindowFocus: false,
-  })
-  const quizzes = useQuery({
-    ...quizManagementQueryOptions.list({ page: 1, size: PREVIEW_PAGE_SIZE }),
-    refetchOnWindowFocus: false,
-  })
+  const queryClient = useQueryClient()
   const recentQuiz = useQuery({
     ...quizManagementQueryOptions.latestReview(),
     refetchOnWindowFocus: false,
   })
+  const recentPending = useQuery({
+    ...quizManagementQueryOptions.pendingSelfAssessment(recentQuiz.data?.quizSetId ?? ''),
+    enabled: Boolean(recentQuiz.data?.quizSetId),
+    refetchOnWindowFocus: false,
+  })
+  const reviewCandidates = useQuery({
+    ...quizManagementQueryOptions.reviewCandidates(REVIEW_CANDIDATE_LIMIT),
+    refetchOnWindowFocus: false,
+  })
+  const [startingAttemptId, setStartingAttemptId] = useState<string>()
+  const startReview = useMutation({
+    mutationFn: startManagedReviewSession,
+    onMutate: (sourceAttemptId) => {
+      setStartingAttemptId(sourceAttemptId)
+    },
+    onSuccess: async (session) => {
+      await queryClient.invalidateQueries({ queryKey: ['private', 'quiz-review'] })
+      navigate(`/review-sessions/${session.reviewSessionId}`)
+    },
+    onSettled: () => {
+      setStartingAttemptId(undefined)
+    },
+  })
+
+  const runAction = (action: LearningReviewAction) => {
+    if (action.kind === 'navigate') navigate(action.path)
+    else startReview.mutate(action.sourceAttemptId)
+  }
 
   return (
     <VStack className="learning-shell" minHeight="100dvh" bg="bg.layerBasement">
@@ -195,10 +224,15 @@ export function LearningManagementPage() {
             ) : recentQuiz.data.sourceAttemptId && recentQuiz.data.quizSetId ? (
               <RecentQuizPanel
                 review={recentQuiz.data}
-                onNavigate={(path) => navigate(path)}
+                pending={recentPending.data ?? null}
+                actionState={recentPending.isError ? 'error' : recentPending.isPending ? 'loading' : 'ready'}
+                starting={startingAttemptId === recentQuiz.data.sourceAttemptId}
+                onRetryAction={() => void recentPending.refetch()}
+                onAction={runAction}
+                onRestart={() => navigate(`/quiz-sets/${recentQuiz.data.quizSetId}`)}
               />
             ) : (
-              <EmptyState>아직 완료한 퀴즈가 없어요. 새 문제를 만들어 학습을 시작해보세요.</EmptyState>
+              <EmptyState>아직 만든 퀴즈가 없어요. 새 문제를 만들어 학습을 시작해보세요.</EmptyState>
             )}
           </VStack>
 
@@ -211,39 +245,31 @@ export function LearningManagementPage() {
             새 문제 만들기
           </ActionButton>
 
-          <VStack as="section" gap="x3" aria-labelledby="materials-preview-heading">
-            <SectionHeading
-              id="materials-preview-heading"
-              title="내 학습자료"
-              action={
-                <ActionButton
-                  type="button"
-                  size="small"
-                  variant="ghost"
-                  aria-label="내 학습자료 전체 보기"
-                  onClick={() => navigate('/learning/materials')}
-                >
-                  전체 보기
-                </ActionButton>
-              }
-            />
-            {materials.isPending ? (
-              <LoadingRows label="학습자료를 불러오는 중" />
-            ) : materials.isError ? (
+          <VStack as="section" gap="x3" aria-labelledby="review-candidates-heading">
+            <SectionHeading id="review-candidates-heading" title="복습할 퀴즈" />
+            {reviewCandidates.isPending ? (
+              <LoadingRows label="복습할 퀴즈를 불러오는 중" />
+            ) : reviewCandidates.isError ? (
               <InlineFailure
-                message="학습자료를 불러오지 못했어요."
-                onRetry={() => void materials.refetch()}
+                message="복습할 퀴즈를 불러오지 못했어요."
+                onRetry={() => void reviewCandidates.refetch()}
               />
-            ) : materials.data.items.length === 0 ? (
-              <EmptyState>아직 저장한 학습자료가 없어요.</EmptyState>
+            ) : reviewCandidates.data.items.length === 0 ? (
+              <EmptyState>복습할 퀴즈가 없어요. 지금까지의 학습이 잘 정리되어 있어요.</EmptyState>
             ) : (
-              <VStack>
-                {materials.data.items.map((material, index) => (
-                  <Box key={material.materialId} width="full" borderTopWidth={index ? 1 : 0} borderColor="stroke.neutralSubtle">
-                    <PreviewRow
-                      title={material.title}
-                      detail={`${material.sourceType === 'NOTION' ? 'Notion에서 가져옴' : '직접 입력'} · ${formatDate(material.updatedAt)}`}
-                      onClick={() => navigate(`/learning/materials/${material.materialId}`)}
+              <VStack as="ul" className="learning-review-list">
+                {reviewCandidates.data.items.map((candidate, index) => (
+                  <Box
+                    as="li"
+                    key={candidate.quizSetId}
+                    width="full"
+                    borderTopWidth={index ? 1 : 0}
+                    borderColor="stroke.neutralSubtle"
+                  >
+                    <ReviewCandidateRow
+                      candidate={candidate}
+                      starting={startingAttemptId === candidate.sourceAttemptId}
+                      onAction={runAction}
                     />
                   </Box>
                 ))}
@@ -251,68 +277,43 @@ export function LearningManagementPage() {
             )}
           </VStack>
 
-          <VStack as="section" gap="x3" aria-labelledby="quizzes-preview-heading">
-            <SectionHeading
-              id="quizzes-preview-heading"
-              title="내 퀴즈"
-              action={
-                <ActionButton
-                  type="button"
-                  size="small"
-                  variant="ghost"
-                  aria-label="내 퀴즈 전체 보기"
-                  onClick={() => navigate('/learning/quizzes')}
-                >
-                  전체 보기
-                </ActionButton>
-              }
-            />
-            {quizzes.isPending ? (
-              <LoadingRows label="퀴즈를 불러오는 중" />
-            ) : quizzes.isError ? (
-              <InlineFailure
-                message="퀴즈를 불러오지 못했어요."
-                onRetry={() => void quizzes.refetch()}
-              />
-            ) : quizzes.data.items.length === 0 ? (
-              <EmptyState>아직 만든 퀴즈가 없어요.</EmptyState>
-            ) : (
-              <VStack>
-                {quizzes.data.items.map((quiz, index) => (
-                  <Box key={quiz.quizSetId} width="full" borderTopWidth={index ? 1 : 0} borderColor="stroke.neutralSubtle">
-                    <PreviewRow
-                      title={quiz.quizTitle}
-                      detail={`${quiz.materialTitle} · ${quizStatusLabel(quiz)}`}
-                      onClick={() => navigate(`/learning/quizzes?focus=${encodeURIComponent(quiz.quizSetId)}`)}
-                    />
-                  </Box>
-                ))}
-              </VStack>
-            )}
+          {startReview.isError ? (
+            <Text as="p" textStyle="t5Regular" color="fg.critical" role="alert">
+              복습을 시작하지 못했어요. 입력한 내용은 없으니 다시 시도해주세요.
+            </Text>
+          ) : null}
+
+          <VStack aria-label="학습 관리" borderTopWidth={1} borderColor="stroke.neutralSubtle">
+            <PreviewRow title="내 퀴즈 전체 보기" onClick={() => navigate('/learning/quizzes')} />
+            <Box width="full" borderTopWidth={1} borderColor="stroke.neutralSubtle">
+              <PreviewRow title="내 학습자료 전체 보기" onClick={() => navigate('/learning/materials')} />
+            </Box>
           </VStack>
         </VStack>
       </Box>
-      <LearningBottomNavigation
-        onNavigate={(destination) => {
-          if (destination === 'home') navigate('/')
-        }}
-      />
     </VStack>
   )
 }
 
-function RecentQuizPanel({ review, onNavigate }: { review: LatestReview; onNavigate: (path: string) => void }) {
+function RecentQuizPanel({
+  review,
+  pending,
+  actionState,
+  starting,
+  onRetryAction,
+  onAction,
+  onRestart,
+}: {
+  review: LatestReview
+  pending: PendingSelfAssessment | null
+  actionState: 'loading' | 'ready' | 'error'
+  starting: boolean
+  onRetryAction: () => void
+  onAction: (action: LearningReviewAction) => void
+  onRestart: () => void
+}) {
   if (!review.quizSetId || !review.sourceAttemptId) return null
-  const primaryPath = review.activeReviewSessionId
-    ? `/review-sessions/${review.activeReviewSessionId}`
-    : review.reviewQuestionCount > 0
-      ? '/review'
-      : `/quiz-attempts/${review.sourceAttemptId}/result`
-  const primaryLabel = review.activeReviewSessionId
-    ? '활성 복습 계속하기'
-    : review.reviewQuestionCount > 0
-      ? `틀린 문제 ${review.reviewQuestionCount}개 풀기`
-      : '결과 보기'
+  const primaryAction = resolveRecentQuizAction(review, pending)
   return (
     <VStack bg="bg.neutralWeak" borderRadius="r3" p="x4" gap="x4" align="flex-start">
       <VStack gap="x1" align="flex-start">
@@ -322,26 +323,89 @@ function RecentQuizPanel({ review, onNavigate }: { review: LatestReview; onNavig
         <Text textStyle="t4Regular" color="fg.neutralMuted">
           {review.materialTitle} · {review.totalQuestionCount}문제 · {review.attemptNumber}회차
         </Text>
+        {review.completedAt ? (
+          <Text textStyle="t3Regular" color="fg.neutralMuted">
+            최근 학습 {formatDate(review.completedAt)}
+          </Text>
+        ) : null}
       </VStack>
+      {actionState === 'error' ? (
+        <VStack gap="x2" align="flex-start">
+          <Text as="p" textStyle="t4Regular" color="fg.critical" role="alert">
+            다음 학습 행동을 확인하지 못했어요.
+          </Text>
+          <ActionButton type="button" size="small" variant="ghost" onClick={onRetryAction}>
+            다시 시도
+          </ActionButton>
+        </VStack>
+      ) : null}
       <Flex className="learning-management-actions" gap="x2" width="full">
         <ActionButton
           type="button"
           size="medium"
           variant="neutralWeak"
-          onClick={() => onNavigate(`/quiz-sets/${review.quizSetId}`)}
+          onClick={onRestart}
         >
-          전체 다시 풀기
+          전체 문제 다시 풀기
         </ActionButton>
-        <ActionButton
-          type="button"
-          size="medium"
-          variant="brandSolid"
-          onClick={() => onNavigate(primaryPath)}
-        >
-          {primaryLabel}
-        </ActionButton>
+        {actionState === 'loading' ? (
+          <ActionButton type="button" size="medium" variant="brandSolid" disabled>
+            다음 행동 확인 중
+          </ActionButton>
+        ) : actionState === 'ready' && primaryAction ? (
+          <ActionButton
+            type="button"
+            size="medium"
+            variant="brandSolid"
+            disabled={starting}
+            onClick={() => onAction(primaryAction)}
+          >
+            {starting ? '복습 준비 중' : primaryAction.label}
+          </ActionButton>
+        ) : null}
       </Flex>
     </VStack>
+  )
+}
+
+function ReviewCandidateRow({
+  candidate,
+  starting,
+  onAction,
+}: {
+  candidate: ReviewCandidate
+  starting: boolean
+  onAction: (action: LearningReviewAction) => void
+}) {
+  const action = resolveReviewCandidateAction(candidate)
+  const stateLabel = candidate.pendingSelfAssessmentAttemptId
+    ? '자기평가가 남아 있어요'
+    : candidate.activeReviewSessionId
+      ? '복습 중'
+      : `틀린 문제 ${candidate.reviewQuestionCount}개`
+  return (
+    <Flex className="learning-review-row" align="center" justify="space-between" gap="x3">
+      <VStack minWidth="0px" gap="x1" align="flex-start">
+        <Text className="learning-long-title" textStyle="t6Medium" color="fg.neutral">
+          {candidate.quizTitle}
+        </Text>
+        <Text textStyle="t3Regular" color="fg.neutralMuted">
+          {candidate.materialTitle} · {stateLabel}
+        </Text>
+        <Text textStyle="t3Regular" color="fg.neutralMuted">
+          최근 학습 {formatDate(candidate.lastLearningActivityAt)}
+        </Text>
+      </VStack>
+      <ActionButton
+        type="button"
+        size="small"
+        variant="neutralWeak"
+        disabled={starting}
+        onClick={() => onAction(action)}
+      >
+        {starting ? '준비 중' : action.label}
+      </ActionButton>
+    </Flex>
   )
 }
 

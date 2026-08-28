@@ -243,7 +243,7 @@ export function QuizMaterialRoutePage() {
             queryKey: quizQueryKeys.attemptResult(submission.attemptId),
             refetchType: 'none',
           })
-          void queryClient.invalidateQueries({ queryKey: quizQueryKeys.latestReview })
+          void queryClient.invalidateQueries({ queryKey: quizQueryKeys.reviews })
           return submission
         },
         onLoadResult: async (attemptId) => adaptQuizResult(await getQuizResult(attemptId)),
@@ -253,7 +253,7 @@ export function QuizMaterialRoutePage() {
             queryKey: quizQueryKeys.attemptResult(resourceId),
             refetchType: 'none',
           })
-          void queryClient.invalidateQueries({ queryKey: quizQueryKeys.latestReview })
+          void queryClient.invalidateQueries({ queryKey: quizQueryKeys.reviews })
           return saved
         },
         onUpdateGradingOutcome: async ({ questionId, outcome }) => {
@@ -410,7 +410,7 @@ export function QuizSetRoutePage() {
             queryKey: quizQueryKeys.attemptResult(submission.attemptId),
             refetchType: 'none',
           })
-          void queryClient.invalidateQueries({ queryKey: quizQueryKeys.latestReview })
+          void queryClient.invalidateQueries({ queryKey: quizQueryKeys.reviews })
           return submission
         },
         onLoadResult: async (attemptId) => adaptQuizResult(await getQuizResult(attemptId)),
@@ -424,11 +424,11 @@ export function QuizSetRoutePage() {
             queryKey: quizQueryKeys.pendingSelfAssessment(state.quizSetId),
             refetchType: 'none',
           })
-          void queryClient.invalidateQueries({ queryKey: quizQueryKeys.latestReview })
+          void queryClient.invalidateQueries({ queryKey: quizQueryKeys.reviews })
           return saved
         },
         onCompleted: (attemptId) => {
-          void queryClient.invalidateQueries({ queryKey: quizQueryKeys.latestReview })
+          void queryClient.invalidateQueries({ queryKey: quizQueryKeys.reviews })
           navigate(`/quiz-attempts/${attemptId}/result`, { replace: true })
         },
         onUpdateGradingOutcome: async ({ questionId, outcome }) => {
@@ -442,7 +442,7 @@ export function QuizSetRoutePage() {
             queryKey: quizQueryKeys.attemptResult(lastAttemptIdRef.current),
             refetchType: 'none',
           })
-          void queryClient.invalidateQueries({ queryKey: quizQueryKeys.latestReview })
+          void queryClient.invalidateQueries({ queryKey: quizQueryKeys.reviews })
           return adaptQuizResult(updated)
         },
       }}
@@ -479,7 +479,7 @@ export function QuizAttemptResultRoutePage() {
             queryKey: quizQueryKeys.attemptResult(attemptId!),
             refetchType: 'none',
           })
-          void queryClient.invalidateQueries({ queryKey: quizQueryKeys.latestReview })
+          void queryClient.invalidateQueries({ queryKey: quizQueryKeys.reviews })
           return adaptQuizResult(updated)
         },
       }}
@@ -497,7 +497,7 @@ export function ReviewEntryRoutePage() {
   const createMutation = useMutation({
     mutationFn: createReviewSession,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: quizQueryKeys.latestReview })
+      void queryClient.invalidateQueries({ queryKey: quizQueryKeys.reviews })
     },
   })
   useEffect(() => {
@@ -588,7 +588,7 @@ export function ReviewSessionRoutePage() {
             queryKey: quizQueryKeys.reviewResult(reviewSessionId!),
             refetchType: 'none',
           })
-          void queryClient.invalidateQueries({ queryKey: quizQueryKeys.latestReview })
+          void queryClient.invalidateQueries({ queryKey: quizQueryKeys.reviews })
           return submission
         },
         onLoadResult: async () => adaptReviewResult(await getReviewResult(reviewSessionId!)),
@@ -606,7 +606,7 @@ export function ReviewSessionRoutePage() {
             queryKey: quizQueryKeys.reviewResult(reviewSessionId!),
             refetchType: 'none',
           })
-          void queryClient.invalidateQueries({ queryKey: quizQueryKeys.latestReview })
+          void queryClient.invalidateQueries({ queryKey: quizQueryKeys.reviews })
           return saved
         },
       }}

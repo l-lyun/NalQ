@@ -41,7 +41,7 @@ scope: web
 
 - 퀴즈 생성·자기평가·복습 서버 API가 함께 배포되기 전에는 `VITE_QUIZ_API_ENABLED=false`를 기본값으로 사용한다. 이때 로컬 개발 서버는 인증된 학습 화면의 실제 버튼과 URL을 유지한 채 기존 fixture를 사용하는 명시적 `mock` 모드로 동작하며, 별도 preview URL 없이 조건 설정부터 생성·풀이·결과·복습까지 검토할 수 있다. `VITE_QUIZ_API_ENABLED=true`이면 같은 URL이 실제 API route page를 사용한다. 프로덕션은 API가 비활성일 때 fixture로 대체하지 않고 퀴즈 라우트와 최신 복습 Query를 등록·실행하지 않는다.
 - 인증 라우트는 생성 조건 진입 `/learning/:materialId/quiz`, QuizSet 상태·풀이 `/quiz-sets/:quizSetId`, 본 퀴즈 결과 `/quiz-attempts/:attemptId/result`, 최신 복습 진입 `/review`, 복습 실행 `/review-sessions/:reviewSessionId`로 연결한다.
-- 홈의 대표 복습 행동과 `복습할 문제` 요약 행은 최신 복습 Query가 대상을 반환할 때 `/review`로 진입해 활성 세션 재개 또는 새 세션 생성을 위임한다. 복습 섹션의 `전체 보기`는 화면 명세대로 `/learning`의 복습 요약으로 이동한다. 실제 API가 빈 최신 복습을 반환하면 홈에는 복습 빈 상태를 표시하고 풀이 버튼을 만들지 않으며, 개발 `mock` 모드는 같은 클릭 지점에서 fixture 기반 `/review` 흐름을 사용한다.
+- 홈의 대표 복습 행동은 최신 복습 Query가 대상을 반환할 때 `/review`로 진입해 활성 세션 재개 또는 새 세션 생성을 위임한다. 학습 메인은 최근 퀴즈와 별도로 `GET /api/v1/quiz-reviews/candidates?limit=3`을 조회하고, 후보의 `sourceAttemptId`로 세션을 직접 만든 뒤 반환된 세션 route로 이동한다. 미완료 자기평가와 활성 복습은 새 세션보다 우선한다. 실제 API가 빈 후보를 반환하면 학습 메인에는 복습 빈 상태를 표시하고, 개발 `mock` 모드는 동일 타입 adapter로 이 진입을 검토한다.
 - 서버 상태 Query key는 모두 `private` prefix 아래에 두어 기존 로그아웃·세션 종료 시 취소와 캐시 제거 범위에 포함한다.
 - 학습자료 목록·상세와 홈·학습이 공유하는 최신 복습 요약은 5분 동안 fresh로 재사용한다. 학습자료 생성, QuizSet 생성·생성 종료, 본 퀴즈 제출·서술형 자기평가·채점 판정 변경, 복습 세션 생성·제출·자기평가 성공 시 관련 feature Query key를 명시적으로 invalidate한다. 현재 풀이 화면이 직접 응답을 적용하는 attempt·review session/result Query는 즉시 재요청으로 화면 상태를 덮지 않도록 stale 표기만 하고 다음 조회에서 새로 가져오며, 홈·학습 요약은 성공 직후 다시 조회할 수 있게 한다.
 - 생성 접수 성공 뒤에는 응답의 `quizSetId` 라우트로 교체하고, 활성 생성 재진입도 서버가 반환한 `quizSetId` 라우트로 교체한다. 따라서 polling과 풀이 데이터의 기준은 URL의 서버 리소스 ID다.
