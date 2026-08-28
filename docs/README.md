@@ -57,6 +57,7 @@ Flow는 여러 화면의 순서와 분기를, Screen Spec은 한 화면의 구�
 | --- | --- | --- | --- |
 | 이메일 기반 자체 인증 | [인증 API](contracts/contract-api-authentication.md) | API Contract | 초안 |
 | 사용자와 인증 | [사용자·인증 데이터](contracts/contract-data-authentication.md) | Data Contract | 초안 |
+| 홈 연속 방문 요약 | [홈 방문 API](contracts/contract-api-home.md) | API Contract | 초안·미구현 |
 | 학습자료·퀴즈·복습 | [학습·퀴즈 API](contracts/contract-api-quiz-learning.md) | API Contract | 검토 중 |
 | 학습자료·퀴즈·복습 데이터 | [학습자료·퀴즈 데이터](contracts/contract-data-quiz-learning.md) | Data Contract | 검토 중 |
 

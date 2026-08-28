@@ -92,7 +92,9 @@ scope: shared
 | Notion 페이지 일회성 복사 | `POST /api/v1/learning-material-imports/notion` | `200 OK` |
 | 문제 세트 생성 접수 | `POST /api/v1/learning-materials/{materialId}/quiz-sets` | `202 Accepted` |
 | 자료의 활성 생성 조회 | `GET /api/v1/learning-materials/{materialId}/quiz-sets/active` | `200 OK` |
+| 내 퀴즈 목록 조회·이름 검색 | `GET /api/v1/quiz-sets` | `200 OK` |
 | 문제 세트 상태·풀이 데이터 조회 | `GET /api/v1/quiz-sets/{quizSetId}` | `200 OK` |
+| 퀴즈 이름 변경 | `PATCH /api/v1/quiz-sets/{quizSetId}` | `200 OK` |
 | 본 퀴즈 최종 제출 | `PUT /api/v1/quiz-sets/{quizSetId}/attempts/{attemptId}` | `201 Created` 또는 `200 OK` |
 | 미완료 서술형 자기평가 회차 조회 | `GET /api/v1/quiz-sets/{quizSetId}/attempts/pending-self-assessment` | `200 OK` |
 | 서술형 자기평가 저장 | `PUT /api/v1/quiz-attempts/{attemptId}/essay-assessments/{questionId}` | `200 OK` |
@@ -310,6 +312,7 @@ Headers: `Authorization`, `Content-Type: application/json`
 - `difficulty`: `EASY`, `NORMAL`, `HARD`.
 - `maxQuestionCount`: 필수, `5`, `10`, `15` 중 하나.
 - 요청을 접수하면 새 불변 `quizSetId`를 만들고 학습자료 본문을 원자적으로 잠근다.
+- 접수 시점의 학습자료 제목으로 `{학습자료명} 퀴즈` 기본 이름을 만들어 QuizSet에 저장한다. 전체가 255 Unicode code point를 넘으면 학습자료 제목 부분만 최대 252 code point로 줄여 ` 퀴즈` 접미사를 보존한다.
 - 같은 학습자료에 `GENERATING` 세트가 있으면 새 요청을 받지 않는다.
 - 서버가 생성 작업 자체를 접수할 수 없으면 `503 QUIZ_002`를 반환하고 QuizSet을 만들거나 본문 잠금 상태를 바꾸지 않는다.
 - 이 요청은 `Idempotency-Key`를 받지 않는다. 접수 응답 유실 여부는 [자료의 활성 생성 조회](#자료의-활성-생성-조회)로 확인하며, 활성 생성이 없을 때만 새 QuizSet 생성을 요청한다.
@@ -322,6 +325,7 @@ Headers: `Authorization`, `Content-Type: application/json`
   "data": {
     "quizSetId": "qset_123",
     "materialId": "123",
+    "quizTitle": "운영체제 스케줄링 퀴즈",
     "status": "GENERATING",
     "pollAfterSeconds": 3,
     "requestedConfig": {
@@ -350,6 +354,7 @@ Headers: `Authorization`, `Content-Type: application/json`
   "data": {
     "quizSetId": "qset_123",
     "materialId": "123",
+    "quizTitle": "운영체제 스케줄링 퀴즈",
     "status": "GENERATING",
     "pollAfterSeconds": 3
   },
@@ -371,7 +376,7 @@ Headers: `Authorization`, `Content-Type: application/json`
 
 `GET /api/v1/quiz-sets/{quizSetId}`
 
-- 모든 상태는 `quizSetId`, `materialId`, `status`를 반환하며 `requestedConfig`는 반환하지 않는다.
+- 모든 상태는 `quizSetId`, `materialId`, 비어 있지 않은 `quizTitle`, `status`를 반환하며 `requestedConfig`는 반환하지 않는다.
 - `GENERATING`은 공통 필드와 다음 조회 권고값 `pollAfterSeconds`만 반환한다. 로컬 요청 조건이 없으면 클라이언트는 일반 생성 진행 상태를 표시한다.
 - `READY`는 공통 필드와 `questions`를 반환한다. 유효 문제가 1개 이상이라는 뜻이며 클라이언트는 로컬 요청 조건 유무와 관계없이 `questions`에서 실제 문제 수와 포함 유형을 계산한다. 실제 수가 최대 문제 수보다 적거나 요청한 유형 일부가 포함되지 않아도 된다.
 - `FAILED`는 공통 필드와 `failure`만 반환하고 문제를 포함하지 않는다. 로컬 요청 조건이 없으면 일반 실패 안내와 새 조건 선택 행동을 제공하며, 외부 생성 서비스 상세는 노출하지 않는다.
@@ -386,6 +391,7 @@ Headers: `Authorization`, `Content-Type: application/json`
   "data": {
     "quizSetId": "qset_123",
     "materialId": "123",
+    "quizTitle": "운영체제 스케줄링 퀴즈",
     "status": "GENERATING",
     "pollAfterSeconds": 3
   },
@@ -401,6 +407,7 @@ Headers: `Authorization`, `Content-Type: application/json`
   "data": {
     "quizSetId": "qset_123",
     "materialId": "123",
+    "quizTitle": "운영체제 스케줄링 퀴즈",
     "status": "FAILED",
     "failure": {
       "code": "SOURCE_INSUFFICIENT",
@@ -458,6 +465,92 @@ Headers: `Authorization`, `Content-Type: application/json`
 정답, 허용 답안, 모범 답안, 핵심 포인트, 해설, 원문 근거와 내부 생성 메타데이터는 `READY` 풀이 데이터에 포함하지 않는다.
 
 클라이언트는 객관식 `choices` 길이를 4개로 가정하지 않고 3개, 4개, 5개를 모두 렌더링·선택·제출할 수 있어야 한다. 배열 순서는 서버가 확정한 보기 순서를 그대로 사용한다.
+
+## 퀴즈 관리 확장 계약
+
+이 절은 홈·학습의 퀴즈명 표시와 검색 가능한 `내 퀴즈` 관리 화면을 위한 **목표 계약이며 아직 서버·웹에 구현되지 않았다.** 기존 구현은 QuizSet의 독립 제목, 전체 목록과 이름 변경 endpoint를 제공하지 않는다. 구현 전까지 학습자료 제목을 `quizTitle`로 위장하거나 이름 변경이 저장되는 것처럼 표시하지 않는다.
+
+### 퀴즈 이름
+
+- QuizSet은 부모 학습자료의 현재 `materialTitle`과 분리된 비어 있지 않은 `quizTitle`을 가진다.
+- `quizTitle`은 1~255 Unicode code point다. 앞뒤 Unicode 공백을 제거한 결과가 비어 있으면 `400 COMMON_001`과 `fields.field=quizTitle`을 반환한다.
+- 퀴즈 이름은 사용자 범위에서 unique일 필요가 없다.
+- 학습자료 제목을 나중에 바꿔도 기존 QuizSet의 `quizTitle`은 자동으로 바뀌지 않는다.
+- 생성 접수 시 기본 이름은 접수 시점의 학습자료 제목으로 만든 `{학습자료명} 퀴즈`다. 255 Unicode code point를 넘으면 학습자료 제목 부분만 최대 252 code point로 줄여 접미사를 보존한다. 기존 QuizSet은 migration 시점의 연결 학습자료 제목으로 같은 규칙을 적용해 backfill한다.
+
+### 내 퀴즈 목록 조회·이름 검색
+
+`GET /api/v1/quiz-sets?page=1&size=6&query=운영체제`
+
+- 현재 인증 사용자가 소유한 QuizSet만 반환한다.
+- `query`는 선택이며 앞뒤 공백을 제거한 뒤 `quizTitle`을 대소문자 구분 없이 부분 검색한다. `materialTitle` 검색은 이 parameter의 의미에 포함하지 않는다.
+- 기본 정렬은 `updatedAt DESC, quizSetId DESC`다. 이름 변경 성공 시 `updatedAt`이 바뀌므로 목록 상단 순서가 바뀔 수 있다.
+- `page`는 1부터 시작하고 `size`의 기본값은 6이다.
+
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "quizSetId": "qset_123",
+        "quizTitle": "운영체제 중간고사 대비",
+        "materialId": "123",
+        "materialTitle": "운영체제 핵심 정리",
+        "status": "READY",
+        "questionCount": 10,
+        "createdAt": "2026-08-26T00:10:00Z",
+        "updatedAt": "2026-08-28T01:00:00Z",
+        "lastAttemptAt": "2026-08-27T03:00:00Z"
+      }
+    ],
+    "page": 1,
+    "size": 6,
+    "totalElements": 1,
+    "totalPages": 1
+  },
+  "error": null
+}
+```
+
+- `status`는 `GENERATING | READY | FAILED`다.
+- `questionCount`는 `READY`에서 1 이상이고 그 외 상태에서는 `null`이다.
+- `lastAttemptAt`은 해당 사용자의 가장 최근 MAIN attempt 활동 시각이며 아직 푼 적이 없으면 `null`이다.
+- 목록은 문제 본문, 정답, 제출 답안과 전체 학습자료 본문을 포함하지 않는다.
+- 검색 결과 없음은 같은 page 모양에서 `items=[]`, `totalElements=0`, `totalPages=0`으로 반환한다.
+
+### 퀴즈 이름 변경
+
+`PATCH /api/v1/quiz-sets/{quizSetId}`
+
+```json
+{
+  "quizTitle": "운영체제 기말 대비"
+}
+```
+
+```json
+{
+  "success": true,
+  "data": {
+    "quizSetId": "qset_123",
+    "quizTitle": "운영체제 기말 대비",
+    "updatedAt": "2026-08-28T01:05:00Z"
+  },
+  "error": null
+}
+```
+
+- 현재 사용자가 소유한 QuizSet만 변경할 수 있으며 없거나 소유하지 않으면 `404 COMMON_003`이다.
+- 제목은 생성 결과와 독립적인 사용자 메타데이터이므로 `GENERATING`, `READY`, `FAILED` 모두에서 변경할 수 있다.
+- 이름 변경은 문제·정답·풀이·결과·복습 snapshot을 바꾸지 않는다.
+- 성공 뒤 홈 최신 복습, 최근 퀴즈, 내 퀴즈 목록과 QuizSet 상세의 관련 캐시를 무효화하거나 응답값으로 갱신한다.
+
+### 기존 응답 보강
+
+- `GET /api/v1/quiz-sets/{quizSetId}`의 모든 상태 응답에 비어 있지 않은 `quizTitle`을 추가한다.
+- `GET /api/v1/quiz-reviews/latest`의 완료 회차가 있는 응답에 비어 있지 않은 `quizTitle`을 추가한다. 완료 회차가 없으면 `quizTitle=null`이다.
+- `materialTitle`은 부모 자료 맥락이며 `quizTitle`의 fallback이 아니다.
 
 ## 본 퀴즈 제출과 자기평가
 
@@ -701,6 +794,7 @@ API의 `reviewSession`은 클라이언트가 복습 실행을 식별하는 공�
 
 - 현재 사용자의 가장 최근 `COMPLETED` 본 퀴즈 회차 하나만 조회한다. 그 회차에서 현재 최종 판정이 `INCORRECT|PARTIAL`이고 `reviewResolvedAt=null`인 문항이 복습 대상이다.
 - `attemptNumber`는 해당 `quizSetId` 안에서 현재 사용자가 완료한 본 퀴즈 회차의 1부터 시작하는 순번이다.
+- `quizTitle`은 해당 QuizSet의 현재 사용자 지정 이름이다. 홈·학습의 주 제목은 이 값을 사용한다.
 - `materialTitle`은 해당 QuizSet이 참조하는 학습자료의 현재 제목이다. 클라이언트는 이 값을 하드코딩한 일반 제목으로 대체하거나 `attemptNumber`를 완료 시각처럼 표시하지 않는다.
 - `completedAt`은 최신 완료 본 퀴즈 회차가 완료된 시각이며 공통 계약에 따라 ISO 8601 UTC 문자열이다.
 - `totalQuestionCount`는 해당 `quizSetId`의 전체 문항 수다. `전체 다시 풀기`의 대상 수와 레이블은 이 값을 사용하며 `reviewQuestionCount`와 혼용하지 않는다.
@@ -714,6 +808,7 @@ API의 `reviewSession`은 클라이언트가 복습 실행을 식별하는 공�
     "sourceAttemptId": "550e8400-e29b-41d4-a716-446655440000",
     "quizSetId": "qset_123",
     "attemptNumber": 2,
+    "quizTitle": "운영체제 중간고사 대비",
     "materialTitle": "운영체제 핵심 정리",
     "completedAt": "2026-08-26T00:20:00Z",
     "totalQuestionCount": 10,
@@ -733,6 +828,7 @@ API의 `reviewSession`은 클라이언트가 복습 실행을 식별하는 공�
     "sourceAttemptId": null,
     "quizSetId": null,
     "attemptNumber": null,
+    "quizTitle": null,
     "materialTitle": null,
     "completedAt": null,
     "totalQuestionCount": 0,
@@ -743,7 +839,7 @@ API의 `reviewSession`은 클라이언트가 복습 실행을 식별하는 공�
 }
 ```
 
-최신 완료 회차는 있지만 미해결 문항이 없으면 세 식별 필드와 `materialTitle`, `completedAt`, `totalQuestionCount`는 최신 회차 맥락 값으로 반환하고 `reviewQuestionCount=0`, `activeReviewSessionId=null`로 반환한다.
+최신 완료 회차는 있지만 미해결 문항이 없으면 세 식별 필드와 `quizTitle`, `materialTitle`, `completedAt`, `totalQuestionCount`는 최신 회차 맥락 값으로 반환하고 `reviewQuestionCount=0`, `activeReviewSessionId=null`로 반환한다.
 
 이 응답 보강은 학습 메인의 `최근 퀴즈` UI가 전체 재풀이와 틀린 문제 풀이를 같은 QuizSet 맥락으로 정확히 표시하기 위한 공유 계약이며 서버 DTO와 웹 `LatestReview` 타입에 동기화되어 있다. 여러 API를 연쇄 조회하거나 일반 문구를 하드코딩하는 방식은 이 계약의 대체 구현으로 보지 않는다.
 
