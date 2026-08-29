@@ -104,6 +104,21 @@ export type LatestReview = {
   activeReviewSessionId: string | null
 }
 
+export type ReviewCandidate = {
+  quizSetId: string
+  quizTitle: string
+  materialTitle: string
+  sourceAttemptId: string
+  pendingSelfAssessmentAttemptId: string | null
+  activeReviewSessionId: string | null
+  reviewQuestionCount: number
+  lastLearningActivityAt: string
+}
+
+export type ReviewCandidateList = {
+  items: ReviewCandidate[]
+}
+
 export type QuizSetManagementStatus = 'GENERATING' | 'READY' | 'FAILED'
 
 export type QuizSetSummary = {

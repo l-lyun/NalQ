@@ -1,25 +1,27 @@
 import {
+  createReviewSession,
   getLatestReview,
   getPendingSelfAssessment,
   getQuizSets,
+  getReviewCandidates,
   renameQuizSet,
 } from './quiz.api'
 import type {
   GetQuizSetsParams,
   LatestReview,
   PendingSelfAssessment,
+  ReviewCandidate,
+  ReviewCandidateList,
+  ReviewSession,
   QuizSetPage,
   QuizSetSummary,
   RenameQuizSetResponse,
 } from './quiz.types'
-export type QuizManagementMode = 'api' | 'mock' | 'disabled'
+import { quizRuntimeMode, type QuizRuntimeMode } from '../model/quizFeature'
 
-export const quizManagementMode: QuizManagementMode =
-  import.meta.env.VITE_QUIZ_MANAGEMENT_API_ENABLED === 'true'
-  ? 'api'
-  : import.meta.env.DEV
-    ? 'mock'
-    : 'disabled'
+export type QuizManagementMode = QuizRuntimeMode
+
+export const quizManagementMode: QuizManagementMode = quizRuntimeMode
 
 const mockQuizSets: QuizSetSummary[] = [
   {
@@ -92,6 +94,29 @@ let mockLatestReview: LatestReview = {
   activeReviewSessionId: 'review-session-network',
 }
 
+const mockReviewCandidates: ReviewCandidate[] = [
+  {
+    quizSetId: 'quiz-set-os-essay',
+    quizTitle: '운영체제 서술형 점검',
+    materialTitle: '운영체제 정리: 프로세스와 스레드, 스케줄링의 차이',
+    sourceAttemptId: '550e8400-e29b-41d4-a716-446655440001',
+    pendingSelfAssessmentAttemptId: '550e8400-e29b-41d4-a716-446655440001',
+    activeReviewSessionId: null,
+    reviewQuestionCount: 2,
+    lastLearningActivityAt: '2026-08-27T01:00:00Z',
+  },
+  {
+    quizSetId: 'quiz-set-data-structure',
+    quizTitle: '자료구조 핵심 개념 퀴즈',
+    materialTitle: '자료구조 핵심 개념',
+    sourceAttemptId: '550e8400-e29b-41d4-a716-446655440002',
+    pendingSelfAssessmentAttemptId: null,
+    activeReviewSessionId: null,
+    reviewQuestionCount: 2,
+    lastLearningActivityAt: '2026-08-26T01:00:00Z',
+  },
+]
+
 function ensureAvailable() {
   if (quizManagementMode === 'disabled') {
     throw new Error('퀴즈 관리 API가 아직 배포되지 않았어요.')
@@ -139,6 +164,30 @@ export async function getManagedLatestReview(signal?: AbortSignal) {
   if (quizManagementMode === 'api') return getLatestReview(signal)
   throwIfAborted(signal)
   return { ...mockLatestReview }
+}
+
+export async function getManagedReviewCandidates(
+  limit: number,
+  signal?: AbortSignal,
+): Promise<ReviewCandidateList> {
+  ensureAvailable()
+  if (quizManagementMode === 'api') return getReviewCandidates(limit, signal)
+  throwIfAborted(signal)
+  return { items: mockReviewCandidates.slice(0, limit).map((item) => ({ ...item })) }
+}
+
+export async function startManagedReviewSession(sourceAttemptId: string): Promise<ReviewSession> {
+  ensureAvailable()
+  if (quizManagementMode === 'api') return createReviewSession(sourceAttemptId)
+  const candidate = mockReviewCandidates.find((item) => item.sourceAttemptId === sourceAttemptId)
+  if (!candidate) throw new Error('복습할 퀴즈를 찾지 못했어요.')
+  return {
+    reviewSessionId: candidate.activeReviewSessionId ?? `review-${candidate.quizSetId}`,
+    sourceAttemptId,
+    status: 'SOLVING',
+    reviewQuestionCount: candidate.reviewQuestionCount,
+    pendingEssayQuestionIds: [],
+  }
 }
 
 export async function renameManagedQuizSet(
