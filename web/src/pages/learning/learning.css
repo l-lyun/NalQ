@@ -138,6 +138,26 @@
   background: var(--seed-color-bg-layer-default-pressed);
 }
 
+.learning-review-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.learning-review-row {
+  min-width: 0;
+  min-height: 72px;
+  padding-block: var(--seed-dimension-x3);
+}
+
+.learning-review-row > :first-child {
+  flex: 1 1 auto;
+}
+
+.learning-review-row > :last-child {
+  flex: 0 1 auto;
+}
+
 .learning-disclosure-trigger:disabled {
   cursor: wait;
 }
@@ -250,6 +270,15 @@
   .learning-management-actions > * {
     width: 100%;
     flex-basis: auto;
+  }
+
+  .learning-review-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .learning-review-row > :last-child {
+    width: 100%;
   }
 }
 
