@@ -16,6 +16,8 @@ import com.openmd.server.quiz.dto.response.EssaySelfAssessmentSummary;
 import com.openmd.server.quiz.dto.response.GradingCount;
 import com.openmd.server.quiz.dto.response.ReviewAttemptResult;
 import com.openmd.server.quiz.dto.response.ReviewAttemptSummary;
+import com.openmd.server.quiz.dto.response.ReviewCandidateItem;
+import com.openmd.server.quiz.dto.response.ReviewCandidateList;
 import com.openmd.server.quiz.dto.response.ReviewLatestView;
 import com.openmd.server.quiz.dto.response.ReviewSessionStart;
 import com.openmd.server.quiz.dto.response.ReviewSessionView;
@@ -116,6 +118,37 @@ class QuizReviewControllerTest {
         .andExpect(jsonPath("$.data.completedAt").value("2026-08-26T00:20:00Z"))
         .andExpect(jsonPath("$.data.totalQuestionCount").value(10))
         .andExpect(jsonPath("$.data.reviewQuestionCount").value(3));
+  }
+
+  @Test
+  void listsReviewCandidatesForTheLearningMain() throws Exception {
+    when(reviews.candidates(7L, 3))
+        .thenReturn(
+            new ReviewCandidateList(
+                List.of(
+                    new ReviewCandidateItem(
+                        "quiz-set-1",
+                        "운영체제 퀴즈",
+                        "운영체제",
+                        "source-1",
+                        "pending-1",
+                        "review-1",
+                        2,
+                        Instant.parse("2026-08-28T12:30:00Z")))));
+
+    mvc.perform(get("/api/v1/quiz-reviews/candidates"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.items[0].quizSetId").value("quiz-set-1"))
+        .andExpect(jsonPath("$.data.items[0].quizTitle").value("운영체제 퀴즈"))
+        .andExpect(jsonPath("$.data.items[0].materialTitle").value("운영체제"))
+        .andExpect(jsonPath("$.data.items[0].sourceAttemptId").value("source-1"))
+        .andExpect(jsonPath("$.data.items[0].pendingSelfAssessmentAttemptId").value("pending-1"))
+        .andExpect(jsonPath("$.data.items[0].activeReviewSessionId").value("review-1"))
+        .andExpect(jsonPath("$.data.items[0].reviewQuestionCount").value(2))
+        .andExpect(
+            jsonPath("$.data.items[0].lastLearningActivityAt")
+                .value("2026-08-28T12:30:00Z"));
+    verify(reviews).candidates(7L, 3);
   }
 
   @Test
