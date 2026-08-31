@@ -17,7 +17,13 @@ scope: ux
 - 관련 기능: [마이페이지 계정 관리](../prd/prd-mypage-account-management.md), [이메일 기반 자체 인증](../prd/prd-local-authentication.md)
 - 관련 흐름: [인증 흐름](flow-authentication.md)
 - 관련 계약: [인증 API](../contracts/contract-api-authentication.md), [사용자·인증 데이터](../contracts/contract-data-authentication.md)
-- 최종 수정일: 2026-08-28
+- 최종 수정일: 2026-09-01
+
+## 현재 구현 단계
+
+- PR #38은 마이페이지 메인, 계정 설정의 닉네임 변경, 로그아웃과 각 후속 메뉴의 안전한 진입 상태를 구현한다.
+- 승인된 운영용 개인정보처리방침, 마케팅 동의 계약과 회원 탈퇴 계약은 아직 없으므로 해당 화면은 완료된 기능으로 오인되지 않는 준비 중 상태를 보여준다.
+- 아래 마케팅 동의·회원 탈퇴 상세와 인수 조건은 후속 구현의 기준이며 PR #38의 인수 범위에서는 제외한다.
 
 ## 요구사항 구분
 
