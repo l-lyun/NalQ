@@ -5,18 +5,14 @@
 .app-tab-panel--active, .app-tab-panel--enter { opacity: 1; pointer-events: auto; }
 .app-tab-panel--enter, .app-tab-panel--exit { will-change: transform, opacity; }
 .app-tab-panel--enter.app-tab-panel--from-right { animation: app-tab-enter-from-right 210ms cubic-bezier(0.2, 0, 0, 1); }
-.app-tab-panel--enter.app-tab-panel--from-left { animation: app-tab-enter-from-left 210ms cubic-bezier(0.2, 0, 0, 1); }
 .app-tab-panel--exit.app-tab-panel--to-left { animation: app-tab-exit-to-left 210ms cubic-bezier(0.2, 0, 0, 1); }
+.app-tab-panel--enter.app-tab-panel--from-left { animation: app-tab-enter-from-left 210ms cubic-bezier(0.2, 0, 0, 1); }
 .app-tab-panel--exit.app-tab-panel--to-right { animation: app-tab-exit-to-right 210ms cubic-bezier(0.2, 0, 0, 1); }
 .app-tab-panel > .home-shell, .app-tab-panel > .learning-shell, .app-tab-panel > .profile-shell { height: 100%; min-height: 0; }
 
 /* Learning keeps ownership of immersive internal screens. Only its legacy top-level
  * navigation is suppressed while the page is hosted by the shared shell. */
 .app-tab-panel .learning-bottom-navigation { display: none; }
-
-/* Legacy learning sub-screens keep their route in history state. Their back button
- * is the observable immersive-screen boundary until the route-first pages land. */
-.app-shell:has(.app-tab-panel[data-app-tab='learning'][aria-hidden='false'] .learning-back-button) > .app-bottom-navigation { display: none; }
 
 .app-bottom-navigation { box-sizing: border-box; flex-shrink: 0; z-index: 2; }
 .app-navigation-list { max-width: 640px; margin: 0 auto; padding: 0; list-style: none; }
@@ -25,8 +21,8 @@
 .app-navigation-button:focus-visible { outline: var(--seed-dimension-x0_5) solid var(--seed-color-stroke-focus-ring); outline-offset: var(--seed-dimension-x0_5); border-radius: var(--seed-radius-r2); }
 
 @keyframes app-tab-enter-from-right { from { opacity: 0.72; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
-@keyframes app-tab-enter-from-left { from { opacity: 0.72; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
 @keyframes app-tab-exit-to-left { from { opacity: 1; transform: translateX(0); } to { opacity: 0.72; transform: translateX(-20px); } }
+@keyframes app-tab-enter-from-left { from { opacity: 0.72; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
 @keyframes app-tab-exit-to-right { from { opacity: 1; transform: translateX(0); } to { opacity: 0.72; transform: translateX(20px); } }
 @keyframes app-tab-fade { from { opacity: 0; } to { opacity: 1; } }
 

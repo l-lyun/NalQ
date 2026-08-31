@@ -11,6 +11,7 @@ import type {
   GetQuizSetsParams,
   PendingSelfAssessment,
   QuizResultResponse,
+  ReviewCandidateList,
   QuizSetPage,
   QuizSetState,
   QuizSubmissionPayload,
@@ -112,6 +113,9 @@ export async function updateGradingOverride(
 
 export const getLatestReview = (signal?: AbortSignal) =>
   getData<LatestReview>('/api/v1/quiz-reviews/latest', signal)
+
+export const getReviewCandidates = (limit = 3, signal?: AbortSignal) =>
+  getData<ReviewCandidateList>(`/api/v1/quiz-reviews/candidates?limit=${limit}`, signal)
 
 export async function createReviewSession(sourceAttemptId: string) {
   const response = await protectedApi.post<ApiResponse<ReviewSessionEnvelope>>(

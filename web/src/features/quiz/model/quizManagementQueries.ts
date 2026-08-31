@@ -3,6 +3,7 @@ import { queryOptions, type QueryClient } from '@tanstack/react-query'
 import {
   getManagedLatestReview,
   getManagedPendingSelfAssessment,
+  getManagedReviewCandidates,
   listManagedQuizSets,
 } from '../api/quizManagementAdapter'
 import type { GetQuizSetsParams } from '../api/quiz.types'
@@ -34,13 +35,19 @@ export const quizManagementQueryOptions = {
       queryFn: ({ signal }) => getManagedLatestReview(signal),
       staleTime: QUIZ_SUMMARY_STALE_TIME,
     }),
+  reviewCandidates: (limit = 3) =>
+    queryOptions({
+      queryKey: quizQueryKeys.reviewCandidates(limit),
+      queryFn: ({ signal }) => getManagedReviewCandidates(limit, signal),
+      staleTime: QUIZ_SUMMARY_STALE_TIME,
+    }),
 }
 
 export async function invalidateQuizManagementQueries(queryClient: QueryClient, quizSetId: string) {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: quizManagementKeys.all }),
     queryClient.invalidateQueries({ queryKey: quizQueryKeys.quizSet(quizSetId) }),
-    queryClient.invalidateQueries({ queryKey: quizQueryKeys.latestReview }),
+    queryClient.invalidateQueries({ queryKey: quizQueryKeys.reviews }),
     queryClient.invalidateQueries({ queryKey: ['private', 'home'] }),
   ])
 }

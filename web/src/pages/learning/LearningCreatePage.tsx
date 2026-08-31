@@ -56,7 +56,7 @@ export function LearningCreatePage() {
       materialsQuery={query}
       materialsFetching={materials.isFetching && !materials.isPending}
       callbacks={{
-        onExit: () => navigate('/learning'),
+        onExit: () => navigate('/learning', { replace: true }),
         onOpenQuizConditions: quizRoutesEnabled
           ? (material) =>
               navigate(`/learning/${material.materialId}/quiz`, {
