@@ -276,7 +276,7 @@ export function QuizSetRoutePage() {
     restartMain?: boolean
   } | null
   const materialTitle = routeState?.materialTitle ?? '학습자료'
-  const restartMain = routeState?.restartMain === true
+  const [restartMain, setRestartMain] = useState(routeState?.restartMain === true)
   const lastAttemptIdRef = useRef<string | undefined>(undefined)
   const createConditionsRef = useRef<QuizConditions | undefined>(undefined)
   const stateQuery = useQuery({
@@ -416,6 +416,13 @@ export function QuizSetRoutePage() {
           if (!attemptId) throw new Error('attempt UUID를 만들지 못했어요.')
           const submission = await submitQuiz(state.quizSetId, attemptId, payload)
           lastAttemptIdRef.current = submission.attemptId
+          if (restartMain) {
+            setRestartMain(false)
+            navigate(location.pathname, {
+              replace: true,
+              state: { materialTitle },
+            })
+          }
           void queryClient.invalidateQueries({
             queryKey: quizQueryKeys.pendingSelfAssessment(state.quizSetId),
             refetchType: 'none',

@@ -26,7 +26,6 @@ import {
 import {
   useLocation,
   useNavigate,
-  useParams,
   useSearchParams,
 } from 'react-router-dom'
 
@@ -163,8 +162,10 @@ function PreviewRow({ title, detail, onClick }: { title: string; detail?: string
 export function LearningManagementPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const quizManagementAvailable = quizManagementMode !== 'disabled'
   const recentQuiz = useQuery({
     ...quizManagementQueryOptions.latestReview(),
+    enabled: quizManagementAvailable,
     refetchOnWindowFocus: false,
   })
   const recentPending = useQuery({
@@ -174,26 +175,28 @@ export function LearningManagementPage() {
   })
   const reviewCandidates = useQuery({
     ...quizManagementQueryOptions.reviewCandidates(REVIEW_CANDIDATE_LIMIT),
+    enabled: quizManagementAvailable,
     refetchOnWindowFocus: false,
   })
-  const [startingAttemptId, setStartingAttemptId] = useState<string>()
+  const reviewStartInFlightRef = useRef(false)
   const startReview = useMutation({
     mutationFn: startManagedReviewSession,
-    onMutate: (sourceAttemptId) => {
-      setStartingAttemptId(sourceAttemptId)
-    },
     onSuccess: async (session) => {
       await queryClient.invalidateQueries({ queryKey: ['private', 'quiz-review'] })
       navigate(`/review-sessions/${session.reviewSessionId}`)
     },
     onSettled: () => {
-      setStartingAttemptId(undefined)
+      reviewStartInFlightRef.current = false
     },
   })
 
   const runAction = (action: LearningReviewAction) => {
+    if (reviewStartInFlightRef.current) return
     if (action.kind === 'navigate') navigate(action.path)
-    else startReview.mutate(action.sourceAttemptId)
+    else {
+      reviewStartInFlightRef.current = true
+      startReview.mutate(action.sourceAttemptId)
+    }
   }
 
   return (
@@ -214,7 +217,9 @@ export function LearningManagementPage() {
             <Text as="h2" id="recent-quiz-heading" textStyle="t9Bold" color="fg.neutral">
               최근 퀴즈
             </Text>
-            {recentQuiz.isPending ? (
+            {!quizManagementAvailable ? (
+              <EmptyState>퀴즈 기능을 준비하고 있어요.</EmptyState>
+            ) : recentQuiz.isPending ? (
               <LoadingRows label="최근 퀴즈를 불러오는 중" count={1} />
             ) : recentQuiz.isError ? (
               <InlineFailure
@@ -226,7 +231,7 @@ export function LearningManagementPage() {
                 review={recentQuiz.data}
                 pending={recentPending.data ?? null}
                 actionState={recentPending.isError ? 'error' : recentPending.isPending ? 'loading' : 'ready'}
-                starting={startingAttemptId === recentQuiz.data.sourceAttemptId}
+                busy={startReview.isPending}
                 onRetryAction={() => void recentPending.refetch()}
                 onAction={runAction}
                 onRestart={() => navigate(`/quiz-sets/${recentQuiz.data.quizSetId}`, {
@@ -237,7 +242,7 @@ export function LearningManagementPage() {
                 })}
               />
             ) : (
-              <EmptyState>아직 만든 퀴즈가 없어요. 새 문제를 만들어 학습을 시작해보세요.</EmptyState>
+              <EmptyState>아직 완료한 퀴즈가 없어요. 퀴즈를 끝까지 풀면 최근 학습을 여기서 이어갈 수 있어요.</EmptyState>
             )}
           </VStack>
 
@@ -252,7 +257,9 @@ export function LearningManagementPage() {
 
           <VStack as="section" gap="x3" aria-labelledby="review-candidates-heading">
             <SectionHeading id="review-candidates-heading" title="복습할 퀴즈" />
-            {reviewCandidates.isPending ? (
+            {!quizManagementAvailable ? (
+              <EmptyState>복습 기능을 준비하고 있어요.</EmptyState>
+            ) : reviewCandidates.isPending ? (
               <LoadingRows label="복습할 퀴즈를 불러오는 중" />
             ) : reviewCandidates.isError ? (
               <InlineFailure
@@ -273,7 +280,7 @@ export function LearningManagementPage() {
                   >
                     <ReviewCandidateRow
                       candidate={candidate}
-                      starting={startingAttemptId === candidate.sourceAttemptId}
+                      busy={startReview.isPending}
                       onAction={runAction}
                     />
                   </Box>
@@ -304,7 +311,7 @@ function RecentQuizPanel({
   review,
   pending,
   actionState,
-  starting,
+  busy,
   onRetryAction,
   onAction,
   onRestart,
@@ -312,7 +319,7 @@ function RecentQuizPanel({
   review: LatestReview
   pending: PendingSelfAssessment | null
   actionState: 'loading' | 'ready' | 'error'
-  starting: boolean
+  busy: boolean
   onRetryAction: () => void
   onAction: (action: LearningReviewAction) => void
   onRestart: () => void
@@ -349,6 +356,7 @@ function RecentQuizPanel({
           type="button"
           size="medium"
           variant="neutralWeak"
+          disabled={busy}
           onClick={onRestart}
         >
           전체 문제 다시 풀기
@@ -362,10 +370,10 @@ function RecentQuizPanel({
             type="button"
             size="medium"
             variant="brandSolid"
-            disabled={starting}
+            disabled={busy}
             onClick={() => onAction(primaryAction)}
           >
-            {starting ? '복습 준비 중' : primaryAction.label}
+            {busy ? '복습 준비 중' : primaryAction.label}
           </ActionButton>
         ) : null}
       </Flex>
@@ -375,11 +383,11 @@ function RecentQuizPanel({
 
 function ReviewCandidateRow({
   candidate,
-  starting,
+  busy,
   onAction,
 }: {
   candidate: ReviewCandidate
-  starting: boolean
+  busy: boolean
   onAction: (action: LearningReviewAction) => void
 }) {
   const action = resolveReviewCandidateAction(candidate)
@@ -405,10 +413,10 @@ function ReviewCandidateRow({
         type="button"
         size="small"
         variant="neutralWeak"
-        disabled={starting}
+        disabled={busy}
         onClick={() => onAction(action)}
       >
-        {starting ? '준비 중' : action.label}
+        {busy ? '준비 중' : action.label}
       </ActionButton>
     </Flex>
   )
@@ -619,8 +627,7 @@ function MaterialDisclosureCard({
   )
 }
 
-export function LearningMaterialEditPage() {
-  const { materialId = '' } = useParams()
+export function LearningMaterialEditPage({ materialId }: { materialId: string }) {
   const navigate = useNavigate()
   const location = useLocation()
   const queryClient = useQueryClient()

@@ -92,7 +92,11 @@
 }
 
 .learning-management-page {
+  height: 100%;
   min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
   overflow-wrap: anywhere;
 }
 

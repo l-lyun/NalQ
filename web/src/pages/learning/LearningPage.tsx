@@ -150,7 +150,10 @@ export function LearningPage({
     screenRef.current = next
     setScreen(next)
   }
-  const goBack = () => window.history.back()
+  const goBack = () => {
+    if (historyDepthRef.current > 0) window.history.back()
+    else callbacks?.onExit?.()
+  }
   const goMain = () => {
     if (historyDepthRef.current > 0) window.history.go(-historyDepthRef.current)
     else callbacks?.onExit?.()

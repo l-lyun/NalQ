@@ -1,9 +1,10 @@
 export type LearningRouteId = 'main' | 'materials' | 'material-edit' | 'quizzes' | 'new-quiz'
 
-export function resolveLearningRoute(pathname: string): {
-  id: LearningRouteId
-  materialId?: string
-} {
+export type LearningRoute =
+  | { id: 'material-edit'; materialId: string }
+  | { id: Exclude<LearningRouteId, 'material-edit'> }
+
+export function resolveLearningRoute(pathname: string): LearningRoute {
   const normalized = pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname
   const materialMatch = normalized.match(/^\/learning\/materials\/([^/]+)$/)
   if (materialMatch?.[1]) {

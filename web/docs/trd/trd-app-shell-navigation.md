@@ -15,7 +15,7 @@ last_updated: 2026-08-28
 
 - 인증된 `/`, `/learning`, `/profile`은 하나의 `AuthenticatedAppShell` 부모 route를 공유한다.
 - 처음 방문한 탭 화면만 지연 마운트하고, 이후에는 `inert`와 `aria-hidden`으로 비활성화한 채 마운트를 유지한다. 따라서 탭별 스크롤·React 로컬 상태·Query observer가 탭 모션 때문에 초기화되지 않는다.
-- 공통 바텀 탭은 움직이지 않는 셸 평면에 두고 콘텐츠 panel만 수평 전환한다. 탭의 상대 위치와 관계없이 기존 panel은 왼쪽으로 나가고 새 panel은 오른쪽에서 들어온다. reduced motion에서는 위치 이동 없이 짧은 opacity 전환만 사용한다.
+- 공통 바텀 탭은 움직이지 않는 셸 평면에 두고 콘텐츠 panel만 수평 전환한다. 탭 클릭은 상대 위치와 관계없이 기존 panel이 왼쪽으로 나가고 새 panel이 오른쪽에서 들어오며, 브라우저·시스템 back의 `POP`은 반대 방향을 사용한다. reduced motion에서는 위치 이동 없이 짧은 opacity 전환만 사용한다.
 - 같은 목적지의 중복 선택은 무시한다. 전환 중 다른 탭 선택은 앞선 중간 목적지를 history에서 replace해 최신 목적지만 남긴다.
 - `/learning/materials`, `/learning/materials/:materialId`, `/learning/quizzes`, `/learning/new`는 학습 하위 route로 등록하며 공통 탭을 숨긴다. `AuthenticatedLearningPage`는 현재 URL을 route ID로 해석해 각각 자료 목록, 자료 편집, 퀴즈 목록, 새 문제 만들기 페이지를 직접 렌더링하며 별도 `window.history` 화면 상태로 route를 흉내 내지 않는다.
 - 퀴즈 생성·풀이·결과·복습 route는 기존 immersive route를 유지하고 앱 셸 탭 모션을 적용하지 않는다.
@@ -34,6 +34,6 @@ last_updated: 2026-08-28
 - `web/`의 `pnpm verify`가 통과한다.
 - 320 CSS px에서 가로 overflow가 없고 공통 탭의 현재 상태가 텍스트와 `aria-current`로 전달된다.
 - 홈 스크롤과 학습 검색 상태가 홈·학습·프로필 왕복 후 유지된다.
-- 탭의 상대 위치와 관계없이 왕복 전환 모두 기존 panel은 왼쪽으로 나가고 새 panel은 오른쪽에서 들어온다.
+- 탭 클릭은 상대 위치와 관계없이 기존 panel이 왼쪽으로 나가고 새 panel이 오른쪽에서 들어오며, `POP`은 역방향으로 복귀한다.
 - 탭 왕복 뒤 이미 방문한 panel과 component instance가 유지되고 모션 때문에 같은 Query를 새로 만들지 않는다.
 - `/learning/materials/:materialId`와 `/learning/new` 직접 진입은 해당 학습 내부 화면을 표시하며 공통 탭은 숨긴다.
