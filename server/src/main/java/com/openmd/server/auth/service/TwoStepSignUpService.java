@@ -19,9 +19,9 @@ import com.openmd.server.auth.security.SignUpTokenDigest;
 import com.openmd.server.auth.security.VerificationCodeDigest;
 import com.openmd.server.auth.security.VerificationCodeGenerator;
 import com.openmd.server.auth.util.EmailNormalizer;
+import com.openmd.server.auth.util.NicknameNormalizer;
 import com.openmd.server.global.error.BusinessException;
 import com.openmd.server.global.error.CommonErrorCode;
-import java.text.Normalizer;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
@@ -39,7 +39,6 @@ public final class TwoStepSignUpService {
 	private static final Duration RESEND_COOLDOWN = Duration.ofSeconds(60);
 	private static final Duration SIGN_UP_TOKEN_TTL = Duration.ofMinutes(15);
 	private static final String CODE_REGEX = "[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}";
-	private static final String NICKNAME_REGEX = "[가-힣A-Za-z0-9]{2,10}";
 	private static final String TERMS_VERSION = "TEMP-2026-08-20";
 	private static final Map<String, String> REQUIRED_AGREEMENTS = Map.of(
 		"SERVICE_TERMS", TERMS_VERSION,
@@ -217,11 +216,7 @@ public final class TwoStepSignUpService {
 	}
 
 	private String normalizeNickname(String input) {
-		String nickname = input == null ? "" : Normalizer.normalize(input, Normalizer.Form.NFC);
-		if (!nickname.matches(NICKNAME_REGEX)) {
-			throw new BusinessException(CommonErrorCode.INVALID_INPUT);
-		}
-		return nickname;
+		return NicknameNormalizer.normalize(input);
 	}
 
 	private void validatePassword(String password) {

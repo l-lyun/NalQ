@@ -24,11 +24,11 @@ test('최근 퀴즈는 자기평가, 활성 복습, 새 복습, 결과 순으로
     quizSetId: 'quiz-1',
     status: 'SELF_ASSESSMENT_REQUIRED',
     pendingEssayQuestionIds: ['question-1'],
-  })?.label, '자기평가 이어하기')
-  assert.equal(resolveRecentQuizAction({ ...recent, activeReviewSessionId: 'review-1' }, null)?.label, '복습 이어하기')
+  })?.label, '채점이 남았어요')
+  assert.equal(resolveRecentQuizAction({ ...recent, activeReviewSessionId: 'review-1' }, null)?.label, '틀린 문제 복습하기')
   assert.deepEqual(resolveRecentQuizAction(recent, null), {
     kind: 'start-review',
-    label: '틀린 문제 3개 복습하기',
+    label: '틀린 문제 복습하기',
     sourceAttemptId: 'attempt-1',
   })
   assert.equal(resolveRecentQuizAction({ ...recent, reviewQuestionCount: 0 }, null)?.label, '결과 보기')
@@ -48,14 +48,14 @@ test('복습 후보도 미완료 자기평가와 활성 복습을 새 복습보�
   assert.equal(resolveReviewCandidateAction({
     ...candidate,
     pendingSelfAssessmentAttemptId: 'attempt-pending',
-  }).label, '자기평가 이어하기')
+  }).label, '채점이 남았어요')
   assert.equal(resolveReviewCandidateAction({
     ...candidate,
     activeReviewSessionId: 'review-2',
-  }).label, '복습 이어하기')
+  }).label, '틀린 문제 복습하기')
   assert.deepEqual(resolveReviewCandidateAction(candidate), {
     kind: 'start-review',
-    label: '틀린 문제 2개 복습하기',
+    label: '틀린 문제 복습하기',
     sourceAttemptId: 'attempt-2',
   })
 })

@@ -46,7 +46,7 @@ scope: repository
 | 학습 | [학습 화면](ux/screen-learning.md) | Screen Spec | 초안 |
 | 미완료 서술형 자기평가 재진입 | [미완료 서술형 자기평가 재진입 화면](ux/screen-quiz-resume.md) | Screen Spec | 초안 |
 | 틀린 문제 다시 풀기 | [틀린 문제 다시 풀기 화면](ux/screen-review.md) | Screen Spec | 초안 |
-| 프로필 | [프로필 화면](ux/screen-profile.md) | Screen Spec | 초안 |
+| 마이페이지 | [마이페이지 화면](ux/screen-mypage.md) | Screen Spec | 초안 |
 | 회원가입 | [회원가입 화면](ux/screen-signup.md) | Screen Spec | 초안 |
 
 Flow는 여러 화면의 순서와 분기를, Screen Spec은 한 화면의 구조와 사용자 가시 상태를 책임진다. 둘 다 PRD의 제품 정책을 복제하지 않는다.

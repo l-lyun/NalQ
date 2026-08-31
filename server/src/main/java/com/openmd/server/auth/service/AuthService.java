@@ -12,7 +12,9 @@ import com.openmd.server.auth.repository.UserRepository;
 import com.openmd.server.auth.security.AccessTokenService;
 import com.openmd.server.auth.security.IssuedAccessToken;
 import com.openmd.server.auth.util.EmailNormalizer;
+import com.openmd.server.auth.util.NicknameNormalizer;
 import com.openmd.server.global.error.BusinessException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -66,10 +68,34 @@ public class AuthService {
 
 	@Transactional(readOnly = true)
 	public CurrentUser currentUser(long userId) {
+		return toCurrentUser(activeUser(userId));
+	}
+
+	@Transactional
+	public CurrentUser updateNickname(long userId, String input) {
+		User user = activeUser(userId);
+		String nickname = NicknameNormalizer.normalize(input);
+		if (userRepository.existsByNicknameIgnoreCaseAndIdNot(nickname, userId)) {
+			throw new BusinessException(AuthErrorCode.NICKNAME_CONFLICT);
+		}
+		user.updateNickname(nickname);
+		try {
+			userRepository.flush();
+		} catch (DataIntegrityViolationException exception) {
+			throw new BusinessException(AuthErrorCode.NICKNAME_CONFLICT);
+		}
+		return toCurrentUser(user);
+	}
+
+	private User activeUser(long userId) {
 		User user = userRepository.findById(userId).orElseThrow(this::invalidCredential);
 		if (user.getStatus() != UserStatus.ACTIVE || user.getEmailVerifiedAt() == null) {
 			throw invalidCredential();
 		}
+		return user;
+	}
+
+	private CurrentUser toCurrentUser(User user) {
 		return new CurrentUser(user.getId(), user.getEmail(), user.getNickname(), true, user.getStatus());
 	}
 

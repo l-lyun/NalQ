@@ -1,10 +1,11 @@
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 import {
   checkNicknameAvailability,
   confirmEmailVerification,
   requestVerificationEmail,
   resendVerificationEmail,
+  updateCurrentUserNickname,
 } from '@/features/auth/api/auth.api'
 
 import {
@@ -14,6 +15,7 @@ import {
   logoutCurrentSession,
   recoverCompletedSignUpSession,
 } from './authSession'
+import { currentUserQueryKey } from './auth.queries'
 
 export function useLoginMutation() {
   return useMutation({ mutationFn: loginAndLoadCurrentUser, retry: false })
@@ -49,4 +51,16 @@ export function useRecoverCompletedSignUpMutation() {
 
 export function useLogoutMutation() {
   return useMutation({ mutationFn: logoutCurrentSession, retry: false })
+}
+
+export function useUpdateCurrentUserNicknameMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: updateCurrentUserNickname,
+    retry: false,
+    onSuccess: async (currentUser) => {
+      queryClient.setQueryData(currentUserQueryKey, currentUser)
+      await queryClient.invalidateQueries({ queryKey: currentUserQueryKey })
+    },
+  })
 }

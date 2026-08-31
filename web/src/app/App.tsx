@@ -57,6 +57,12 @@ export function App() {
                 <Route path="/learning/quizzes" element={null} />
                 <Route path="/learning/new" element={null} />
                 <Route path="/profile" element={null} />
+                <Route path="/profile/account" element={null} />
+                <Route path="/profile/terms" element={null} />
+                <Route path="/profile/privacy" element={null} />
+                <Route path="/profile/marketing" element={null} />
+                <Route path="/profile/inquiry" element={null} />
+                <Route path="/profile/withdrawal" element={null} />
               </Route>
               {quizRoutesEnabled ? (
                 <>

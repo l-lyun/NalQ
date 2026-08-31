@@ -552,14 +552,14 @@ function RecentQuizContext({
   if (review.activeReviewSessionId) {
     rows.push({
       id: `${review.sourceAttemptId}-review`,
-      title: '틀린 문제 이어서 풀기',
+      title: '틀린 문제 복습하기',
       detail: '진행 중인 문제를 첫 문제부터 다시 풀어요',
       onClick: onStartReview,
     })
   } else if (review.reviewQuestionCount > 0) {
     rows.push({
       id: `${review.sourceAttemptId}-review`,
-      title: `틀린 문제 ${review.reviewQuestionCount}개만 풀기`,
+      title: '틀린 문제 복습하기',
       detail: '최근 회차의 미해결 문제만 풀어요',
       onClick: onStartReview,
     })
@@ -681,7 +681,7 @@ function MaterialCollection({
                         <br />
                         {disableLocked
                           ? '문제 생성 중 · 완료 후 선택 가능'
-                          : '문제 생성 중 · 본문 임시 잠금'}
+                          : '문제 생성 중'}
                       </>
                     ) : (
                       `${sourceLabel[material.sourceType]} · ${formatMaterialDate(material.updatedAt)}`
@@ -940,7 +940,7 @@ function MaterialDetailScreen({ materialId, loadMaterial, onBack, headingRef }: 
           </Text>
           {state.data.contentEditStatus === 'LOCKED_GENERATING' ? (
             <Text as="p" textStyle="t4Regular" color="fg.neutralMuted">
-              문제 생성 중이라 본문이 임시 잠금 상태예요.
+              문제 생성 중
             </Text>
           ) : null}
           <VStack gap="x2">
