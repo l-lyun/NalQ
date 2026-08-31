@@ -7,23 +7,29 @@ import { useCurrentUser } from '@/features/auth/model/auth.queries'
 
 import { ProfilePage } from './ProfilePage'
 import { AccountSettingsPage, PendingFeaturePage, TermsPage } from './ProfileSubPages'
+import {
+  cameFromProfileMain,
+  normalizeProfilePath,
+  profileSubPageNavigationState,
+} from './profileRoutes'
 
 export function AuthenticatedProfilePage() {
   const location = useLocation()
   const navigate = useNavigate()
   const currentUser = useCurrentUser()
   const logout = useLogoutMutation()
+  const pathname = normalizeProfilePath(location.pathname)
   const status = currentUser.isPending && !currentUser.data
     ? 'loading'
     : currentUser.isError && !currentUser.data
       ? 'error'
       : 'ready'
   const back = () => {
-    if (location.key === 'default') navigate('/profile', { replace: true })
-    else navigate(-1)
+    if (cameFromProfileMain(location.state)) navigate(-1)
+    else navigate('/profile', { replace: true })
   }
 
-  if (location.pathname === '/profile/account') {
+  if (pathname === '/profile/account') {
     return (
       <AccountSettingsPage
         status={status}
@@ -34,13 +40,19 @@ export function AuthenticatedProfilePage() {
       />
     )
   }
-  if (location.pathname === '/profile/terms') {
+  if (pathname === '/profile/terms') {
     return <TermsPage termId="service" title="서비스 이용약관" onBack={back} />
   }
-  if (location.pathname === '/profile/privacy') {
-    return <TermsPage termId="privacy" title="개인정보처리방침" onBack={back} />
+  if (pathname === '/profile/privacy') {
+    return (
+      <PendingFeaturePage
+        title="개인정보처리방침"
+        description="운영용 개인정보처리방침이 확정되지 않아 임시 수집·이용 동의서를 대신 보여주지 않아요."
+        onBack={back}
+      />
+    )
   }
-  if (location.pathname === '/profile/marketing') {
+  if (pathname === '/profile/marketing') {
     return (
       <PendingFeaturePage
         title="마케팅 수신동의"
@@ -49,7 +61,7 @@ export function AuthenticatedProfilePage() {
       />
     )
   }
-  if (location.pathname === '/profile/inquiry') {
+  if (pathname === '/profile/inquiry') {
     return (
       <PendingFeaturePage
         title="서비스 이용 문의하기"
@@ -58,7 +70,7 @@ export function AuthenticatedProfilePage() {
       />
     )
   }
-  if (location.pathname === '/profile/withdrawal') {
+  if (pathname === '/profile/withdrawal') {
     return (
       <PendingFeaturePage
         title="회원탈퇴"
@@ -76,12 +88,12 @@ export function AuthenticatedProfilePage() {
       appVersion={import.meta.env.VITE_APP_VERSION?.trim() || packageMetadata.version}
       logoutPending={logout.isPending}
       logoutError={logout.isError ? '로그아웃하지 못했어요. 다시 시도해주세요.' : undefined}
-      onOpenAccount={() => navigate('/profile/account')}
-      onOpenTerms={() => navigate('/profile/terms')}
-      onOpenPrivacy={() => navigate('/profile/privacy')}
-      onOpenMarketing={() => navigate('/profile/marketing')}
-      onOpenInquiry={() => navigate('/profile/inquiry')}
-      onOpenWithdrawal={() => navigate('/profile/withdrawal')}
+      onOpenAccount={() => navigate('/profile/account', { state: profileSubPageNavigationState })}
+      onOpenTerms={() => navigate('/profile/terms', { state: profileSubPageNavigationState })}
+      onOpenPrivacy={() => navigate('/profile/privacy', { state: profileSubPageNavigationState })}
+      onOpenMarketing={() => navigate('/profile/marketing', { state: profileSubPageNavigationState })}
+      onOpenInquiry={() => navigate('/profile/inquiry', { state: profileSubPageNavigationState })}
+      onOpenWithdrawal={() => navigate('/profile/withdrawal', { state: profileSubPageNavigationState })}
       onLogout={() => {
         if (!window.confirm('이 기기에서 로그아웃할까요?')) return
         logout.reset()

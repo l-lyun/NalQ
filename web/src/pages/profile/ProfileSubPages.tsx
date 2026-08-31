@@ -35,8 +35,8 @@ export function AccountSettingsPage({
   const [draft, setDraft] = useState(nickname ?? '')
 
   useEffect(() => {
-    if (!updateNickname.isPending) setDraft(nickname ?? '')
-  }, [nickname, updateNickname.isPending])
+    setDraft(nickname ?? '')
+  }, [nickname])
 
   const normalizedNickname = draft.normalize('NFC')
   const formatValid = NICKNAME_PATTERN.test(normalizedNickname)
