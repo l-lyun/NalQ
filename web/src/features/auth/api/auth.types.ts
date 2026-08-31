@@ -79,3 +79,7 @@ export type CurrentUser = {
   emailVerified: boolean
   status: 'PENDING_ACTIVATION' | 'ACTIVE' | 'SUSPENDED' | 'WITHDRAWN'
 }
+
+export type UpdateCurrentUserNicknameRequest = {
+  nickname: string
+}

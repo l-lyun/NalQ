@@ -13,7 +13,7 @@ import type { AppTabId } from '../shell/appTabs'
 const items = [
   { id: 'home', label: '홈', currentIcon: IconHouseSquareFill, icon: IconHouseSquareLine },
   { id: 'learning', label: '학습', currentIcon: IconBookFill, icon: IconBookLine },
-  { id: 'profile', label: '프로필', currentIcon: IconPersonCircleFill, icon: IconPersonCircleLine },
+  { id: 'profile', label: '마이페이지', currentIcon: IconPersonCircleFill, icon: IconPersonCircleLine },
 ] satisfies Array<{
   id: AppTabId
   label: string

@@ -150,6 +150,33 @@ class AuthServiceTest {
 	}
 
 	@Test
+	void updatesTheCurrentUsersNicknameAfterNfcNormalization() throws Exception {
+		User user = activeSignUpUser(32L, "Study7");
+		when(users.findById(32L)).thenReturn(Optional.of(user));
+		when(users.existsByNicknameIgnoreCaseAndIdNot("가7", 32L)).thenReturn(false);
+
+		CurrentUser current = service.updateNickname(32L, "가7");
+
+		assertEquals("가7", current.nickname());
+		assertEquals("가7", user.getNickname());
+		verify(users).flush();
+	}
+
+	@Test
+	void rejectsANicknameOwnedByAnotherUserWithoutChangingTheCurrentUser() throws Exception {
+		User user = activeSignUpUser(32L, "Study7");
+		when(users.findById(32L)).thenReturn(Optional.of(user));
+		when(users.existsByNicknameIgnoreCaseAndIdNot("공부왕7", 32L)).thenReturn(true);
+
+		BusinessException exception = assertThrows(BusinessException.class,
+			() -> service.updateNickname(32L, "공부왕7"));
+
+		assertEquals(AuthErrorCode.NICKNAME_CONFLICT, exception.getErrorCode());
+		assertEquals("Study7", user.getNickname());
+		verify(users, never()).flush();
+	}
+
+	@Test
 	void logoutStillRevokesThePresentedRefreshCredential() {
 		service.logout("current-refresh");
 

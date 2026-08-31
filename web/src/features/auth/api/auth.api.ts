@@ -7,6 +7,7 @@ import type {
   LoginRequest,
   NicknameAvailability,
   NicknameAvailabilityRequest,
+  UpdateCurrentUserNicknameRequest,
   VerificationRequired,
 } from './auth.types'
 import { protectedApi } from '@/shared/api/protectedApi'
@@ -55,6 +56,15 @@ export function createSession(payload: LoginRequest) {
 export async function getCurrentUser(signal?: AbortSignal) {
   try {
     const response = await protectedApi.get<ApiResponse<CurrentUser>>('/api/v1/users/me', { signal })
+    return unwrapApiResponse(response.data)
+  } catch (error) {
+    throw toApiClientError(error)
+  }
+}
+
+export async function updateCurrentUserNickname(payload: UpdateCurrentUserNicknameRequest) {
+  try {
+    const response = await protectedApi.patch<ApiResponse<CurrentUser>>('/api/v1/users/me', payload)
     return unwrapApiResponse(response.data)
   } catch (error) {
     throw toApiClientError(error)

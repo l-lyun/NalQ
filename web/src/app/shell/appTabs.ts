@@ -14,7 +14,7 @@ export const appTabOrder: Record<AppTabId, number> = {
 
 export function getAppTab(pathname: string): AppTabId {
   const normalizedPathname = normalizeAppPath(pathname)
-  if (normalizedPathname === '/profile') return 'profile'
+  if (normalizedPathname === '/profile' || normalizedPathname.startsWith('/profile/')) return 'profile'
   if (normalizedPathname === '/learning' || normalizedPathname.startsWith('/learning/')) return 'learning'
   return 'home'
 }

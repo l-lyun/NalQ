@@ -1,6 +1,6 @@
 import { Box, VStack } from '@seed-design/react'
 import { useLayoutEffect, useRef, useState } from 'react'
-import { Outlet, useLocation, useNavigate, useNavigationType } from 'react-router-dom'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 
 import { AppBottomNavigation } from '@/app/navigation/AppBottomNavigation'
 import { AuthenticatedHomePage } from '@/pages/home/AuthenticatedHomePage'
@@ -21,7 +21,6 @@ const transitionDurationMs = 210
 export function AuthenticatedAppShell() {
   const location = useLocation()
   const navigate = useNavigate()
-  const navigationType = useNavigationType()
   const activeTab = getAppTab(location.pathname)
   const previousTabRef = useRef(activeTab)
   const pendingTabRef = useRef<AppTabId | null>(null)
@@ -42,7 +41,6 @@ export function AuthenticatedAppShell() {
     setTransition({
       from: previousTab,
       to: activeTab,
-      navigation: navigationType === 'POP' ? 'pop' : 'forward',
     })
     previousTabRef.current = activeTab
     transitionTimerRef.current = window.setTimeout(() => {
@@ -50,7 +48,7 @@ export function AuthenticatedAppShell() {
       pendingTabRef.current = null
       transitionTimerRef.current = null
     }, transitionDurationMs)
-  }, [activeTab, navigationType])
+  }, [activeTab])
 
   const navigateToTab = (tab: AppTabId) => {
     if (tab === activeTab && isTopLevelTabPath(location.pathname)) return

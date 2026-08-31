@@ -33,16 +33,16 @@ export function resolveQuizManagementActions(
     return [{ label: '생성 다시 시도', path: `/learning/${quiz.materialId}/quiz`, primary: true }]
   }
   if (pending) {
-    return [{ label: '자기평가 이어하기', path: `/quiz-sets/${pending.quizSetId}`, primary: true }]
+    return [{ label: '채점이 남았어요', path: `/quiz-sets/${pending.quizSetId}`, primary: true }]
   }
   if (latestReview?.quizSetId === quiz.quizSetId && latestReview.sourceAttemptId) {
     const actions: QuizManagementAction[] = [
       { label: '결과 보기', path: `/quiz-attempts/${latestReview.sourceAttemptId}/result` },
     ]
     if (latestReview.activeReviewSessionId) {
-      actions.push({ label: '복습 이어하기', path: `/review-sessions/${latestReview.activeReviewSessionId}`, primary: true })
+      actions.push({ label: '틀린 문제 복습하기', path: `/review-sessions/${latestReview.activeReviewSessionId}`, primary: true })
     } else if (latestReview.reviewQuestionCount > 0) {
-      actions.push({ label: `틀린 문제 ${latestReview.reviewQuestionCount}개 복습하기`, path: '/review', primary: true })
+      actions.push({ label: '틀린 문제 복습하기', path: '/review', primary: true })
     } else {
       actions.push({ label: '전체 다시 풀기', path: `/quiz-sets/${quiz.quizSetId}`, primary: true })
     }

@@ -15,8 +15,8 @@ const items: Array<{
 }> = [
   { id: 'home', label: '홈', icon: IconHouseSquareLine },
   { id: 'learning', label: '학습', icon: IconBookFill },
-  // TODO: 프로필 라우트가 추가되면 disabled를 제거하고 라우팅 콜백을 연결한다.
-  { id: 'profile', label: '프로필', icon: IconPersonCircleLine, disabled: true },
+  // TODO: 마이페이지 라우트가 추가되면 disabled를 제거하고 라우팅 콜백을 연결한다.
+  { id: 'profile', label: '마이페이지', icon: IconPersonCircleLine, disabled: true },
 ]
 
 export function LearningBottomNavigation({

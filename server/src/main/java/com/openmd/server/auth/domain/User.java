@@ -107,6 +107,10 @@ public class User extends BaseEntity {
 		status = UserStatus.ACTIVE;
 	}
 
+	public void updateNickname(String nickname) {
+		this.nickname = nickname;
+	}
+
 	public String getEmail() { return email; }
 	public String getNormalizedEmail() { return normalizedEmail; }
 	public String getPasswordHash() { return passwordHash; }

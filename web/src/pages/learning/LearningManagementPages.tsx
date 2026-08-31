@@ -391,19 +391,11 @@ function ReviewCandidateRow({
   onAction: (action: LearningReviewAction) => void
 }) {
   const action = resolveReviewCandidateAction(candidate)
-  const stateLabel = candidate.pendingSelfAssessmentAttemptId
-    ? '자기평가가 남아 있어요'
-    : candidate.activeReviewSessionId
-      ? '복습 중'
-      : `틀린 문제 ${candidate.reviewQuestionCount}개`
   return (
     <Flex className="learning-review-row" align="center" justify="space-between" gap="x3">
       <VStack minWidth="0px" gap="x1" align="flex-start">
         <Text className="learning-long-title" textStyle="t6Medium" color="fg.neutral">
           {candidate.quizTitle}
-        </Text>
-        <Text textStyle="t3Regular" color="fg.neutralMuted">
-          {candidate.materialTitle} · {stateLabel}
         </Text>
         <Text textStyle="t3Regular" color="fg.neutralMuted">
           최근 학습 {formatDate(candidate.lastLearningActivityAt)}
@@ -574,7 +566,7 @@ function MaterialDisclosureCard({
           </Text>
           {locked ? (
             <Text textStyle="t4Regular" color="fg.warning">
-              문제 생성 중 · 본문은 잠시 수정할 수 없어요
+              문제 생성 중
             </Text>
           ) : null}
         </VStack>

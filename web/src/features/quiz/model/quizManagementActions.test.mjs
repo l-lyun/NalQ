@@ -25,7 +25,7 @@ test('일반 MAIN 퀴즈에는 이어서 풀기를 만들지 않는다', () => {
   assert.equal(actions.some((action) => action.label.includes('이어서')), false)
 })
 
-test('미완료 서술형 회차만 자기평가 이어서 하기로 연결한다', () => {
+test('미완료 서술형 회차는 채점이 남았음을 안내한다', () => {
   const pending = {
     attemptId: 'attempt-1',
     quizSetId: quiz.quizSetId,
@@ -34,7 +34,7 @@ test('미완료 서술형 회차만 자기평가 이어서 하기로 연결한�
   }
   const actions = resolveQuizManagementActions(quiz, pending)
   assert.deepEqual(actions, [
-    { label: '자기평가 이어하기', path: '/quiz-sets/quiz-1', primary: true },
+    { label: '채점이 남았어요', path: '/quiz-sets/quiz-1', primary: true },
   ])
 })
 
@@ -63,7 +63,7 @@ test('활성 복습은 결과 보기와 활성 세션 재개를 함께 제공한
     activeReviewSessionId: 'review-1',
   }
   const actions = resolveQuizManagementActions(quiz, null, latest)
-  assert.deepEqual(actions.map((action) => action.label), ['결과 보기', '복습 이어하기'])
+  assert.deepEqual(actions.map((action) => action.label), ['결과 보기', '틀린 문제 복습하기'])
   assert.equal(actions[1]?.path, '/review-sessions/review-1')
 })
 
