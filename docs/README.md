@@ -42,6 +42,7 @@ scope: repository
 | 이메일 기반 자체 인증 | [인증 흐름](ux/flow-authentication.md) | Flow | 초안 |
 | 학습자료 만들기 | [학습자료 만들기 흐름](ux/flow-content-import.md) | Flow | 검토 중 |
 | 퀴즈 생성부터 복습까지 | [퀴즈 흐름](ux/flow-quiz-solving.md) | Flow | 검토 중 |
+| 서술형 자기평가와 채점 결과 | [퀴즈 피드백 화면](ux/screen-quiz-feedback.md) | Screen Spec | 검토 중 |
 | 홈 | [홈 화면](ux/screen-home.md) | Screen Spec | 초안 |
 | 학습 | [학습 화면](ux/screen-learning.md) | Screen Spec | 초안 |
 | 미완료 서술형 자기평가 재진입 | [미완료 서술형 자기평가 재진입 화면](ux/screen-quiz-resume.md) | Screen Spec | 초안 |
