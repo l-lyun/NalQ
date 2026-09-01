@@ -20,7 +20,7 @@ scope: shared
 
 ### 인증과 소유권
 
-- 모든 엔드포인트는 유효한 Access Token이 필요하다.
+- 모든 클라이언트 API 엔드포인트는 유효한 OpenMD Access Token이 필요하다. Notion OAuth callback만 브라우저가 아닌 제공자 redirect를 받으므로 Bearer Token 대신 서버가 발급한 일회성·만료형 OAuth state로 요청의 사용자와 복귀 위치를 검증한다.
 - 서버는 Access Token에서 얻은 `userId`로 학습자료, 문제 세트, 본 퀴즈 회차와 복습 세션의 소유권을 판단한다. 요청 body의 `userId`는 받지 않는다.
 - attempt, 문항 결과와 복습 리소스는 요청 경로의 개별 ID 존재 여부만 확인하지 않는다. 현재 사용자의 학습자료 → 문제 세트 → attempt → attempt 문항 연결 전체가 일치하는지 검증하며, 복습은 원본 MAIN attempt와 원본 attempt 문항까지 같은 소유권 연결 안에 있는지 검증한다.
 - `quizSetId`, `attemptId`, 복습 ID와 문항 ID는 리소스 식별자일 뿐 권한 증명이 아니다. 클라이언트가 알고 있는 ID만으로 소유권 검증을 생략하지 않는다.
@@ -89,6 +89,11 @@ scope: shared
 | 학습자료 목록 조회·제목 검색 | `GET /api/v1/learning-materials` | `200 OK` |
 | 학습자료 상세 조회 | `GET /api/v1/learning-materials/{materialId}` | `200 OK` |
 | 학습자료 수정 | `PATCH /api/v1/learning-materials/{materialId}` | `200 OK` |
+| Notion 연결 상태 조회 | `GET /api/v1/integrations/notion/connection` | `200 OK` |
+| Notion OAuth 승인 시작 | `POST /api/v1/integrations/notion/authorizations` | `201 Created` |
+| Notion OAuth callback | `GET /api/v1/integrations/notion/callback` | `302 Found` |
+| Notion 접근 페이지 조회 | `GET /api/v1/integrations/notion/pages` | `200 OK` |
+| Notion 연결 해제 | `DELETE /api/v1/integrations/notion/connection` | `200 OK` |
 | Notion 페이지 일회성 복사 | `POST /api/v1/learning-material-imports/notion` | `200 OK` |
 | 문제 세트 생성 접수 | `POST /api/v1/learning-materials/{materialId}/quiz-sets` | `202 Accepted` |
 | 자료의 활성 생성 조회 | `GET /api/v1/learning-materials/{materialId}/quiz-sets/active` | `200 OK` |
@@ -111,10 +116,10 @@ scope: shared
 
 ## 학습자료
 
-### 이번 조회 연동 범위
+### 이번 학습자료 연동 범위
 
-- **확정·이번 구현:** 기존 학습자료 저장을 유지하고, 인증 사용자의 학습자료 목록과 상세를 조회한다.
-- **확정·후속 구현:** 학습자료 수정과 Notion 단일 페이지 일회성 복사는 계약을 유지하되 이번 조회 연동 구현에는 포함하지 않는다.
+- **확정·이번 구현:** 기존 학습자료 저장·목록·상세·수정을 유지하고, 사용자별 Notion Public OAuth 연결, 연결 워크스페이스의 접근 페이지 조회와 단일 페이지 일회성 복사를 서버·웹에 연결한다.
+- **확정·후속 구현:** 네이티브 앱의 OAuth 복귀 UX를 추가한다. 이 절의 서버 요청·응답과 오류 의미는 웹·앱 공통이며 플랫폼별 화면 경로를 필드로 고정하지 않는다.
 - **비범위:** 학습자료 삭제, Notion 동기화와 실제 외부 문제 생성 서비스 연동은 이번 작업에서 다루지 않는다.
 
 ### 저장
@@ -261,7 +266,140 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 - 공개 상태는 `EDITABLE`, `LOCKED_GENERATING`뿐이며 영구 잠금 상태는 두지 않는다.
 - 학습자료 수정은 이미 만들어진 QuizSet·풀이·결과를 바꾸지 않는다. 이후 새 QuizSet은 생성 접수 시점의 최신 저장 본문을 근거로 한다.
 
-### Notion 단일 페이지 일회성 복사
+### 확정된 Notion HTTP 계약
+
+아래 여섯 경로, 요청·응답 필드, HTTP status와 여섯 공개 오류의 의미는 이번 구현의 확정 계약이다.
+
+#### Notion 연결 상태 조회
+
+`GET /api/v1/integrations/notion/connection`
+
+```json
+{
+  "success": true,
+  "data": {
+    "status": "CONNECTED",
+    "workspaceName": "개인 학습 공간"
+  },
+  "error": null
+}
+```
+
+- `status`는 `DISCONNECTED`, `CONNECTED`, `REAUTH_REQUIRED` 중 하나다.
+- `workspaceName`은 Notion이 제공한 연결 워크스페이스의 표시 이름이다. Notion의 정상 token 응답에서도 이름이 없을 수 있으므로 모든 상태에서 `null`을 허용하며, 클라이언트는 `CONNECTED|REAUTH_REQUIRED`인데 값이 없으면 일반적인 "연결된 Notion 워크스페이스" 표시를 사용한다. 내부 `workspaceId`는 클라이언트에 반환하지 않는다.
+- OpenMD 사용자 한 명은 활성 Notion 워크스페이스 연결을 최대 한 개만 가진다. 다른 워크스페이스로 바꾸려면 현재 연결 해제를 먼저 완료해야 한다.
+- `REAUTH_REQUIRED`는 로컬 연결의 워크스페이스 의미를 보존하지만 현재 접근 자격으로 페이지 목록·복사를 계속할 수 없는 상태다. 같은 워크스페이스 재인증만 기존 연결을 갱신할 수 있다.
+- Notion access token·refresh token과 제공자 원시 연결 정보는 이 응답을 포함한 어떤 클라이언트 응답에도 포함하지 않는다.
+
+#### Notion 연결 데이터와 암호화
+
+- 서버는 Notion 연결을 OpenMD `user_id`당 unique 한 행으로 저장한다. 행은 내부 `workspace_id`, nullable 표시용 `workspace_name`, 암호화한 access token, 선택적인 암호화 refresh token, 암호화 key version, `CONNECTED|REAUTH_REQUIRED` 상태와 생성·수정 시각을 가진다.
+- Notion token 응답에는 token 만료 시각이 없으므로 추측한 만료 시각이나 `expiresAt`을 연결 행에 저장하지 않는다. OAuth 승인 시작 응답의 `expiresAt`은 일회성 승인 요청의 만료일 뿐 token 수명이 아니다.
+- token은 각각 별도의 nonce를 사용하는 AES-256-GCM으로 암호화한다. AAD는 `userId + workspaceId + tokenType`을 결합해 다른 사용자·워크스페이스·token 종류로 암호문을 옮겨 사용할 수 없게 한다.
+- 개발 환경의 암호화 key는 환경 변수로 주입하고, 운영 key는 secret manager에서 공급한다. DB에는 key 원문 대신 복호화할 key version만 저장한다.
+- Notion 사용자 이름·이메일·프로필 등 사용자 개인정보, `bot_id`와 OAuth 원시 응답은 저장하지 않는다. 연결은 학습자료 가져오기에 필요한 read content capability만 요청·사용한다.
+- token 갱신은 같은 `user_id` 연결 행을 잠근 한 요청만 수행한다. 갱신 성공 시 새 access token과 제공된 refresh token을 한 트랜잭션에서 교체하고, 갱신을 촉발한 원 요청을 한 번만 다시 호출한다.
+- refresh token이 없거나 갱신에 실패해 재동의가 필요하면 기존 연결 메타데이터를 삭제하지 않고 `REAUTH_REQUIRED`로 전환한다. Notion token 갱신 실패를 OpenMD `401`로 노출하지 않는다.
+
+#### Notion OAuth 승인 시작과 callback
+
+`POST /api/v1/integrations/notion/authorizations`
+
+```json
+{
+  "returnUri": "https://app.openmd.example/learning/import/notion"
+}
+```
+
+```json
+{
+  "success": true,
+  "data": {
+    "authorizationUrl": "https://notion.example/authorize/opaque-request",
+    "expiresAt": "2026-09-01T06:10:00Z"
+  },
+  "error": null
+}
+```
+
+- `returnUri`는 서버에 미리 등록된 정확한 복귀 URI 중 하나여야 한다. 임의 origin·부분 일치·요청 Host에서 조합한 URI를 허용하지 않는다.
+- 서버는 승인 요청마다 예측할 수 없는 일회성 state를 만들고 현재 `userId`, `returnUri`, 만료 시각과 연결한다. state 원문과 Notion 자격은 일반 로그에 남기지 않는다.
+- `authorizationUrl`은 클라이언트가 그대로 열어야 하는 만료형 opaque URL이다. 웹은 현재 페이지를 이 URL로 이동하는 full-page redirect를 사용한다. 서버 계약은 팝업, WebView 또는 네이티브 deep link를 요구하지 않는다.
+- 연결이 없으면 사용자는 자신이 권한을 줄 수 있는 임의의 워크스페이스를 승인할 수 있다. 기존 연결이 있으면 같은 워크스페이스의 재인증·접근 페이지 추가에만 승인 결과를 사용할 수 있다.
+- 기존 연결이 있는데 callback에서 다른 워크스페이스가 확인되면 새로 발급된 자격을 저장하지 않고 폐기하며 기존 `CONNECTED|REAUTH_REQUIRED` 상태를 유지한다. callback은 `outcome=failed&error=NOTION_WORKSPACE_MISMATCH`로 복귀시키고, 클라이언트는 기존 연결을 계속 사용하거나 현재 연결 해제 뒤 다른 워크스페이스 연결을 시작한다. 이 오류는 현재 자격이 무효하다는 뜻이 아니며 재인증을 요구하지 않는다.
+- 재인증·접근 페이지 추가 전의 `pageId`는 OAuth state, 서버 연결 정보나 프론트 복원 상태에 저장하지 않는다. callback 뒤 사용자는 페이지 목록을 새로고침하고 다시 선택한다.
+
+`GET /api/v1/integrations/notion/callback`
+
+- 이 경로의 query는 Notion OAuth protocol 입력이며 웹·앱이 직접 구성하지 않는다. 서버는 일회성 state, 만료, 사용자 연결 상태와 승인 결과를 검증한다.
+- 기존 연결을 전제로 시작한 재인증·접근 페이지 추가 state는 해당 연결이 해제되거나 다른 자격으로 바뀌면 무효하다. 이후 도착한 callback은 자격을 저장하거나 연결을 다시 만들지 않고 `NOTION_CONNECTION_REQUIRED`로 복귀시킨다.
+- 성공하면 자격을 암호화해 저장하고 `returnUri?outcome=connected`로 `302 Found` 복귀시킨다. 사용자가 승인을 취소하면 연결을 만들거나 바꾸지 않고 `returnUri?outcome=cancelled`, 실패하면 `returnUri?outcome=failed&error={Notion 공개 오류 코드}`로 복귀시킨다.
+- state가 만료·유실·재사용되어 신뢰할 수 있는 `returnUri`를 복구할 수 없으면 서버는 요청값에서 복귀 주소를 만들지 않는다. 환경별로 등록한 고정 웹 복귀 URI에 `outcome=failed&error=NOTION_CONNECTION_REQUIRED`를 붙여 보낸다. 이 코드는 이 callback 문맥에서 "유효한 OAuth 승인 흐름을 계속할 수 없음"도 뜻한다. 웹은 query 제거와 연결 상태 재조회 뒤 `DISCONNECTED`면 최초 연결을, `CONNECTED|REAUTH_REQUIRED`면 해당 상태에 맞는 승인 흐름을 처음부터 다시 시작할 수 있게 한다.
+- callback redirect query는 `outcome=connected|cancelled|failed`와 `failed`일 때 여섯 Notion 공개 오류 중 하나인 `error`만 허용한다. `connected|cancelled`에는 `error`를 붙이지 않는다. Notion authorization `code`, access·refresh token, OAuth `state`, 원시 오류와 내부 예외는 복귀 URI에 포함하지 않는다.
+- 웹은 복귀 즉시 callback query를 주소에서 제거한 뒤 `GET /api/v1/integrations/notion/connection`을 다시 조회한다. `outcome=connected`이면 페이지 선택으로, `cancelled|failed`이면 입력 방식 선택으로 이동한다. redirect query를 연결 상태의 원장으로 사용하지 않는다.
+- 현재 구현의 소비자는 웹이지만, API의 연결 상태와 오류 의미는 플랫폼 중립이다. 네이티브 앱에서 사용할 복귀 URI 등록과 외부 브라우저 복귀 UX는 후속 범위다.
+
+#### Notion 외부 호출과 재시도
+
+- 서버는 Notion 연결 timeout을 3초, 개별 응답 읽기 timeout을 15초, 한 OpenMD 요청의 전체 Notion 처리 시간을 20초로 제한한다.
+- 한 외부 호출의 재시도는 최대 한 번이다. `429`와 `529`는 `Retry-After`를 존중하고, 읽기 `GET`의 `5xx`는 한 번 재시도한다. 남은 전체 처리 시간 안에 재시도할 수 없으면 `NOTION_TEMPORARILY_UNAVAILABLE`로 끝낸다.
+- Notion `400`, `403`, `404`는 재시도하지 않는다. Notion `401`은 위 token 갱신 절차를 한 번 수행하고 원 요청을 한 번 다시 호출하며, 계속 실패하면 `NOTION_REAUTH_REQUIRED`다.
+- 이 MVP에는 자체 복합 rate limiter, Redis 대기열이나 background retry 작업을 추가하지 않는다. 클라이언트는 연결·재인증·목록·복사·해제 요청이 진행 중인 동안 같은 작업과 관련된 버튼을 비활성화한다.
+
+#### Notion 접근 페이지 조회
+
+`GET /api/v1/integrations/notion/pages?cursor=opaque-cursor&query=운영체제`
+
+- `cursor`: 선택, 직전 성공 응답의 `nextCursor`를 그대로 사용하는 opaque 문자열이다.
+- `query`: 선택, 페이지 선택을 돕는 제목 검색어다. 생략하거나 정리 결과가 빈 문자열이면 제목 필터를 적용하지 않는다.
+- 한 응답은 수정 시각 최신순으로 최대 20개를 반환한다. 더 보기는 `nextCursor`를 사용하고, 새로고침은 `cursor` 없이 현재 `query`의 첫 목록을 다시 요청한다.
+- `query`가 바뀌면 클라이언트는 현재 항목과 이전 `nextCursor`를 버리고, `cursor`가 없는 새 검색의 첫 요청부터 시작한다. 서로 다른 `query`에서 받은 cursor를 재사용하지 않는다.
+- 서버는 현재 연결된 워크스페이스에서 사용자가 integration 접근을 허용한 일반 페이지와 데이터베이스의 개별 행 페이지만 반환하고 데이터베이스 자체는 제외한다. 하위 페이지는 상위 페이지 본문에 포함한다는 의미가 아니라 별도로 선택 가능한 항목이다.
+
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "pageId": "opaque-notion-page-id",
+        "title": "운영체제 정리",
+        "lastEditedAt": "2026-09-01T05:30:00Z"
+      }
+    ],
+    "nextCursor": null
+  },
+  "error": null
+}
+```
+
+- `pageId`와 `nextCursor`는 opaque 문자열이며 클라이언트가 해석하거나 권한 증명으로 사용하지 않는다.
+- 제목이 없는 페이지의 `title`은 빈 문자열일 수 있다. 페이지 선택 화면의 대체 표시는 저장될 학습자료 제목이 아니며, 학습자료 저장에는 사용자가 유효한 제목을 입력해야 한다.
+- 목록에 없는 페이지 접근을 추가하려면 같은 워크스페이스 OAuth 승인을 다시 진행한 뒤 cursor 없는 첫 목록을 새로고침한다. 재승인 전 `pageId`를 자동 선택하거나 복원하지 않는다.
+- Notion 검색에서 접근 가능한 페이지가 누락되는 경우, 웹은 사용자가 입력한 Notion URL에서 page UUID를 추출해 같은 `pageId` 요청으로 아래 가져오기 API를 호출할 수 있다. 별도 URL 가져오기 endpoint를 만들지 않으며 서버는 입력 URL이나 추출한 `pageId`를 가져오기 기록으로 저장하지 않는다.
+
+#### Notion 연결 해제
+
+`DELETE /api/v1/integrations/notion/connection`
+
+```json
+{
+  "success": true,
+  "data": {
+    "status": "DISCONNECTED"
+  },
+  "error": null
+}
+```
+
+- 서버는 Notion 쪽 접근 권한 철회를 먼저 수행한다. revoke `200`이면 로컬 정보를 삭제한다. revoke 응답이 유실되거나 성공 여부가 불명확하면 같은 token을 Notion introspection endpoint로 확인하고 `active=false`일 때만 이미 철회된 것으로 판단해 삭제한다.
+- 연결 해제와 token 갱신이 겹치면 해제 성공 응답 전에 새로 발급된 자격까지 철회된 것을 확인해야 한다. 성공한 해제는 Notion에 유효한 현재 자격을 남기거나 갱신 중인 자격을 로컬 연결 삭제 뒤에 저장하지 않는다.
+- introspection 결과가 `active=true`이면 로컬 정보를 유지하고 연결 해제를 실패 처리한다. introspection 자체가 실패해 상태를 확인할 수 없어도 로컬 정보를 유지한다.
+- 제공자 일시 장애로 철회 결과를 확인할 수 없으면 `503 NOTION_TEMPORARILY_UNAVAILABLE`을 반환하고 로컬 연결을 보존한다. 클라이언트는 같은 연결 해제를 다시 요청할 수 있다.
+- 해제가 완료되면 해당 사용자가 먼저 시작하고 아직 소비하지 않은 OAuth 승인 요청도 무효해진다. 늦게 도착한 callback이 연결을 다시 만들어서는 안 된다.
+- 성공 재요청에서 이미 로컬 연결이 없으면 현재 `DISCONNECTED` 결과를 반환한다.
+
+#### Notion 단일 페이지 일회성 복사
 
 `POST /api/v1/learning-material-imports/notion`
 
@@ -277,22 +415,23 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
   "data": {
     "sourceType": "NOTION",
     "title": "복사한 페이지 제목",
-    "content": "복사한 본문",
-    "warnings": [
-      {
-        "code": "UNSUPPORTED_BLOCK_OMITTED",
-        "message": "일부 지원하지 않는 블록은 제외됐어요. 저장 전에 내용을 확인해 주세요."
-      }
-    ]
+    "content": "# 운영체제\n\n프로세스와 스레드의 차이..."
   },
   "error": null
 }
 ```
 
-- 서버는 사용자가 선택한 페이지 하나를 요청 시점에 한 번 읽는다.
+- 서버는 현재 사용자에게 연결된 워크스페이스에서 사용자가 선택한 페이지 하나를 요청 시점에 한 번 읽는다. `pageId`를 알고 있다는 사실만으로 권한 검증을 생략하지 않는다.
+- 서버는 같은 요청 안에서 Notion Page API로 최신 제목을 먼저 읽고, 성공한 뒤 Markdown API를 `include_transcript=false`로 순차 호출한다. 두 호출을 병렬 실행하거나 첫 호출 결과 없이 Markdown 호출을 시작하지 않는다.
+- 하위 페이지는 현재 페이지 본문에 자동 병합하지 않는다. 사용자가 하위 페이지를 별도로 선택해 이 API를 호출해야 별도 가져오기 결과가 된다.
+- 같은 사용자가 같은 페이지를 여러 번 호출하는 것을 허용한다. 이 API는 멱등 키나 중복 원장을 두지 않고 매 요청 시점의 페이지를 새로 읽는다.
+- Markdown 응답의 첫 줄을 제목으로 간주해 제거하지 않는다. fenced·inline code 영역 밖의 Notion enhanced Markdown 줄바꿈 표시인 정확한 `<br>`만 Markdown 강제 줄바꿈인 두 칸과 줄바꿈(`  \n`)으로 치환한다. 코드 영역의 `<br>` 리터럴과 그 밖의 enhanced Markdown·링크는 응답 텍스트 그대로 유지한다.
+- 이미지·영상·파일 등 미디어 본체와 녹취는 본문에서 제외하되 제공된 캡션·대체 텍스트는 일반 텍스트로 유지한다. 미디어 원본 URL, 다운로드 자격과 녹취 원문을 반환하지 않는다.
+- Markdown 응답이 truncated 상태이거나 `unknown_block_ids`가 하나 이상이거나 코드 영역 밖의 본문에 Notion이 생성한 `<unknown>` 또는 속성을 가진 `<unknown ...>` 태그가 있으면 추가 회수를 시도하지 않고 `NOTION_CONTENT_INCOMPLETE`로 전체 실패한다. 사용자가 fenced·inline code에 작성한 같은 리터럴은 불완전 표시로 판정하지 않는다. 이 실패에는 부분 `content`를 반환하지 않는다.
 - 성공 응답은 프론트 편집용 값이며 서버 학습자료·draft·import job을 만들지 않는다.
-- 복사된 본문이 20,000자를 넘더라도 잘라 저장하지 않고 초과 경고와 함께 반환할 수 있다. 20,000자 저장 제한은 사용자가 프론트에서 수정한 뒤 학습자료 저장 요청에서 검증한다.
-- `warnings[].code`는 저장을 막지 않는 사용자 검토 신호다. 외부 블록 타입이나 파싱 예외 원문을 노출하지 않는다.
+- 빈 `content`도 가져오기 성공으로 반환한다. 서버는 제목과 본문을 길이 때문에 자르지 않고 전체 반환한다.
+- 성공 응답 `data`는 `sourceType`, `title`, `content`만 포함한다. `contentLength`, `pageId`, Notion URL, workspace 정보와 `warnings`를 추가하지 않는다.
+- 클라이언트는 제목의 앞뒤 Unicode 공백을 제거한 값이 1..255 code point이고, 본문에 Unicode 비공백 문자가 하나 이상 있으며 전체 본문이 1..20,000 code point일 때만 `저장하고 퀴즈 만들기`와 `자료만 저장`을 활성화한다. 서버는 최종 `POST /api/v1/learning-materials`에서 같은 저장 제한을 다시 검증한다.
 - 자동·수동 동기화 엔드포인트는 제공하지 않는다.
 
 ## 문제 세트 생성
@@ -1058,13 +1197,21 @@ Headers: `Authorization`, `Content-Type: application/json`
 
 ### 최소 안정 코드
 
+여섯 Notion 오류 코드, HTTP status와 사용자 복구 의미는 확정이다.
+
 | 조건 | HTTP | 코드 | 복구 |
 | --- | --- | --- | --- |
 | 필드 누락·형식·허용 enum/개수 | `400` | 기존 `COMMON_001` | `fields`에 따라 입력 수정 |
 | 읽을 수 없는 JSON | `400` | 기존 `COMMON_002` | 요청 본문 수정 |
-| 없거나 소유하지 않은 리소스, 접근할 수 없는 Notion 페이지 | `404` | 기존 `COMMON_003` | 목록·권한·페이지 선택 확인 |
+| 없거나 소유하지 않은 OpenMD 리소스 | `404` | 기존 `COMMON_003` | 목록과 현재 사용자 소유권 확인 |
 | 예상하지 못한 서버 오류 | `500` | 기존 `COMMON_999` | 학습자료 생성은 같은 멱등 키로 재시도하고, QuizSet 생성은 활성 생성 조회 후 없을 때만 새 요청하며, 제출은 같은 attempt 또는 review session 식별자로 재시도 |
 | 인증 정보 없음·잘못됨·만료 | `401` | 기존 `AUTH_005` | 갱신 또는 재로그인 |
+| 활성 Notion 연결 없이 페이지 목록·복사를 요청했거나 callback의 유효한 OAuth 승인 state를 복구할 수 없음 | `400` 또는 callback `302` query | `NOTION_CONNECTION_REQUIRED` | 연결 상태를 다시 조회한다. `DISCONNECTED`면 최초 연결, `CONNECTED|REAUTH_REQUIRED`면 현재 상태에 맞는 승인을 처음부터 다시 시작하거나 붙여넣기로 전환 |
+| Notion 자격을 갱신할 수 없거나 제공자 재동의가 필요함 | `409` | `NOTION_REAUTH_REQUIRED` | 현재 워크스페이스와 기존 편집 상태를 보존하되 `pageId`는 보존하지 않고, 같은 워크스페이스 재인증 뒤 페이지를 재선택 |
+| 기존 연결이 있는데 OAuth callback에서 다른 워크스페이스가 확인됨 | callback `302` query | `NOTION_WORKSPACE_MISMATCH` | 기존 연결을 계속 사용하거나, 현재 연결을 해제한 뒤 다른 워크스페이스 연결을 새로 시작 |
+| 선택 페이지 없음, 현재 연결에서 공유되지 않음 또는 접근 권한 철회 | `400` | `NOTION_PAGE_NOT_ACCESSIBLE` | 기존 편집 상태를 보존하고 다른 접근 가능 페이지 선택·권한 확인 또는 붙여넣기로 전환 |
+| `truncated`, `unknown_block_ids` 또는 코드 영역 밖의 `<unknown>`·`<unknown ...>`으로 완전한 본문을 확인할 수 없음 | `400` | `NOTION_CONTENT_INCOMPLETE` | 부분 본문을 사용하지 않고 선택 페이지를 보존해 재시도하거나 붙여넣기로 전환 |
+| Notion timeout·rate limit·일시 장애 또는 연결 해제 철회 결과를 확인할 수 없음 | `503` | `NOTION_TEMPORARILY_UNAVAILABLE` | 연결·선택·편집 상태를 보존하고 같은 작업을 재시도하거나 붙여넣기로 전환 |
 | 생성 중인 학습자료 본문 수정 | `409` | `MATERIAL_001` | 제목만 수정하거나 생성 종료를 확인한 뒤 본문 저장 재시도 |
 | 학습자료 본문 20,000자 초과 | `413` | `MATERIAL_002` | 본문을 줄인 뒤 같은 저장 흐름 재시도 |
 | 같은 학습자료에 이미 `GENERATING` 작업이 있음 | `409` | `QUIZ_001` | 기존 생성 상태 확인 |
@@ -1072,10 +1219,11 @@ Headers: `Authorization`, `Content-Type: application/json`
 | `READY`가 아닌 세트 제출, attempt UUID의 소유자·QuizSet 불일치, 자기평가 상태 또는 수정 불가 자동 채점 문항 | `409` | `ATTEMPT_001` | 최신 문제 세트·attempt 상태와 결과 확인 |
 | 완료된 복습 세션 재변경 또는 이미 확정된 서술형 평가 변경 | `409` | `REVIEW_001` | 세션과 결과 재조회 |
 
-- MVP의 안정 오류 코드는 `COMMON_001/002/003/999`, `AUTH_005`, `MATERIAL_001/002`, `QUIZ_001/002`, `ATTEMPT_001`, `REVIEW_001`로 제한한다.
-- Notion, 외부 생성 서비스, LLM 또는 세부 검증 단계별 공개 오류 코드를 추가하지 않는다.
+- MVP의 안정 오류 코드는 `COMMON_001/002/003/999`, `AUTH_005`, `MATERIAL_001/002`, `NOTION_CONNECTION_REQUIRED`, `NOTION_REAUTH_REQUIRED`, `NOTION_WORKSPACE_MISMATCH`, `NOTION_PAGE_NOT_ACCESSIBLE`, `NOTION_CONTENT_INCOMPLETE`, `NOTION_TEMPORARILY_UNAVAILABLE`, `QUIZ_001/002`, `ATTEMPT_001`, `REVIEW_001`로 제한한다.
+- Notion 오류는 위 여섯 가지 사용자 복구 의미로만 공개한다. 제공자 원시 오류명, HTTP 본문, 세부 block 타입, token 갱신 실패 원문과 내부 예외를 새 공개 코드나 `fields`로 전달하지 않는다.
+- 공개 `401 AUTH_005`는 OpenMD Access Token 인증 실패에만 사용한다. Notion `401`은 내부 갱신 뒤 성공하거나 `409 NOTION_REAUTH_REQUIRED`로 변환한다.
 - 비동기 생성 실패는 정상 상태 조회의 `status=FAILED`로 전달한다. HTTP 오류와 혼용하지 않는다.
-- `error.message`는 사용자가 다음 행동을 이해할 수준으로 쓰고 내부 예외·LLM·Notion 상세를 노출하지 않는다.
+- `error.message`는 사용자가 다음 행동을 이해할 수준으로 쓰고 내부 예외·LLM·Notion 상세를 노출하지 않는다. 정확한 사용자 문구는 이 계약의 안정 필드가 아니며 클라이언트는 여섯 Notion `error.code`와 [학습자료 흐름의 보존·복구 규칙](../ux/flow-content-import.md#취소와-실패)으로 분기한다.
 - 입력 오류의 `fields`는 `responses[0].selectedChoiceId`나 `responses[1].blankAnswers[0].blankId`처럼 클라이언트가 해당 입력을 찾을 수 있는 경로를 사용한다.
 
 ## 정렬과 조회 경계
@@ -1088,6 +1236,8 @@ Headers: `Authorization`, `Content-Type: application/json`
 
 - 학습자료 본문, 사용자 답안, 모범 답안과 원문 근거는 민감한 학습 콘텐츠로 취급한다.
 - 요청·응답 본문, Notion 접근 자격과 외부 생성 서비스 원문을 일반 애플리케이션 로그에 남기지 않는다. `attemptId`, `reviewSessionId`, `quizSetId`는 비밀이 아니지만 운영 로그에는 문제 해결에 필요한 식별자만 최소로 남긴다. 학습자료 생성의 `Idempotency-Key` 원문은 로그에 남기지 않는다.
+- Notion access token과 갱신 자격은 서버에서 암호화해 저장하고 클라이언트에 반환하지 않는다. 서버는 제공자가 허용하는 갱신 절차를 사용하며, 갱신할 수 없으면 연결 메타데이터를 임의 삭제하지 않고 `REAUTH_REQUIRED` 상태로 전환한다.
+- 연결 해제는 제공자 권한 철회 확인 뒤 로컬 token과 연결 메타데이터를 삭제한다. 철회 확인이 일시적으로 실패하면 로컬 자격을 보존하되 일반 API 사용에는 위 공개 상태와 오류 규칙을 적용한다.
 - 운영 로그는 요청 추적 식별자, 사용자 내부 식별자, 리소스 식별자, 공개 오류 코드와 상태 전이에 필요한 최소 메타데이터만 남긴다.
 
 ## 호환성과 폐기
@@ -1098,4 +1248,4 @@ Headers: `Authorization`, `Content-Type: application/json`
 
 ## 열린 질문
 
-- 재연결 뒤 페이지 선택 복원 여부는 [학습자료 흐름의 열린 질문](../ux/flow-content-import.md#열린-질문)이 책임진다.
+- 여섯 Notion 오류의 정확한 사용자 문구와 화면 표현은 [학습자료 흐름의 열린 질문](../ux/flow-content-import.md#열린-질문)이 책임진다. 오류 코드, 보존 상태와 복구 행동은 확정 계약이다.
