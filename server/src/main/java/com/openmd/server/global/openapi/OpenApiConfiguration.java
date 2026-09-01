@@ -21,6 +21,7 @@ public class OpenApiConfiguration {
 	private static final String PUBLIC_AUTH_PATH_PREFIX = "/api/v1/auth/";
 	private static final String BROWSER_REFRESH_PATH = "/api/v1/auth/web/sessions/refresh";
 	private static final String BROWSER_LOGOUT_PATH = "/api/v1/auth/web/sessions/current";
+	private static final String NOTION_CALLBACK_PATH = "/api/v1/integrations/notion/callback";
 
 	@Bean
 	OpenAPI openMdOpenApi(
@@ -57,7 +58,7 @@ public class OpenApiConfiguration {
 					pathItem.readOperations().forEach(operation -> operation.setSecurity(
 						List.of(new SecurityRequirement().addList(BROWSER_REFRESH_COOKIE))
 					));
-				} else if (path.startsWith(PUBLIC_AUTH_PATH_PREFIX)) {
+				} else if (path.startsWith(PUBLIC_AUTH_PATH_PREFIX) || NOTION_CALLBACK_PATH.equals(path)) {
 					pathItem.readOperations().forEach(operation -> operation.setSecurity(List.of()));
 				}
 			});

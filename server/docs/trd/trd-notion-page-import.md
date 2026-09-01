@@ -1,12 +1,12 @@
 ---
 document_type: trd
-status: review
+status: implemented
 scope: server
 ---
 
 # [TRD · Server] Notion 단일 페이지 가져오기 서버 설계
 
-- 상태: 검토 중
+- 상태: 구현 동기화
 - 대상: Notion Public OAuth 연결, 페이지 선택, Markdown 일회성 복사
 - 제품 정책: [학습자료 만들기 PRD](../../../docs/prd/prd-content-import.md)
 - 사용자 흐름: [학습자료 만들기 흐름](../../../docs/ux/flow-content-import.md)
@@ -96,7 +96,7 @@ scope: server
 - Redis key는 state 원문의 SHA-256 digest를 사용하고, value에 `userId`, 서버 allowlist로 확정한 복귀 대상, 의도(`CONNECT|REAUTHORIZE`), 생성 시각과 승인 시작 시점의 nullable `workspaceId`·`credentialRevision` snapshot을 둔다. `pageId`나 편집 본문은 넣지 않는다.
 - TTL은 15분이며 callback은 Redis 7 `GETDEL` 또는 동일한 원자 연산으로 state를 한 번만 소비한다. 만료·없음·재사용은 자격 교환 전에 거절한다. 이때 요청 query에서 복귀 주소를 추론하지 않고 환경별 고정 `oauthFailureReturnUri`에 `outcome=failed&error=NOTION_CONNECTION_REQUIRED`를 붙여 복귀시킨다. 이 callback 문맥의 코드는 연결 행 유무가 아니라 유효한 승인 흐름을 계속할 수 없다는 뜻이며, 클라이언트는 연결 상태 재조회 결과에 맞춰 새 승인을 시작한다.
 - `returnUri`는 임의 URL을 받지 않고 환경별 정확한 allowlist 값만 선택한다. callback은 Bearer 인증 대신 소비한 state의 `userId`로 소유자를 확정하고 그 계정이 존재하는지 다시 확인한다.
-- callback은 연결 행을 잠근 뒤 state의 연결 snapshot과 현재 행을 비교한다. `CONNECT`는 현재 행이 여전히 없을 때만, `REAUTHORIZE`는 같은 `workspaceId`와 `credentialRevision`의 행이 남아 있을 때만 자격 교환·저장을 계속한다. 연결 해제·다른 callback·자격 교체로 행이 없어지거나 revision이 바뀌었으면 이미 받은 authorization code를 저장하지 않고 안전하게 실패시켜, 해제 전에 발급된 늦은 callback이 연결을 되살리지 못하게 한다.
+- callback은 state를 먼저 읽어 소유 사용자를 확인하고, 연결 행이 아직 없는 최초 연결도 직렬화할 수 있도록 해당 `users` 행을 잠근 다음 Redis `GETDEL`로 state를 원자 소비한다. 그 뒤 연결 snapshot과 현재 행을 비교한다. `CONNECT`는 현재 행이 여전히 없을 때만, `REAUTHORIZE`는 같은 `workspaceId`와 `credentialRevision`의 행이 남아 있을 때만 자격 교환·저장을 계속한다. 연결 해제도 같은 사용자 행 잠금 안에서 미소비 state를 무효화하므로, 해제·다른 callback·자격 교체 뒤 늦은 callback은 자격 교환·저장을 진행하지 않는다.
 - callback 복귀 query에는 `outcome=connected|cancelled|failed`와 필요한 공개 OpenMD 오류 code만 둔다. Notion authorization code·token·state·원시 오류는 포함하지 않는다.
 - 새 워크스페이스 최초 연결은 새 행을 만든다. 기존 행이 있는 재인증·접근 페이지 추가는 응답 `workspace_id`가 같을 때만 자격과 표시 이름을 교체한다.
 - 기존 행이 있는데 다른 `workspace_id`가 오면 새 자격을 저장하지 않고 revoke를 시도한 뒤 기존 행과 상태를 유지한다. callback은 `outcome=failed&error=NOTION_WORKSPACE_MISMATCH`로 복귀시키며 이 오류를 기존 자격의 재인증 필요로 해석하지 않는다. 사용자는 기존 연결을 계속 사용하거나, 기존 연결 해제를 완료한 뒤 다른 워크스페이스를 연결한다.
@@ -104,7 +104,7 @@ scope: server
 ## 7. Notion HTTP client 정책
 
 - 모든 요청은 고정 구성 `Notion-Version: 2026-03-11`과 요청별 필요 header를 사용한다. 업그레이드는 한 구성 값과 adapter 계약 테스트로 통제한다.
-- 연결 timeout 3초, 응답 timeout 15초, 하나의 OpenMD 요청이 소비하는 Notion 총 시간 20초를 상한으로 둔다.
+- 연결 timeout 3초, 개별 응답 timeout 15초, 하나의 OpenMD 요청이 소비하는 Notion 총 시간 20초를 상한으로 둔다. 서비스 진입점이 공유 deadline을 만들고 JDK HTTP transport가 매 호출마다 `min(15초, 남은 시간)`을 request timeout으로 사용해 순차 Page→Markdown 호출과 refresh·재시도도 같은 예산을 소비한다.
 - `429`, `529`는 `Retry-After`가 남은 20초 예산 안일 때 jitter 후 한 번만 재시도한다. 최종 OpenMD `503`에는 제공자 값을 검증한 `Retry-After` 표준 header를 전달할 수 있다.
 - 멱등 GET의 `500|502|503|504`는 예산 안에서 한 번만 재시도한다. 일반 `400|403|404`는 재시도하지 않는다.
 - OAuth code 교환·refresh 교체처럼 일회성 자격을 소비하는 POST는 응답 유실 후 무작정 자동 재시도하지 않는다.
@@ -139,7 +139,7 @@ scope: server
 1. 현재 `userId`의 `CONNECTED` 행을 읽고 token을 복호화한다.
 2. Notion `GET /v1/pages/{pageId}`로 현재 접근과 최신 제목을 확인한다. 목록에서 본 제목을 request로 받지 않는다.
 3. Page 응답의 `type=title` property `plain_text`를 합친다. 비어 있으면 기본 제목을 만들지 않고 `""`를 사용한다.
-4. Notion `GET /v1/pages/{pageId}/markdown?include_transcript=false`를 호출한다.
+4. Notion `GET /v1/pages/{pageId}/markdown?include_transcript=false`를 호출하고 공식 응답의 `markdown`, `truncated`, `unknown_block_ids`를 provider 중립 모델로 옮긴다.
 5. `truncated=true`, 비어 있지 않은 `unknown_block_ids` 또는 Notion이 만든 `<unknown ...>`이 있으면 추가 회수 없이 전체를 실패시킨다. 편집 상태로 쓸 부분 `content`는 반환하지 않는다.
 6. 이미지·동영상·오디오·PDF·파일 본체와 만료 URL을 제외하되 caption·alt text는 일반 텍스트로 유지한다.
 7. fenced·inline code 밖에서 enhanced Markdown 줄바꿈으로 쓰인 정확한 `<br>` 토큰만 Markdown hard break인 두 공백과 newline으로 치환한다. 코드 영역의 `<br>` 리터럴, 제목 같아 보이는 첫 `#` 행, 기타 enhanced Markdown tag·링크는 추측해 제거하거나 바꾸지 않는다.
@@ -212,3 +212,4 @@ Windows에서는 각 명령의 `server/gradlew` 대신 `server/gradlew.bat`을 �
 | 날짜 | 변경 | 결정자 |
 | --- | --- | --- |
 | 2026-09-01 | Notion Public OAuth·1인 1 워크스페이스·Markdown 일회성 복사와 서버 안전 경계 설계 | 사용자 확정 |
+| 2026-09-01 | Redis state peek-lock-GETDEL, 사용자 행 callback 직렬화, AES-GCM 자격 원장, 남은 시간 기반 HTTP transport와 fake 경계 구현 | 서버 구현 |

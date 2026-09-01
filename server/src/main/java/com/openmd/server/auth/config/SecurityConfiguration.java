@@ -56,6 +56,7 @@ public class SecurityConfiguration {
 			.authorizeHttpRequests(authorize -> {
 				authorize.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll();
 				authorize.requestMatchers("/api/v1/auth/**").permitAll();
+				authorize.requestMatchers(HttpMethod.GET, "/api/v1/integrations/notion/callback").permitAll();
 				if (apiDocsEnabled) {
 					authorize.requestMatchers(API_DOCUMENTATION_PATHS).permitAll();
 				}
