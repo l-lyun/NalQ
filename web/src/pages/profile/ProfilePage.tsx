@@ -56,7 +56,7 @@ export function ProfilePage({
   return (
     <VStack className="profile-shell" minHeight="100dvh" bg="bg.layerBasement">
       <Box as="main" className="profile-main" bg="bg.layerDefault" width="full" pt="safeArea">
-        <VStack className="profile-content" px="spacingX.globalGutter" pt="x6" pb="spacingY.screenBottom" gap="x4">
+        <VStack className="profile-content" px="spacingX.globalGutter" pt="x4" pb="spacingY.screenBottom" gap="x3">
           <Text as="h1" textStyle="t12Bold" color="fg.neutral">마이페이지</Text>
           {status === 'loading' ? <ProfileLoading /> : status === 'error' ? (
             <VStack minHeight="320px" align="center" justify="center" gap="x4">
@@ -108,7 +108,7 @@ export function ProfilePage({
 
 function SettingsSection({ title, titleId, children }: { title: string; titleId: string; children: React.ReactNode }) {
   return (
-    <VStack as="section" gap="x2" aria-labelledby={titleId}>
+    <VStack as="section" gap="x1" aria-labelledby={titleId}>
       <Text as="h2" id={titleId} textStyle="t10Bold" color="fg.neutral">{title}</Text>
       <List.Root className="profile-list" width="full">{children}</List.Root>
     </VStack>
@@ -146,7 +146,7 @@ function SettingsRow({
 
 function ProfileLoading() {
   return (
-    <VStack gap="x4" aria-busy="true" aria-label="마이페이지 정보를 불러오는 중">
+    <VStack gap="x3" aria-busy="true" aria-label="마이페이지 정보를 불러오는 중">
       <HStack align="center" gap="x3">
         <Skeleton tone="neutral" radius="full" width="64px" height="64px" />
         <VStack gap="x2">
@@ -154,7 +154,7 @@ function ProfileLoading() {
           <Skeleton tone="neutral" radius="8" width="200px" height="x4" />
         </VStack>
       </HStack>
-      <VStack gap="x3">
+      <VStack gap="x2">
         <Skeleton tone="neutral" radius="8" width="96px" height="x6" />
         <Skeleton tone="neutral" radius="8" width="full" height="180px" />
       </VStack>
