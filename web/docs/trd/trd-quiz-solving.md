@@ -43,6 +43,9 @@ scope: web
 - 퀴즈 route와 학습 메인의 퀴즈 관리·최근 퀴즈·복습 후보 adapter는 모두 같은 `VITE_QUIZ_API_ENABLED`에서 runtime mode를 파생한다. 별도 관리 API flag를 두어 route만 켜지고 학습 메인 Query는 꺼지는 분리 배포 상태를 만들지 않는다.
 - 인증 라우트는 생성 조건 진입 `/learning/:materialId/quiz`, QuizSet 상태·풀이 `/quiz-sets/:quizSetId`, 본 퀴즈 결과 `/quiz-attempts/:attemptId/result`, 최신 복습 진입 `/review`, 복습 실행 `/review-sessions/:reviewSessionId`로 연결한다.
 - 학습 메인의 `전체 문제 다시 풀기`는 `/quiz-sets/:quizSetId`에 `restartMain` route state를 전달한다. 이 intent에서는 미완료 서술형 채점 재개 Query를 건너뛰고 `READY`부터 새 `MAIN` 회차를 시작하며, 일반 진입과 `채점이 남았어요` 행동은 기존처럼 pending 회차를 우선한다.
+- 내 퀴즈의 `퀴즈 풀기`도 `/quiz-sets/:quizSetId`에 `{ restartMain: true }` route state를 전달해 항상 새 `MAIN` 회차를 시작한다. 내 퀴즈 목록은 풀이·결과·복습 행동을 결정하지 않으므로 카드별 pending self-assessment Query와 페이지 단위 latest review Query를 실행하지 않는다. 해당 Query는 학습 메인과 일반 QuizSet route처럼 실제 소비 화면에만 남긴다.
+- 내 퀴즈 disclosure는 내 학습자료와 같은 `expanded` URL search parameter의 쉼표 구분 ID Set 규칙을 사용한다. 검색·페이지·focus parameter를 갱신할 때 `expanded`를 유지하고, 여러 QuizSet을 동시에 펼칠 수 있다.
+- 퀴즈 이름 변경은 펼친 `READY` 카드의 controlled modal에서 수행한다. 현재 제목을 draft로 시작해 공백과 255 Unicode code point 제한을 검증하고, 저장 중 중복 제출과 닫기를 막는다. 성공 시 QuizSet 목록·상세·복습·홈 Query를 기존 invalidation 경계로 갱신하고 dialog trigger로 focus를 복귀하며, 실패 시 draft와 오류를 modal에 유지한다. `GENERATING`·`FAILED`에서는 이름 변경과 풀이를 모두 비활성화한다.
 - 홈의 대표 복습 행동은 최신 복습 Query가 대상을 반환할 때 `/review`로 진입해 활성 세션 재개 또는 새 세션 생성을 위임한다. 학습 메인은 최근 퀴즈와 별도로 `GET /api/v1/quiz-reviews/candidates?limit=3`을 조회하고, 후보의 `sourceAttemptId`로 세션을 직접 만든 뒤 반환된 세션 route로 이동한다. 미완료 자기평가와 활성 복습은 새 세션보다 우선한다. 실제 API가 빈 후보를 반환하면 학습 메인에는 복습 빈 상태를 표시하고, 개발 `mock` 모드는 동일 타입 adapter로 이 진입을 검토한다.
 - 서버 상태 Query key는 모두 `private` prefix 아래에 두어 기존 로그아웃·세션 종료 시 취소와 캐시 제거 범위에 포함한다.
 - 학습자료 목록·상세와 홈·학습이 공유하는 최신 복습 요약은 5분 동안 fresh로 재사용한다. 학습자료 생성, QuizSet 생성·생성 종료, 본 퀴즈 제출·서술형 자기평가·채점 판정 변경, 복습 세션 생성·제출·자기평가 성공 시 관련 feature Query key를 명시적으로 invalidate한다. 현재 풀이 화면이 직접 응답을 적용하는 attempt·review session/result Query는 즉시 재요청으로 화면 상태를 덮지 않도록 stale 표기만 하고 다음 조회에서 새로 가져오며, 홈·학습 요약은 성공 직후 다시 조회할 수 있게 한다.
@@ -53,6 +56,7 @@ scope: web
 ## 표현 컴포넌트 경계
 
 - `web/src/pages/quiz/`는 API가 준비되기 전에도 검토할 수 있는 표현 전용 화면과 fixture를 제공한다. fixture의 지연·요약 갱신은 개발 미리보기용이며 공개 API 계약으로 해석하지 않는다.
+- 내 퀴즈 카드는 접힌 header와 펼친 행동 영역을 분리하고 header만 disclosure trigger로 둔다. `GENERATING`은 펼친 영역 위에 비상호작용 overlay와 진행 표시를, `FAILED`는 같은 overlay와 정적 실패 표시를 렌더링하되 header의 펼치기·접기는 유지한다. 두 상태 모두 별도 불가능 이유 문구나 삭제 행동을 추가하지 않는다.
 - 객관식 `choices`는 가변 길이 3~5개다. 풀이·결과·복습 컴포넌트와 화면 답안 상태는 네 개 고정 인덱스를 가정하지 않고 서버 배열 순서를 그대로 렌더링하며 선택값은 배열 위치가 아니라 `choiceId`로 보존한다.
 - 프론트는 3개 보기에 빈 행을 추가하거나 5번째 보기를 잘라내지 않는다. 계약 범위를 벗어난 길이는 조용히 보정하지 않고 문제 데이터 오류 상태로 처리한다.
 - 틀린 문제 다시 풀기는 본 퀴즈의 `QuizFlowPage`와 문항 입력·이동·전체 제출·서술형 자기평가·결과 표현을 그대로 재사용한다. 풀이 화면의 사용자 노출 차이는 상단 헤더에서 학습자료 제목 뒤에 ` · 복습`을 덧붙이는 것뿐이며, 복습용 풀이 화면이나 문항별 즉시 채점 UI를 따로 만들지 않는다.
@@ -73,6 +77,8 @@ scope: web
 ## 기술 검증 기준
 
 - 같은 `userId + quizSetId`의 생성 조건만 기기 로컬에서 복원하며 다른 사용자·문제 세트나 손상된 값은 사용하지 않는다.
+- 내 퀴즈 목록 조회만으로 카드 수에 비례한 pending self-assessment 요청이나 latest review 요청이 발생하지 않으며, `expanded` Set은 검색·페이지 전환 뒤에도 URL에서 보존된다.
+- 내 퀴즈의 READY 카드 이름 변경은 modal 검증·중복 제출 방지·성공 cache invalidation·focus 복귀를 수행하고, 퀴즈 풀기는 새 `MAIN` intent를 전달한다. `GENERATING`·`FAILED`는 두 행동이 비활성이고 disclosure 자체는 조작할 수 있다.
 - 생성 조건 로컬 값이 없어도 생성 중에는 일반 안내를, `READY`에서는 실제 문제 수·유형을 표시하고 서버 상태 전이를 정상 처리한다.
 - 생성 POST 응답 유실 뒤 재시도는 활성 생성 조회를 먼저 수행하며, 활성 QuizSet이 있으면 새 POST 없이 해당 식별자로 polling을 이어간다.
 - 새로고침·이탈·브라우저 종료 뒤 본 퀴즈와 복습의 현재 문항·미제출 답안을 복원하지 않고 첫 문항부터 다시 시작한다.
