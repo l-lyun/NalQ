@@ -74,7 +74,9 @@ export type QuizResultSummary = {
   reviewCount: number
 }
 export type QuizResult = {
+  kind: 'MAIN' | 'REVIEW'
   status: QuizAttemptStatus | ReviewSessionStatus
+  reviewAvailable: boolean
   summary: QuizResultSummary
   items: QuizResultItem[]
 }
@@ -127,6 +129,8 @@ export type QuizPresentationCallbacks = {
   }) => QuizResult | Promise<QuizResult>
   onCompleted?: (resourceId: string) => void
   onResultExit?: () => void
+  onStartReview?: (resourceId: string) => void | Promise<void>
+  onGoHome?: () => void
 }
 
 export type QuizFlowScene =

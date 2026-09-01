@@ -116,6 +116,7 @@ function fixtureContractResult(
   const essays = questionResults.filter((item) => item.type === 'ESSAY')
   return {
     attemptId: '550e8400-e29b-41d4-a716-446655440000', quizSetId: 'qset_fixture', status: 'COMPLETED',
+    reviewAvailable: questionResults.some((item) => item.outcome !== 'CORRECT'),
     summary: {
       scoredGrading: { correctQuestionCount: automatic.filter((item) => item.outcome === 'CORRECT').length, gradedQuestionCount: automatic.length },
       essaySelfAssessment: {

@@ -11,6 +11,7 @@ import {
   LearningTextarea,
 } from './components/LearningPrimitives'
 import { countUnicodeCodePoints } from './learning.text'
+import { getLearningRoutePanelClassName } from './learningRoutes'
 import type {
   LearningMaterialDetail,
   LearningMaterialDraft,
@@ -225,7 +226,10 @@ export function LearningPage({
   return (
     <VStack className="learning-shell" minHeight="100dvh" bg="bg.layerBasement">
       <Box as="main" className="learning-main" bg="bg.layerDefault" width="full" pt="safeArea">
-        <Box className="learning-route-panel" key={`${screen.id}-${'materialId' in screen ? screen.materialId : ''}`}>
+        <Box
+          className={getLearningRoutePanelClassName(screen.id)}
+          key={`${screen.id}-${'materialId' in screen ? screen.materialId : ''}`}
+        >
           {screen.id === 'main' ? (
             <LearningMain
               materialsState={materialsState}

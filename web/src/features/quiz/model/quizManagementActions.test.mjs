@@ -2,82 +2,39 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  createNewMainQuizDestination,
+  parseExpandedQuizIds,
   resolvePendingSelfAssessmentForQuizEntry,
-  resolveQuizManagementActions,
-  resolveQuizManagementActionState,
+  toggleExpandedQuizId,
 } from './quizManagementActions.ts'
 
-const quiz = {
-  quizSetId: 'quiz-1',
-  quizTitle: '운영체제 퀴즈',
-  materialId: 'material-1',
-  materialTitle: '운영체제',
-  status: 'READY',
-  questionCount: 10,
-  createdAt: '2026-08-20T00:00:00Z',
-  updatedAt: '2026-08-20T00:00:00Z',
-  lastAttemptAt: null,
-}
+test('내 퀴즈 펼침 상태는 URL의 쉼표 구분 ID Set으로 여러 카드를 보존한다', () => {
+  const initial = parseExpandedQuizIds('quiz-1,quiz-2')
+  assert.deepEqual([...initial], ['quiz-1', 'quiz-2'])
 
-test('일반 MAIN 퀴즈에는 이어서 풀기를 만들지 않는다', () => {
-  const actions = resolveQuizManagementActions(quiz, null)
-  assert.deepEqual(actions.map((action) => action.label), ['퀴즈 풀기'])
-  assert.equal(actions.some((action) => action.label.includes('이어서')), false)
+  const collapsed = toggleExpandedQuizId(initial, 'quiz-1')
+  assert.deepEqual([...collapsed], ['quiz-2'])
+  assert.deepEqual([...initial], ['quiz-1', 'quiz-2'])
+
+  const expanded = toggleExpandedQuizId(collapsed, 'quiz-3')
+  assert.deepEqual([...expanded], ['quiz-2', 'quiz-3'])
 })
 
-test('미완료 서술형 회차는 채점이 남았음을 안내한다', () => {
-  const pending = {
-    attemptId: 'attempt-1',
-    quizSetId: quiz.quizSetId,
-    status: 'SELF_ASSESSMENT_REQUIRED',
-    pendingEssayQuestionIds: ['question-4'],
-  }
-  const actions = resolveQuizManagementActions(quiz, pending)
-  assert.deepEqual(actions, [
-    { label: '채점이 남았어요', path: '/quiz-sets/quiz-1', primary: true },
-  ])
+test('내 퀴즈의 퀴즈 풀기는 새 MAIN 회차 intent를 만든다', () => {
+  assert.deepEqual(createNewMainQuizDestination('quiz-1'), {
+    path: '/quiz-sets/quiz-1',
+    state: { restartMain: true },
+  })
 })
 
 test('전체 문제 다시 풀기 진입은 미완료 자기평가 자동 재개를 우회한다', () => {
   const pending = {
     attemptId: 'attempt-1',
-    quizSetId: quiz.quizSetId,
+    quizSetId: 'quiz-1',
     status: 'SELF_ASSESSMENT_REQUIRED',
     pendingEssayQuestionIds: ['question-4'],
   }
 
   assert.equal(resolvePendingSelfAssessmentForQuizEntry(pending, true), null)
   assert.equal(resolvePendingSelfAssessmentForQuizEntry(pending, false), pending)
-})
-
-test('활성 복습은 결과 보기와 활성 세션 재개를 함께 제공한다', () => {
-  const latest = {
-    sourceAttemptId: 'attempt-1',
-    quizSetId: quiz.quizSetId,
-    attemptNumber: 2,
-    quizTitle: quiz.quizTitle,
-    materialTitle: quiz.materialTitle,
-    completedAt: '2026-08-20T00:00:00Z',
-    totalQuestionCount: 10,
-    reviewQuestionCount: 3,
-    activeReviewSessionId: 'review-1',
-  }
-  const actions = resolveQuizManagementActions(quiz, null, latest)
-  assert.deepEqual(actions.map((action) => action.label), ['결과 보기', '틀린 문제 복습하기'])
-  assert.equal(actions[1]?.path, '/review-sessions/review-1')
-})
-
-test('완료 이력만 있는 일반 MAIN은 전체 다시 풀기로 표현한다', () => {
-  const actions = resolveQuizManagementActions(
-    { ...quiz, lastAttemptAt: '2026-08-20T00:00:00Z' },
-    null,
-  )
-  assert.deepEqual(actions.map((action) => action.label), ['전체 다시 풀기'])
-  assert.equal(actions.some((action) => action.label.includes('이어서')), false)
-})
-
-test('최신 복습 조회가 끝나기 전에는 퀴즈 행동을 보류한다', () => {
-  assert.equal(resolveQuizManagementActionState('ready', 'loading'), 'loading')
-  assert.equal(resolveQuizManagementActionState('ready', 'error'), 'error')
-  assert.equal(resolveQuizManagementActionState('ready', 'ready'), 'ready')
 })

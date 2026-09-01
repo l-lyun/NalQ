@@ -15,3 +15,9 @@ export function resolveLearningRoute(pathname: string): LearningRoute {
   if (normalized === '/learning/new') return { id: 'new-quiz' }
   return { id: 'main' }
 }
+
+export function getLearningRoutePanelClassName(screenId: string) {
+  return screenId === 'main'
+    ? 'learning-route-panel'
+    : 'learning-route-panel learning-route-panel--enter'
+}

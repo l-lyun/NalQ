@@ -25,6 +25,11 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createSubmissionPayload, isQuestionAnswered } from '@/features/quiz/model/quizAdapter'
 import { createUuidV4 } from '@/features/quiz/model/randomUuid'
 
+import {
+  getQuizOutcomeLabel,
+  getQuizResultTitle,
+  shouldShowQuizReviewAction,
+} from './quizFeedback'
 import type {
   QuizAnswer,
   QuizAnswers,
@@ -224,6 +229,8 @@ export function QuizFlowPage({
   const [correctionOutcome, setCorrectionOutcome] = useState<QuizBinaryOutcome>('CORRECT')
   const [savingCorrection, setSavingCorrection] = useState(false)
   const [correctionError, setCorrectionError] = useState<string>()
+  const [reviewStarting, setReviewStarting] = useState(false)
+  const [reviewStartError, setReviewStartError] = useState<string>()
   const questionHeadingRef = useRef<HTMLHeadingElement>(null)
   const submitLockRef = useRef(false)
   const submissionRef = useRef<{
@@ -232,6 +239,7 @@ export function QuizFlowPage({
   } | undefined>(undefined)
   const essaySaveLockRef = useRef(false)
   const correctionSaveLockRef = useRef(false)
+  const reviewStartLockRef = useRef(false)
 
   const currentQuestion = questions[questionIndex]
   const answeredCount = questions.filter((question) =>
@@ -526,6 +534,22 @@ export function QuizFlowPage({
     }
   }
 
+  const startReview = async () => {
+    const start = callbacks?.onStartReview
+    if (reviewStartLockRef.current || !start || !resourceId) return
+    reviewStartLockRef.current = true
+    setReviewStarting(true)
+    setReviewStartError(undefined)
+    try {
+      await start(resourceId)
+    } catch {
+      setReviewStartError('복습을 시작하지 못했어요. 현재 결과를 유지했으니 다시 시도해 주세요.')
+    } finally {
+      reviewStartLockRef.current = false
+      setReviewStarting(false)
+    }
+  }
+
   return (
     <VStack className="quiz-shell" minHeight="100dvh" bg="bg.layerBasement">
       <Box as="main" className="quiz-main" bg="bg.layerDefault" width="full" pt="safeArea">
@@ -599,11 +623,15 @@ export function QuizFlowPage({
           <ResultScreen
             result={resultState}
             item={resultItem}
-            title={flowKind === 'REVIEW' ? '다시 푼 문제 결과' : '채점 결과'}
+            title={getQuizResultTitle(resultState.kind)}
             correctionAvailable={Boolean(callbacks?.onUpdateGradingOutcome)}
+            reviewStarting={reviewStarting}
+            reviewStartError={reviewStartError}
             onBack={() => callbacks?.onResultExit?.()}
             onOpenList={() => setSheet('RESULT_LIST')}
             onCorrect={() => openCorrection(resultItem)}
+            onStartReview={callbacks?.onStartReview ? () => void startReview() : undefined}
+            onGoHome={callbacks?.onGoHome}
           />
         ) : null}
       </Box>
@@ -1502,7 +1530,7 @@ function EssayAssessmentScreen({
           </ul>
         </VStack>
         <ResultReadingSection title="해설">{item.explanation}</ResultReadingSection>
-        <ResultReadingSection title="원문 근거">{item.sourceExcerpt}</ResultReadingSection>
+        <ResultReadingSection title="학습자료 본문">{item.sourceExcerpt}</ResultReadingSection>
 
         <ChoiceFieldset
           legend="내 평가"
@@ -1510,7 +1538,7 @@ function EssayAssessmentScreen({
           value={outcome ?? ''}
           options={[
             { value: 'CORRECT', label: '정답' },
-            { value: 'PARTIAL', label: '부분 이해' },
+            { value: 'PARTIAL', label: '보완 필요' },
             { value: 'INCORRECT', label: '오답' },
           ]}
           onChange={(value) => onOutcomeChange(value as QuizResultOutcome)}
@@ -1534,18 +1562,27 @@ function ResultScreen({
   item,
   title,
   correctionAvailable,
+  reviewStarting,
+  reviewStartError,
   onBack,
   onOpenList,
   onCorrect,
+  onStartReview,
+  onGoHome,
 }: {
   result: QuizResult
   item: QuizResultItem
   title: string
   correctionAvailable: boolean
+  reviewStarting: boolean
+  reviewStartError?: string
   onBack: () => void
   onOpenList: () => void
   onCorrect: () => void
+  onStartReview?: () => void
+  onGoHome?: () => void
 }) {
+  const reviewActionAvailable = shouldShowQuizReviewAction(result) && Boolean(onStartReview)
   return (
     <VStack className="quiz-screen">
       <ScreenHeader
@@ -1581,7 +1618,7 @@ function ResultScreen({
               서술형 자기평가
             </Text>
             <Text textStyle="t5Bold" color="fg.neutral">
-              정답 {result.summary.essayCorrectCount} · 부분 이해 {result.summary.essayPartialCount} ·
+              정답 {result.summary.essayCorrectCount} · 보완 필요 {result.summary.essayPartialCount} ·
               오답 {result.summary.essayIncorrectCount}
             </Text>
           </VStack>
@@ -1659,7 +1696,39 @@ function ResultScreen({
           ) : null}
 
           <ResultReadingSection title="해설">{item.explanation}</ResultReadingSection>
-          <ResultReadingSection title="원문 근거">{item.sourceExcerpt}</ResultReadingSection>
+          <ResultReadingSection title="학습자료 본문">{item.sourceExcerpt}</ResultReadingSection>
+        </VStack>
+
+        <VStack className="quiz-result-actions" gap="x2" align="stretch">
+          {reviewStartError ? (
+            <Text as="p" textStyle="t4Regular" color="fg.critical" role="alert">
+              {reviewStartError}
+            </Text>
+          ) : null}
+          {reviewActionAvailable && onStartReview ? (
+            <ActionButton
+              size="large"
+              variant="brandSolid"
+              loading={reviewStarting}
+              disabled={reviewStarting}
+              onClick={onStartReview}
+            >
+              복습하기
+            </ActionButton>
+          ) : result.summary.reviewCount === 0 ? (
+            <Text as="p" textStyle="t4Regular" color="fg.neutralMuted">
+              복습할 문제가 없어요.
+            </Text>
+          ) : null}
+          {onGoHome ? (
+            <ActionButton
+              size="large"
+              variant={reviewActionAvailable ? 'neutralWeak' : 'brandSolid'}
+              onClick={onGoHome}
+            >
+              홈으로
+            </ActionButton>
+          ) : null}
         </VStack>
       </VStack>
     </VStack>
@@ -1667,10 +1736,7 @@ function ResultScreen({
 }
 
 function outcomeLabel(outcome?: QuizResultOutcome) {
-  if (outcome === 'CORRECT') return '정답'
-  if (outcome === 'PARTIAL') return '부분 이해'
-  if (outcome === 'INCORRECT') return '오답'
-  return '평가 대기'
+  return getQuizOutcomeLabel(outcome)
 }
 
 function OutcomeLabel({ outcome }: { outcome?: QuizResultOutcome }) {

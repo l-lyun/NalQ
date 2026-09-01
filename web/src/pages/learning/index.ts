@@ -7,7 +7,6 @@ export {
   LearningMaterialsPage,
   QuizManagementPage,
 } from './LearningManagementPages'
-export { resolveQuizManagementActions } from '@/features/quiz/model/quizManagementActions'
 
 export const learningManagementRoutePaths = [
   '/learning',

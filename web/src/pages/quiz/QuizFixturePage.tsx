@@ -27,11 +27,15 @@ export function QuizFixturePage({
   flowKind = 'QUIZ',
   materialTitle = '자료구조 핵심 개념',
   onExit,
+  onHome,
+  onStartReview,
 }: {
   initialScene?: QuizFlowScene
   flowKind?: QuizFlowKind
   materialTitle?: string
   onExit?: () => void
+  onHome?: () => void
+  onStartReview?: () => void
 }) {
   const isReview = flowKind === 'REVIEW'
   const initialQuestions = isReview
@@ -69,6 +73,7 @@ export function QuizFixturePage({
       result={result}
       flowKind={flowKind}
       initialScene={isReview ? 'SOLVING' : initialScene}
+      initialResourceId={isReview ? 'fixture-review-session' : 'fixture-attempt'}
       initialConditions={quizFixtureConditions}
       initialAnswers={isReview ? {} : quizFixtureAnswers}
       generationState={initialScene === 'READY' ? { status: 'READY', ready: quizFixtureReady } : undefined}
@@ -81,6 +86,8 @@ export function QuizFixturePage({
         onExitQuiz: onExit,
         onDeferQuiz: onExit,
         onResultExit: onExit,
+        onGoHome: onHome,
+        onStartReview,
         onSubmit: async (input) => {
           const submission = await resolveQuizFixtureSubmission(input, questions)
           setPendingEssayQuestionIds(submission.pendingEssayQuestionIds)

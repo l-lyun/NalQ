@@ -92,7 +92,7 @@ export function NextActionSection({ nextAction }: Pick<HomePageProps, 'nextActio
 
   return (
     <VStack as="section" gap="x4" aria-labelledby="home-next-action-title">
-      <VStack bg="bg.neutralWeak" borderRadius="r3" p="x5" gap="x4">
+      <VStack bg="bg.brandWeak" borderRadius="r3" p="x5" gap="x4">
         <VStack gap="spacingY.betweenText">
           <Text as="h2" id="home-next-action-title" textStyle="t8Bold" color="fg.neutral">
             {nextAction.title}

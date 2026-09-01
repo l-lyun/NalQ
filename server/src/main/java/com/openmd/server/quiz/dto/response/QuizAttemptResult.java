@@ -7,5 +7,6 @@ public record QuizAttemptResult(
     String attemptId,
     String quizSetId,
     QuizAttemptStatus status,
+    boolean reviewAvailable,
     QuizAttemptSummary summary,
     List<QuizQuestionResultView> questionResults) {}

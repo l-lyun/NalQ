@@ -26,6 +26,7 @@ public class QuizAttemptResultService {
 
   private final QuizAttemptRepository attempts;
   private final QuizAttemptResultProjector projector;
+  private final QuizReviewAvailabilityResolver reviewAvailability;
   private final QuizAttemptQuestionRepository attemptQuestions;
   private final QuizQuestionRepository questions;
   private final QuizSetRepository sets;
@@ -33,11 +34,13 @@ public class QuizAttemptResultService {
   public QuizAttemptResultService(
       QuizAttemptRepository attempts,
       QuizAttemptResultProjector projector,
+      QuizReviewAvailabilityResolver reviewAvailability,
       QuizAttemptQuestionRepository attemptQuestions,
       QuizQuestionRepository questions,
       QuizSetRepository sets) {
     this.attempts = attempts;
     this.projector = projector;
+    this.reviewAvailability = reviewAvailability;
     this.attemptQuestions = attemptQuestions;
     this.questions = questions;
     this.sets = sets;
@@ -50,7 +53,7 @@ public class QuizAttemptResultService {
             .findByPublicIdAndUserId(attemptPublicId, userId)
             .filter(value -> value.getType() == QuizAttemptType.MAIN)
             .orElseThrow(() -> new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND));
-    return projector.project(attempt);
+    return reviewAvailability.enrich(userId, attempt, projector.project(attempt));
   }
 
   @Transactional(readOnly = true)
@@ -90,6 +93,10 @@ public class QuizAttemptResultService {
                 .filter(result -> result.outcome() != null)
                 .filter(result -> result.outcome() != GradingOutcome.CORRECT)
                 .count();
+    var sourceResult = projector.project(source);
+    boolean reviewAvailable =
+        reviewAvailability.isAvailable(
+            userId, source, sourceResult.summary().reviewQuestionCount());
     ReviewAttemptSummary summary =
         new ReviewAttemptSummary(
             new GradingCount(automaticallyCorrect, automaticallyGraded),
@@ -100,6 +107,7 @@ public class QuizAttemptResultService {
         review.getPublicId(),
         source.getPublicId(),
         review.getStatus().name(),
+        reviewAvailable,
         summary,
         projected.questionResults());
   }

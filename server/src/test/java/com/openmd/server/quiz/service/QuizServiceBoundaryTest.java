@@ -43,6 +43,7 @@ class QuizServiceBoundaryTest {
         new QuizAttemptResultService(
             attempts,
             mock(QuizAttemptResultProjector.class),
+            mock(QuizReviewAvailabilityResolver.class),
             mock(QuizAttemptQuestionRepository.class),
             mock(QuizQuestionRepository.class),
             mock(QuizSetRepository.class));
@@ -64,6 +65,7 @@ class QuizServiceBoundaryTest {
         new QuizAttemptResultService(
             attempts,
             mock(QuizAttemptResultProjector.class),
+            mock(QuizReviewAvailabilityResolver.class),
             mock(QuizAttemptQuestionRepository.class),
             mock(QuizQuestionRepository.class),
             mock(QuizSetRepository.class));
@@ -94,6 +96,7 @@ class QuizServiceBoundaryTest {
         new QuizAttemptResultService(
             attempts,
             mock(QuizAttemptResultProjector.class),
+            mock(QuizReviewAvailabilityResolver.class),
             mock(QuizAttemptQuestionRepository.class),
             mock(QuizQuestionRepository.class),
             sets);

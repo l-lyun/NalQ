@@ -180,12 +180,14 @@ class QuizReviewControllerTest {
                 "review-1",
                 "source-1",
                 "COMPLETED",
+                false,
                 new ReviewAttemptSummary(
                     new GradingCount(1, 2), new EssaySelfAssessmentSummary(0, 1, 0), 1, 2),
                 List.of()));
 
     mvc.perform(get("/api/v1/review-sessions/review-1/result"))
         .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.reviewAvailable").value(false))
         .andExpect(jsonPath("$.data.summary.resolvedQuestionCount").value(1))
         .andExpect(jsonPath("$.data.summary.unresolvedQuestionCount").value(2))
         .andExpect(jsonPath("$.data.summary.reviewQuestionCount").doesNotExist());

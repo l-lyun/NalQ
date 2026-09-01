@@ -27,6 +27,7 @@ public class GradingOverrideService {
   private final QuizAttemptQuestionRepository attemptQuestions;
   private final QuizSubmittedAnswerRepository answers;
   private final QuizAttemptResultProjector projector;
+  private final QuizReviewAvailabilityResolver reviewAvailability;
   private final QuizAttemptLockService locks;
 
   public GradingOverrideService(
@@ -34,11 +35,13 @@ public class GradingOverrideService {
       QuizAttemptQuestionRepository attemptQuestions,
       QuizSubmittedAnswerRepository answers,
       QuizAttemptResultProjector projector,
+      QuizReviewAvailabilityResolver reviewAvailability,
       QuizAttemptLockService locks) {
     this.questions = questions;
     this.attemptQuestions = attemptQuestions;
     this.answers = answers;
     this.projector = projector;
+    this.reviewAvailability = reviewAvailability;
     this.locks = locks;
   }
 
@@ -62,7 +65,7 @@ public class GradingOverrideService {
     }
     attemptQuestion.override(outcome);
     attemptQuestions.flush();
-    return projector.project(attempt);
+    return reviewAvailability.enrich(userId, attempt, projector.project(attempt));
   }
 
   private boolean isUserCorrectable(QuestionType type) {

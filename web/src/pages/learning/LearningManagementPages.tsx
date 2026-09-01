@@ -11,13 +11,11 @@ import {
 import {
   keepPreviousData,
   useMutation,
-  useQueries,
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query'
 import {
   type FormEvent,
-  type KeyboardEvent,
   useEffect,
   useMemo,
   useRef,
@@ -53,8 +51,9 @@ import {
 } from '@/features/quiz/model/quizManagementQueries'
 import { quizManagementKeys } from '@/features/quiz/model/quizManagementQueries'
 import {
-  resolveQuizManagementActions,
-  resolveQuizManagementActionState,
+  createNewMainQuizDestination,
+  parseExpandedQuizIds,
+  toggleExpandedQuizId,
 } from '@/features/quiz/model/quizManagementActions'
 import {
   type LearningReviewAction,
@@ -69,6 +68,7 @@ import {
   LearningTextInput,
   LearningTextarea,
 } from './components/LearningPrimitives'
+import { QuizManagementCard } from './components/QuizManagementCard'
 import { countUnicodeCodePoints } from './learning.text'
 import './learning.css'
 
@@ -327,7 +327,7 @@ function RecentQuizPanel({
   if (!review.quizSetId || !review.sourceAttemptId) return null
   const primaryAction = resolveRecentQuizAction(review, pending)
   return (
-    <VStack bg="bg.neutralWeak" borderRadius="r3" p="x4" gap="x4" align="flex-start">
+    <VStack bg="bg.brandWeak" borderRadius="r3" p="x4" gap="x4" align="flex-start">
       <VStack gap="x1" align="flex-start">
         <Text className="learning-long-title" textStyle="t7Bold" color="fg.neutral">
           {review.quizTitle}
@@ -787,40 +787,19 @@ export function QuizManagementPage() {
   const requestedPage = Number(searchParams.get('page') ?? '1')
   const page = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1
   const focusedQuizId = searchParams.get('focus')
+  const expanded = useMemo(
+    () => parseExpandedQuizIds(searchParams.get('expanded')),
+    [searchParams],
+  )
   const quizzes = useQuery({
     ...quizManagementQueryOptions.list({ page, size: QUIZ_SET_PAGE_SIZE, query }),
     placeholderData: keepPreviousData,
     refetchOnWindowFocus: false,
   })
-  const latestReview = useQuery({
-    ...quizManagementQueryOptions.latestReview(),
-    refetchOnWindowFocus: false,
-  })
-  const pendingQueries = useQueries({
-    queries: (quizzes.data?.items ?? []).map((quiz) => ({
-      ...quizManagementQueryOptions.pendingSelfAssessment(quiz.quizSetId),
-      enabled: quiz.status === 'READY',
-      refetchOnWindowFocus: false,
-    })),
-  })
-  const pendingByQuizSet = new Map<string, PendingSelfAssessment | null>()
-  ;(quizzes.data?.items ?? []).forEach((quiz, index) => {
-    pendingByQuizSet.set(quiz.quizSetId, pendingQueries[index]?.data ?? null)
-  })
   const [editingId, setEditingId] = useState<string>()
   const [draftTitle, setDraftTitle] = useState('')
   const [renameError, setRenameError] = useState<string>()
   const [savedMessage, setSavedMessage] = useState<string>()
-  const inputRef = useRef<HTMLInputElement>(null)
-  const renameButtons = useRef(new Map<string, HTMLButtonElement>())
-
-  useEffect(() => {
-    if (editingId) {
-      inputRef.current?.focus()
-      inputRef.current?.select()
-    }
-  }, [editingId, renameError])
-
   useEffect(() => {
     if (!focusedQuizId) return
     requestAnimationFrame(() => document.getElementById(`quiz-card-${focusedQuizId}`)?.focus())
@@ -835,7 +814,6 @@ export function QuizManagementPage() {
       setRenameError(undefined)
       setSavedMessage(`“${updated.quizTitle}”으로 이름을 변경했어요.`)
       await invalidateQuizManagementQueries(queryClient, editedId)
-      requestAnimationFrame(() => renameButtons.current.get(editedId)?.focus())
     },
     onError: () => {
       setRenameError('이름을 저장하지 못했어요. 입력한 이름을 유지했으니 다시 시도해주세요.')
@@ -858,9 +836,9 @@ export function QuizManagementPage() {
     setSavedMessage(undefined)
   }
   const cancelRename = (quizSetId: string) => {
+    if (rename.isPending && editingId === quizSetId) return
     setEditingId(undefined)
     setRenameError(undefined)
-    requestAnimationFrame(() => renameButtons.current.get(quizSetId)?.focus())
   }
   const saveRename = (quizSetId: string) => {
     const title = draftTitle.trim()
@@ -875,6 +853,10 @@ export function QuizManagementPage() {
     }
     setRenameError(undefined)
     rename.mutate({ quizSetId, quizTitle: title })
+  }
+  const toggleExpanded = (quizSetId: string) => {
+    const next = toggleExpandedQuizId(expanded, quizSetId)
+    updateSearch({ expanded: [...next].join(',') || null })
   }
 
   return (
@@ -924,50 +906,33 @@ export function QuizManagementPage() {
           </EmptyState>
         ) : (
           <VStack as="ul" className="learning-management-list" gap="x3">
-            {quizzes.data.items.map((quiz, index) => {
-              const pendingQuery = pendingQueries[index]
-              const pendingState = quiz.status !== 'READY'
-                ? 'ready'
-                : pendingQuery?.isError
-                  ? 'error'
-                  : pendingQuery?.isPending
-                    ? 'loading'
-                    : 'ready'
-              return (
-                <QuizManagementCard
+            {quizzes.data.items.map((quiz) => (
+              <QuizManagementCard
                 key={quiz.quizSetId}
-                quiz={quiz}
-                latestReview={latestReview.data}
-                pending={pendingByQuizSet.get(quiz.quizSetId) ?? null}
-                actionState={resolveQuizManagementActionState(
-                  pendingState,
-                  latestReview.isError
-                    ? 'error'
-                    : latestReview.isPending
-                      ? 'loading'
-                      : 'ready',
-                )}
-                editing={editingId === quiz.quizSetId}
-                draftTitle={draftTitle}
+                quizId={quiz.quizSetId}
+                title={quiz.quizTitle}
+                materialTitle={quiz.materialTitle}
+                questionCount={quiz.questionCount}
+                status={quiz.status}
+                expanded={expanded.has(quiz.quizSetId)}
+                disclosureDisabled={quizzes.isFetching}
+                renameOpen={editingId === quiz.quizSetId}
+                renameDraft={draftTitle}
                 renameError={editingId === quiz.quizSetId ? renameError : undefined}
-                saving={rename.isPending && editingId === quiz.quizSetId}
-                inputRef={inputRef}
-                registerRenameButton={(element) => {
-                  if (element) renameButtons.current.set(quiz.quizSetId, element)
-                  else renameButtons.current.delete(quiz.quizSetId)
+                renameSaving={rename.isPending && editingId === quiz.quizSetId}
+                onToggle={() => toggleExpanded(quiz.quizSetId)}
+                onRenameOpenChange={(open) => {
+                  if (open) beginRename(quiz)
+                  else cancelRename(quiz.quizSetId)
                 }}
-                onDraftTitleChange={setDraftTitle}
-                onBeginRename={() => beginRename(quiz)}
-                onCancelRename={() => cancelRename(quiz.quizSetId)}
-                onSaveRename={() => saveRename(quiz.quizSetId)}
-                onRetryAction={() => {
-                  if (quiz.status === 'READY') void pendingQuery?.refetch()
-                  void latestReview.refetch()
+                onRenameDraftChange={setDraftTitle}
+                onRenameSubmit={() => saveRename(quiz.quizSetId)}
+                onStartQuiz={() => {
+                  const destination = createNewMainQuizDestination(quiz.quizSetId)
+                  navigate(destination.path, { state: destination.state })
                 }}
-                onNavigate={(path) => navigate(path)}
               />
-              )
-            })}
+            ))}
           </VStack>
         )}
         {quizzes.data ? (
@@ -987,158 +952,6 @@ export function QuizManagementPage() {
       </VStack>
     </Box>
   )
-}
-
-function QuizManagementCard({
-  quiz,
-  latestReview,
-  pending,
-  actionState,
-  editing,
-  draftTitle,
-  renameError,
-  saving,
-  inputRef,
-  registerRenameButton,
-  onDraftTitleChange,
-  onBeginRename,
-  onCancelRename,
-  onSaveRename,
-  onRetryAction,
-  onNavigate,
-}: {
-  quiz: QuizSetSummary
-  latestReview?: LatestReview
-  pending: PendingSelfAssessment | null
-  actionState: 'loading' | 'ready' | 'error'
-  editing: boolean
-  draftTitle: string
-  renameError?: string
-  saving: boolean
-  inputRef: React.RefObject<HTMLInputElement | null>
-  registerRenameButton: (element: HTMLButtonElement | null) => void
-  onDraftTitleChange: (value: string) => void
-  onBeginRename: () => void
-  onCancelRename: () => void
-  onSaveRename: () => void
-  onRetryAction: () => void
-  onNavigate: (path: string) => void
-}) {
-  const actions = resolveQuizManagementActions(quiz, pending, latestReview)
-  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      onCancelRename()
-    }
-  }
-  return (
-    <Box
-      as="li"
-      id={`quiz-card-${quiz.quizSetId}`}
-      tabIndex={-1}
-      className="learning-quiz-card"
-      borderWidth={1}
-      borderColor="stroke.neutralSubtle"
-      borderRadius="r3"
-      p="x4"
-    >
-      <VStack gap="x4" align="flex-start">
-        {editing ? (
-          <form
-            className="learning-form"
-            onSubmit={(event) => {
-              event.preventDefault()
-              onSaveRename()
-            }}
-          >
-            <VStack gap="x3">
-              <LearningField
-                label="퀴즈 이름"
-                error={renameError}
-                characterCount={{ current: countUnicodeCodePoints(draftTitle), max: 255 }}
-              >
-                <LearningTextInput
-                  ref={inputRef}
-                  invalid={Boolean(renameError)}
-                  value={draftTitle}
-                  disabled={saving}
-                  enterKeyHint="done"
-                  onKeyDown={handleKeyDown}
-                  onChange={(event) => onDraftTitleChange(event.currentTarget.value)}
-                />
-              </LearningField>
-              <Flex className="learning-management-actions" gap="x2">
-                <ActionButton type="button" size="medium" variant="ghost" disabled={saving} onClick={onCancelRename}>
-                  취소
-                </ActionButton>
-                <ActionButton type="submit" size="medium" variant="neutralWeak" disabled={saving}>
-                  {saving ? '저장하는 중...' : '저장'}
-                </ActionButton>
-              </Flex>
-            </VStack>
-          </form>
-        ) : (
-          <>
-            <VStack gap="x1" align="flex-start">
-              <Text className="learning-long-title" textStyle="t7Bold" color="fg.neutral">
-                {quiz.quizTitle}
-              </Text>
-              <Text textStyle="t4Regular" color="fg.neutralMuted">
-                {quiz.materialTitle}{quiz.questionCount ? ` · ${quiz.questionCount}문제` : ''}
-              </Text>
-              <Text textStyle="t4Regular" color="fg.neutralMuted">
-                {quizStatusLabel(quiz)}{quiz.lastAttemptAt ? ` · 최근 학습 ${formatDate(quiz.lastAttemptAt)}` : ''}
-              </Text>
-            </VStack>
-            {actionState === 'error' ? (
-              <VStack gap="x2" align="flex-start">
-                <Text as="p" textStyle="t4Regular" color="fg.critical" role="alert">
-                  다음 학습 행동을 확인하지 못했어요.
-                </Text>
-                <ActionButton type="button" size="small" variant="ghost" onClick={onRetryAction}>
-                  다시 시도
-                </ActionButton>
-              </VStack>
-            ) : actionState === 'loading' ? (
-              <Text as="p" textStyle="t4Regular" color="fg.neutralMuted" role="status">
-                다음 학습 행동을 확인하고 있어요.
-              </Text>
-            ) : null}
-            <Flex className="learning-management-actions" gap="x2" width="full">
-              <ActionButton
-                ref={registerRenameButton}
-                type="button"
-                size="medium"
-                variant="ghost"
-                disabled={saving}
-                onClick={onBeginRename}
-              >
-                이름 변경
-              </ActionButton>
-              {actionState === 'ready' ? actions.map((action) => (
-                <ActionButton
-                  key={action.label}
-                  type="button"
-                  size="medium"
-                  variant={action.primary ? 'neutralWeak' : 'ghost'}
-                  disabled={saving}
-                  onClick={() => onNavigate(action.path)}
-                >
-                  {action.label}
-                </ActionButton>
-              )) : null}
-            </Flex>
-          </>
-        )}
-      </VStack>
-    </Box>
-  )
-}
-
-function quizStatusLabel(quiz: QuizSetSummary) {
-  if (quiz.status === 'GENERATING') return '문제를 만들고 있어요'
-  if (quiz.status === 'FAILED') return '문제 생성에 실패했어요'
-  return quiz.lastAttemptAt ? '최근 풀이 있음' : '풀기 전'
 }
 
 function Pagination({
