@@ -31,9 +31,12 @@ class GradingOverrideServiceTest {
       mock(QuizAttemptQuestionRepository.class);
   private final QuizSubmittedAnswerRepository answers = mock(QuizSubmittedAnswerRepository.class);
   private final QuizAttemptResultProjector projector = mock(QuizAttemptResultProjector.class);
+  private final QuizReviewAvailabilityResolver reviewAvailability =
+      mock(QuizReviewAvailabilityResolver.class);
   private final QuizAttemptLockService locks = mock(QuizAttemptLockService.class);
   private final GradingOverrideService service =
-      new GradingOverrideService(questions, attemptQuestions, answers, projector, locks);
+      new GradingOverrideService(
+          questions, attemptQuestions, answers, projector, reviewAvailability, locks);
 
   private QuizAttempt attempt;
   private QuizQuestion question;
@@ -64,6 +67,7 @@ class GradingOverrideServiceTest {
     QuizAttemptResult expected = mock(QuizAttemptResult.class);
     when(answers.existsByAttemptQuestionId(19L)).thenReturn(true);
     when(projector.project(attempt)).thenReturn(expected);
+    when(reviewAvailability.enrich(7L, attempt, expected)).thenReturn(expected);
 
     QuizAttemptResult actual = service.update(7L, "attempt_1", "question_1", "CORRECT");
 

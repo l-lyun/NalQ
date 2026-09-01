@@ -69,6 +69,7 @@ public class QuizAttemptResultProjector {
         attempt.getPublicId(),
         set.getPublicId(),
         attempt.getStatus(),
+        false,
         new QuizAttemptSummary(
             new GradingCount(correct, graded),
             new EssaySelfAssessmentSummary(essayCorrect, partial, essayIncorrect),

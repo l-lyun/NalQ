@@ -10,3 +10,7 @@ export function getQuizOutcomeLabel(outcome?: QuizResultOutcome) {
   if (outcome === 'INCORRECT') return '오답'
   return '평가 대기'
 }
+
+export function shouldShowQuizReviewAction(result: QuizResult) {
+  return result.reviewAvailable
+}

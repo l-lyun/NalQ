@@ -29,6 +29,7 @@ import {
   loadRequestedConfig,
   saveRequestedConfig,
 } from '@/features/quiz/model/quizRequestedConfigStorage'
+import { startReviewForCurrentRoute } from '@/features/quiz/model/reviewStartNavigation'
 import { resolvePendingSelfAssessmentForQuizEntry } from '@/features/quiz/model/quizManagementActions'
 import { useCurrentUser } from '@/features/auth/model/auth.queries'
 import { learningMaterialKeys } from '@/features/learning-material/api/learningMaterial.api'
@@ -49,6 +50,7 @@ import type {
 const emptyResult: QuizResult = {
   kind: 'MAIN',
   status: 'COMPLETED',
+  reviewAvailable: false,
   summary: {
     correctCount: 0,
     gradedCount: 0,
@@ -120,10 +122,26 @@ async function startReviewFromResult(
   sourceAttemptId: string,
   queryClient: ReturnType<typeof useQueryClient>,
   navigate: NavigateFunction,
+  isRouteActive: () => boolean,
 ) {
-  const session = await createReviewSession(sourceAttemptId)
-  await queryClient.invalidateQueries({ queryKey: quizQueryKeys.reviews })
-  navigate(`/review-sessions/${session.reviewSessionId}`)
+  await startReviewForCurrentRoute({
+    sourceAttemptId,
+    createSession: createReviewSession,
+    invalidateReviews: () => queryClient.invalidateQueries({ queryKey: quizQueryKeys.reviews }),
+    isRouteActive,
+    navigate,
+  })
+}
+
+function useRouteActiveRef() {
+  const routeActiveRef = useRef(true)
+  useEffect(() => {
+    routeActiveRef.current = true
+    return () => {
+      routeActiveRef.current = false
+    }
+  }, [])
+  return routeActiveRef
 }
 
 export function QuizMaterialRoutePage() {
@@ -132,6 +150,7 @@ export function QuizMaterialRoutePage() {
   const location = useLocation()
   const currentUser = useCurrentUser()
   const queryClient = useQueryClient()
+  const routeActiveRef = useRouteActiveRef()
   const materialTitle = (location.state as { materialTitle?: string } | null)?.materialTitle ?? '학습자료'
   const [quizSetId, setQuizSetId] = useState<string>()
   const lastConditionsRef = useRef<QuizConditions | undefined>(undefined)
@@ -245,7 +264,12 @@ export function QuizMaterialRoutePage() {
         onDeferQuiz: () => navigate('/learning'),
         onResultExit: () => navigate('/learning'),
         onGoHome: () => navigate('/'),
-        onStartReview: (attemptId) => startReviewFromResult(attemptId, queryClient, navigate),
+        onStartReview: (attemptId) => startReviewFromResult(
+          attemptId,
+          queryClient,
+          navigate,
+          () => routeActiveRef.current,
+        ),
         onSubmit: async ({ attemptId, payload }) => {
           if (!attemptId) throw new Error('attempt UUID를 만들지 못했어요.')
           const submission = await submitQuiz(quizSetId!, attemptId, payload)
@@ -284,6 +308,7 @@ export function QuizSetRoutePage() {
   const location = useLocation()
   const currentUser = useCurrentUser()
   const queryClient = useQueryClient()
+  const routeActiveRef = useRouteActiveRef()
   const routeState = location.state as {
     materialTitle?: string
     restartMain?: boolean
@@ -426,7 +451,12 @@ export function QuizSetRoutePage() {
         onDeferQuiz: () => navigate('/learning'),
         onResultExit: () => navigate('/learning'),
         onGoHome: () => navigate('/'),
-        onStartReview: (attemptId) => startReviewFromResult(attemptId, queryClient, navigate),
+        onStartReview: (attemptId) => startReviewFromResult(
+          attemptId,
+          queryClient,
+          navigate,
+          () => routeActiveRef.current,
+        ),
         onSubmit: async ({ attemptId, payload }) => {
           if (!attemptId) throw new Error('attempt UUID를 만들지 못했어요.')
           const submission = await submitQuiz(state.quizSetId, attemptId, payload)
@@ -490,6 +520,7 @@ export function QuizAttemptResultRoutePage() {
   const { attemptId } = useParams<{ attemptId: string }>()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const routeActiveRef = useRouteActiveRef()
   const resultQuery = useQuery({
     queryKey: quizQueryKeys.attemptResult(attemptId!),
     queryFn: ({ signal }) => getQuizResult(attemptId!, signal),
@@ -499,7 +530,10 @@ export function QuizAttemptResultRoutePage() {
   if (resultQuery.isError || !resultQuery.data) {
     return <RouteStatus message="결과를 불러오지 못했어요. 다시 시도해 주세요." retry={() => void resultQuery.refetch()} />
   }
-  const result = adaptQuizResult(resultQuery.data)
+  const result = {
+    ...adaptQuizResult(resultQuery.data),
+    reviewAvailable: resultQuery.data.reviewAvailable && !resultQuery.isFetching,
+  }
   return (
     <QuizFlowPage
       materialTitle="학습자료"
@@ -510,7 +544,12 @@ export function QuizAttemptResultRoutePage() {
       callbacks={{
         onResultExit: () => navigate('/learning'),
         onGoHome: () => navigate('/'),
-        onStartReview: () => startReviewFromResult(attemptId!, queryClient, navigate),
+        onStartReview: () => startReviewFromResult(
+          attemptId!,
+          queryClient,
+          navigate,
+          () => routeActiveRef.current,
+        ),
         onUpdateGradingOutcome: async ({ questionId, outcome }) => {
           const updated = await updateGradingOverride(attemptId!, questionId, outcome)
           void queryClient.invalidateQueries({
@@ -569,6 +608,7 @@ export function ReviewSessionRoutePage() {
   const { reviewSessionId } = useParams<{ reviewSessionId: string }>()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const routeActiveRef = useRouteActiveRef()
   const sessionQuery = useQuery({
     queryKey: quizQueryKeys.reviewSession(reviewSessionId!),
     queryFn: ({ signal }) => getReviewSession(reviewSessionId!, signal),
@@ -597,7 +637,12 @@ export function ReviewSessionRoutePage() {
     )
   }
   const session = sessionQuery.data
-  const result = resultQuery.data ? adaptReviewResult(resultQuery.data) : emptyResult
+  const result = resultQuery.data
+    ? {
+        ...adaptReviewResult(resultQuery.data),
+        reviewAvailable: resultQuery.data.reviewAvailable && !resultQuery.isFetching,
+      }
+    : emptyResult
   const scene = session.status === 'SOLVING'
     ? 'SOLVING'
     : session.status === 'SELF_ASSESSMENT_REQUIRED'
@@ -621,6 +666,7 @@ export function ReviewSessionRoutePage() {
           resultQuery.data!.sourceAttemptId,
           queryClient,
           navigate,
+          () => routeActiveRef.current,
         ),
         onSubmit: async ({ payload }) => {
           const submission = await submitReview(reviewSessionId!, payload)

@@ -76,6 +76,7 @@ export type QuizResultSummary = {
 export type QuizResult = {
   kind: 'MAIN' | 'REVIEW'
   status: QuizAttemptStatus | ReviewSessionStatus
+  reviewAvailable: boolean
   summary: QuizResultSummary
   items: QuizResultItem[]
 }

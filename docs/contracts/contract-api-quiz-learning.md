@@ -733,6 +733,7 @@ Headers: `Authorization`, `Content-Type: application/json`
     "attemptId": "550e8400-e29b-41d4-a716-446655440000",
     "quizSetId": "qset_123",
     "status": "COMPLETED",
+    "reviewAvailable": true,
     "summary": {
       "scoredGrading": {
         "correctQuestionCount": 2,
@@ -791,6 +792,7 @@ Headers: `Authorization`, `Content-Type: application/json`
 - `representativeAnswer`는 결과 설명에 필요한 대표 정답만 공개한다. 빈칸·단답형의 허용 정답 전체를 반환하지 않는다. 서술형은 `modelAnswer`와 `keyPoints`를 제공한다.
 - `summary.scoredGrading`의 분자·분모는 객관식·빈칸·단답형이며, 단답형·빈칸형은 최신 `outcome`을 분자 계산에 사용한다. 최초 제출 응답의 `automaticGrading`은 제출 시점 자동 판정 요약이므로 별도 의미를 유지한다.
 - `summary`는 저장된 문항 결과와 복습 해결 상태를 기준으로 조회 시 계산한다. 클라이언트는 쓰기 성공 응답의 전체 결과를 적용하고 필요하면 이 결과 API를 다시 조회한다.
+- `reviewAvailable`은 이 회차가 해당 QuizSet에서 가장 최근에 완료한 `MAIN`이고, 현재 미해결 문항 또는 이 회차를 원본으로 한 활성 복습 세션이 있을 때만 `true`다. 결과 화면은 `summary.reviewQuestionCount`만으로 과거 회차의 복습 시작 가능 여부를 추측하지 않는다.
 - 서버가 보존하는 객관식·빈칸과 단답형의 `automaticOutcome`은 복습 뒤에도 바뀌지 않는다. 조회 projection의 단답형·빈칸형 `outcome`은 사용자 수정으로 바뀔 수 있고 복습 자체는 이를 변경하지 않는다. 복습 대상 여부는 서버가 현재 판정과 복습 해결 상태로 계산하며 결과 화면은 `summary.reviewQuestionCount`를 사용한다.
 
 ## 복습 세션
@@ -1049,7 +1051,8 @@ Headers: `Authorization`, `Content-Type: application/json`
 - `SELF_ASSESSMENT_REQUIRED`에서도 자동 채점 결과와 자기평가할 서술형 상세를 조회할 수 있다. 최종 완료 요약은 `COMPLETED`에서만 완료로 표현한다.
 - `questionResults`는 복습 세션에 snapshot된 문항만 원래 `number` 오름차순으로 반환한다.
 - 문항 결과의 `response`, 대표 답안 또는 모범 답안, `outcome`, 해설과 원문 근거 모양은 본 퀴즈 결과와 동일하다.
-- 응답에는 `reviewSessionId`, `sourceAttemptId`, `status`, `summary`, `questionResults`를 포함한다. `summary`는 이번 재풀이의 자동 채점 수, 서술형 자기평가 수, 해결·미해결 수를 구분한다.
+- 응답에는 `reviewSessionId`, `sourceAttemptId`, `status`, `reviewAvailable`, `summary`, `questionResults`를 포함한다. `summary`는 이번 재풀이의 자동 채점 수, 서술형 자기평가 수, 해결·미해결 수를 구분한다.
+- `reviewAvailable`은 원본 `sourceAttemptId`가 해당 QuizSet의 최신 완료 `MAIN`이고 현재 미해결 문항 또는 활성 복습 세션이 있을 때만 `true`다. 복습 중 다른 탭에서 더 최신 `MAIN`이 완료되면 기존 복습 결과는 남은 오답 수와 관계없이 새 복습 시작 행동을 제공하지 않는다.
 
 ## 오류
 

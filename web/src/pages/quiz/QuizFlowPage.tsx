@@ -25,7 +25,11 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createSubmissionPayload, isQuestionAnswered } from '@/features/quiz/model/quizAdapter'
 import { createUuidV4 } from '@/features/quiz/model/randomUuid'
 
-import { getQuizOutcomeLabel, getQuizResultTitle } from './quizFeedback'
+import {
+  getQuizOutcomeLabel,
+  getQuizResultTitle,
+  shouldShowQuizReviewAction,
+} from './quizFeedback'
 import type {
   QuizAnswer,
   QuizAnswers,
@@ -1578,6 +1582,7 @@ function ResultScreen({
   onStartReview?: () => void
   onGoHome?: () => void
 }) {
+  const reviewActionAvailable = shouldShowQuizReviewAction(result) && Boolean(onStartReview)
   return (
     <VStack className="quiz-screen">
       <ScreenHeader
@@ -1700,27 +1705,25 @@ function ResultScreen({
               {reviewStartError}
             </Text>
           ) : null}
-          {result.summary.reviewCount > 0 ? (
-            onStartReview ? (
-              <ActionButton
-                size="large"
-                variant="brandSolid"
-                loading={reviewStarting}
-                disabled={reviewStarting}
-                onClick={onStartReview}
-              >
-                복습하기
-              </ActionButton>
-            ) : null
-          ) : (
+          {reviewActionAvailable && onStartReview ? (
+            <ActionButton
+              size="large"
+              variant="brandSolid"
+              loading={reviewStarting}
+              disabled={reviewStarting}
+              onClick={onStartReview}
+            >
+              복습하기
+            </ActionButton>
+          ) : result.summary.reviewCount === 0 ? (
             <Text as="p" textStyle="t4Regular" color="fg.neutralMuted">
               복습할 문제가 없어요.
             </Text>
-          )}
+          ) : null}
           {onGoHome ? (
             <ActionButton
               size="large"
-              variant={result.summary.reviewCount > 0 ? 'neutralWeak' : 'brandSolid'}
+              variant={reviewActionAvailable ? 'neutralWeak' : 'brandSolid'}
               onClick={onGoHome}
             >
               홈으로

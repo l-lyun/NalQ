@@ -146,6 +146,7 @@ class QuizAttemptControllerTest {
     mockMvc
         .perform(get("/api/v1/quiz-attempts/attempt_1/result"))
         .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.reviewAvailable").value(false))
         .andExpect(jsonPath("$.data.questionResults[0].response.answer").value("선입선출"))
         .andExpect(jsonPath("$.data.questionResults[0].outcome").value("CORRECT"))
         .andExpect(jsonPath("$.data.summary.revision").doesNotExist())
@@ -170,6 +171,7 @@ class QuizAttemptControllerTest {
         "attempt_1",
         "set_1",
         QuizAttemptStatus.COMPLETED,
+        false,
         new QuizAttemptSummary(
             new GradingCount(outcome == GradingOutcome.CORRECT ? 1 : 0, 1),
             new EssaySelfAssessmentSummary(0, 0, 0),

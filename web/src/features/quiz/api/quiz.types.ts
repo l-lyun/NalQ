@@ -84,6 +84,7 @@ export type QuizResultResponse = {
   attemptId: string
   quizSetId: string
   status: QuizAttemptStatus
+  reviewAvailable: boolean
   summary: {
     scoredGrading: { correctQuestionCount: number; gradedQuestionCount: number }
     essaySelfAssessment: { correctCount: number; partialCount: number; incorrectCount: number }
@@ -179,6 +180,7 @@ export type ReviewResultResponse = {
   reviewSessionId: string
   sourceAttemptId: string
   status: QuizAttemptStatus
+  reviewAvailable: boolean
   // The contract describes this summary semantically but does not define its JSON field names.
   summary: unknown
   questionResults: QuestionResult[]
