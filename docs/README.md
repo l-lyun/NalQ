@@ -72,6 +72,7 @@ TRD는 각 애플리케이션의 `docs/trd/trd-*.md`에 두며, 파일명과 제
 | Server | OpenAPI와 Swagger UI | [서버 OpenAPI 운영 TRD](../server/docs/trd/trd-openapi-documentation.md) | 초안 |
 | Server | 패키지 구조 | [서버 패키지 구조 TRD](../server/docs/trd/trd-package-structure.md) | 구현 동기화 |
 | Server | 학습자료 생성·조회 | [학습자료 생성·조회 TRD](../server/docs/trd/trd-learning-material-creation.md) | 구현 동기화 |
+| Server | Notion 단일 페이지 가져오기 | [Notion 가져오기 TRD](../server/docs/trd/trd-notion-page-import.md) | 검토 중 |
 | Server | 퀴즈·복습 통합 저장 모델 | [퀴즈 채점 TRD](../server/docs/trd/trd-quiz-grading.md) | 목표 설계 확정, V5 SQL 반영·Java 구현 동기화 전 |
 | Web | 인증 상태·토큰·API 통합 | [웹 인증 TRD](../web/docs/trd/trd-authentication.md) | 구현 동기화 |
 | Web | 앱 셸·최상위 탭 상태 보존 | [웹 앱 셸 TRD](../web/docs/trd/trd-app-shell-navigation.md) | 구현 동기화 |
