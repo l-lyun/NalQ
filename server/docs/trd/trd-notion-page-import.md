@@ -78,7 +78,8 @@ scope: server
 - `workspace_name`이 `null`인 정상 OAuth 응답도 저장한다. 연결 상태 API도 `null`을 그대로 반환하고 클라이언트가 일반적인 연결 표시를 사용한다.
 - Notion 토큰 응답에 만료 시각이 없으므로 `expires_at`을 추측해 저장하지 않는다.
 - Notion 사용자 ID·이름·이메일·avatar, `bot_id`, OAuth 원시 응답과 페이지 목록은 저장하지 않는다.
-- 연결 해제는 Notion revoke `200` 뒤 행을 삭제한다. revoke 응답 유실·timeout처럼 성공 여부가 불명확하면 같은 token을 `POST /v1/oauth/introspect`로 한 번 확인한다. `active=false`면 삭제하고, `active=true`이거나 introspection 결과를 확인할 수 없으면 행을 보존하고 `503`을 반환한다.
+- 연결 해제는 연결 행을 `SELECT ... FOR UPDATE`로 잠근 뒤 그 revision의 최신 token에 Notion revoke를 수행한다. revoke `200`이면 같은 잠금 안에서 revision이 바뀌지 않았음을 확인하고 행을 삭제한다. revoke 응답 유실·timeout처럼 성공 여부가 불명확하면 같은 token을 `POST /v1/oauth/introspect`로 한 번 확인한다. `active=false`면 삭제하고, `active=true`이거나 introspection 결과를 확인할 수 없으면 행을 보존하고 `503`을 반환한다.
+- 구현이 외부 revoke 동안 DB 잠금을 해제하도록 바뀌면 삭제 전에 행과 `credential_revision`을 다시 읽는다. revision이 달라졌으면 새 token까지 revoke·비활성 확인한 뒤에만 행을 삭제하며, 최신 자격의 철회를 확인하지 못한 상태에서 로컬 행만 삭제하지 않는다.
 
 ## 5. 토큰 암호화와 키 주입
 
@@ -92,12 +93,13 @@ scope: server
 ## 6. OAuth state와 callback
 
 - `POST /api/v1/integrations/notion/authorizations`는 OpenMD Bearer 사용자를 확인하고 256-bit 수준의 CSPRNG state를 만든다.
-- Redis key는 state 원문의 SHA-256 digest를 사용하고, value에 `userId`, 서버 allowlist로 확정한 복귀 대상, 의도(`CONNECT|REAUTHORIZE`), 생성 시각을 둔다. `pageId`나 편집 본문은 넣지 않는다.
+- Redis key는 state 원문의 SHA-256 digest를 사용하고, value에 `userId`, 서버 allowlist로 확정한 복귀 대상, 의도(`CONNECT|REAUTHORIZE`), 생성 시각과 승인 시작 시점의 nullable `workspaceId`·`credentialRevision` snapshot을 둔다. `pageId`나 편집 본문은 넣지 않는다.
 - TTL은 15분이며 callback은 Redis 7 `GETDEL` 또는 동일한 원자 연산으로 state를 한 번만 소비한다. 만료·없음·재사용은 자격 교환 전에 거절한다. 이때 요청 query에서 복귀 주소를 추론하지 않고 환경별 고정 `oauthFailureReturnUri`에 `outcome=failed&error=NOTION_CONNECTION_REQUIRED`를 붙여 복귀시킨다. 이 callback 문맥의 코드는 연결 행 유무가 아니라 유효한 승인 흐름을 계속할 수 없다는 뜻이며, 클라이언트는 연결 상태 재조회 결과에 맞춰 새 승인을 시작한다.
 - `returnUri`는 임의 URL을 받지 않고 환경별 정확한 allowlist 값만 선택한다. callback은 Bearer 인증 대신 소비한 state의 `userId`로 소유자를 확정하고 그 계정이 존재하는지 다시 확인한다.
+- callback은 연결 행을 잠근 뒤 state의 연결 snapshot과 현재 행을 비교한다. `CONNECT`는 현재 행이 여전히 없을 때만, `REAUTHORIZE`는 같은 `workspaceId`와 `credentialRevision`의 행이 남아 있을 때만 자격 교환·저장을 계속한다. 연결 해제·다른 callback·자격 교체로 행이 없어지거나 revision이 바뀌었으면 이미 받은 authorization code를 저장하지 않고 안전하게 실패시켜, 해제 전에 발급된 늦은 callback이 연결을 되살리지 못하게 한다.
 - callback 복귀 query에는 `outcome=connected|cancelled|failed`와 필요한 공개 OpenMD 오류 code만 둔다. Notion authorization code·token·state·원시 오류는 포함하지 않는다.
 - 새 워크스페이스 최초 연결은 새 행을 만든다. 기존 행이 있는 재인증·접근 페이지 추가는 응답 `workspace_id`가 같을 때만 자격과 표시 이름을 교체한다.
-- 기존 행이 있는데 다른 `workspace_id`가 오면 새 자격을 저장하지 않고 revoke를 시도한 뒤 기존 행을 유지한다. 사용자는 기존 연결 해제를 완료한 뒤 다른 워크스페이스를 연결한다.
+- 기존 행이 있는데 다른 `workspace_id`가 오면 새 자격을 저장하지 않고 revoke를 시도한 뒤 기존 행과 상태를 유지한다. callback은 `outcome=failed&error=NOTION_WORKSPACE_MISMATCH`로 복귀시키며 이 오류를 기존 자격의 재인증 필요로 해석하지 않는다. 사용자는 기존 연결을 계속 사용하거나, 기존 연결 해제를 완료한 뒤 다른 워크스페이스를 연결한다.
 
 ## 7. Notion HTTP client 정책
 
@@ -109,7 +111,7 @@ scope: server
 - 자체 분산 rate-limit 큐·일일 제한은 두지 않는다. 프론트의 진행 중 버튼 제한, OAuth state 일회성, DB unique·갱신 잠금과 Notion의 `429|529` 응답 처리로 MVP를 보호한다.
 - Notion 원시 request·response body, token, authorization code, refresh 실패 원문과 학습 본문을 일반 로그에 남기지 않는다. request ID, OpenMD user ID, 공개 error code, endpoint 분류, latency·status 분류만 최소 기록한다.
 
-## 8. 자격 갱신 동시성
+## 8. 자격 갱신·연결 해제 동시성
 
 1. 서비스는 호출에 사용한 `credentialRevision`을 기억한다.
 2. Notion이 `401 unauthorized`를 반환하면 연결 행을 `SELECT ... FOR UPDATE`로 다시 읽는다.
@@ -117,6 +119,7 @@ scope: server
 4. revision이 같고 refresh token이 있으면 잠금을 소유한 요청만 Notion refresh를 호출한다. 성공 응답의 access·refresh token은 새 nonce로 암호화해 하나의 DB transaction에서 함께 교체하고 revision을 증가시킨다.
 5. 갱신 성공 후 원래 Notion 요청은 한 번만 재시도한다. 다시 `401`이면 추가 refresh 루프를 만들지 않고 `REAUTH_REQUIRED`로 전이한다.
 6. refresh token이 없거나 `invalid_grant`·확정적 무효 응답이면 `REAUTH_REQUIRED`를 저장한다. timeout·일시 5xx는 토큰을 삭제하지 않고 일시 장애로 변환한다.
+7. 연결 해제도 같은 사용자 행 잠금과 `credential_revision` 경계를 사용한다. 갱신이 먼저 끝나면 해제가 증가한 revision의 새 token을 revoke하고, 해제가 먼저 행을 삭제하면 대기하던 갱신은 행 없음으로 종료한다. 어느 순서에서도 로컬 행 없이 유효한 새 token이 남아서는 안 된다.
 
 외부 호출 동안 행 잠금을 유지하는 방식은 MVP의 사용자별 연결 하나·자동 재시도 한 번 범위에서 수용한다. 잠금 대기·DB transaction 시간은 계측하고, 실제 병목이 확인될 때만 분산 single-flight로 확장한다.
 
@@ -139,7 +142,7 @@ scope: server
 4. Notion `GET /v1/pages/{pageId}/markdown?include_transcript=false`를 호출한다.
 5. `truncated=true`, 비어 있지 않은 `unknown_block_ids` 또는 Notion이 만든 `<unknown ...>`이 있으면 추가 회수 없이 전체를 실패시킨다. 편집 상태로 쓸 부분 `content`는 반환하지 않는다.
 6. 이미지·동영상·오디오·PDF·파일 본체와 만료 URL을 제외하되 caption·alt text는 일반 텍스트로 유지한다.
-7. 정확한 `<br>` 토큰을 Markdown hard break인 두 공백과 newline으로 치환한다. 제목 같아 보이는 첫 `#` 행, 기타 enhanced Markdown tag·링크는 추측해 제거하지 않는다.
+7. fenced·inline code 밖에서 enhanced Markdown 줄바꿈으로 쓰인 정확한 `<br>` 토큰만 Markdown hard break인 두 공백과 newline으로 치환한다. 코드 영역의 `<br>` 리터럴, 제목 같아 보이는 첫 `#` 행, 기타 enhanced Markdown tag·링크는 추측해 제거하거나 바꾸지 않는다.
 8. 의도적으로 제외한 요소 때문에 content가 비어도 가져오기는 성공이다. 성공 응답은 `sourceType=NOTION`, `title`, `content`만 반환한다.
 9. 본문·제목을 20,000·255자로 자르지 않는다. 학습자료 저장 API가 최종 길이·비어 있지 않음을 다시 검증한다.
 
@@ -151,6 +154,7 @@ scope: server
 | --- | --- | --- |
 | 연결 행 없음 또는 callback state 유실·만료·재사용 | 요청 API `400` 또는 callback `302`의 `NOTION_CONNECTION_REQUIRED` | Notion 자격 호출을 시작하지 않으며, 클라이언트가 연결 상태 재조회 후 현재 상태에 맞는 승인을 새로 시작 |
 | refresh 불가·재동의 필요 | `409 NOTION_REAUTH_REQUIRED` | 행은 `REAUTH_REQUIRED`, token·workspace 의미 보존 |
+| 기존 연결의 워크스페이스와 callback 승인 워크스페이스가 다름 | callback `302`의 `NOTION_WORKSPACE_MISMATCH` | 새 자격은 저장하지 않고 기존 행·상태 보존 |
 | 페이지 없음·비공유·접근 불가 | `400 NOTION_PAGE_NOT_ACCESSIBLE` | 부분 제목·본문 없음 |
 | truncation·unknown·변환 완전성 미확인 | `400 NOTION_CONTENT_INCOMPLETE` | 부분 content 없음 |
 | timeout·rate limit·Notion 일시 5xx·revoke 미확인 | `503 NOTION_TEMPORARILY_UNAVAILABLE` | 재시도 가능 상태 보존 |
@@ -174,22 +178,26 @@ Notion 원시 HTTP status·error code·message와 stack trace를 공개 응답�
 - 연결 상태·nullable `workspaceName`, OAuth 시작·callback·페이지 목록·해제·import의 공개 요청·응답·오류 계약
 - 다른 사용자 연결 접근 차단과 `user_id` unique
 - OAuth state 만료·일회 소비·재사용·임의 return URI 거절과 state 유실 시 고정 안전 URI 복귀
-- 다른 워크스페이스 callback이 기존 행을 덮지 않음
+- 연결 해제 또는 다른 자격 교체 뒤 늦게 도착한 callback이 연결을 다시 만들거나 최신 자격을 덮지 않음
+- 다른 워크스페이스 callback이 기존 행을 덮지 않고 `NOTION_WORKSPACE_MISMATCH`로 복귀함
 - revoke 응답 유실 뒤 introspection `active=false`면 로컬 삭제, `active=true`·확인 실패면 보존
 - AES-GCM round trip, 매번 다른 nonce, AAD·tag 변조 실패, 알 수 없는 key version 실패
 - 동시 `401`에서 refresh 호출·자격 교체가 한 번만 일어나고 모든 소비자가 같은 새 자격을 사용함
+- refresh와 연결 해제가 동시에 실행되어도 최신 token 철회 확인 전 행을 삭제하지 않고 유효한 자격을 고아로 남기지 않음
 - `429|529` Retry-After, GET 5xx, timeout, 재시도 상한과 총 20초 예산
 - 최신 순 20개·cursor·제목 검색·빈 제목·일반 페이지·data source 행 투영
 - Page 제목 후 Markdown의 순차 호출, `include_transcript=false`
-- 제목·본문 무자르기, 빈 content 성공, 미디어 URL 제거·caption 유지, `<br>` 치환, 링크·enhanced tag 유지
-- `truncated|unknown_block_ids|<unknown>`의 부분 응답 없는 전체 실패
+- 제목·본문 무자르기, 빈 content 성공, 미디어 URL 제거·caption 유지, 코드 영역 밖 `<br>` 치환, 링크·enhanced tag와 코드 영역 리터럴 유지
+- `truncated|unknown_block_ids|<unknown ...>`의 구조 인지 판정과 부분 응답 없는 전체 실패
 - 평문 token·OAuth code·state·Notion 원시 오류·본문 로그 비노출
 
 ### 검증 명령
 
-- Docker 불필요: `server/gradlew.bat fastTest`
-- MySQL·Redis Testcontainers: `server/gradlew.bat integrationTest`
-- 전체 서버: `server/gradlew.bat test`
+- Docker 불필요: `server/gradlew fastTest`
+- MySQL·Redis Testcontainers: `server/gradlew integrationTest`
+- 전체 서버: `server/gradlew test`
+
+Windows에서는 각 명령의 `server/gradlew` 대신 `server/gradlew.bat`을 사용한다.
 
 외부 Notion은 port fixture·가상 HTTP server로 대체하고 실제 OAuth 자격·네트워크에 의존하지 않는다. MySQL 제약과 Redis 원자 소비만 `integration` tag로 검증한다.
 
