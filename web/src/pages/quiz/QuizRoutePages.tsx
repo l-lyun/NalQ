@@ -1,7 +1,7 @@
 import { ActionButton, ProgressCircle, Text, VStack } from '@seed-design/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
-import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams, type NavigateFunction } from 'react-router-dom'
 
 import { shouldRetryQuery } from '@/app/providers/queryClient'
 import {
@@ -47,6 +47,7 @@ import type {
 } from './quiz.types'
 
 const emptyResult: QuizResult = {
+  kind: 'MAIN',
   status: 'COMPLETED',
   summary: {
     correctCount: 0,
@@ -113,6 +114,16 @@ function validateQuestions(questions: QuizQuestion[]) {
     }
   }
   return questions
+}
+
+async function startReviewFromResult(
+  sourceAttemptId: string,
+  queryClient: ReturnType<typeof useQueryClient>,
+  navigate: NavigateFunction,
+) {
+  const session = await createReviewSession(sourceAttemptId)
+  await queryClient.invalidateQueries({ queryKey: quizQueryKeys.reviews })
+  navigate(`/review-sessions/${session.reviewSessionId}`)
 }
 
 export function QuizMaterialRoutePage() {
@@ -233,6 +244,8 @@ export function QuizMaterialRoutePage() {
         onExitQuiz: () => navigate('/learning'),
         onDeferQuiz: () => navigate('/learning'),
         onResultExit: () => navigate('/learning'),
+        onGoHome: () => navigate('/'),
+        onStartReview: (attemptId) => startReviewFromResult(attemptId, queryClient, navigate),
         onSubmit: async ({ attemptId, payload }) => {
           if (!attemptId) throw new Error('attempt UUID를 만들지 못했어요.')
           const submission = await submitQuiz(quizSetId!, attemptId, payload)
@@ -412,6 +425,8 @@ export function QuizSetRoutePage() {
         onExitQuiz: () => navigate('/learning'),
         onDeferQuiz: () => navigate('/learning'),
         onResultExit: () => navigate('/learning'),
+        onGoHome: () => navigate('/'),
+        onStartReview: (attemptId) => startReviewFromResult(attemptId, queryClient, navigate),
         onSubmit: async ({ attemptId, payload }) => {
           if (!attemptId) throw new Error('attempt UUID를 만들지 못했어요.')
           const submission = await submitQuiz(state.quizSetId, attemptId, payload)
@@ -494,6 +509,8 @@ export function QuizAttemptResultRoutePage() {
       initialResourceId={attemptId}
       callbacks={{
         onResultExit: () => navigate('/learning'),
+        onGoHome: () => navigate('/'),
+        onStartReview: () => startReviewFromResult(attemptId!, queryClient, navigate),
         onUpdateGradingOutcome: async ({ questionId, outcome }) => {
           const updated = await updateGradingOverride(attemptId!, questionId, outcome)
           void queryClient.invalidateQueries({
@@ -599,6 +616,12 @@ export function ReviewSessionRoutePage() {
       callbacks={{
         onExitQuiz: () => navigate('/learning'),
         onResultExit: () => navigate('/learning'),
+        onGoHome: () => navigate('/'),
+        onStartReview: () => startReviewFromResult(
+          resultQuery.data!.sourceAttemptId,
+          queryClient,
+          navigate,
+        ),
         onSubmit: async ({ payload }) => {
           const submission = await submitReview(reviewSessionId!, payload)
           void queryClient.invalidateQueries({

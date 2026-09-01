@@ -341,7 +341,20 @@
 }
 
 .quiz-reading-section {
+  padding: var(--seed-dimension-x3);
   overflow-wrap: anywhere;
+}
+
+.quiz-content:has(input[name^='essay-assessment-']) {
+  gap: var(--seed-dimension-x3);
+}
+
+.quiz-content:has(.quiz-result-summary) {
+  gap: var(--seed-dimension-x4);
+}
+
+.quiz-content:has(.quiz-result-summary) > section {
+  gap: var(--seed-dimension-x3);
 }
 
 .quiz-key-points {

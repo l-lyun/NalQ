@@ -47,6 +47,8 @@ scope: web
 - 내 퀴즈 disclosure는 내 학습자료와 같은 `expanded` URL search parameter의 쉼표 구분 ID Set 규칙을 사용한다. 검색·페이지·focus parameter를 갱신할 때 `expanded`를 유지하고, 여러 QuizSet을 동시에 펼칠 수 있다.
 - 퀴즈 이름 변경은 펼친 `READY` 카드의 controlled modal에서 수행한다. 현재 제목을 draft로 시작해 공백과 255 Unicode code point 제한을 검증하고, 저장 중 중복 제출과 닫기를 막는다. 성공 시 QuizSet 목록·상세·복습·홈 Query를 기존 invalidation 경계로 갱신하고 dialog trigger로 focus를 복귀하며, 실패 시 draft와 오류를 modal에 유지한다. `GENERATING`·`FAILED`에서는 이름 변경과 풀이를 모두 비활성화한다.
 - 홈의 대표 복습 행동은 최신 복습 Query가 대상을 반환할 때 `/review`로 진입해 활성 세션 재개 또는 새 세션 생성을 위임한다. 학습 메인은 최근 퀴즈와 별도로 `GET /api/v1/quiz-reviews/candidates?limit=3`을 조회하고, 후보의 `sourceAttemptId`로 세션을 직접 만든 뒤 반환된 세션 route로 이동한다. 미완료 자기평가와 활성 복습은 새 세션보다 우선한다. 실제 API가 빈 후보를 반환하면 학습 메인에는 복습 빈 상태를 표시하고, 개발 `mock` 모드는 동일 타입 adapter로 이 진입을 검토한다.
+- 본 퀴즈와 복습 결과 adapter는 각각 `MAIN`, `REVIEW` kind를 부여한다. 화면 제목은 이 실제 결과 kind로 `채점 결과`, `복습 결과`를 결정하고 route 진입 방식이나 임시 `flowKind`로 추정하지 않는다.
+- 결과 하단 `복습하기`는 현재 본 퀴즈 attempt ID 또는 복습 결과의 원본 attempt ID로 기존 review session 생성 API를 호출한다. 성공하면 반환된 session route로 이동하고, 진행 중에는 중복 요청을 막으며, 실패하면 현재 결과를 유지한다. `홈으로`는 `/`로 이동한다.
 - 서버 상태 Query key는 모두 `private` prefix 아래에 두어 기존 로그아웃·세션 종료 시 취소와 캐시 제거 범위에 포함한다.
 - 학습자료 목록·상세와 홈·학습이 공유하는 최신 복습 요약은 5분 동안 fresh로 재사용한다. 학습자료 생성, QuizSet 생성·생성 종료, 본 퀴즈 제출·서술형 자기평가·채점 판정 변경, 복습 세션 생성·제출·자기평가 성공 시 관련 feature Query key를 명시적으로 invalidate한다. 현재 풀이 화면이 직접 응답을 적용하는 attempt·review session/result Query는 즉시 재요청으로 화면 상태를 덮지 않도록 stale 표기만 하고 다음 조회에서 새로 가져오며, 홈·학습 요약은 성공 직후 다시 조회할 수 있게 한다.
 - 생성 접수 성공 뒤에는 응답의 `quizSetId` 라우트로 교체하고, 활성 생성 재진입도 서버가 반환한 `quizSetId` 라우트로 교체한다. 따라서 polling과 풀이 데이터의 기준은 URL의 서버 리소스 ID다.
@@ -66,7 +68,7 @@ scope: web
 - 결과 조회 adapter는 `response=null`이면 `답하지 않음`으로 표시하고 판정 수정 행동을 만들지 않는다. 답을 작성한 `SHORT_ANSWER` 또는 `FILL_IN_THE_BLANK`만 수정 가능하며 현재 판정과 관계없이 `채점 수정` 행동을 제공한다. 빈칸 채우기는 `response.blankAnswers`에 하나 이상의 답변이 있으면 일부 빈칸만 작성했더라도 수정할 수 있고, 완전 미응답이면 수정할 수 없다. 화면에서 사용하지 않는 `automaticOutcome`, `gradingSource`, `correctedAt`, `reviewRequired`, 별도 `unanswered` 필드를 요구하지 않는다.
 - 최종 제출 표현 경계는 제출 성공 응답의 `status`를 그대로 사용한다. `COMPLETED`는 결과로, `SELF_ASSESSMENT_REQUIRED`는 `pendingEssayQuestionIds` 순서의 자기평가로 이동하며, 제출 실패는 미응답 확인 시트로 되돌리지 않고 답안을 보존한 별도 재시도 상태로 이동한다.
 - 퀴즈 생성 POST에는 `Idempotency-Key`를 보내지 않는다. 접수 응답을 확인하지 못한 재시도에서는 자료의 활성 생성을 먼저 조회하고, `GENERATING` QuizSet이 없을 때만 같은 조건으로 새 생성 POST를 보낸다.
-- 서술형 자기평가는 결과 조회 모양의 내 답·모범 답안·핵심 포인트·해설·원문 근거를 읽고 문항별 `CORRECT`·`PARTIAL`·`INCORRECT`를 저장한다. 저장 응답의 `status`와 `remainingSelfAssessmentCount`를 확인한 뒤에만 다음 문항 또는 완료 결과로 이동한다.
+- 서술형 자기평가는 결과 조회 모양의 내 답·모범 답안·핵심 포인트·해설·학습자료 본문을 읽고 문항별 `정답(CORRECT)`·`보완 필요(PARTIAL)`·`오답(INCORRECT)`을 저장한다. 저장 응답의 `status`와 `remainingSelfAssessmentCount`를 확인한 뒤에만 다음 문항 또는 완료 결과로 이동한다.
 - 표현 callback은 실제 API adapter가 연결될 때 서버 성공 응답을 잃지 않도록 최종 제출 결과, 서술형 저장 결과와 판정 수정 결과를 필수 반환한다. 단답형·빈칸 채우기 판정 수정 adapter는 공통 `PUT /api/v1/quiz-attempts/{attemptId}/grading-overrides/{questionId}`에 `{ outcome }`만 보내며, 기존 `short-answer-gradings` 경로는 서버의 기존 소비자 호환 별칭이므로 신규 웹 요청에는 사용하지 않는다. 한 화면에서 요청을 직렬화하고 저장 중 추가 수정 행동을 막는다. 성공하면 서버가 반환한 전체 최신 결과로 현재 결과 상태를 교체하며 로컬 delta로 문항 판정이나 요약을 추정하지 않고, 실패하면 기존 판정과 요약을 유지한 채 재시도 행동을 제공한다. 공개 revision이나 충돌 해결 UI는 두지 않고 마지막으로 서버에 커밋된 판정을 현재 값으로 사용한다.
 
 ## 구현 전 확인

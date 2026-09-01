@@ -121,6 +121,7 @@ function toResultItem(item: QuestionResult): QuizResultItem {
 
 export function adaptQuizResult(data: QuizResultResponse): QuizResult {
   return {
+    kind: 'MAIN',
     status: data.status,
     summary: {
       correctCount: data.summary.scoredGrading.correctQuestionCount,
@@ -139,6 +140,7 @@ export function adaptReviewResult(data: ReviewResultResponse): QuizResult {
   const automaticallyGraded = items.filter((item) => item.type !== 'ESSAY')
   const essays = items.filter((item) => item.type === 'ESSAY')
   return {
+    kind: 'REVIEW',
     status: data.status,
     // Contract lines 794-799 do not define review summary JSON keys. Derive only the
     // already-visible counts until the shared contract names the server projection.

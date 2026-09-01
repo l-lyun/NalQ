@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { resolveLearningRoute } from './learningRoutes.ts'
+import { getLearningRoutePanelClassName, resolveLearningRoute } from './learningRoutes.ts'
 
 test('학습 route를 실제 화면 뎁스로 구분한다', () => {
   assert.deepEqual(resolveLearningRoute('/learning'), { id: 'main' })
@@ -12,4 +12,9 @@ test('학습 route를 실제 화면 뎁스로 구분한다', () => {
   })
   assert.deepEqual(resolveLearningRoute('/learning/quizzes'), { id: 'quizzes' })
   assert.deepEqual(resolveLearningRoute('/learning/new'), { id: 'new-quiz' })
+})
+
+test('최상위 학습 화면에는 내부 route 진입 모션을 중첩하지 않는다', () => {
+  assert.equal(getLearningRoutePanelClassName('main'), 'learning-route-panel')
+  assert.match(getLearningRoutePanelClassName('new-quiz'), /learning-route-panel--enter/)
 })

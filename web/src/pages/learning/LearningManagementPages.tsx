@@ -327,7 +327,7 @@ function RecentQuizPanel({
   if (!review.quizSetId || !review.sourceAttemptId) return null
   const primaryAction = resolveRecentQuizAction(review, pending)
   return (
-    <VStack bg="bg.neutralWeak" borderRadius="r3" p="x4" gap="x4" align="flex-start">
+    <VStack bg="bg.brandWeak" borderRadius="r3" p="x4" gap="x4" align="flex-start">
       <VStack gap="x1" align="flex-start">
         <Text className="learning-long-title" textStyle="t7Bold" color="fg.neutral">
           {review.quizTitle}
