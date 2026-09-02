@@ -20,21 +20,24 @@
 
 ## EAS 프로필
 
-- `ios-simulator`: 인증서 없이 iOS Simulator에서 네이티브 설정을 점검하는 빌드다.
+- `ios-simulator`: 인증서 없이 iOS Simulator에서 네이티브 설정을 점검하는 Release 빌드다. `preview` 환경의 `EXPO_PUBLIC_WEB_URL`에는 Simulator에서 접근 가능한 검증용 HTTPS 주소를 등록해야 한다.
 - `production`: App Store/TestFlight용 Release 빌드다. build number는 EAS 원격 값에서 자동 증가한다.
 - `submit.production`: App Store Connect의 `NalQ` 앱 ID를 사용해 제출 대상을 자동으로 선택한다.
 
 ## 첫 TestFlight 빌드 전에 필요한 계정 작업
 
-1. EAS의 `production` 환경에 공개 빌드 변수 `EXPO_PUBLIC_WEB_URL`을 실제 운영 HTTPS 주소로 등록한다. 이 값은 비밀이 아니지만 앱 번들에 포함된다.
-2. 운영 WebView URL을 실제 iPhone과 iPad에서 검증한 뒤 production 빌드를 실행한다.
-3. EAS가 관리하는 배포 인증서와 provisioning profile은 Expo 및 Apple 계정에서 관리한다. 인증서나 `.p8` 파일은 저장소에 커밋하지 않는다.
+1. Simulator 검증 전 EAS의 `preview` 환경에 공개 빌드 변수 `EXPO_PUBLIC_WEB_URL`을 Simulator에서 접근 가능한 검증용 HTTPS 주소로 등록한다.
+2. EAS의 `production` 환경에는 같은 이름으로 실제 운영 HTTPS 주소를 등록한다. 두 값은 비밀이 아니지만 각각의 앱 번들에 포함된다.
+3. 운영 WebView URL을 실제 iPhone과 iPad에서 검증한 뒤 production 빌드를 실행한다.
+4. EAS가 관리하는 배포 인증서와 provisioning profile은 Expo 및 Apple 계정에서 관리한다. 인증서나 `.p8` 파일은 저장소에 커밋하지 않는다.
 
 예시 명령은 `app/`에서 실행한다.
 
 ```powershell
 pnpm dlx eas-cli@latest login
 pnpm dlx eas-cli@latest init
+pnpm dlx eas-cli@latest env:create --environment preview --name EXPO_PUBLIC_WEB_URL --value https://YOUR_PREVIEW_HOST --visibility plaintext
+pnpm dlx eas-cli@latest build --platform ios --profile ios-simulator
 pnpm dlx eas-cli@latest env:create --environment production --name EXPO_PUBLIC_WEB_URL --value https://YOUR_PRODUCTION_HOST --visibility plaintext
 pnpm dlx eas-cli@latest build --platform ios --profile production
 pnpm dlx eas-cli@latest submit --platform ios --profile production

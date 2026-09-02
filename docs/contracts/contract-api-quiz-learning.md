@@ -20,7 +20,7 @@ scope: shared
 
 ### 인증과 소유권
 
-- 모든 클라이언트 API 엔드포인트는 유효한 OpenMD Access Token이 필요하다. Notion OAuth callback만 브라우저가 아닌 제공자 redirect를 받으므로 Bearer Token 대신 서버가 발급한 일회성·만료형 OAuth state로 요청의 사용자와 복귀 위치를 검증한다.
+- 모든 클라이언트 API 엔드포인트는 유효한 NalQ Access Token이 필요하다. Notion OAuth callback만 브라우저가 아닌 제공자 redirect를 받으므로 Bearer Token 대신 서버가 발급한 일회성·만료형 OAuth state로 요청의 사용자와 복귀 위치를 검증한다.
 - 서버는 Access Token에서 얻은 `userId`로 학습자료, 문제 세트, 본 퀴즈 회차와 복습 세션의 소유권을 판단한다. 요청 body의 `userId`는 받지 않는다.
 - attempt, 문항 결과와 복습 리소스는 요청 경로의 개별 ID 존재 여부만 확인하지 않는다. 현재 사용자의 학습자료 → 문제 세트 → attempt → attempt 문항 연결 전체가 일치하는지 검증하며, 복습은 원본 MAIN attempt와 원본 attempt 문항까지 같은 소유권 연결 안에 있는지 검증한다.
 - `quizSetId`, `attemptId`, 복습 ID와 문항 ID는 리소스 식별자일 뿐 권한 증명이 아니다. 클라이언트가 알고 있는 ID만으로 소유권 검증을 생략하지 않는다.
@@ -287,19 +287,19 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 
 - `status`는 `DISCONNECTED`, `CONNECTED`, `REAUTH_REQUIRED` 중 하나다.
 - `workspaceName`은 Notion이 제공한 연결 워크스페이스의 표시 이름이다. Notion의 정상 token 응답에서도 이름이 없을 수 있으므로 모든 상태에서 `null`을 허용하며, 클라이언트는 `CONNECTED|REAUTH_REQUIRED`인데 값이 없으면 일반적인 "연결된 Notion 워크스페이스" 표시를 사용한다. 내부 `workspaceId`는 클라이언트에 반환하지 않는다.
-- OpenMD 사용자 한 명은 활성 Notion 워크스페이스 연결을 최대 한 개만 가진다. 다른 워크스페이스로 바꾸려면 현재 연결 해제를 먼저 완료해야 한다.
+- NalQ 사용자 한 명은 활성 Notion 워크스페이스 연결을 최대 한 개만 가진다. 다른 워크스페이스로 바꾸려면 현재 연결 해제를 먼저 완료해야 한다.
 - `REAUTH_REQUIRED`는 로컬 연결의 워크스페이스 의미를 보존하지만 현재 접근 자격으로 페이지 목록·복사를 계속할 수 없는 상태다. 같은 워크스페이스 재인증만 기존 연결을 갱신할 수 있다.
 - Notion access token·refresh token과 제공자 원시 연결 정보는 이 응답을 포함한 어떤 클라이언트 응답에도 포함하지 않는다.
 
 #### Notion 연결 데이터와 암호화
 
-- 서버는 Notion 연결을 OpenMD `user_id`당 unique 한 행으로 저장한다. 행은 내부 `workspace_id`, nullable 표시용 `workspace_name`, 암호화한 access token, 선택적인 암호화 refresh token, 암호화 key version, `CONNECTED|REAUTH_REQUIRED` 상태와 생성·수정 시각을 가진다.
+- 서버는 Notion 연결을 NalQ `user_id`당 unique 한 행으로 저장한다. 행은 내부 `workspace_id`, nullable 표시용 `workspace_name`, 암호화한 access token, 선택적인 암호화 refresh token, 암호화 key version, `CONNECTED|REAUTH_REQUIRED` 상태와 생성·수정 시각을 가진다.
 - Notion token 응답에는 token 만료 시각이 없으므로 추측한 만료 시각이나 `expiresAt`을 연결 행에 저장하지 않는다. OAuth 승인 시작 응답의 `expiresAt`은 일회성 승인 요청의 만료일 뿐 token 수명이 아니다.
 - token은 각각 별도의 nonce를 사용하는 AES-256-GCM으로 암호화한다. AAD는 `userId + workspaceId + tokenType`을 결합해 다른 사용자·워크스페이스·token 종류로 암호문을 옮겨 사용할 수 없게 한다.
 - 개발 환경의 암호화 key는 환경 변수로 주입하고, 운영 key는 secret manager에서 공급한다. DB에는 key 원문 대신 복호화할 key version만 저장한다.
 - Notion 사용자 이름·이메일·프로필 등 사용자 개인정보, `bot_id`와 OAuth 원시 응답은 저장하지 않는다. 연결은 학습자료 가져오기에 필요한 read content capability만 요청·사용한다.
 - token 갱신은 같은 `user_id` 연결 행을 잠근 한 요청만 수행한다. 갱신 성공 시 새 access token과 제공된 refresh token을 한 트랜잭션에서 교체하고, 갱신을 촉발한 원 요청을 한 번만 다시 호출한다.
-- refresh token이 없거나 갱신에 실패해 재동의가 필요하면 기존 연결 메타데이터를 삭제하지 않고 `REAUTH_REQUIRED`로 전환한다. Notion token 갱신 실패를 OpenMD `401`로 노출하지 않는다.
+- refresh token이 없거나 갱신에 실패해 재동의가 필요하면 기존 연결 메타데이터를 삭제하지 않고 `REAUTH_REQUIRED`로 전환한다. Notion token 갱신 실패를 NalQ `401`로 노출하지 않는다.
 
 #### Notion OAuth 승인 시작과 callback
 
@@ -341,7 +341,7 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 
 #### Notion 외부 호출과 재시도
 
-- 서버는 Notion 연결 timeout을 3초, 개별 응답 읽기 timeout을 15초, 한 OpenMD 요청의 전체 Notion 처리 시간을 20초로 제한한다.
+- 서버는 Notion 연결 timeout을 3초, 개별 응답 읽기 timeout을 15초, 한 NalQ 요청의 전체 Notion 처리 시간을 20초로 제한한다.
 - 한 외부 호출의 재시도는 최대 한 번이다. `429`와 `529`는 `Retry-After`를 존중하고, 읽기 `GET`의 `5xx`는 한 번 재시도한다. 남은 전체 처리 시간 안에 재시도할 수 없으면 `NOTION_TEMPORARILY_UNAVAILABLE`로 끝낸다.
 - Notion `400`, `403`, `404`는 재시도하지 않는다. Notion `401`은 위 token 갱신 절차를 한 번 수행하고 원 요청을 한 번 다시 호출하며, 계속 실패하면 `NOTION_REAUTH_REQUIRED`다.
 - 이 MVP에는 자체 복합 rate limiter, Redis 대기열이나 background retry 작업을 추가하지 않는다. 클라이언트는 연결·재인증·목록·복사·해제 요청이 진행 중인 동안 같은 작업과 관련된 버튼을 비활성화한다.
@@ -1203,7 +1203,7 @@ Headers: `Authorization`, `Content-Type: application/json`
 | --- | --- | --- | --- |
 | 필드 누락·형식·허용 enum/개수 | `400` | 기존 `COMMON_001` | `fields`에 따라 입력 수정 |
 | 읽을 수 없는 JSON | `400` | 기존 `COMMON_002` | 요청 본문 수정 |
-| 없거나 소유하지 않은 OpenMD 리소스 | `404` | 기존 `COMMON_003` | 목록과 현재 사용자 소유권 확인 |
+| 없거나 소유하지 않은 NalQ 리소스 | `404` | 기존 `COMMON_003` | 목록과 현재 사용자 소유권 확인 |
 | 예상하지 못한 서버 오류 | `500` | 기존 `COMMON_999` | 학습자료 생성은 같은 멱등 키로 재시도하고, QuizSet 생성은 활성 생성 조회 후 없을 때만 새 요청하며, 제출은 같은 attempt 또는 review session 식별자로 재시도 |
 | 인증 정보 없음·잘못됨·만료 | `401` | 기존 `AUTH_005` | 갱신 또는 재로그인 |
 | 활성 Notion 연결 없이 페이지 목록·복사를 요청했거나 callback의 유효한 OAuth 승인 state를 복구할 수 없음 | `400` 또는 callback `302` query | `NOTION_CONNECTION_REQUIRED` | 연결 상태를 다시 조회한다. `DISCONNECTED`면 최초 연결, `CONNECTED|REAUTH_REQUIRED`면 현재 상태에 맞는 승인을 처음부터 다시 시작하거나 붙여넣기로 전환 |
@@ -1221,7 +1221,7 @@ Headers: `Authorization`, `Content-Type: application/json`
 
 - MVP의 안정 오류 코드는 `COMMON_001/002/003/999`, `AUTH_005`, `MATERIAL_001/002`, `NOTION_CONNECTION_REQUIRED`, `NOTION_REAUTH_REQUIRED`, `NOTION_WORKSPACE_MISMATCH`, `NOTION_PAGE_NOT_ACCESSIBLE`, `NOTION_CONTENT_INCOMPLETE`, `NOTION_TEMPORARILY_UNAVAILABLE`, `QUIZ_001/002`, `ATTEMPT_001`, `REVIEW_001`로 제한한다.
 - Notion 오류는 위 여섯 가지 사용자 복구 의미로만 공개한다. 제공자 원시 오류명, HTTP 본문, 세부 block 타입, token 갱신 실패 원문과 내부 예외를 새 공개 코드나 `fields`로 전달하지 않는다.
-- 공개 `401 AUTH_005`는 OpenMD Access Token 인증 실패에만 사용한다. Notion `401`은 내부 갱신 뒤 성공하거나 `409 NOTION_REAUTH_REQUIRED`로 변환한다.
+- 공개 `401 AUTH_005`는 NalQ Access Token 인증 실패에만 사용한다. Notion `401`은 내부 갱신 뒤 성공하거나 `409 NOTION_REAUTH_REQUIRED`로 변환한다.
 - 비동기 생성 실패는 정상 상태 조회의 `status=FAILED`로 전달한다. HTTP 오류와 혼용하지 않는다.
 - `error.message`는 사용자가 다음 행동을 이해할 수준으로 쓰고 내부 예외·LLM·Notion 상세를 노출하지 않는다. 정확한 사용자 문구는 이 계약의 안정 필드가 아니며 클라이언트는 여섯 Notion `error.code`와 [학습자료 흐름의 보존·복구 규칙](../ux/flow-content-import.md#취소와-실패)으로 분기한다.
 - 입력 오류의 `fields`는 `responses[0].selectedChoiceId`나 `responses[1].blankAnswers[0].blankId`처럼 클라이언트가 해당 입력을 찾을 수 있는 경로를 사용한다.

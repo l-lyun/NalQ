@@ -1,12 +1,12 @@
 ---
 version: alpha
-name: OpenMD SEED-Aligned Study Workspace
+name: NalQ SEED-Aligned Study Workspace
 description: A calm, document-like learning interface whose runtime foundation and components come from SEED Design.
 omitted:
   - section: colors
     reason: SEED semantic color tokens and theme resolution are the authoritative runtime source; this document records roles, not duplicate literal values.
   - section: typography
-    reason: SEED text styles remain authoritative for size, line height, and weight; OpenMD's approved Pretendard-first family and platform boundaries are recorded below without duplicating font assets or implementation details.
+    reason: SEED text styles remain authoritative for size, line height, and weight; NalQ's approved Pretendard-first family and platform boundaries are recorded below without duplicating font assets or implementation details.
   - section: spacing
     reason: SEED dimension and semantic spacing tokens are authoritative and are referenced in the Layout section.
   - section: rounded
@@ -15,25 +15,25 @@ omitted:
     reason: Current SEED React documentation and installed packages are authoritative; component mappings below are guidance, not copied recipe tokens.
 ---
 
-# OpenMD Design System
+# NalQ Design System
 
 > Status: design baseline draft
 >
-> Format: Stitch `DESIGN.md` compatible headings with OpenMD's nine-section extension
+> Format: Stitch `DESIGN.md` compatible headings with NalQ's nine-section extension
 >
 > Foundation source: SEED Rootage 2.6.0 and current SEED React documentation, verified 2026-08-19
 
-This file defines how OpenMD should feel, arrange information, and choose SEED primitives. It is not a copy of SEED token values and must not become a second token source. When a SEED recipe or token changes, the installed SEED package and current official documentation win.
+This file defines how NalQ should feel, arrange information, and choose SEED primitives. It is not a copy of SEED token values and must not become a second token source. When a SEED recipe or token changes, the installed SEED package and current official documentation win.
 
 ## Overview
 
 ### Visual Theme & Atmosphere
 
-OpenMD should feel like a well-organized study desk in clear daylight: calm enough for long reading, structured enough to make the next learning action obvious, and warm without looking decorative or childish. The interface is content-first and document-like. Whitespace, type hierarchy, and short lists do most of the grouping; containers and shadows are supporting tools.
+NalQ should feel like a well-organized study desk in clear daylight: calm enough for long reading, structured enough to make the next learning action obvious, and warm without looking decorative or childish. The interface is content-first and document-like. Whitespace, type hierarchy, and short lists do most of the grouping; containers and shadows are supporting tools.
 
 The visual rhythm is mostly neutral. SEED brand color appears where the user should act, not as a page-wide decoration. Positive, critical, warning, and informative colors retain their semantic meanings. AI generation may use SEED's `magic` loading treatment, but AI output must still be labeled in words and must never look authoritative only because of color.
 
-OpenMD is an application, not a Notion marketing-site replica. Do not reproduce Notion's proprietary font, blue, warm-white HEX values, sticker palette, pill-everywhere styling, or dark promotional hero. Preserve the useful design ideas instead: a quiet document canvas, generous grouping space, restrained elevation, and one unmistakable next action.
+NalQ is an application, not a Notion marketing-site replica. Do not reproduce Notion's proprietary font, blue, warm-white HEX values, sticker palette, pill-everywhere styling, or dark promotional hero. Preserve the useful design ideas instead: a quiet document canvas, generous grouping space, restrained elevation, and one unmistakable next action.
 
 ### Product goals that shape the interface
 
@@ -60,7 +60,7 @@ OpenMD is an application, not a Notion marketing-site replica. Do not reproduce 
 ### Design decisions in this document
 
 - Use SEED semantic tokens and component recipes instead of Notion values or local look-alike primitives.
-- Use Pretendard as OpenMD's approved web and WebView-first Korean font family while preserving SEED text styles for size, line height, and weight.
+- Use Pretendard as NalQ's approved web and WebView-first Korean font family while preserving SEED text styles for size, line height, and weight.
 - Use a mobile-first, single-column study flow; introduce multiple columns only when they improve comparison or scanning.
 - Prefer lists and whitespace over repeating dashboard cards.
 - Keep one prominent solid CTA per screen or local task region.
@@ -68,7 +68,7 @@ OpenMD is an application, not a Notion marketing-site replica. Do not reproduce 
 
 ### Open decisions and exceptions
 
-- OpenMD's proprietary illustration, character, and decorative asset language is not defined. Do not invent a Notion-like sticker palette.
+- NalQ's proprietary illustration, character, and decorative asset language is not defined. Do not invent a Notion-like sticker palette.
 - A verified SEED bottom-navigation React component was not found in the current Docs MCP listing. The three-tab product structure remains confirmed, but its implementation primitive must be checked against the installed package before coding.
 - Exact desktop content max-width and whether the product exposes dark appearance remain implementation/design review decisions. Do not turn example widths into global contracts.
 
@@ -78,7 +78,7 @@ OpenMD is an application, not a Notion marketing-site replica. Do not reproduce 
 
 Use semantic token names in design and implementation. Never copy the token's resolved light-theme HEX into product code: the same token resolves differently by theme.
 
-| Role | SEED token | OpenMD use |
+| Role | SEED token | NalQ use |
 | --- | --- | --- |
 | App basement | `bg.layerBasement` | Recessed app background behind primary surfaces |
 | Primary surface | `bg.layerDefault` | Main page, reading, list, and form surface |
@@ -114,9 +114,9 @@ Use semantic token names in design and implementation. Never copy the token's re
 
 ### Typography Rules
 
-Use SEED `Text` and its `textStyle` prop. A text style combines font size, line height, and weight; prefer it over setting each property independently. Use scalable `t*` styles by default so user font scaling is respected. `Static` styles are exceptions for cases proven to require fixed typography, not a visual shortcut. The OpenMD font-family decision changes glyph design and fallback behavior, not the SEED text scale or semantic hierarchy.
+Use SEED `Text` and its `textStyle` prop. A text style combines font size, line height, and weight; prefer it over setting each property independently. Use scalable `t*` styles by default so user font scaling is respected. `Static` styles are exceptions for cases proven to require fixed typography, not a visual shortcut. The NalQ font-family decision changes glyph design and fallback behavior, not the SEED text scale or semantic hierarchy.
 
-| OpenMD role | SEED text style | Typical use |
+| NalQ role | SEED text style | Typical use |
 | --- | --- | --- |
 | Display statement | `t14Bold` | Rare onboarding or completion statement; not routine app chrome |
 | Screen title | `t12Bold` | Primary page title |
@@ -144,9 +144,9 @@ SEED Rootage provides scalable `t1`–`t14` sizes equivalent to 11, 12, 13, 14, 
 
 ### Font-family boundary
 
-Pretendard is the approved OpenMD font direction for Korean reading quality and consistent web-based UI across platforms. This is an OpenMD design decision, not a SEED Rootage foundation fact.
+Pretendard is the approved NalQ font direction for Korean reading quality and consistent web-based UI across platforms. This is an NalQ design decision, not a SEED Rootage foundation fact.
 
-SEED officially recommends its cross-platform system-font stack. OpenMD intentionally overrides only the font-family for Korean reading quality and web/WebView consistency; SEED text styles remain authoritative for font size, line height, and weight.
+SEED officially recommends its cross-platform system-font stack. NalQ intentionally overrides only the font-family for Korean reading quality and web/WebView consistency; SEED text styles remain authoritative for font size, line height, and weight.
 
 - Web and WebView content use `Pretendard Variable` first, followed by a Korean-capable platform system sans fallback and then generic system sans. Do not rely on a Latin-oriented system stack as the only Korean fallback.
 - WebView content uses the same font assets delivered by the web bundle. The native shell must not load a second independent font for content rendered inside that WebView.
@@ -162,7 +162,7 @@ SEED officially recommends its cross-platform system-font stack. OpenMD intentio
 
 Use the current SEED React component when it owns the meaning, states, and accessibility behavior. Use `Box`, `VStack`, `HStack`, `Flex`, and `Grid` for composition; do not create a local component merely to imitate a SEED control.
 
-| Need | Verified SEED component or composition | OpenMD rule |
+| Need | Verified SEED component or composition | NalQ rule |
 | --- | --- | --- |
 | Primary action | `ActionButton` `brandSolid` or `neutralSolid`, usually `size="large"` | One prominent solid CTA per screen/task region; reserve `brandSolid` for the core learning action |
 | Supporting action | `ActionButton` `neutralWeak`, `neutralOutline`, `brandOutline`, or `ghost` | Keep visually subordinate; do not pair outline variants with solid variants against SEED guidance |
@@ -207,11 +207,11 @@ SEED radius tokens are `r0_5`, `r1`, `r1_5`, `r2`, `r2_5`, `r3`, `r3_5`, `r4`, `
 
 ### Layout Principles
 
-OpenMD is mobile-first and vertically progressive. A user should be able to identify the page, understand the current learning context, and see the next action without scanning a dashboard grid.
+NalQ is mobile-first and vertically progressive. A user should be able to identify the page, understand the current learning context, and see the next action without scanning a dashboard grid.
 
 ### SEED spacing scale
 
-| Token | Resolved size | OpenMD role |
+| Token | Resolved size | NalQ role |
 | --- | ---: | --- |
 | `x1` | 4px | Micro alignment only; not a page gap |
 | `x2` | 8px | Icon-label and tightly related inline content |
@@ -296,7 +296,7 @@ Use semantic layer colors before shadows. Let SEED overlay components own their 
 
 SEED is mobile-first. Values set at a breakpoint continue into wider viewports unless overridden.
 
-| Breakpoint | Min width | OpenMD behavior |
+| Breakpoint | Min width | NalQ behavior |
 | --- | ---: | --- |
 | `base` | 0px | Single-column WebView/app layout, full-width primary action, bottom-tab context |
 | `sm` | 480px | Preserve single flow; allow slightly wider local controls and media |
@@ -338,11 +338,11 @@ Never: hardcoded HEX, Notion font/tracking/shadows, palette-colored chrome, inve
 ### Ready-to-use generation prompt
 
 ```text
-Design an OpenMD screen from its approved feature, flow, and screen specification.
+Design an NalQ screen from its approved feature, flow, and screen specification.
 
 Keep the experience like a calm, well-organized study desk: content-first, document-like,
 and generous with whitespace. Put one contextual next learning action above statistics and
-secondary features. Use the OpenMD DESIGN.md hierarchy and responsive rules.
+secondary features. Use the NalQ DESIGN.md hierarchy and responsive rules.
 
 Use current SEED React components and semantic tokens. Verify component names, props,
 deprecation status, icons, and Rootage tokens in the official SEED Docs MCP before writing
@@ -379,4 +379,4 @@ foundation primitives, then document the custom exception and its accessibility 
 - React docs: `components/chip-tabs`, `components/segmented-control`, `components/skeleton`, `components/result-section`, `components/page-banner`, `components/snackbar`
 - React docs: `components/concepts/responsive-design`, `components/layout/grid`
 
-Anything not listed above is a design direction or OpenMD decision, not an asserted SEED API. Re-verify at implementation time.
+Anything not listed above is a design direction or NalQ decision, not an asserted SEED API. Re-verify at implementation time.

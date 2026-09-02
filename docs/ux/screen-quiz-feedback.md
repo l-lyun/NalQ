@@ -15,7 +15,7 @@ last_updated: 2026-09-01
 - 관련 기능: [퀴즈 생성·풀이·결과·복습](../prd/prd-quiz-learning.md)
 - 관련 흐름: [퀴즈 생성부터 복습까지](flow-quiz-solving.md)
 - 연관 화면: [미완료 서술형 자기평가 재진입](screen-quiz-resume.md), [틀린 문제 다시 풀기](screen-review.md)
-- 시각 기준: [OpenMD Design System](../../DESIGN.md)
+- 시각 기준: [NalQ Design System](../../DESIGN.md)
 
 ## 문서 책임
 
@@ -219,4 +219,4 @@ last_updated: 2026-09-01
 
 | 날짜 | 변경 | 근거 | 작성자 |
 | --- | --- | --- | --- |
-| 2026-09-01 | 자기평가·결과 밀도, `보완 필요` 문구, `학습자료 본문` 명칭과 결과 직후 복습·홈 행동 확정 | 사용자 승인 | OpenMD UX/UI 설계 |
+| 2026-09-01 | 자기평가·결과 밀도, `보완 필요` 문구, `학습자료 본문` 명칭과 결과 직후 복습·홈 행동 확정 | 사용자 승인 | NalQ UX/UI 설계 |

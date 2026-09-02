@@ -1,4 +1,4 @@
-# OpenMD
+# NalQ
 
 비즈니스 기능 없이 개발 환경만 구성한 monorepo입니다.
 

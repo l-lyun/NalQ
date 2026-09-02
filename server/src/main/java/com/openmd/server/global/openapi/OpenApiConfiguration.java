@@ -37,9 +37,9 @@ public class OpenApiConfiguration {
 
 		return new OpenAPI()
 			.info(new Info()
-				.title("OpenMD API")
+				.title("NalQ API")
 				.version("v1")
-				.description("OpenMD 서버의 실행 가능한 HTTP 계약입니다."))
+				.description("NalQ 서버의 실행 가능한 HTTP 계약입니다."))
 			.components(new Components()
 				.addSecuritySchemes(BEARER_AUTH, bearerAuth)
 				.addSecuritySchemes(BROWSER_REFRESH_COOKIE, browserRefreshCookie))

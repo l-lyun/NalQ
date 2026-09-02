@@ -21,12 +21,12 @@ scope: server
 
 ### 범위
 
-- OpenMD 사용자별 Notion Public OAuth 연결 하나
+- NalQ 사용자별 Notion Public OAuth 연결 하나
 - OAuth state의 Redis 15분 TTL·일회 소비와 고정 복귀 대상 검증
 - MySQL 연결 원장과 AES-256-GCM 토큰 암호화
 - access token 인증 실패 시 refresh token 교체 동시성
 - 접근 페이지 검색·cursor 조회, 선택 페이지 제목·Markdown 일회성 복사
-- Notion 응답의 OpenMD 성공·오류 모델 변환
+- Notion 응답의 NalQ 성공·오류 모델 변환
 - 실제 Notion 자격에 의존하지 않는 단위·계약·MySQL·Redis 통합 검증
 
 ### 비범위
@@ -73,7 +73,7 @@ scope: server
 | `created_at` | `TIMESTAMP(6)` | not null |
 | `updated_at` | `TIMESTAMP(6)` | not null |
 
-- `uk_notion_connections_user` 제약이 활성 워크스페이스 하나를 최종 보장한다. `workspace_id`는 unique가 아니므로 서로 다른 OpenMD 사용자가 같은 워크스페이스를 승인할 수 있다.
+- `uk_notion_connections_user` 제약이 활성 워크스페이스 하나를 최종 보장한다. `workspace_id`는 unique가 아니므로 서로 다른 NalQ 사용자가 같은 워크스페이스를 승인할 수 있다.
 - `user_id` FK는 기존 계정 생명주기 미확정을 지켜 `ON DELETE RESTRICT`로 둔다.
 - `workspace_name`이 `null`인 정상 OAuth 응답도 저장한다. 연결 상태 API도 `null`을 그대로 반환하고 클라이언트가 일반적인 연결 표시를 사용한다.
 - Notion 토큰 응답에 만료 시각이 없으므로 `expires_at`을 추측해 저장하지 않는다.
@@ -92,24 +92,24 @@ scope: server
 
 ## 6. OAuth state와 callback
 
-- `POST /api/v1/integrations/notion/authorizations`는 OpenMD Bearer 사용자를 확인하고 256-bit 수준의 CSPRNG state를 만든다.
+- `POST /api/v1/integrations/notion/authorizations`는 NalQ Bearer 사용자를 확인하고 256-bit 수준의 CSPRNG state를 만든다.
 - Redis key는 state 원문의 SHA-256 digest를 사용하고, value에 `userId`, 서버 allowlist로 확정한 복귀 대상, 의도(`CONNECT|REAUTHORIZE`), 생성 시각과 승인 시작 시점의 nullable `workspaceId`·`credentialRevision` snapshot을 둔다. `pageId`나 편집 본문은 넣지 않는다.
 - TTL은 15분이며 callback은 Redis 7 `GETDEL` 또는 동일한 원자 연산으로 state를 한 번만 소비한다. 만료·없음·재사용은 자격 교환 전에 거절한다. 이때 요청 query에서 복귀 주소를 추론하지 않고 환경별 고정 `oauthFailureReturnUri`에 `outcome=failed&error=NOTION_CONNECTION_REQUIRED`를 붙여 복귀시킨다. 이 callback 문맥의 코드는 연결 행 유무가 아니라 유효한 승인 흐름을 계속할 수 없다는 뜻이며, 클라이언트는 연결 상태 재조회 결과에 맞춰 새 승인을 시작한다.
 - `returnUri`는 임의 URL을 받지 않고 환경별 정확한 allowlist 값만 선택한다. callback은 Bearer 인증 대신 소비한 state의 `userId`로 소유자를 확정하고 그 계정이 존재하는지 다시 확인한다.
 - callback은 연결 행을 잠근 뒤 state의 연결 snapshot과 현재 행을 비교한다. `CONNECT`는 현재 행이 여전히 없을 때만, `REAUTHORIZE`는 같은 `workspaceId`와 `credentialRevision`의 행이 남아 있을 때만 자격 교환·저장을 계속한다. 연결 해제·다른 callback·자격 교체로 행이 없어지거나 revision이 바뀌었으면 이미 받은 authorization code를 저장하지 않고 안전하게 실패시켜, 해제 전에 발급된 늦은 callback이 연결을 되살리지 못하게 한다.
-- callback 복귀 query에는 `outcome=connected|cancelled|failed`와 필요한 공개 OpenMD 오류 code만 둔다. Notion authorization code·token·state·원시 오류는 포함하지 않는다.
+- callback 복귀 query에는 `outcome=connected|cancelled|failed`와 필요한 공개 NalQ 오류 code만 둔다. Notion authorization code·token·state·원시 오류는 포함하지 않는다.
 - 새 워크스페이스 최초 연결은 새 행을 만든다. 기존 행이 있는 재인증·접근 페이지 추가는 응답 `workspace_id`가 같을 때만 자격과 표시 이름을 교체한다.
 - 기존 행이 있는데 다른 `workspace_id`가 오면 새 자격을 저장하지 않고 revoke를 시도한 뒤 기존 행과 상태를 유지한다. callback은 `outcome=failed&error=NOTION_WORKSPACE_MISMATCH`로 복귀시키며 이 오류를 기존 자격의 재인증 필요로 해석하지 않는다. 사용자는 기존 연결을 계속 사용하거나, 기존 연결 해제를 완료한 뒤 다른 워크스페이스를 연결한다.
 
 ## 7. Notion HTTP client 정책
 
 - 모든 요청은 고정 구성 `Notion-Version: 2026-03-11`과 요청별 필요 header를 사용한다. 업그레이드는 한 구성 값과 adapter 계약 테스트로 통제한다.
-- 연결 timeout 3초, 응답 timeout 15초, 하나의 OpenMD 요청이 소비하는 Notion 총 시간 20초를 상한으로 둔다.
-- `429`, `529`는 `Retry-After`가 남은 20초 예산 안일 때 jitter 후 한 번만 재시도한다. 최종 OpenMD `503`에는 제공자 값을 검증한 `Retry-After` 표준 header를 전달할 수 있다.
+- 연결 timeout 3초, 응답 timeout 15초, 하나의 NalQ 요청이 소비하는 Notion 총 시간 20초를 상한으로 둔다.
+- `429`, `529`는 `Retry-After`가 남은 20초 예산 안일 때 jitter 후 한 번만 재시도한다. 최종 NalQ `503`에는 제공자 값을 검증한 `Retry-After` 표준 header를 전달할 수 있다.
 - 멱등 GET의 `500|502|503|504`는 예산 안에서 한 번만 재시도한다. 일반 `400|403|404`는 재시도하지 않는다.
 - OAuth code 교환·refresh 교체처럼 일회성 자격을 소비하는 POST는 응답 유실 후 무작정 자동 재시도하지 않는다.
 - 자체 분산 rate-limit 큐·일일 제한은 두지 않는다. 프론트의 진행 중 버튼 제한, OAuth state 일회성, DB unique·갱신 잠금과 Notion의 `429|529` 응답 처리로 MVP를 보호한다.
-- Notion 원시 request·response body, token, authorization code, refresh 실패 원문과 학습 본문을 일반 로그에 남기지 않는다. request ID, OpenMD user ID, 공개 error code, endpoint 분류, latency·status 분류만 최소 기록한다.
+- Notion 원시 request·response body, token, authorization code, refresh 실패 원문과 학습 본문을 일반 로그에 남기지 않는다. request ID, NalQ user ID, 공개 error code, endpoint 분류, latency·status 분류만 최소 기록한다.
 
 ## 8. 자격 갱신·연결 해제 동시성
 
@@ -125,7 +125,7 @@ scope: server
 
 ## 9. 페이지 목록
 
-- OpenMD `GET /api/v1/integrations/notion/pages` adapter는 Notion `POST /v1/search`를 `object=page`, `last_edited_time DESC`, `page_size=20`으로 호출한다.
+- NalQ `GET /api/v1/integrations/notion/pages` adapter는 Notion `POST /v1/search`를 `object=page`, `last_edited_time DESC`, `page_size=20`으로 호출한다.
 - `query`는 제목 검색에만 사용하고, `cursor`는 제공자 `next_cursor`를 해석하지 않은 채 전달한다. 응답은 `pageId`, `title`, `lastEditedAt`, `nextCursor`만 포함한다.
 - 일반 페이지와 data source 행 페이지를 허용하고 database·data source 객체 자체는 제외한다. 제목은 `type=title` property의 `plain_text`를 순서대로 합치며 없으면 빈 문자열이다.
 - Search index는 즉시·전체 결과를 보장하지 않으므로 서버·DB 목록 cache를 두지 않고 cursor 없는 새로고침을 지원한다.
@@ -158,9 +158,9 @@ scope: server
 | 페이지 없음·비공유·접근 불가 | `400 NOTION_PAGE_NOT_ACCESSIBLE` | 부분 제목·본문 없음 |
 | truncation·unknown·변환 완전성 미확인 | `400 NOTION_CONTENT_INCOMPLETE` | 부분 content 없음 |
 | timeout·rate limit·Notion 일시 5xx·revoke 미확인 | `503 NOTION_TEMPORARILY_UNAVAILABLE` | 재시도 가능 상태 보존 |
-| OpenMD Bearer 없음·무효 | `401 AUTH_005` | Notion 재인증으로 변환하지 않음 |
+| NalQ Bearer 없음·무효 | `401 AUTH_005` | Notion 재인증으로 변환하지 않음 |
 
-Notion 원시 HTTP status·error code·message와 stack trace를 공개 응답에 넣지 않는다. 클라이언트는 HTTP status만이 아니라 안정 OpenMD `error.code`로 폴백을 결정한다.
+Notion 원시 HTTP status·error code·message와 stack trace를 공개 응답에 넣지 않는다. 클라이언트는 HTTP status만이 아니라 안정 NalQ `error.code`로 폴백을 결정한다.
 
 ## 12. 구성과 비밀 경계
 

@@ -4,9 +4,9 @@ status: draft
 scope: repository
 ---
 
-# [Index] OpenMD 문서 지도
+# [Index] NalQ 문서 지도
 
-이 파일은 OpenMD의 제품·UX·공유 계약·기술 원장을 찾기 위한 유일한 문서 인덱스다. 모든 문서를 한꺼번에 읽지 말고 현재 작업에 필요한 원장만 선택한다. 문서를 만들거나 분리할 때는 [문서 운영 가이드](guide.md)를 따른다.
+이 파일은 NalQ의 제품·UX·공유 계약·기술 원장을 찾기 위한 유일한 문서 인덱스다. 모든 문서를 한꺼번에 읽지 말고 현재 작업에 필요한 원장만 선택한다. 문서를 만들거나 분리할 때는 [문서 운영 가이드](guide.md)를 따른다.
 
 ## 읽기 순서
 
@@ -29,7 +29,7 @@ scope: repository
 
 | 관심사 | 원장 | 상태 |
 | --- | --- | --- |
-| 제품 목표·범위·원칙·내비게이션·용어 | [OpenMD 제품 기반](product.md) | 초안 |
+| 제품 목표·범위·원칙·내비게이션·용어 | [NalQ 제품 기반](product.md) | 초안 |
 | 홈 | [홈 PRD](prd/prd-home.md) | 초안 |
 | 이메일 기반 자체 인증 | [자체 인증 PRD](prd/prd-local-authentication.md) | 초안 |
 | 학습자료 만들기 | [학습자료 만들기 PRD](prd/prd-content-import.md) | 검토 중 |
