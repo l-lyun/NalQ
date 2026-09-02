@@ -31,7 +31,10 @@ import {
   LearningTextarea,
   LearningTextInput,
 } from './components/LearningPrimitives'
-import { resolveLearningMaterialsReturnTo } from './learningRoutes'
+import {
+  readLearningCreateReturnState,
+  resolveLearningMaterialsReturnTo,
+} from './learningRoutes'
 import './learning.css'
 
 type EditorRouteState = {
@@ -39,6 +42,7 @@ type EditorRouteState = {
   title?: string
   content?: string
   returnTo?: string
+  learningCreateReturnState?: unknown
 }
 
 type SaveDestination = 'material' | 'quiz'
@@ -51,6 +55,7 @@ export function LearningMaterialCreatePage() {
   const routeState = (location.state ?? {}) as EditorRouteState
   const sourceType = routeState.sourceType === 'NOTION' ? 'NOTION' : 'PASTE'
   const returnTo = resolveLearningMaterialsReturnTo(routeState.returnTo)
+  const learningCreateReturnState = readLearningCreateReturnState(routeState.learningCreateReturnState)
   const [title, setTitle] = useState(routeState.title ?? '')
   const [content, setContent] = useState(routeState.content ?? '')
   const [touched, setTouched] = useState({ title: sourceType === 'NOTION', content: sourceType === 'NOTION' })
@@ -101,7 +106,15 @@ export function LearningMaterialCreatePage() {
   })
 
   const requestBack = () => {
-    navigate(returnTo ?? (sourceType === 'NOTION' ? '/learning/import/notion' : '/learning/new'))
+    if (returnTo) {
+      navigate(returnTo)
+      return
+    }
+    navigate(sourceType === 'NOTION' ? '/learning/import/notion' : '/learning/new', {
+      state: Object.keys(learningCreateReturnState).length > 0
+        ? { learningCreateReturnState }
+        : undefined,
+    })
   }
 
   return (

@@ -25,6 +25,9 @@ export function LearningCreatePage() {
   const navigate = useNavigate()
   const location = useLocation()
   const returnState = readLearningCreateReturnState(location.state)
+  const childRouteState = Object.keys(returnState).length > 0
+    ? { learningCreateReturnState: returnState }
+    : undefined
   const queryClient = useQueryClient()
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
@@ -65,9 +68,16 @@ export function LearningCreatePage() {
             ? { restoreScrollTop: returnState.returnScrollTop }
             : undefined,
         }),
-        onStartNotionImport: () => navigate('/learning/import/notion'),
+        onStartNotionImport: () => navigate('/learning/import/notion', {
+          state: childRouteState,
+        }),
         onStartDirectInput: () => navigate('/learning/materials/new', {
-          state: { sourceType: 'PASTE', title: '', content: '' },
+          state: {
+            sourceType: 'PASTE',
+            title: '',
+            content: '',
+            ...childRouteState,
+          },
         }),
         onOpenQuizConditions: quizRoutesEnabled
           ? (material) =>

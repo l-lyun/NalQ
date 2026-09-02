@@ -25,10 +25,10 @@ test('노션 URL의 32자리 또는 dashed UUID를 canonical page id로 바꾼�
 })
 
 test('상대 날짜는 수정 접미사 없이 표시한다', () => {
-  const now = new Date('2026-09-02T12:00:00+09:00')
-  assert.equal(formatNotionRelativeDate('2026-09-02T01:00:00+09:00', now), '오늘')
-  assert.equal(formatNotionRelativeDate('2026-09-01T23:00:00+09:00', now), '어제')
-  assert.equal(formatNotionRelativeDate('2026-08-30T12:00:00+09:00', now), '3일 전')
+  const now = new Date(2026, 8, 2, 12)
+  assert.equal(formatNotionRelativeDate(new Date(2026, 8, 2, 1).toISOString(), now), '오늘')
+  assert.equal(formatNotionRelativeDate(new Date(2026, 8, 1, 23).toISOString(), now), '어제')
+  assert.equal(formatNotionRelativeDate(new Date(2026, 7, 30, 12).toISOString(), now), '3일 전')
 })
 
 test('공개 오류 코드는 서버 message가 아니라 code로 사용자 복구 의미를 고른다', () => {

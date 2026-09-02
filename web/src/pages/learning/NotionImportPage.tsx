@@ -50,11 +50,15 @@ import {
   LearningScreenHeader,
   LearningTextInput,
 } from './components/LearningPrimitives'
-import { resolveLearningMaterialsReturnTo } from './learningRoutes'
+import {
+  readLearningCreateReturnState,
+  resolveLearningMaterialsReturnTo,
+} from './learningRoutes'
 import './learning.css'
 
 const PAGE_REVEAL_SIZE = 5
 const NOTION_RETURN_TO_STORAGE_KEY = 'openmd:notion-import:return-to'
+const NOTION_CREATE_RETURN_STATE_STORAGE_KEY = 'openmd:notion-import:create-return-state'
 
 type CallbackNotice = { outcome?: 'connected' | 'cancelled' | 'failed'; error?: string }
 type ConfirmKind = 'disconnect' | 'switch-workspace' | null
@@ -73,6 +77,11 @@ export function NotionImportPage() {
     if (routeReturnTo) return routeReturnTo
     return location.search ? consumeNotionReturnTo() : undefined
   })
+  const [learningCreateReturnState] = useState(() => readLearningCreateReturnState(
+    location.search
+      ? consumeNotionLearningCreateReturnState()
+      : (location.state as { learningCreateReturnState?: unknown } | null)?.learningCreateReturnState,
+  ))
   const [rawQuery, setRawQuery] = useState('')
   const [committedQuery, setCommittedQuery] = useState('')
   const [composing, setComposing] = useState(false)
@@ -99,7 +108,7 @@ export function NotionImportPage() {
   const importing = useMutation({ mutationFn: importNotionPage })
   const authorizing = useMutation({
     mutationFn: () => {
-      rememberNotionReturnTo(returnTo)
+      rememberNotionNavigationState(returnTo, learningCreateReturnState)
       return startNotionAuthorization(`${window.location.origin}/learning/import/notion`)
     },
     onSuccess: ({ authorizationUrl }) => window.location.assign(authorizationUrl),
@@ -115,17 +124,24 @@ export function NotionImportPage() {
     },
   })
 
-  useEffect(() => () => {
-    mounted.current = false
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
   }, [])
 
   useEffect(() => {
     if (!location.search) return
     navigate(location.pathname, {
       replace: true,
-      state: returnTo ? { returnTo } : location.state,
+      state: returnTo
+        ? { returnTo }
+        : Object.keys(learningCreateReturnState).length > 0
+          ? { learningCreateReturnState }
+          : location.state,
     })
-  }, [location.pathname, location.search, location.state, navigate, returnTo])
+  }, [learningCreateReturnState, location.pathname, location.search, location.state, navigate, returnTo])
 
   useEffect(() => {
     if (composing) return
@@ -219,6 +235,7 @@ export function NotionImportPage() {
           title: result.title,
           content: result.content,
           ...(returnTo ? { returnTo } : {}),
+          ...(Object.keys(learningCreateReturnState).length > 0 ? { learningCreateReturnState } : {}),
         },
       })
     } catch (error) {
@@ -235,6 +252,7 @@ export function NotionImportPage() {
 
   const submitLink = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (importing.isPending || authorizing.isPending) return
     if (!link.trim()) {
       setLinkError('노션 페이지 링크를 입력해 주세요.')
       return
@@ -266,7 +284,16 @@ export function NotionImportPage() {
         <LearningScreenHeader
           title="노션에서 가져오기"
           onBack={() => {
-            if (!interactionLocked) navigate(returnTo ?? '/learning/new')
+            if (interactionLocked) return
+            if (returnTo) {
+              navigate(returnTo)
+              return
+            }
+            navigate('/learning/new', {
+              state: Object.keys(learningCreateReturnState).length > 0
+                ? learningCreateReturnState
+                : undefined,
+            })
           }}
         />
 
@@ -289,6 +316,7 @@ export function NotionImportPage() {
                 title: '',
                 content: '',
                 ...(returnTo ? { returnTo } : {}),
+                ...(Object.keys(learningCreateReturnState).length > 0 ? { learningCreateReturnState } : {}),
               },
             })}
           />
@@ -468,7 +496,9 @@ export function NotionImportPage() {
         open={linkOpen}
         link={link}
         error={linkError}
-        loading={importing.isPending}
+        loading={importing.isPending || authorizing.isPending}
+        loadingLabel={authorizing.isPending ? '노션 연결 여는 중' : '페이지 가져오는 중'}
+        authorizationError={authorizing.isError ? presentationForError(authorizing.error) : undefined}
         onOpenChange={(open) => { setLinkOpen(open); if (!open) setLinkError(undefined) }}
         onLinkChange={(value) => { setLink(value); setLinkError(undefined) }}
         onSubmit={submitLink}
@@ -556,11 +586,13 @@ function ManageSheet({ open, disabled, authorizationError, onOpenChange, onAddAc
   )
 }
 
-function LinkSheet({ open, link, error, loading, onOpenChange, onLinkChange, onSubmit, onAddAccess }: {
+function LinkSheet({ open, link, error, loading, loadingLabel, authorizationError, onOpenChange, onLinkChange, onSubmit, onAddAccess }: {
   open: boolean
   link: string
   error?: string
   loading: boolean
+  loadingLabel: string
+  authorizationError?: string
   onOpenChange: (open: boolean) => void
   onLinkChange: (value: string) => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
@@ -577,11 +609,14 @@ function LinkSheet({ open, link, error, loading, onOpenChange, onLinkChange, onS
             <LearningField label="노션 페이지 링크" error={error}>
               <LearningTextInput autoFocus type="url" value={link} readOnly={loading} placeholder="https://www.notion.so/..." invalid={Boolean(error)} onChange={(event) => onLinkChange(event.currentTarget.value)} />
             </LearningField>
-            {error === '이 페이지에 접근할 수 없어요' ? <ActionButton type="button" size="small" variant="ghost" onClick={onAddAccess}>접근 페이지 추가하기</ActionButton> : null}
+            {authorizationError ? (
+              <InlineStatus message={authorizationError} action="다시 시도" onAction={onAddAccess} />
+            ) : null}
+            {error === '이 페이지에 접근할 수 없어요' ? <ActionButton type="button" size="small" variant="ghost" disabled={loading} onClick={onAddAccess}>접근 페이지 추가하기</ActionButton> : null}
           </VStack></form></BottomSheet.Body>
         <BottomSheet.Footer>
           <ActionButton type="button" size="large" variant="neutralWeak" disabled={loading} onClick={() => onOpenChange(false)}>취소</ActionButton>
-          <ActionButton type="submit" form="notion-link-form" size="large" variant="brandSolid" loading={loading} disabled={loading}>{loading ? '페이지 가져오는 중' : '링크로 가져오기'}</ActionButton>
+          <ActionButton type="submit" form="notion-link-form" size="large" variant="brandSolid" loading={loading} disabled={loading}>{loading ? loadingLabel : '링크로 가져오기'}</ActionButton>
         </BottomSheet.Footer>
       </BottomSheet.Content></BottomSheet.Positioner></Portal>
     </BottomSheet.Root>
@@ -620,10 +655,21 @@ function readCallbackNotice(search: string): CallbackNotice {
   }
 }
 
-function rememberNotionReturnTo(returnTo: string | undefined) {
+function rememberNotionNavigationState(
+  returnTo: string | undefined,
+  learningCreateReturnState: ReturnType<typeof readLearningCreateReturnState>,
+) {
   try {
     if (returnTo) window.sessionStorage.setItem(NOTION_RETURN_TO_STORAGE_KEY, returnTo)
     else window.sessionStorage.removeItem(NOTION_RETURN_TO_STORAGE_KEY)
+    if (Object.keys(learningCreateReturnState).length > 0) {
+      window.sessionStorage.setItem(
+        NOTION_CREATE_RETURN_STATE_STORAGE_KEY,
+        JSON.stringify(learningCreateReturnState),
+      )
+    } else {
+      window.sessionStorage.removeItem(NOTION_CREATE_RETURN_STATE_STORAGE_KEY)
+    }
   } catch {
     // OAuth can continue even when transient browser storage is unavailable.
   }
@@ -634,6 +680,16 @@ function consumeNotionReturnTo() {
     const returnTo = window.sessionStorage.getItem(NOTION_RETURN_TO_STORAGE_KEY)
     window.sessionStorage.removeItem(NOTION_RETURN_TO_STORAGE_KEY)
     return resolveLearningMaterialsReturnTo(returnTo)
+  } catch {
+    return undefined
+  }
+}
+
+function consumeNotionLearningCreateReturnState() {
+  try {
+    const value = window.sessionStorage.getItem(NOTION_CREATE_RETURN_STATE_STORAGE_KEY)
+    window.sessionStorage.removeItem(NOTION_CREATE_RETURN_STATE_STORAGE_KEY)
+    return value ? JSON.parse(value) : undefined
   } catch {
     return undefined
   }
