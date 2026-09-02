@@ -79,7 +79,11 @@ public final class RestNotionClient implements NotionClient {
 		return within(() -> {
 			NotionHttpResponse response = oauthPost("/v1/oauth/introspect", Map.of("token", accessToken));
 			ensureOAuthSuccess(response);
-			return json(response).path("active").asBoolean(false);
+			JsonNode active = json(response).get("active");
+			if (active == null || !active.isBoolean()) {
+				throw new NotionClientException(NotionClientFailure.TEMPORARY);
+			}
+			return active.asBoolean();
 		});
 	}
 

@@ -30,6 +30,16 @@ public class NotionConnection {
 	private String refreshTokenCiphertext;
 	@Column(name = "refresh_token_nonce", columnDefinition = "BINARY(12)")
 	private byte[] refreshTokenNonce;
+	@Column(name = "pending_revocation_workspace_id", length = 36)
+	private String pendingRevocationWorkspaceId;
+	@Column(name = "pending_revocation_token_ciphertext", columnDefinition = "TEXT")
+	private String pendingRevocationTokenCiphertext;
+	@Column(name = "pending_revocation_token_nonce", columnDefinition = "BINARY(12)")
+	private byte[] pendingRevocationTokenNonce;
+	@Column(name = "pending_revocation_key_version", length = 32)
+	private String pendingRevocationKeyVersion;
+	@Column(name = "pending_revocation_created_at")
+	private Instant pendingRevocationCreatedAt;
 	@Column(name = "encryption_key_version", nullable = false, length = 32)
 	private String encryptionKeyVersion;
 	@Enumerated(EnumType.STRING)
@@ -72,6 +82,24 @@ public class NotionConnection {
 		updatedAt = now;
 	}
 
+	public void rememberPendingRevocation(String workspaceId, EncryptedToken token, Instant now) {
+		pendingRevocationWorkspaceId = workspaceId;
+		pendingRevocationTokenCiphertext = java.util.Base64.getEncoder().encodeToString(token.ciphertext());
+		pendingRevocationTokenNonce = token.nonce();
+		pendingRevocationKeyVersion = token.keyVersion();
+		pendingRevocationCreatedAt = now;
+		updatedAt = now;
+	}
+
+	public void clearPendingRevocation(Instant now) {
+		pendingRevocationWorkspaceId = null;
+		pendingRevocationTokenCiphertext = null;
+		pendingRevocationTokenNonce = null;
+		pendingRevocationKeyVersion = null;
+		pendingRevocationCreatedAt = null;
+		updatedAt = now;
+	}
+
 	private void replaceTokens(EncryptedToken access, EncryptedToken refresh, Instant now, boolean bumpRevision) {
 		accessTokenCiphertext = java.util.Base64.getEncoder().encodeToString(access.ciphertext());
 		accessTokenNonce = access.nonce();
@@ -88,6 +116,9 @@ public class NotionConnection {
 
 	public EncryptedToken accessToken() { return new EncryptedToken(java.util.Base64.getDecoder().decode(accessTokenCiphertext), accessTokenNonce, encryptionKeyVersion); }
 	public EncryptedToken refreshToken() { return refreshTokenCiphertext == null ? null : new EncryptedToken(java.util.Base64.getDecoder().decode(refreshTokenCiphertext), refreshTokenNonce, encryptionKeyVersion); }
+	public EncryptedToken pendingRevocationToken() { return pendingRevocationTokenCiphertext == null ? null : new EncryptedToken(java.util.Base64.getDecoder().decode(pendingRevocationTokenCiphertext), pendingRevocationTokenNonce, pendingRevocationKeyVersion); }
+	public boolean hasPendingRevocation() { return pendingRevocationTokenCiphertext != null; }
+	public String getPendingRevocationWorkspaceId() { return pendingRevocationWorkspaceId; }
 	public Long getUserId() { return userId; }
 	public String getWorkspaceId() { return workspaceId; }
 	public String getWorkspaceName() { return workspaceName; }

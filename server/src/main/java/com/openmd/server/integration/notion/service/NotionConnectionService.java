@@ -76,13 +76,17 @@ public class NotionConnectionService {
 			.orElseGet(() -> new NotionConnectionView("DISCONNECTED", null));
 	}
 
-	@Transactional(readOnly = true)
+	@Transactional
 	public NotionAuthorization startAuthorization(long userId, String returnUri) {
 		if (returnUri == null || !allowedReturnUris.contains(returnUri)) {
 			throw new BusinessException(CommonErrorCode.INVALID_INPUT,
 				List.of(new FieldError("returnUri", "등록된 복귀 URI여야 합니다.")));
 		}
+		if (users.findByIdForUpdate(userId).isEmpty()) {
+			throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+		}
 		Optional<NotionConnection> current = connections.findByUserId(userId);
+		current.ifPresent(this::clearPendingRevocation);
 		String rawState = newState();
 		Instant now = clock.instant();
 		states.save(rawState, new NotionOAuthState(
@@ -96,7 +100,7 @@ public class NotionConnectionService {
 		return new NotionAuthorization(client.authorizationUrl(rawState), now.plus(STATE_TTL));
 	}
 
-	@Transactional
+	@Transactional(noRollbackFor = BusinessException.class)
 	public String completeAuthorization(String rawState, String code, String providerError) {
 		return NotionRequestBudget.within(clock,
 			() -> completeAuthorizationWithinBudget(rawState, code, providerError));
@@ -140,7 +144,14 @@ public class NotionConnectionService {
 			return failed(state.returnUri(), NotionErrorCode.TEMPORARILY_UNAVAILABLE);
 		}
 		if (current.isPresent() && !current.get().getWorkspaceId().equals(grant.workspaceId())) {
-			try { client.revoke(grant.accessToken()); } catch (RuntimeException ignored) { }
+			EncryptedToken pending = cipher.encrypt(
+				state.userId(), grant.workspaceId(), TokenType.PENDING_REVOCATION, grant.accessToken()
+			);
+			current.get().rememberPendingRevocation(grant.workspaceId(), pending, clock.instant());
+			if (!revocationConfirmed(grant.accessToken())) {
+				throw new BusinessException(NotionErrorCode.TEMPORARILY_UNAVAILABLE);
+			}
+			current.get().clearPendingRevocation(clock.instant());
 			return failed(state.returnUri(), NotionErrorCode.WORKSPACE_MISMATCH);
 		}
 
@@ -203,6 +214,7 @@ public class NotionConnectionService {
 			return new NotionDisconnected("DISCONNECTED");
 		}
 		NotionConnection connection = found.get();
+		clearPendingRevocation(connection);
 		String token = accessToken(connection);
 		boolean revoked;
 		try {
@@ -287,6 +299,32 @@ public class NotionConnectionService {
 			connection.accessToken());
 	}
 
+	private void clearPendingRevocation(NotionConnection connection) {
+		EncryptedToken encrypted = connection.pendingRevocationToken();
+		if (encrypted == null) return;
+		String token = cipher.decrypt(
+			connection.getUserId(), connection.getPendingRevocationWorkspaceId(),
+			TokenType.PENDING_REVOCATION, encrypted
+		);
+		if (!revocationConfirmed(token)) {
+			throw new BusinessException(NotionErrorCode.TEMPORARILY_UNAVAILABLE);
+		}
+		connection.clearPendingRevocation(clock.instant());
+	}
+
+	private boolean revocationConfirmed(String token) {
+		try {
+			if (client.revoke(token)) return true;
+		} catch (RuntimeException ignored) {
+			// An uncertain revoke response must be checked explicitly below.
+		}
+		try {
+			return !client.introspect(token);
+		} catch (RuntimeException ignored) {
+			return false;
+		}
+	}
+
 	private BusinessException mapped(NotionClientException exception) {
 		return switch (exception.failure()) {
 			case NOT_ACCESSIBLE -> new BusinessException(NotionErrorCode.PAGE_NOT_ACCESSIBLE);
@@ -317,6 +355,9 @@ public class NotionConnectionService {
 	}
 
 	private static String append(String uri, String query) {
-		return uri + (uri.contains("?") ? "&" : "?") + query;
+		int fragmentStart = uri.indexOf('#');
+		String base = fragmentStart < 0 ? uri : uri.substring(0, fragmentStart);
+		String fragment = fragmentStart < 0 ? "" : uri.substring(fragmentStart);
+		return base + (base.contains("?") ? "&" : "?") + query + fragment;
 	}
 }

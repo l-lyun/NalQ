@@ -76,4 +76,20 @@ class NotionMarkdownProcessorTest {
 			`<audio src="literal">코드</audio>`
 			""", processor.process(new NotionMarkdown(media, false, List.of())));
 	}
+
+	@Test
+	void removesImageUrlsWhenAltTextOrDestinationContainsMarkdownEscapes() {
+		String markdown = "![설명 \\] 계속](https://signed.example/file\\))";
+
+		assertEquals("설명 \\] 계속", processor.process(
+			new NotionMarkdown(markdown, false, List.of())
+		));
+	}
+
+	@Test
+	void doesNotCloseAFenceWhenBackticksAreFollowedByNonWhitespace() {
+		String markdown = "```text\n`````not-a-closing-fence\n<unknown value=\"literal\"/>\n```\n";
+
+		assertEquals(markdown, processor.process(new NotionMarkdown(markdown, false, List.of())));
+	}
 }

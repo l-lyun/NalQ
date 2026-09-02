@@ -66,6 +66,11 @@ scope: server
 | `access_token_nonce` | `BINARY(12)` | GCM nonce, not null |
 | `refresh_token_ciphertext` | `TEXT` | nullable |
 | `refresh_token_nonce` | `BINARY(12)` | refresh token이 있을 때만 존재 |
+| `pending_revocation_workspace_id` | `VARCHAR(36)` | 다른 워크스페이스 자격 철회 확인 대기 중에만 존재 |
+| `pending_revocation_token_ciphertext` | `TEXT` | 철회 확인 대기 access token 암호문, nullable |
+| `pending_revocation_token_nonce` | `BINARY(12)` | pending token이 있을 때만 존재 |
+| `pending_revocation_key_version` | `VARCHAR(32)` | pending token 복호화 키 선택, nullable |
+| `pending_revocation_created_at` | `TIMESTAMP(6)` | 철회 확인 대기 시작 시각, nullable |
 | `encryption_key_version` | `VARCHAR(32)` | 복호화 키 선택, not null |
 | `status` | `VARCHAR(24)` | `CONNECTED`, `REAUTH_REQUIRED` |
 | `credential_revision` | `BIGINT` | 자격 교체 경쟁 비교, not null |
@@ -99,7 +104,7 @@ scope: server
 - callback은 state를 먼저 읽어 소유 사용자를 확인하고, 연결 행이 아직 없는 최초 연결도 직렬화할 수 있도록 해당 `users` 행을 잠근 다음 Redis `GETDEL`로 state를 원자 소비한다. 그 뒤 연결 snapshot과 현재 행을 비교한다. `CONNECT`는 현재 행이 여전히 없을 때만, `REAUTHORIZE`는 같은 `workspaceId`와 `credentialRevision`의 행이 남아 있을 때만 자격 교환·저장을 계속한다. 연결 해제도 같은 사용자 행 잠금 안에서 미소비 state를 무효화하므로, 해제·다른 callback·자격 교체 뒤 늦은 callback은 자격 교환·저장을 진행하지 않는다.
 - callback 복귀 query에는 `outcome=connected|cancelled|failed`와 필요한 공개 OpenMD 오류 code만 둔다. Notion authorization code·token·state·원시 오류는 포함하지 않는다.
 - 새 워크스페이스 최초 연결은 새 행을 만든다. 기존 행이 있는 재인증·접근 페이지 추가는 응답 `workspace_id`가 같을 때만 자격과 표시 이름을 교체한다.
-- 기존 행이 있는데 다른 `workspace_id`가 오면 새 자격을 저장하지 않고 revoke를 시도한 뒤 기존 행과 상태를 유지한다. callback은 `outcome=failed&error=NOTION_WORKSPACE_MISMATCH`로 복귀시키며 이 오류를 기존 자격의 재인증 필요로 해석하지 않는다. 사용자는 기존 연결을 계속 사용하거나, 기존 연결 해제를 완료한 뒤 다른 워크스페이스를 연결한다.
+- 기존 행이 있는데 다른 `workspace_id`가 오면 새 자격을 기존 연결 자격과 분리된 pending revocation 필드에 암호화해 보존하고 revoke를 시도한다. revoke 성공 또는 introspection의 명시적 `active=false`를 확인한 뒤 pending 값을 지우고 `outcome=failed&error=NOTION_WORKSPACE_MISMATCH`로 복귀시킨다. 철회를 확인하지 못하면 pending 값을 보존하고 `503`을 반환하며, 다음 승인 시작 또는 연결 해제에서 철회를 다시 확인하기 전에는 새 작업을 진행하지 않는다. 기존 행과 상태는 유지하고 이 오류를 기존 자격의 재인증 필요로 해석하지 않는다.
 
 ## 7. Notion HTTP client 정책
 

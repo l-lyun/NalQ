@@ -3,15 +3,19 @@ package com.openmd.server.integration.notion.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.inOrder;
 
 import com.openmd.server.auth.repository.UserRepository;
 import com.openmd.server.global.error.BusinessException;
 import com.openmd.server.integration.notion.client.NotionClient;
+import com.openmd.server.integration.notion.client.NotionClientException;
+import com.openmd.server.integration.notion.client.NotionClientFailure;
 import com.openmd.server.integration.notion.client.NotionMarkdown;
 import com.openmd.server.integration.notion.client.NotionPage;
 import com.openmd.server.integration.notion.client.NotionTokenGrant;
@@ -105,6 +109,88 @@ class NotionConnectionServiceTest {
 		verify(client).revoke("new-access");
 		verify(connections, never()).save(any());
 		assertEquals("workspace-a", existing.getWorkspaceId());
+	}
+
+	@Test
+	void preservesAnUnconfirmedMismatchedCredentialForLaterRevocation() {
+		NotionConnection existing = NotionConnection.connected(
+			7L, "workspace-a", "기존", new EncryptedToken(new byte[]{1}, new byte[12], "v1"), null,
+			clock.instant()
+		);
+		NotionOAuthState state = new NotionOAuthState(
+			7L, "https://app.openmd.example/learning/import/notion", "REAUTHORIZE", clock.instant(),
+			"workspace-a", 0L
+		);
+		when(states.find("state")).thenReturn(Optional.of(state));
+		when(states.consume("state")).thenReturn(Optional.of(state));
+		when(connections.findByUserIdForUpdate(7L)).thenReturn(Optional.of(existing));
+		when(client.exchangeAuthorizationCode("code"))
+			.thenReturn(new NotionTokenGrant("new-access", "new-refresh", "workspace-b", "새 공간"));
+		when(client.revoke("new-access")).thenThrow(new NotionClientException(NotionClientFailure.TEMPORARY));
+		when(client.introspect("new-access")).thenThrow(new NotionClientException(NotionClientFailure.TEMPORARY));
+
+		BusinessException exception = assertThrows(
+			BusinessException.class,
+			() -> service.completeAuthorization("state", "code", null)
+		);
+
+		assertEquals(NotionErrorCode.TEMPORARILY_UNAVAILABLE, exception.getErrorCode());
+		assertTrue(existing.hasPendingRevocation());
+		verify(connections, never()).save(any());
+	}
+
+	@Test
+	void retriesAPreservedPendingRevocationBeforeStartingAnotherAuthorization() {
+		NotionConnection existing = NotionConnection.connected(
+			7L, "workspace-a", "기존", new EncryptedToken(new byte[]{1}, new byte[12], "v1"), null,
+			clock.instant()
+		);
+		existing.rememberPendingRevocation(
+			"workspace-b", new EncryptedToken(new byte[]{2}, new byte[12], "v1"), clock.instant()
+		);
+		when(connections.findByUserId(7L)).thenReturn(Optional.of(existing));
+		when(client.revoke("access-token")).thenReturn(true);
+		when(client.authorizationUrl(any())).thenReturn("https://notion.test/authorize");
+
+		service.startAuthorization(7L, "https://app.openmd.example/learning/import/notion");
+
+		assertFalse(existing.hasPendingRevocation());
+		verify(client).revoke("access-token");
+		verify(states).save(any(), any(), any());
+	}
+
+	@Test
+	void authorizationStartLocksTheUserBeforeSavingState() {
+		when(connections.findByUserId(7L)).thenReturn(Optional.empty());
+		when(client.authorizationUrl(any())).thenReturn("https://notion.test/authorize");
+
+		service.startAuthorization(7L, "https://app.openmd.example/learning/import/notion");
+
+		var order = inOrder(users, states);
+		order.verify(users).findByIdForUpdate(7L);
+		order.verify(states).save(any(), any(), any());
+	}
+
+	@Test
+	void appendsCallbackOutcomeBeforeAnExistingFragment() {
+		NotionConnectionService fragmentService = new NotionConnectionService(
+			connections, states, client, cipher, users, new NotionMarkdownProcessor(), clock,
+			List.of("https://app.openmd.example/import#section"),
+			"https://app.openmd.example/import#section"
+		);
+		NotionOAuthState state = new NotionOAuthState(
+			7L, "https://app.openmd.example/import#section", "CONNECT", clock.instant(), null, null
+		);
+		when(states.find("state")).thenReturn(Optional.of(state));
+		when(states.consume("state")).thenReturn(Optional.of(state));
+		when(connections.findByUserIdForUpdate(7L)).thenReturn(Optional.empty());
+		when(client.exchangeAuthorizationCode("code"))
+			.thenReturn(new NotionTokenGrant("access", null, "workspace-a", null));
+
+		assertEquals(
+			"https://app.openmd.example/import?outcome=connected#section",
+			fragmentService.completeAuthorization("state", "code", null)
+		);
 	}
 
 	@Test

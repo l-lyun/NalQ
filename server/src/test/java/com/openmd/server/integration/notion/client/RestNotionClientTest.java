@@ -109,6 +109,18 @@ class RestNotionClientTest {
 		assertEquals(2, transport.requests.size());
 	}
 
+	@Test
+	void acceptsOnlyAnExplicitBooleanActiveValueFromIntrospection() {
+		transport.respond(200, "{}");
+		assertThrows(NotionClientException.class, () -> client.introspect("access"));
+
+		transport.respond(200, "{\"active\":\"false\"}");
+		assertThrows(NotionClientException.class, () -> client.introspect("access"));
+
+		transport.respond(200, "{\"active\":false}");
+		assertEquals(false, client.introspect("access"));
+	}
+
 	private record Request(String method, String path, Map<String, String> headers,
 		Map<String, Object> body, Duration timeout) {}
 	private record Scripted(NotionHttpResponse response, Duration advance) {}

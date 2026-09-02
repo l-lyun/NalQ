@@ -8,7 +8,6 @@ import java.util.regex.Pattern;
 
 public final class NotionMarkdownProcessor {
 
-	private static final Pattern MEDIA = Pattern.compile("!\\[([^]]*)]\\([^\\n)]*\\)");
 	private static final Pattern MEDIA_TAG = Pattern.compile(
 		"</?(?:audio|video|file|pdf)\\b[^>]*>", Pattern.CASE_INSENSITIVE
 	);
@@ -28,7 +27,9 @@ public final class NotionMarkdownProcessor {
 			if (current == '`') {
 				int runLength = backtickRunLength(markdown, index);
 				boolean fenceMarker = inlineDelimiterLength == 0 && isFenceMarkerPosition(markdown, index)
-					&& ((!fenced && runLength >= 3) || (fenced && runLength >= fenceDelimiterLength));
+					&& ((!fenced && runLength >= 3)
+						|| (fenced && runLength >= fenceDelimiterLength
+							&& isFenceClosingLine(markdown, index + runLength)));
 				if (fenceMarker) {
 					if (!fenced) {
 						fenced = true;
@@ -66,11 +67,10 @@ public final class NotionMarkdownProcessor {
 					index += 4;
 					continue;
 				}
-				Matcher media = MEDIA.matcher(markdown);
-				media.region(index, markdown.length());
-				if (media.lookingAt()) {
-					output.append(media.group(1));
-					index = media.end();
+				Image image = imageAt(markdown, index);
+				if (image != null) {
+					output.append(image.altText());
+					index = image.end();
 					continue;
 				}
 				Matcher mediaTag = MEDIA_TAG.matcher(markdown);
@@ -100,4 +100,44 @@ public final class NotionMarkdownProcessor {
 		while (end < markdown.length() && markdown.charAt(end) == '`') end++;
 		return end - start;
 	}
+
+	private static boolean isFenceClosingLine(String markdown, int index) {
+		for (int cursor = index; cursor < markdown.length() && markdown.charAt(cursor) != '\n'; cursor++) {
+			char value = markdown.charAt(cursor);
+			if (value != ' ' && value != '\t' && value != '\r') return false;
+		}
+		return true;
+	}
+
+	private static Image imageAt(String markdown, int start) {
+		if (!markdown.startsWith("![", start)) return null;
+		int altEnd = closingDelimiter(markdown, start + 2, ']', false);
+		if (altEnd < 0 || altEnd + 1 >= markdown.length() || markdown.charAt(altEnd + 1) != '(') return null;
+		int destinationEnd = closingDelimiter(markdown, altEnd + 2, ')', true);
+		if (destinationEnd < 0) return null;
+		return new Image(markdown.substring(start + 2, altEnd), destinationEnd + 1);
+	}
+
+	private static int closingDelimiter(String markdown, int start, char closing, boolean nestedParentheses) {
+		int depth = 0;
+		for (int index = start; index < markdown.length(); index++) {
+			char value = markdown.charAt(index);
+			if (value == '\n') return -1;
+			if (value == '\\') {
+				index++;
+				continue;
+			}
+			if (nestedParentheses && value == '(') {
+				depth++;
+				continue;
+			}
+			if (value == closing) {
+				if (depth == 0) return index;
+				depth--;
+			}
+		}
+		return -1;
+	}
+
+	private record Image(String altText, int end) { }
 }
