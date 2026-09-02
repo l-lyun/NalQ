@@ -39,7 +39,14 @@ export function extractNotionPageId(input: string): string | null {
     || hostname.endsWith('.notion.site')
   if (!isNotionHost) return null
 
-  const matches = [...decodeURIComponent(url.pathname).matchAll(/([0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/gi)]
+  let decodedPathname: string
+  try {
+    decodedPathname = decodeURIComponent(url.pathname)
+  } catch {
+    return null
+  }
+
+  const matches = [...decodedPathname.matchAll(/([0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/gi)]
   const value = matches.at(-1)?.[1]?.replaceAll('-', '').toLowerCase()
   if (!value) return null
   return `${value.slice(0, 8)}-${value.slice(8, 12)}-${value.slice(12, 16)}-${value.slice(16, 20)}-${value.slice(20)}`

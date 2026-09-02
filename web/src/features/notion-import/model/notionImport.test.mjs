@@ -18,6 +18,10 @@ test('노션 URL의 32자리 또는 dashed UUID를 canonical page id로 바꾼�
   )
   assert.equal(extractNotionPageId('https://example.com/0123456789abcdef0123456789abcdef'), null)
   assert.equal(extractNotionPageId('https://evilnotion.so/0123456789abcdef0123456789abcdef'), null)
+  assert.equal(
+    extractNotionPageId('https://www.notion.so/%E0%A4%A-0123456789abcdef0123456789abcdef'),
+    null,
+  )
 })
 
 test('상대 날짜는 수정 접미사 없이 표시한다', () => {

@@ -2,7 +2,7 @@
 document_type: trd
 status: implemented
 scope: web
-last_updated: 2026-08-31
+last_updated: 2026-09-03
 ---
 
 # [TRD] 웹 앱 셸과 최상위 탭 상태 보존
@@ -13,6 +13,7 @@ last_updated: 2026-08-31
 
 ## 라우트와 마운트 경계
 
+- 최상위 브라우저 라우터는 `createBrowserRouter`와 `RouterProvider`로 구성한다. 저장 전 편집 화면은 Data Router의 blocker를 사용해 헤더 back뿐 아니라 브라우저·WebView history 이동도 같은 이탈 확인으로 모은다.
 - 인증된 `/`, `/learning`, `/profile`은 하나의 `AuthenticatedAppShell` 부모 route를 공유한다. `/profile/*` 하위 route는 마이페이지 안의 계정·서비스 정보 화면이며 공통 하단 탭을 숨긴다.
 - 처음 방문한 탭 화면만 지연 마운트하고, 이후에는 `inert`와 `aria-hidden`으로 비활성화한 채 마운트를 유지한다. 따라서 탭별 스크롤·React 로컬 상태·Query observer가 탭 모션 때문에 초기화되지 않는다.
 - 공통 바텀 탭은 움직이지 않는 셸 평면에 두고 콘텐츠 panel만 수평 전환한다. 탭 클릭과 브라우저·시스템 back의 `POP` 모두 상대 위치와 관계없이 기존 panel이 왼쪽으로 나가고 새 panel이 오른쪽에서 들어온다. reduced motion에서는 위치 이동 없이 짧은 opacity 전환만 사용한다.

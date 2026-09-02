@@ -6,8 +6,8 @@ import {
   VStack,
 } from '@seed-design/react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useMemo, useRef, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useBlocker, useLocation, useNavigate } from 'react-router-dom'
 
 import {
   createLearningMaterial,
@@ -22,6 +22,7 @@ import {
   validateLearningMaterialDraft,
 } from '@/features/learning-material/model/learningMaterialDraft'
 import { createUuidV4 } from '@/features/quiz/model/randomUuid'
+import { quizRoutesEnabled } from '@/features/quiz/model/quizFeature'
 
 import {
   LearningField,
@@ -56,10 +57,16 @@ export function LearningMaterialCreatePage() {
   const [exitOpen, setExitOpen] = useState(false)
   const [destination, setDestination] = useState<SaveDestination | null>(null)
   const attemptRef = useRef<SaveAttempt | null>(null)
+  const allowNavigationRef = useRef(false)
   const draft = useMemo(() => ({ title, content }), [content, title])
   const errors = validateLearningMaterialDraft(draft)
   const valid = isLearningMaterialDraftValid(draft)
   const hasUnsavedDraft = sourceType === 'NOTION' || Boolean(title || content)
+  const blocker = useBlocker(() => hasUnsavedDraft && !allowNavigationRef.current)
+
+  useEffect(() => {
+    if (blocker.state === 'blocked') setExitOpen(true)
+  }, [blocker.state])
 
   const save = useMutation({
     mutationFn: async (nextDestination: SaveDestination) => {
@@ -77,8 +84,9 @@ export function LearningMaterialCreatePage() {
     },
     onSuccess: (created, nextDestination) => {
       attemptRef.current = null
+      allowNavigationRef.current = true
       void queryClient.invalidateQueries({ queryKey: learningMaterialKeys.all })
-      if (nextDestination === 'quiz') {
+      if (nextDestination === 'quiz' && quizRoutesEnabled) {
         navigate(`/learning/${created.materialId}/quiz`, {
           replace: true,
           state: { materialTitle: created.title },
@@ -93,8 +101,7 @@ export function LearningMaterialCreatePage() {
   })
 
   const requestBack = () => {
-    if (hasUnsavedDraft) setExitOpen(true)
-    else navigate(returnTo ?? '/learning/new')
+    navigate(returnTo ?? (sourceType === 'NOTION' ? '/learning/import/notion' : '/learning/new'))
   }
 
   return (
@@ -179,12 +186,17 @@ export function LearningMaterialCreatePage() {
               type="button"
               size="large"
               variant="brandSolid"
-              disabled={!valid || save.isPending}
+              disabled={!valid || save.isPending || !quizRoutesEnabled}
               loading={save.isPending && destination === 'quiz'}
               onClick={() => save.mutate('quiz')}
             >
               {save.isPending && destination === 'quiz' ? '저장 중' : '저장하고 퀴즈 만들기'}
             </ActionButton>
+            {!quizRoutesEnabled ? (
+              <Text as="p" textStyle="t3Regular" color="fg.neutralMuted">
+                현재 환경에서는 퀴즈 만들기를 사용할 수 없어요. 자료 저장을 이용해 주세요.
+              </Text>
+            ) : null}
             {!valid ? (
               <Text as="p" textStyle="t3Regular" color="fg.neutralMuted">
                 제목과 내용을 저장 가능한 상태로 입력해 주세요.
@@ -194,7 +206,14 @@ export function LearningMaterialCreatePage() {
         </VStack>
       </VStack>
 
-      <ContentDialog.Root open={exitOpen} onOpenChange={setExitOpen} closeOnEscape>
+      <ContentDialog.Root
+        open={exitOpen}
+        onOpenChange={(open) => {
+          setExitOpen(open)
+          if (!open && blocker.state === 'blocked') blocker.reset()
+        }}
+        closeOnEscape
+      >
         <Portal>
           <ContentDialog.Backdrop />
           <ContentDialog.Positioner>
@@ -211,10 +230,7 @@ export function LearningMaterialCreatePage() {
                   type="button"
                   size="large"
                   variant="neutralWeak"
-                  onClick={() => navigate(
-                    returnTo ?? (sourceType === 'NOTION' ? '/learning/import/notion' : '/learning/new'),
-                    { replace: true },
-                  )}
+                  onClick={() => blocker.state === 'blocked' && blocker.proceed()}
                 >
                   저장하지 않고 나가기
                 </ActionButton>

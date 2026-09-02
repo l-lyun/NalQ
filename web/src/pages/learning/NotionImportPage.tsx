@@ -58,6 +58,7 @@ const NOTION_RETURN_TO_STORAGE_KEY = 'openmd:notion-import:return-to'
 
 type CallbackNotice = { outcome?: 'connected' | 'cancelled' | 'failed'; error?: string }
 type ConfirmKind = 'disconnect' | 'switch-workspace' | null
+type PageErrorKind = 'first' | 'more'
 
 export function NotionImportPage() {
   const navigate = useNavigate()
@@ -82,6 +83,7 @@ export function NotionImportPage() {
   const [pageLoading, setPageLoading] = useState(false)
   const [moreLoading, setMoreLoading] = useState(false)
   const [pageError, setPageError] = useState<string>()
+  const [pageErrorKind, setPageErrorKind] = useState<PageErrorKind>('first')
   const [importError, setImportError] = useState<string>()
   const [manageOpen, setManageOpen] = useState(false)
   const [linkOpen, setLinkOpen] = useState(false)
@@ -89,6 +91,7 @@ export function NotionImportPage() {
   const [linkError, setLinkError] = useState<string>()
   const [confirm, setConfirm] = useState<ConfirmKind>(null)
   const requestSequence = useRef(0)
+  const mounted = useRef(true)
   const connection = useQuery({
     ...notionConnectionQueryOptions,
     enabled: !location.search,
@@ -112,6 +115,10 @@ export function NotionImportPage() {
     },
   })
 
+  useEffect(() => () => {
+    mounted.current = false
+  }, [])
+
   useEffect(() => {
     if (!location.search) return
     navigate(location.pathname, {
@@ -128,6 +135,7 @@ export function NotionImportPage() {
 
   const loadFirstBatch = useCallback(async (preserveCurrent = false) => {
     const sequence = ++requestSequence.current
+    setMoreLoading(false)
     setPageLoading(true)
     setPageError(undefined)
     setSelectedPageId('')
@@ -144,6 +152,7 @@ export function NotionImportPage() {
       setVisibleCount(PAGE_REVEAL_SIZE)
     } catch (error) {
       if (sequence !== requestSequence.current) return
+      setPageErrorKind('first')
       setPageError(presentationForError(error))
     } finally {
       if (sequence === requestSequence.current) setPageLoading(false)
@@ -164,17 +173,23 @@ export function NotionImportPage() {
       return
     }
     if (!nextCursor) return
+    const sequence = requestSequence.current
+    const query = committedQuery
+    const cursor = nextCursor
     setMoreLoading(true)
     setPageError(undefined)
     try {
-      const batch = await getNotionPages({ query: committedQuery, cursor: nextCursor })
+      const batch = await getNotionPages({ query, cursor })
+      if (sequence !== requestSequence.current || query !== committedQuery) return
       setPages((current) => [...current, ...batch.items])
       setNextCursor(batch.nextCursor)
       setVisibleCount((current) => current + PAGE_REVEAL_SIZE)
     } catch (error) {
+      if (sequence !== requestSequence.current || query !== committedQuery) return
+      setPageErrorKind('more')
       setPageError(presentationForError(error))
     } finally {
-      setMoreLoading(false)
+      if (sequence === requestSequence.current) setMoreLoading(false)
     }
   }
 
@@ -183,11 +198,21 @@ export function NotionImportPage() {
     authorizing.mutate()
   }
 
+  const updateRawQuery = (value: string) => {
+    requestSequence.current += 1
+    setRawQuery(value)
+    setSelectedPageId('')
+    setNextCursor(null)
+    setMoreLoading(false)
+    setImportError(undefined)
+  }
+
   const finishImport = async (pageId: string, fromLink = false) => {
     setImportError(undefined)
     if (fromLink) setLinkError(undefined)
     try {
       const result = await importing.mutateAsync(pageId)
+      if (!mounted.current) return
       navigate('/learning/materials/new', {
         state: {
           sourceType: result.sourceType,
@@ -197,6 +222,7 @@ export function NotionImportPage() {
         },
       })
     } catch (error) {
+      if (!mounted.current) return
       const code = toApiClientError(error).code
       const message = presentationForError(error)
       if (fromLink) setLinkError(message)
@@ -237,7 +263,12 @@ export function NotionImportPage() {
   return (
     <VStack className="learning-management-page" bg="bg.layerDefault">
       <VStack className="learning-content notion-import-content" px="spacingX.globalGutter" pt="x4" pb="spacingY.screenBottom" gap="x6">
-        <LearningScreenHeader title="노션에서 가져오기" onBack={() => navigate(returnTo ?? '/learning/new')} />
+        <LearningScreenHeader
+          title="노션에서 가져오기"
+          onBack={() => {
+            if (!interactionLocked) navigate(returnTo ?? '/learning/new')
+          }}
+        />
 
         {connection.isPending ? <ConnectionSkeleton /> : connection.isError ? (
           <InlineStatus
@@ -310,9 +341,9 @@ export function NotionImportPage() {
                   onCompositionStart={() => setComposing(true)}
                   onCompositionEnd={(event) => {
                     setComposing(false)
-                    setRawQuery(event.currentTarget.value)
+                    updateRawQuery(event.currentTarget.value)
                   }}
-                  onChange={(event) => setRawQuery(event.currentTarget.value)}
+                  onChange={(event) => updateRawQuery(event.currentTarget.value)}
                   onKeyDown={(event) => {
                     if (event.key !== 'Enter' || event.nativeEvent.isComposing) return
                     event.preventDefault()
@@ -365,7 +396,7 @@ export function NotionImportPage() {
                     노션에서 OpenMD가 접근할 페이지를 추가해 주세요.
                   </Text>
                   {committedQuery ? (
-                    <ActionButton type="button" size="small" variant="ghost" onClick={() => setRawQuery('')}>검색어 지우기</ActionButton>
+                    <ActionButton type="button" size="small" variant="ghost" onClick={() => updateRawQuery('')}>검색어 지우기</ActionButton>
                   ) : (
                     <ActionButton type="button" size="small" variant="ghost" onClick={beginAuthorization}>접근 페이지 추가하기</ActionButton>
                   )}
@@ -377,7 +408,15 @@ export function NotionImportPage() {
                   {moreLoading ? '더 불러오는 중' : '더 보기'}
                 </ActionButton>
               ) : null}
-              {pageError && pages.length ? <InlineStatus message={pageError} action="다시 시도" onAction={() => void showMore()} /> : null}
+              {pageError && pages.length ? (
+                <InlineStatus
+                  message={pageError}
+                  action="다시 시도"
+                  onAction={() => pageErrorKind === 'first'
+                    ? void loadFirstBatch(true)
+                    : void showMore()}
+                />
+              ) : null}
             </VStack>
 
             <VStack gap="x2" align="flex-start">
@@ -421,6 +460,7 @@ export function NotionImportPage() {
         disabled={interactionLocked}
         onOpenChange={setManageOpen}
         onAddAccess={beginAuthorization}
+        authorizationError={authorizing.isError ? presentationForError(authorizing.error) : undefined}
         onSwitch={() => { setManageOpen(false); setConfirm('switch-workspace') }}
         onDisconnect={() => { setManageOpen(false); setConfirm('disconnect') }}
       />
@@ -489,9 +529,10 @@ function InlineStatus({ message, action, onAction }: { message: string; action: 
   )
 }
 
-function ManageSheet({ open, disabled, onOpenChange, onAddAccess, onSwitch, onDisconnect }: {
+function ManageSheet({ open, disabled, authorizationError, onOpenChange, onAddAccess, onSwitch, onDisconnect }: {
   open: boolean
   disabled: boolean
+  authorizationError?: string
   onOpenChange: (open: boolean) => void
   onAddAccess: () => void
   onSwitch: () => void
@@ -502,6 +543,9 @@ function ManageSheet({ open, disabled, onOpenChange, onAddAccess, onSwitch, onDi
       <Portal><BottomSheet.Backdrop /><BottomSheet.Positioner><BottomSheet.Content>
         <BottomSheet.Header><BottomSheet.Title>노션 연결 관리</BottomSheet.Title><BottomSheet.Description>워크스페이스 연결과 접근 페이지를 관리해요.</BottomSheet.Description></BottomSheet.Header>
         <BottomSheet.Body><VStack gap="x2">
+          {authorizationError ? (
+            <InlineStatus message={authorizationError} action="다시 시도" onAction={onAddAccess} />
+          ) : null}
           <ActionButton autoFocus type="button" size="large" variant="neutralWeak" disabled={disabled} onClick={onAddAccess}>접근할 페이지 추가</ActionButton>
           <ActionButton type="button" size="large" variant="neutralWeak" disabled={disabled} onClick={onSwitch}>다른 워크스페이스 연결</ActionButton>
           <ActionButton type="button" size="large" variant="neutralWeak" disabled={disabled} onClick={onDisconnect}>연결 해제</ActionButton>
