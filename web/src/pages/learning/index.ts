@@ -1,5 +1,7 @@
 export { LearningPage } from './LearningPage'
 export { AuthenticatedLearningPage } from './AuthenticatedLearningPage'
+export { LearningMaterialCreatePage } from './LearningMaterialCreatePage'
+export { NotionImportPage } from './NotionImportPage'
 export { LearningCreatePage } from './LearningCreatePage'
 export {
   LearningManagementPage,

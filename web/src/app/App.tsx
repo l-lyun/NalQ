@@ -53,7 +53,9 @@ export function App() {
                 <Route index element={null} />
                 <Route path="/learning" element={null} />
                 <Route path="/learning/materials" element={null} />
+                <Route path="/learning/materials/new" element={null} />
                 <Route path="/learning/materials/:materialId" element={null} />
+                <Route path="/learning/import/notion" element={null} />
                 <Route path="/learning/quizzes" element={null} />
                 <Route path="/learning/new" element={null} />
                 <Route path="/profile" element={null} />

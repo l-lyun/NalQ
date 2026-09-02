@@ -57,6 +57,10 @@ export function LearningCreatePage() {
       materialsFetching={materials.isFetching && !materials.isPending}
       callbacks={{
         onExit: () => navigate('/learning', { replace: true }),
+        onStartNotionImport: () => navigate('/learning/import/notion'),
+        onStartDirectInput: () => navigate('/learning/materials/new', {
+          state: { sourceType: 'PASTE', title: '', content: '' },
+        }),
         onOpenQuizConditions: quizRoutesEnabled
           ? (material) =>
               navigate(`/learning/${material.materialId}/quiz`, {
