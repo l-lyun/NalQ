@@ -1,13 +1,18 @@
 {
   "expo": {
-    "name": "app",
-    "slug": "app",
+    "name": "NalQ",
+    "slug": "nalq",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "buildNumber": "1",
+      "bundleIdentifier": "com.nalq.app",
+      "supportsTablet": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -20,6 +25,12 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "eb4f22d0-514e-49c7-a11b-32f9ca592e93"
+      }
+    },
+    "owner": "hhhyyuns-team"
   }
 }
