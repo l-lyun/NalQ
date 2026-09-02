@@ -30,3 +30,23 @@ export function getLearningRoutePanelClassName(screenId: string) {
     ? 'learning-route-panel'
     : 'learning-route-panel learning-route-panel--enter'
 }
+
+export function resolveLearningMaterialsReturnTo(value: unknown) {
+  if (typeof value !== 'string') return undefined
+
+  try {
+    const base = 'https://openmd.local'
+    const target = new URL(value, base)
+    const pathname = target.pathname.length > 1
+      ? target.pathname.replace(/\/+$/, '')
+      : target.pathname
+
+    if (target.origin !== base || pathname !== '/learning/materials' || target.hash) {
+      return undefined
+    }
+
+    return `/learning/materials${target.search}`
+  } catch {
+    return undefined
+  }
+}

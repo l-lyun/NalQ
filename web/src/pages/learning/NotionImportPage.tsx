@@ -50,9 +50,11 @@ import {
   LearningScreenHeader,
   LearningTextInput,
 } from './components/LearningPrimitives'
+import { resolveLearningMaterialsReturnTo } from './learningRoutes'
 import './learning.css'
 
 const PAGE_REVEAL_SIZE = 5
+const NOTION_RETURN_TO_STORAGE_KEY = 'openmd:notion-import:return-to'
 
 type CallbackNotice = { outcome?: 'connected' | 'cancelled' | 'failed'; error?: string }
 type ConfirmKind = 'disconnect' | 'switch-workspace' | null
@@ -63,6 +65,13 @@ export function NotionImportPage() {
   const queryClient = useQueryClient()
   const initialCallback = useRef(readCallbackNotice(location.search))
   const [callbackNotice] = useState(initialCallback.current)
+  const [returnTo] = useState(() => {
+    const routeReturnTo = resolveLearningMaterialsReturnTo(
+      (location.state as { returnTo?: unknown } | null)?.returnTo,
+    )
+    if (routeReturnTo) return routeReturnTo
+    return location.search ? consumeNotionReturnTo() : undefined
+  })
   const [rawQuery, setRawQuery] = useState('')
   const [committedQuery, setCommittedQuery] = useState('')
   const [composing, setComposing] = useState(false)
@@ -86,7 +95,10 @@ export function NotionImportPage() {
   })
   const importing = useMutation({ mutationFn: importNotionPage })
   const authorizing = useMutation({
-    mutationFn: () => startNotionAuthorization(`${window.location.origin}/learning/import/notion`),
+    mutationFn: () => {
+      rememberNotionReturnTo(returnTo)
+      return startNotionAuthorization(`${window.location.origin}/learning/import/notion`)
+    },
     onSuccess: ({ authorizationUrl }) => window.location.assign(authorizationUrl),
   })
   const disconnecting = useMutation({
@@ -102,8 +114,11 @@ export function NotionImportPage() {
 
   useEffect(() => {
     if (!location.search) return
-    navigate(location.pathname, { replace: true, state: location.state })
-  }, [location.pathname, location.search, location.state, navigate])
+    navigate(location.pathname, {
+      replace: true,
+      state: returnTo ? { returnTo } : location.state,
+    })
+  }, [location.pathname, location.search, location.state, navigate, returnTo])
 
   useEffect(() => {
     if (composing) return
@@ -174,7 +189,12 @@ export function NotionImportPage() {
     try {
       const result = await importing.mutateAsync(pageId)
       navigate('/learning/materials/new', {
-        state: { sourceType: result.sourceType, title: result.title, content: result.content },
+        state: {
+          sourceType: result.sourceType,
+          title: result.title,
+          content: result.content,
+          ...(returnTo ? { returnTo } : {}),
+        },
       })
     } catch (error) {
       const code = toApiClientError(error).code
@@ -217,7 +237,7 @@ export function NotionImportPage() {
   return (
     <VStack className="learning-management-page" bg="bg.layerDefault">
       <VStack className="learning-content notion-import-content" px="spacingX.globalGutter" pt="x4" pb="spacingY.screenBottom" gap="x6">
-        <LearningScreenHeader title="노션에서 가져오기" onBack={() => navigate('/learning/new')} />
+        <LearningScreenHeader title="노션에서 가져오기" onBack={() => navigate(returnTo ?? '/learning/new')} />
 
         {connection.isPending ? <ConnectionSkeleton /> : connection.isError ? (
           <InlineStatus
@@ -232,7 +252,14 @@ export function NotionImportPage() {
             pending={authorizing.isPending}
             error={authorizing.isError ? presentationForError(authorizing.error) : undefined}
             onConnect={beginAuthorization}
-            onDirect={() => navigate('/learning/materials/new', { state: { sourceType: 'PASTE', title: '', content: '' } })}
+            onDirect={() => navigate('/learning/materials/new', {
+              state: {
+                sourceType: 'PASTE',
+                title: '',
+                content: '',
+                ...(returnTo ? { returnTo } : {}),
+              },
+            })}
           />
         ) : (
           <VStack gap="x6" aria-busy={interactionLocked}>
@@ -546,6 +573,25 @@ function readCallbackNotice(search: string): CallbackNotice {
   return {
     outcome: outcome === 'connected' || outcome === 'cancelled' || outcome === 'failed' ? outcome : undefined,
     error: isNotionErrorCode(error) ? error : undefined,
+  }
+}
+
+function rememberNotionReturnTo(returnTo: string | undefined) {
+  try {
+    if (returnTo) window.sessionStorage.setItem(NOTION_RETURN_TO_STORAGE_KEY, returnTo)
+    else window.sessionStorage.removeItem(NOTION_RETURN_TO_STORAGE_KEY)
+  } catch {
+    // OAuth can continue even when transient browser storage is unavailable.
+  }
+}
+
+function consumeNotionReturnTo() {
+  try {
+    const returnTo = window.sessionStorage.getItem(NOTION_RETURN_TO_STORAGE_KEY)
+    window.sessionStorage.removeItem(NOTION_RETURN_TO_STORAGE_KEY)
+    return resolveLearningMaterialsReturnTo(returnTo)
+  } catch {
+    return undefined
   }
 }
 

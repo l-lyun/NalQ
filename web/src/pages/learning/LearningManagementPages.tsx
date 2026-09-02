@@ -1,9 +1,11 @@
 import { IconChevronRightLine } from '@karrotmarket/react-monochrome-icon'
 import {
   ActionButton,
+  BottomSheet,
   Box,
   Flex,
   Icon,
+  Portal,
   Skeleton,
   Text,
   VStack,
@@ -62,12 +64,14 @@ import {
 } from '@/features/quiz/model/learningReviewActions'
 
 import {
+  LearningActionList,
   LearningField,
   LearningNotice,
   LearningScreenHeader,
   LearningTextInput,
   LearningTextarea,
 } from './components/LearningPrimitives'
+import { resolveLearningMaterialsReturnTo } from './learningRoutes'
 import { QuizManagementCard } from './components/QuizManagementCard'
 import { countUnicodeCodePoints } from './learning.text'
 import './learning.css'
@@ -416,6 +420,7 @@ function ReviewCandidateRow({
 
 export function LearningMaterialsPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const back = usePageBack()
   const [searchParams, setSearchParams] = useSearchParams()
   const query = searchParams.get('query') ?? ''
@@ -455,10 +460,19 @@ export function LearningMaterialsPage() {
     updateParams({ expanded: [...next].join(',') || null })
   }
 
+  const returnTo = resolveLearningMaterialsReturnTo(`${location.pathname}${location.search}`)
+    ?? '/learning/materials'
+
   return (
     <Box as="main" className="learning-management-page" bg="bg.layerDefault" minHeight="100dvh" pt="safeArea">
       <VStack className="learning-content" px="spacingX.globalGutter" pt="x4" pb="spacingY.screenBottom" gap="x5">
         <LearningScreenHeader title="내 학습자료" onBack={back} />
+        <LearningMaterialAddSheet
+          onNotion={() => navigate('/learning/import/notion', { state: { returnTo } })}
+          onDirect={() => navigate('/learning/materials/new', {
+            state: { sourceType: 'PASTE', title: '', content: '', returnTo },
+          })}
+        />
         <LearningField label="학습자료 제목 검색">
           <LearningTextInput
             type="search"
@@ -522,6 +536,63 @@ export function LearningMaterialsPage() {
         ) : null}
       </VStack>
     </Box>
+  )
+}
+
+function LearningMaterialAddSheet({ onNotion, onDirect }: {
+  onNotion: () => void
+  onDirect: () => void
+}) {
+  return (
+    <BottomSheet.Root>
+      <BottomSheet.Trigger asChild>
+        <ActionButton
+          className="learning-full-width-action"
+          type="button"
+          size="large"
+          variant="brandSolid"
+        >
+          학습자료 추가하기
+        </ActionButton>
+      </BottomSheet.Trigger>
+      <Portal>
+        <BottomSheet.Backdrop />
+        <BottomSheet.Positioner>
+          <BottomSheet.Content>
+            <BottomSheet.Header>
+              <BottomSheet.Title>학습자료 추가하기</BottomSheet.Title>
+              <BottomSheet.Description>자료를 가져올 방법을 선택해 주세요.</BottomSheet.Description>
+            </BottomSheet.Header>
+            <BottomSheet.Body>
+              <LearningActionList
+                label="학습자료 추가 방법"
+                rows={[
+                  {
+                    id: 'notion',
+                    title: '노션에서 가져오기',
+                    detail: '노션 페이지 하나를 복사해 확인·수정해요',
+                    onClick: onNotion,
+                  },
+                  {
+                    id: 'direct',
+                    title: '직접 입력하기',
+                    detail: '제목과 본문을 직접 작성해요',
+                    onClick: onDirect,
+                  },
+                ]}
+              />
+            </BottomSheet.Body>
+            <BottomSheet.Footer>
+              <BottomSheet.CloseButton asChild>
+                <ActionButton type="button" size="large" variant="neutralWeak">
+                  취소
+                </ActionButton>
+              </BottomSheet.CloseButton>
+            </BottomSheet.Footer>
+          </BottomSheet.Content>
+        </BottomSheet.Positioner>
+      </Portal>
+    </BottomSheet.Root>
   )
 }
 
@@ -656,7 +727,9 @@ export function LearningMaterialEditPage({ materialId }: { materialId: string })
         queryClient.invalidateQueries({ queryKey: ['private', 'quiz-review'] }),
         queryClient.invalidateQueries({ queryKey: ['private', 'home'] }),
       ])
-      const returnTo = (location.state as { returnTo?: string } | null)?.returnTo
+      const returnTo = resolveLearningMaterialsReturnTo(
+        (location.state as { returnTo?: unknown } | null)?.returnTo,
+      )
       navigate(returnTo ?? '/learning/materials', { replace: true, state: { saved: true } })
     },
     onError: (error) => {
@@ -692,7 +765,9 @@ export function LearningMaterialEditPage({ materialId }: { materialId: string })
 
   const goBack = () => {
     if (dirty && !window.confirm('변경사항을 버리고 나갈까요?')) return
-    const returnTo = (location.state as { returnTo?: string } | null)?.returnTo
+    const returnTo = resolveLearningMaterialsReturnTo(
+      (location.state as { returnTo?: unknown } | null)?.returnTo,
+    )
     navigate(returnTo ?? '/learning/materials')
   }
 

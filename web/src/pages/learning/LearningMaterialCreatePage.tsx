@@ -30,12 +30,14 @@ import {
   LearningTextarea,
   LearningTextInput,
 } from './components/LearningPrimitives'
+import { resolveLearningMaterialsReturnTo } from './learningRoutes'
 import './learning.css'
 
 type EditorRouteState = {
   sourceType?: LearningMaterialSourceType
   title?: string
   content?: string
+  returnTo?: string
 }
 
 type SaveDestination = 'material' | 'quiz'
@@ -47,6 +49,7 @@ export function LearningMaterialCreatePage() {
   const queryClient = useQueryClient()
   const routeState = (location.state ?? {}) as EditorRouteState
   const sourceType = routeState.sourceType === 'NOTION' ? 'NOTION' : 'PASTE'
+  const returnTo = resolveLearningMaterialsReturnTo(routeState.returnTo)
   const [title, setTitle] = useState(routeState.title ?? '')
   const [content, setContent] = useState(routeState.content ?? '')
   const [touched, setTouched] = useState({ title: sourceType === 'NOTION', content: sourceType === 'NOTION' })
@@ -81,14 +84,17 @@ export function LearningMaterialCreatePage() {
           state: { materialTitle: created.title },
         })
       } else {
-        navigate(`/learning/materials/${created.materialId}`, { replace: true })
+        navigate(`/learning/materials/${created.materialId}`, {
+          replace: true,
+          state: returnTo ? { returnTo } : undefined,
+        })
       }
     },
   })
 
   const requestBack = () => {
     if (hasUnsavedDraft) setExitOpen(true)
-    else navigate('/learning/new')
+    else navigate(returnTo ?? '/learning/new')
   }
 
   return (
@@ -205,7 +211,10 @@ export function LearningMaterialCreatePage() {
                   type="button"
                   size="large"
                   variant="neutralWeak"
-                  onClick={() => navigate(sourceType === 'NOTION' ? '/learning/import/notion' : '/learning/new', { replace: true })}
+                  onClick={() => navigate(
+                    returnTo ?? (sourceType === 'NOTION' ? '/learning/import/notion' : '/learning/new'),
+                    { replace: true },
+                  )}
                 >
                   저장하지 않고 나가기
                 </ActionButton>
