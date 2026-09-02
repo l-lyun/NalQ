@@ -11,7 +11,12 @@ import type {
   WebViewOpenWindowEvent,
 } from 'react-native-webview/lib/WebViewTypes';
 
-import { classifyNavigation, selectInternalRetryUrl } from './navigationPolicy';
+import {
+  classifyNavigation,
+  isPendingMainDocumentHttpError,
+  selectInternalRetryUrl,
+  shouldHandleWebViewBack,
+} from './navigationPolicy';
 import { ShellStateView, type ShellState } from './ShellStateView';
 
 interface OpenMdWebViewProps {
@@ -57,7 +62,7 @@ export function OpenMdWebView({ webOrigin, webUrl }: OpenMdWebViewProps) {
     }
 
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (shellState !== 'ready' || !canGoBack) {
+      if (!shouldHandleWebViewBack(shellState === 'ready', canGoBack)) {
         return false;
       }
 
@@ -158,12 +163,13 @@ export function OpenMdWebView({ webOrigin, webUrl }: OpenMdWebViewProps) {
 
   const handleHttpError = useCallback(
     (event: WebViewHttpErrorEvent) => {
-      const failedNavigation = classifyNavigation(event.nativeEvent.url, webOrigin);
-      const isPendingMainDocument = failedNavigation.action === 'internal'
-        && failedNavigation.url === pendingMainDocumentUrlRef.current;
-
-      if (isPendingMainDocument && event.nativeEvent.statusCode >= 400) {
-        showMainDocumentLoadError(failedNavigation.url);
+      if (isPendingMainDocumentHttpError(
+        event.nativeEvent.url,
+        event.nativeEvent.statusCode,
+        pendingMainDocumentUrlRef.current,
+        webOrigin,
+      )) {
+        showMainDocumentLoadError(event.nativeEvent.url);
       }
     },
     [showMainDocumentLoadError, webOrigin],

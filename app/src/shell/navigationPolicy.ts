@@ -54,3 +54,25 @@ export function selectInternalRetryUrl(
   const initialNavigation = classifyNavigation(initialUrl, webOrigin);
   return initialNavigation.action === 'internal' ? initialNavigation.url : null;
 }
+
+export function shouldHandleWebViewBack(
+  isDocumentReady: boolean,
+  canGoBack: boolean,
+): boolean {
+  return isDocumentReady && canGoBack;
+}
+
+export function isPendingMainDocumentHttpError(
+  failedUrl: string,
+  statusCode: number,
+  pendingMainDocumentUrl: string,
+  webOrigin: string,
+): boolean {
+  if (statusCode < 400) {
+    return false;
+  }
+
+  const failedNavigation = classifyNavigation(failedUrl, webOrigin);
+  return failedNavigation.action === 'internal'
+    && failedNavigation.url === pendingMainDocumentUrl;
+}
