@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 
 import {
   createLearningMaterial,
@@ -13,6 +13,7 @@ import { quizRoutesEnabled } from '@/features/quiz/model/quizFeature'
 import { createUuidV4 } from '@/features/quiz/model/randomUuid'
 
 import { LearningPage } from './LearningPage'
+import { readLearningCreateReturnState } from './learningRoutes'
 import type {
   LearningMaterialDraft,
   LearningSectionState,
@@ -22,6 +23,8 @@ type CreationAttempt = { fingerprint: string; idempotencyKey: string }
 
 export function LearningCreatePage() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const returnState = readLearningCreateReturnState(location.state)
   const queryClient = useQueryClient()
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
@@ -56,7 +59,12 @@ export function LearningCreatePage() {
       materialsQuery={query}
       materialsFetching={materials.isFetching && !materials.isPending}
       callbacks={{
-        onExit: () => navigate('/learning', { replace: true }),
+        onExit: () => navigate(returnState.returnTo ?? '/learning', {
+          replace: true,
+          state: returnState.returnTo && returnState.returnScrollTop !== undefined
+            ? { restoreScrollTop: returnState.returnScrollTop }
+            : undefined,
+        }),
         onStartNotionImport: () => navigate('/learning/import/notion'),
         onStartDirectInput: () => navigate('/learning/materials/new', {
           state: { sourceType: 'PASTE', title: '', content: '' },

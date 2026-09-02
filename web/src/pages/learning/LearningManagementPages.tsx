@@ -71,7 +71,10 @@ import {
   LearningTextInput,
   LearningTextarea,
 } from './components/LearningPrimitives'
-import { resolveLearningMaterialsReturnTo } from './learningRoutes'
+import {
+  resolveLearningMaterialsReturnTo,
+  resolveLearningQuizzesReturnTo,
+} from './learningRoutes'
 import { QuizManagementCard } from './components/QuizManagementCard'
 import { countUnicodeCodePoints } from './learning.text'
 import './learning.css'
@@ -858,6 +861,8 @@ export function QuizManagementPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
+  const pageRef = useRef<HTMLDivElement>(null)
   const query = searchParams.get('query') ?? ''
   const requestedPage = Number(searchParams.get('page') ?? '1')
   const page = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1
@@ -875,6 +880,16 @@ export function QuizManagementPage() {
   const [draftTitle, setDraftTitle] = useState('')
   const [renameError, setRenameError] = useState<string>()
   const [savedMessage, setSavedMessage] = useState<string>()
+  const restoreScrollTop = (() => {
+    const value = (location.state as { restoreScrollTop?: unknown } | null)?.restoreScrollTop
+    return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined
+  })()
+
+  useEffect(() => {
+    if (restoreScrollTop === undefined || quizzes.isPending) return
+    const frame = requestAnimationFrame(() => pageRef.current?.scrollTo({ top: restoreScrollTop }))
+    return () => cancelAnimationFrame(frame)
+  }, [quizzes.isPending, restoreScrollTop])
   useEffect(() => {
     if (!focusedQuizId) return
     requestAnimationFrame(() => document.getElementById(`quiz-card-${focusedQuizId}`)?.focus())
@@ -934,10 +949,29 @@ export function QuizManagementPage() {
     updateSearch({ expanded: [...next].join(',') || null })
   }
 
+  const openQuizCreation = () => {
+    const returnTo = resolveLearningQuizzesReturnTo(`${location.pathname}${location.search}`)
+    navigate('/learning/new', {
+      state: {
+        ...(returnTo ? { returnTo } : {}),
+        returnScrollTop: pageRef.current?.scrollTop ?? 0,
+      },
+    })
+  }
+
   return (
-    <Box as="main" className="learning-management-page" bg="bg.layerDefault" minHeight="100dvh" pt="safeArea">
+    <Box ref={pageRef} as="main" className="learning-management-page" bg="bg.layerDefault" minHeight="100dvh" pt="safeArea">
       <VStack className="learning-content" px="spacingX.globalGutter" pt="x4" pb="spacingY.screenBottom" gap="x5">
         <LearningScreenHeader title="내 퀴즈" onBack={back} />
+        <ActionButton
+          className="learning-full-width-action"
+          type="button"
+          size="large"
+          variant="brandSolid"
+          onClick={openQuizCreation}
+        >
+          퀴즈 만들기
+        </ActionButton>
         <LearningField label="퀴즈 제목 검색">
           <LearningTextInput
             type="search"
@@ -971,11 +1005,7 @@ export function QuizManagementPage() {
               <ActionButton type="button" size="medium" variant="neutralWeak" onClick={() => updateSearch({ query: null, page: null })}>
                 검색어 지우기
               </ActionButton>
-            ) : (
-              <ActionButton type="button" size="medium" variant="neutralWeak" onClick={() => navigate('/learning')}>
-                학습으로 돌아가기
-              </ActionButton>
-            )}
+            ) : undefined}
           >
             {query.trim() ? `“${query.trim()}”와 일치하는 퀴즈가 없어요.` : '아직 만든 퀴즈가 없어요.'}
           </EmptyState>

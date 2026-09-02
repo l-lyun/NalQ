@@ -50,3 +50,39 @@ export function resolveLearningMaterialsReturnTo(value: unknown) {
     return undefined
   }
 }
+
+export function resolveLearningQuizzesReturnTo(value: unknown) {
+  if (typeof value !== 'string') return undefined
+
+  try {
+    const base = 'https://openmd.local'
+    const target = new URL(value, base)
+    const pathname = target.pathname.length > 1
+      ? target.pathname.replace(/\/+$/, '')
+      : target.pathname
+
+    if (target.origin !== base || pathname !== '/learning/quizzes' || target.hash) {
+      return undefined
+    }
+
+    return `/learning/quizzes${target.search}`
+  } catch {
+    return undefined
+  }
+}
+
+export function readLearningCreateReturnState(value: unknown) {
+  if (!value || typeof value !== 'object') return {}
+  const candidate = value as { returnTo?: unknown; returnScrollTop?: unknown }
+  const returnTo = resolveLearningQuizzesReturnTo(candidate.returnTo)
+  const returnScrollTop = typeof candidate.returnScrollTop === 'number'
+    && Number.isFinite(candidate.returnScrollTop)
+    && candidate.returnScrollTop >= 0
+    ? candidate.returnScrollTop
+    : undefined
+
+  return {
+    ...(returnTo ? { returnTo } : {}),
+    ...(returnTo && returnScrollTop !== undefined ? { returnScrollTop } : {}),
+  }
+}
