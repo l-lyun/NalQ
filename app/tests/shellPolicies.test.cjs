@@ -19,7 +19,7 @@ const {
   classifyNavigation,
   isPendingMainDocumentHttpError,
   selectInternalRetryUrl,
-  shouldExitOnboardingOnBack,
+  selectWebViewBackFallbackPath,
   shouldHandleWebViewBack,
 } = require('../src/shell/navigationPolicy.ts');
 const { DEFAULT_WEB_URL, resolveWebUrl } = require('../src/shell/webUrl.ts');
@@ -103,28 +103,32 @@ test('Android back is consumed only for a ready document with WebView history', 
   assert.equal(shouldHandleWebViewBack(false, false), false);
 });
 
-test('Android back exits the authenticated onboarding route to home', () => {
+test('Android back selects a safe fallback for onboarding and direct guide entry', () => {
   const origin = 'https://app.openmd.example';
 
   assert.equal(
-    shouldExitOnboardingOnBack(true, `${origin}/onboarding`, origin),
-    true,
+    selectWebViewBackFallbackPath(true, `${origin}/onboarding`, origin),
+    '/',
   );
   assert.equal(
-    shouldExitOnboardingOnBack(true, `${origin}/onboarding/`, origin),
-    true,
+    selectWebViewBackFallbackPath(true, `${origin}/onboarding/`, origin),
+    '/',
   );
   assert.equal(
-    shouldExitOnboardingOnBack(true, `${origin}/profile/guide`, origin),
-    false,
+    selectWebViewBackFallbackPath(true, `${origin}/profile/guide`, origin),
+    '/profile',
   );
   assert.equal(
-    shouldExitOnboardingOnBack(false, `${origin}/onboarding`, origin),
-    false,
+    selectWebViewBackFallbackPath(true, `${origin}/profile/guide/`, origin),
+    '/profile',
   );
   assert.equal(
-    shouldExitOnboardingOnBack(true, 'https://attacker.example/onboarding', origin),
-    false,
+    selectWebViewBackFallbackPath(false, `${origin}/onboarding`, origin),
+    null,
+  );
+  assert.equal(
+    selectWebViewBackFallbackPath(true, 'https://attacker.example/onboarding', origin),
+    null,
   );
 });
 

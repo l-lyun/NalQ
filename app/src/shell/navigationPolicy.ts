@@ -62,22 +62,24 @@ export function shouldHandleWebViewBack(
   return isDocumentReady && canGoBack;
 }
 
-export function shouldExitOnboardingOnBack(
+export function selectWebViewBackFallbackPath(
   isDocumentReady: boolean,
   currentUrl: string,
   webOrigin: string,
-): boolean {
+): '/' | '/profile' | null {
   if (!isDocumentReady) {
-    return false;
+    return null;
   }
 
   const navigation = classifyNavigation(currentUrl, webOrigin);
   if (navigation.action !== 'internal') {
-    return false;
+    return null;
   }
 
   const pathname = new URL(navigation.url).pathname.replace(/\/+$/, '') || '/';
-  return pathname === '/onboarding';
+  if (pathname === '/onboarding') return '/';
+  if (pathname === '/profile/guide') return '/profile';
+  return null;
 }
 
 export function isPendingMainDocumentHttpError(

@@ -1,6 +1,8 @@
 import { IconArrowLeftLine } from '@karrotmarket/react-monochrome-icon'
 import { ActionButton, Box, Flex, Icon, Text, VisuallyHidden, VStack } from '@seed-design/react'
-import { useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
+
+import { moveOnboardingIndex, type OnboardingMoveSource } from './onboardingCarousel'
 
 import './onboarding.css'
 
@@ -36,12 +38,24 @@ type SwipeStart = {
 export function OnboardingPage({ mode, onExit }: OnboardingPageProps) {
   const [index, setIndex] = useState(0)
   const swipeStart = useRef<SwipeStart | null>(null)
+  const headingRef = useRef<HTMLHeadingElement | null>(null)
+  const shouldFocusHeading = useRef(false)
   const slide = slides[index]
   const previousAvailable = index > 0
   const nextAvailable = index < slides.length - 1
 
-  const move = (direction: -1 | 1) => {
-    setIndex((current) => Math.max(0, Math.min(slides.length - 1, current + direction)))
+  useEffect(() => {
+    if (!shouldFocusHeading.current) return
+    shouldFocusHeading.current = false
+    headingRef.current?.focus()
+  }, [index])
+
+  const move = (direction: -1 | 1, source: OnboardingMoveSource = 'carousel') => {
+    setIndex((current) => {
+      const next = moveOnboardingIndex(current, direction, slides.length, source)
+      shouldFocusHeading.current = next.focusHeading
+      return next.index
+    })
   }
 
   const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
@@ -123,7 +137,7 @@ export function OnboardingPage({ mode, onExit }: OnboardingPageProps) {
               </Text>
             </Box>
             <VStack align="flex-start" gap="x3">
-              <Text as="h2" textStyle="t10Bold" color="fg.neutral">{slide.title}</Text>
+              <Text ref={headingRef} as="h2" tabIndex={-1} textStyle="t10Bold" color="fg.neutral">{slide.title}</Text>
               <Text as="p" textStyle="t5Regular" color="fg.neutralMuted">{slide.description}</Text>
             </VStack>
           </VStack>
@@ -140,7 +154,7 @@ export function OnboardingPage({ mode, onExit }: OnboardingPageProps) {
         <Flex width="full" align="center" justify="space-between">
           <Box className="onboarding-footer-side">
             {previousAvailable ? (
-              <ActionButton type="button" size="small" variant="ghost" onClick={() => move(-1)}>
+              <ActionButton type="button" size="small" variant="ghost" onClick={() => move(-1, 'control')}>
                 이전
               </ActionButton>
             ) : null}
@@ -156,7 +170,7 @@ export function OnboardingPage({ mode, onExit }: OnboardingPageProps) {
           </Flex>
           <Box className="onboarding-footer-side onboarding-footer-side--end">
             {nextAvailable ? (
-              <ActionButton type="button" size="small" variant="ghost" onClick={() => move(1)}>
+              <ActionButton type="button" size="small" variant="ghost" onClick={() => move(1, 'control')}>
                 다음
               </ActionButton>
             ) : null}

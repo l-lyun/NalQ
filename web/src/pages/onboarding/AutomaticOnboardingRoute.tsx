@@ -1,4 +1,5 @@
 import { ActionButton, Text, VStack } from '@seed-design/react'
+import { useEffect } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 
 import { useCurrentUser } from '@/features/auth/model/auth.queries'
@@ -13,6 +14,10 @@ export function AutomaticOnboardingRoute() {
   const location = useLocation()
   const navigate = useNavigate()
   const currentUser = useCurrentUser()
+
+  useEffect(() => () => {
+    finishAutomaticOnboarding()
+  }, [])
 
   if (currentUser.isPending && !currentUser.data) {
     return (

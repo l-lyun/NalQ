@@ -57,6 +57,7 @@ export async function logoutCurrentSession() {
       await endLocalSession()
     } finally {
       broadcastSessionEnded()
+      window.location.replace('/')
     }
   }
 }

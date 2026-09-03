@@ -102,9 +102,7 @@ export function AuthenticatedProfilePage() {
       onLogout={() => {
         if (!window.confirm('이 기기에서 로그아웃할까요?')) return
         logout.reset()
-        logout.mutate(undefined, {
-          onSettled: () => navigate('/', { replace: true }),
-        })
+        logout.mutate()
       }}
       onRetry={() => void currentUser.refetch()}
     />
