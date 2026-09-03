@@ -104,8 +104,9 @@ public class QuizGenerationPersistenceService {
   }
 
   @Transactional
-  public int failInterruptedGenerations() {
-    List<QuizSet> interrupted = sets.findAllByStatus(QuizSetStatus.GENERATING);
+  public int failInterruptedGenerations(Instant startupAt) {
+    List<QuizSet> interrupted =
+        sets.findInterruptedForUpdate(QuizSetStatus.GENERATING, startupAt);
     interrupted.forEach(
         set -> {
           set.fail(QuizSetFailureCode.GENERATION_FAILED);

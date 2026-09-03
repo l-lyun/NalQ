@@ -528,7 +528,7 @@ Spring AI 외측 재시도, provider client 재시도와 OpenAI SDK 재시도를
 
 초기 MVP는 단일 서버와 메모리 큐를 전제로 한다.
 
-- 서버 시작 시 남은 `GENERATING`은 이전 프로세스가 더 이상 처리할 수 없으므로 `GENERATION_FAILED`로 종결한다.
+- 서버 구성 시각보다 먼저 생성된 `GENERATING`만 이전 프로세스의 미완료 작업으로 보고 `GENERATION_FAILED`로 종결한다. 현재 프로세스가 시작된 뒤 수락한 요청은 시작 복구 대상에서 제외한다.
 - 이전 작업을 자동 재실행하지 않는다. 중복 비용과 서버 재시작 루프를 피한다.
 - generated UNIQUE column은 상태가 `FAILED`로 바뀐 즉시 사용자 슬롯을 자동으로 풀어 준다.
 - 사용자는 실패를 확인한 후 새 요청으로 다시 생성한다.
@@ -549,8 +549,10 @@ Spring AI 외측 재시도, provider client 재시도와 OpenAI SDK 재시도를
 | queue capacity | 20 |
 | stale execution | 10분 |
 | prompt version | `quiz-generation-v1` |
+| generation enabled | `true` |
 
 API key는 전용 환경변수·secret에서만 주입한다. 설정 객체 `toString()`, actuator, 예외 메시지와 로그에 노출하지 않는다.
+`generation enabled=false`이면 워커뿐 아니라 생성 POST와 활성 생성 조회 API도 등록하지 않아 처리 주체 없는 `GENERATING` 행을 만들지 않는다.
 
 ## 12. 로그와 계측
 

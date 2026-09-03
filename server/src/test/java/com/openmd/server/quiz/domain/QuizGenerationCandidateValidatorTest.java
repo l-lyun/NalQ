@@ -230,6 +230,31 @@ class QuizGenerationCandidateValidatorTest {
     assertEquals("동시성", result.getFirst().candidate().topic());
   }
 
+  @Test
+  void treatsUnicodeSpaceSeparatorsAsEquivalentInSourceEvidence() {
+    QuizGenerationCandidate candidate =
+        new QuizGenerationCandidate(
+            QuestionType.SHORT_ANSWER,
+            "공백",
+            "어떤 문자열인가요?",
+            "해설",
+            "알파 베타 감마",
+            List.of(),
+            List.of("문자열"),
+            List.of(),
+            "",
+            List.of());
+
+    assertEquals(
+        1,
+        validator
+            .validateAll(
+                List.of(candidate),
+                List.of(QuestionType.SHORT_ANSWER),
+                "알파\u00a0베타\u2003감마")
+            .size());
+  }
+
   private ChoiceCandidate choice(String text, boolean correct) {
     return new ChoiceCandidate(text, correct);
   }

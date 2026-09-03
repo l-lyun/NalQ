@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.time.Instant;
 import java.util.concurrent.Executor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,6 +37,7 @@ public class QuizGenerationWorker {
   private final QuizGenerationPersistenceService persistence;
   private final Executor executor;
   private final QuizGenerationTaskRegistry tasks;
+  private final Instant startupAt;
   private final QuizGenerationCandidateValidator validator = new QuizGenerationCandidateValidator();
   private final QuizGenerationPolicy policy = new QuizGenerationPolicy();
 
@@ -48,6 +50,7 @@ public class QuizGenerationWorker {
     this.persistence = persistence;
     this.executor = executor;
     this.tasks = tasks;
+    this.startupAt = Instant.now();
   }
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -62,7 +65,7 @@ public class QuizGenerationWorker {
 
   @EventListener(ApplicationReadyEvent.class)
   public void failInterruptedGenerationsOnStartup() {
-    int failed = persistence.failInterruptedGenerations();
+    int failed = persistence.failInterruptedGenerations(startupAt);
     if (failed > 0) log.warn("Failed {} interrupted quiz generations", failed);
   }
 

@@ -19,7 +19,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/learning-materials/{materialId}/quiz-sets")
-@ConditionalOnProperty(name = "openmd.quiz.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(
+    name = {"openmd.quiz.enabled", "openmd.quiz.generation.enabled"},
+    havingValue = "true",
+    matchIfMissing = true)
 public class QuizGenerationController {
   private final QuizGenerationService service;
 

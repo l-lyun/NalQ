@@ -40,7 +40,10 @@ public interface QuizSetRepository extends JpaRepository<QuizSet, Long> {
   Page<QuizSet> findAllByUserIdAndStatusNotAndQuizTitleContainingIgnoreCase(
       long userId, QuizSetStatus status, String quizTitle, Pageable pageable);
 
-  List<QuizSet> findAllByStatus(QuizSetStatus status);
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("select q from QuizSet q where q.status = :status and q.createdAt < :startupAt")
+  List<QuizSet> findInterruptedForUpdate(
+      @Param("status") QuizSetStatus status, @Param("startupAt") Instant startupAt);
 
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("select q from QuizSet q where q.status = :status and q.generationStartedAt < :cutoff")

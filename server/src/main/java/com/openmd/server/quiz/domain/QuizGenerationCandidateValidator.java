@@ -15,7 +15,7 @@ import java.util.regex.Pattern;
 
 public final class QuizGenerationCandidateValidator {
   private static final Pattern BLANK_MARKER = Pattern.compile("\\[(\\d+)]");
-  private static final Pattern WHITESPACE = Pattern.compile("\\s+");
+  private static final Pattern WHITESPACE = Pattern.compile("[\\p{javaWhitespace}\\p{Z}]+");
 
   public List<ValidatedQuizQuestion> validateAll(List<QuizGenerationCandidate> candidates) {
     return validateAll(candidates, List.of(QuestionType.values()), null);

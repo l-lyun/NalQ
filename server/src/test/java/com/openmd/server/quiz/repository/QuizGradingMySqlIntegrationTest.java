@@ -230,8 +230,9 @@ class QuizGradingMySqlIntegrationTest {
     Fixture fixture = fixture();
     QuizSet interrupted =
         sets.saveAndFlush(QuizSet.generating(fixture.userId(), fixture.materialId(), "자료 퀴즈"));
+    Instant startup = Instant.now().plusSeconds(1);
 
-    assertEquals(1, generation.failInterruptedGenerations());
+    assertEquals(1, generation.failInterruptedGenerations(startup));
 
     assertEquals(
         QuizSetStatus.FAILED.name(),
@@ -251,6 +252,22 @@ class QuizGradingMySqlIntegrationTest {
             "SELECT COUNT(*) FROM notifications WHERE quiz_set_id = ?",
             Long.class,
             interrupted.getPublicId()));
+  }
+
+  @Test
+  void startupRecoveryLeavesGenerationsAcceptedAfterTheProcessStarted() {
+    Fixture fixture = fixture();
+    Instant startup = Instant.now();
+    QuizSet acceptedAfterStartup =
+        sets.saveAndFlush(QuizSet.generating(fixture.userId(), fixture.materialId(), "새 퀴즈"));
+
+    assertEquals(0, generation.failInterruptedGenerations(startup));
+    assertEquals(
+        QuizSetStatus.GENERATING.name(),
+        jdbc.queryForObject(
+            "SELECT status FROM quiz_sets WHERE id = ?",
+            String.class,
+            acceptedAfterStartup.getId()));
   }
 
   @Test
