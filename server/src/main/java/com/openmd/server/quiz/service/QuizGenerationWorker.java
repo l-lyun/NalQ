@@ -12,14 +12,11 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
-import java.time.Instant;
 import java.util.concurrent.Executor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
 import org.springframework.core.task.TaskRejectedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.event.TransactionPhase;
@@ -37,7 +34,6 @@ public class QuizGenerationWorker {
   private final QuizGenerationPersistenceService persistence;
   private final Executor executor;
   private final QuizGenerationTaskRegistry tasks;
-  private final Instant startupAt;
   private final QuizGenerationCandidateValidator validator = new QuizGenerationCandidateValidator();
   private final QuizGenerationPolicy policy = new QuizGenerationPolicy();
 
@@ -50,7 +46,6 @@ public class QuizGenerationWorker {
     this.persistence = persistence;
     this.executor = executor;
     this.tasks = tasks;
-    this.startupAt = Instant.now();
   }
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -61,12 +56,6 @@ public class QuizGenerationWorker {
       log.warn("Quiz generation queue rejected quizSetId={}", request.quizSetId());
       failSafely(request, QuizSetFailureCode.GENERATION_FAILED);
     }
-  }
-
-  @EventListener(ApplicationReadyEvent.class)
-  public void failInterruptedGenerationsOnStartup() {
-    int failed = persistence.failInterruptedGenerations(startupAt);
-    if (failed > 0) log.warn("Failed {} interrupted quiz generations", failed);
   }
 
   private void generate(QuizGenerationRequested request) {

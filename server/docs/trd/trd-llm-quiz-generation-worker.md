@@ -554,6 +554,8 @@ Spring AI 외측 재시도, provider client 재시도와 OpenAI SDK 재시도를
 API key는 전용 환경변수·secret에서만 주입한다. 설정 객체 `toString()`, actuator, 예외 메시지와 로그에 노출하지 않는다.
 `generation enabled=false`이면 워커뿐 아니라 생성 POST와 활성 생성 조회 API도 등록하지 않아 처리 주체 없는 `GENERATING` 행을 만들지 않는다.
 확인 UI가 배포된 환경에서만 `OPENMD_QUIZ_GENERATION_ENABLED=true`를 명시해 기능을 활성화한다.
+기능을 활성화할 때 `OPENAI_API_KEY`가 비어 있거나 placeholder이면 서버 시작을 실패시킨다.
+이전 프로세스가 남긴 `GENERATING` 행의 시작 복구는 generation enabled와 분리해, 새 생성이 비활성인 환경에서도 사용자 자료 잠금을 해제한다.
 
 ## 12. 로그와 계측
 
