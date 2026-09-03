@@ -48,6 +48,7 @@ export async function getNotionPages(
     '/api/v1/integrations/notion/pages',
     {
       signal,
+      timeout: 25_000,
       params: {
         ...(query.trim() ? { query: query.trim() } : {}),
         ...(cursor ? { cursor } : {}),

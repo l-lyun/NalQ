@@ -59,6 +59,7 @@ import './learning.css'
 const PAGE_REVEAL_SIZE = 5
 const NOTION_RETURN_TO_STORAGE_KEY = 'openmd:notion-import:return-to'
 const NOTION_CREATE_RETURN_STATE_STORAGE_KEY = 'openmd:notion-import:create-return-state'
+const NOTION_MATERIAL_SCROLL_STORAGE_KEY = 'openmd:notion-import:material-scroll-top'
 
 type CallbackNotice = { outcome?: 'connected' | 'cancelled' | 'failed'; error?: string }
 type ConfirmKind = 'disconnect' | 'switch-workspace' | null
@@ -82,6 +83,11 @@ export function NotionImportPage() {
       ? consumeNotionLearningCreateReturnState()
       : (location.state as { learningCreateReturnState?: unknown } | null)?.learningCreateReturnState,
   ))
+  const [returnScrollTop] = useState(() => {
+    const routeValue = (location.state as { returnScrollTop?: unknown } | null)?.returnScrollTop
+    if (typeof routeValue === 'number' && Number.isFinite(routeValue) && routeValue >= 0) return routeValue
+    return location.search ? consumeNotionMaterialScrollTop() : undefined
+  })
   const [rawQuery, setRawQuery] = useState('')
   const [committedQuery, setCommittedQuery] = useState('')
   const [composing, setComposing] = useState(false)
@@ -108,7 +114,7 @@ export function NotionImportPage() {
   const importing = useMutation({ mutationFn: importNotionPage })
   const authorizing = useMutation({
     mutationFn: () => {
-      rememberNotionNavigationState(returnTo, learningCreateReturnState)
+      rememberNotionNavigationState(returnTo, learningCreateReturnState, returnScrollTop)
       return startNotionAuthorization(`${window.location.origin}/learning/import/notion`)
     },
     onSuccess: ({ authorizationUrl }) => window.location.assign(authorizationUrl),
@@ -181,6 +187,7 @@ export function NotionImportPage() {
   }, [connection.data?.status, loadFirstBatch])
 
   const visiblePages = useMemo(() => pages.slice(0, visibleCount), [pages, visibleCount])
+  const queryIsSettled = rawQuery.trim() === committedQuery
   const interactionLocked = importing.isPending || authorizing.isPending || disconnecting.isPending
 
   const showMore = async () => {
@@ -235,6 +242,7 @@ export function NotionImportPage() {
           title: result.title,
           content: result.content,
           ...(returnTo ? { returnTo } : {}),
+          ...(returnScrollTop !== undefined ? { returnScrollTop } : {}),
           ...(Object.keys(learningCreateReturnState).length > 0 ? { learningCreateReturnState } : {}),
         },
       })
@@ -285,14 +293,15 @@ export function NotionImportPage() {
           title="노션에서 가져오기"
           onBack={() => {
             if (interactionLocked) return
-            if (returnTo) {
-              navigate(returnTo)
+            if (!callbackNotice.outcome && !callbackNotice.error) {
+              navigate(-1)
               return
             }
-            navigate('/learning/new', {
+            navigate(returnTo ?? '/learning/new', {
+              replace: true,
               state: Object.keys(learningCreateReturnState).length > 0
                 ? learningCreateReturnState
-                : undefined,
+                : returnTo ? { restoreScrollTop: returnScrollTop } : undefined,
             })
           }}
         />
@@ -316,16 +325,21 @@ export function NotionImportPage() {
                 title: '',
                 content: '',
                 ...(returnTo ? { returnTo } : {}),
+                ...(returnScrollTop !== undefined ? { returnScrollTop } : {}),
                 ...(Object.keys(learningCreateReturnState).length > 0 ? { learningCreateReturnState } : {}),
               },
             })}
           />
         ) : (
           <VStack gap="x6" aria-busy={interactionLocked}>
-            {callbackNotice.outcome === 'connected' || callbackNotice.error ? (
+            {callbackNotice.outcome === 'connected' || callbackNotice.outcome === 'cancelled' || callbackNotice.error ? (
               <Box aria-live="polite">
                 <LearningNotice>
-                  {callbackNotice.error ? getNotionErrorPresentation(callbackNotice.error).message : '노션 연결이 완료됐어요.'}
+                  {callbackNotice.error
+                    ? getNotionErrorPresentation(callbackNotice.error).message
+                    : callbackNotice.outcome === 'cancelled'
+                      ? '노션 연결을 취소했어요.'
+                      : '노션 연결이 완료됐어요.'}
                 </LearningNotice>
               </Box>
             ) : null}
@@ -353,7 +367,7 @@ export function NotionImportPage() {
                   layout="iconOnly"
                   variant="ghost"
                   aria-label="페이지 목록 새로고침"
-                  disabled={interactionLocked || pageLoading}
+                  disabled={interactionLocked || pageLoading || !queryIsSettled}
                   loading={pageLoading && pages.length > 0}
                   onClick={() => void loadFirstBatch(true)}
                 >
@@ -391,7 +405,7 @@ export function NotionImportPage() {
                   aria-label="가져올 노션 페이지"
                   name="notion-page"
                   value={selectedPageId}
-                  disabled={interactionLocked || pageLoading}
+                  disabled={interactionLocked || pageLoading || !queryIsSettled}
                   onValueChange={(value: string) => {
                     setSelectedPageId(value)
                     setImportError(undefined)
@@ -658,6 +672,7 @@ function readCallbackNotice(search: string): CallbackNotice {
 function rememberNotionNavigationState(
   returnTo: string | undefined,
   learningCreateReturnState: ReturnType<typeof readLearningCreateReturnState>,
+  returnScrollTop: number | undefined,
 ) {
   try {
     if (returnTo) window.sessionStorage.setItem(NOTION_RETURN_TO_STORAGE_KEY, returnTo)
@@ -670,8 +685,24 @@ function rememberNotionNavigationState(
     } else {
       window.sessionStorage.removeItem(NOTION_CREATE_RETURN_STATE_STORAGE_KEY)
     }
+    if (returnScrollTop !== undefined) {
+      window.sessionStorage.setItem(NOTION_MATERIAL_SCROLL_STORAGE_KEY, String(returnScrollTop))
+    } else {
+      window.sessionStorage.removeItem(NOTION_MATERIAL_SCROLL_STORAGE_KEY)
+    }
   } catch {
     // OAuth can continue even when transient browser storage is unavailable.
+  }
+}
+
+function consumeNotionMaterialScrollTop() {
+  try {
+    const value = window.sessionStorage.getItem(NOTION_MATERIAL_SCROLL_STORAGE_KEY)
+    window.sessionStorage.removeItem(NOTION_MATERIAL_SCROLL_STORAGE_KEY)
+    const parsed = value === null ? undefined : Number(value)
+    return parsed !== undefined && Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined
+  } catch {
+    return undefined
   }
 }
 

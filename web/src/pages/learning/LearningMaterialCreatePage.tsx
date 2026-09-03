@@ -42,6 +42,7 @@ type EditorRouteState = {
   title?: string
   content?: string
   returnTo?: string
+  returnScrollTop?: number
   learningCreateReturnState?: unknown
 }
 
@@ -55,6 +56,9 @@ export function LearningMaterialCreatePage() {
   const routeState = (location.state ?? {}) as EditorRouteState
   const sourceType = routeState.sourceType === 'NOTION' ? 'NOTION' : 'PASTE'
   const returnTo = resolveLearningMaterialsReturnTo(routeState.returnTo)
+  const returnScrollTop = typeof routeState.returnScrollTop === 'number' && routeState.returnScrollTop >= 0
+    ? routeState.returnScrollTop
+    : undefined
   const learningCreateReturnState = readLearningCreateReturnState(routeState.learningCreateReturnState)
   const [title, setTitle] = useState(routeState.title ?? '')
   const [content, setContent] = useState(routeState.content ?? '')
@@ -99,7 +103,7 @@ export function LearningMaterialCreatePage() {
       } else {
         navigate(`/learning/materials/${created.materialId}`, {
           replace: true,
-          state: returnTo ? { returnTo } : undefined,
+          state: returnTo ? { returnTo, returnScrollTop } : undefined,
         })
       }
     },
@@ -107,13 +111,11 @@ export function LearningMaterialCreatePage() {
 
   const requestBack = () => {
     if (returnTo) {
-      navigate(returnTo)
+      navigate(returnTo, { state: { restoreScrollTop: returnScrollTop } })
       return
     }
     navigate(sourceType === 'NOTION' ? '/learning/import/notion' : '/learning/new', {
-      state: Object.keys(learningCreateReturnState).length > 0
-        ? { learningCreateReturnState }
-        : undefined,
+      state: Object.keys(learningCreateReturnState).length > 0 ? learningCreateReturnState : undefined,
     })
   }
 

@@ -424,6 +424,7 @@ function ReviewCandidateRow({
 export function LearningMaterialsPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const pageRef = useRef<HTMLDivElement>(null)
   const back = usePageBack()
   const [searchParams, setSearchParams] = useSearchParams()
   const query = searchParams.get('query') ?? ''
@@ -465,15 +466,30 @@ export function LearningMaterialsPage() {
 
   const returnTo = resolveLearningMaterialsReturnTo(`${location.pathname}${location.search}`)
     ?? '/learning/materials'
+  const restoreScrollTop = (() => {
+    const value = (location.state as { restoreScrollTop?: unknown } | null)?.restoreScrollTop
+    return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined
+  })()
+
+  useEffect(() => {
+    if (restoreScrollTop === undefined || materials.isPending) return
+    const frame = requestAnimationFrame(() => pageRef.current?.scrollTo({ top: restoreScrollTop }))
+    return () => cancelAnimationFrame(frame)
+  }, [materials.isPending, restoreScrollTop])
+
+  const creationState = () => ({
+    returnTo,
+    returnScrollTop: pageRef.current?.scrollTop ?? 0,
+  })
 
   return (
-    <Box as="main" className="learning-management-page" bg="bg.layerDefault" minHeight="100dvh" pt="safeArea">
+    <Box ref={pageRef} as="main" className="learning-management-page" bg="bg.layerDefault" minHeight="100dvh" pt="safeArea">
       <VStack className="learning-content" px="spacingX.globalGutter" pt="x4" pb="spacingY.screenBottom" gap="x5">
         <LearningScreenHeader title="내 학습자료" onBack={back} />
         <LearningMaterialAddSheet
-          onNotion={() => navigate('/learning/import/notion', { state: { returnTo } })}
+          onNotion={() => navigate('/learning/import/notion', { state: creationState() })}
           onDirect={() => navigate('/learning/materials/new', {
-            state: { sourceType: 'PASTE', title: '', content: '', returnTo },
+            state: { sourceType: 'PASTE', title: '', content: '', ...creationState() },
           })}
         />
         <LearningField label="학습자료 제목 검색">
@@ -733,7 +749,14 @@ export function LearningMaterialEditPage({ materialId }: { materialId: string })
       const returnTo = resolveLearningMaterialsReturnTo(
         (location.state as { returnTo?: unknown } | null)?.returnTo,
       )
-      navigate(returnTo ?? '/learning/materials', { replace: true, state: { saved: true } })
+      const returnScrollTop = (location.state as { returnScrollTop?: unknown } | null)?.returnScrollTop
+      navigate(returnTo ?? '/learning/materials', {
+        replace: true,
+        state: {
+          saved: true,
+          ...(typeof returnScrollTop === 'number' ? { restoreScrollTop: returnScrollTop } : {}),
+        },
+      })
     },
     onError: (error) => {
       setSaveError(error instanceof Error ? error.message : '학습자료를 저장하지 못했어요. 다시 시도해주세요.')
@@ -771,7 +794,10 @@ export function LearningMaterialEditPage({ materialId }: { materialId: string })
     const returnTo = resolveLearningMaterialsReturnTo(
       (location.state as { returnTo?: unknown } | null)?.returnTo,
     )
-    navigate(returnTo ?? '/learning/materials')
+    const returnScrollTop = (location.state as { returnScrollTop?: unknown } | null)?.returnScrollTop
+    navigate(returnTo ?? '/learning/materials', {
+      state: typeof returnScrollTop === 'number' ? { restoreScrollTop: returnScrollTop } : undefined,
+    })
   }
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
