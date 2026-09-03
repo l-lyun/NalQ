@@ -14,6 +14,8 @@ scope: web
   - [인증 흐름](../../../docs/ux/flow-authentication.md)
   - [인증 API 계약](../../../docs/contracts/contract-api-authentication.md)
   - [사용자·인증 데이터 계약](../../../docs/contracts/contract-data-authentication.md)
+  - [로그인 전 공개 랜딩](../../../docs/ux/screen-public-landing.md)
+  - [첫 진입 온보딩과 NalQ 가이드](../../../docs/ux/screen-onboarding.md)
   - [NalQ 디자인 기준](../../../DESIGN.md)
 
 ## 1. 목적
@@ -44,6 +46,8 @@ scope: web
 | 도메인 서버 상태 | TanStack Query | 학습자료, 풀이 기록 | Query cache, 사용자별 격리 |
 | Refresh Token | browser cookie jar | 서버가 발급·회전·삭제 | HttpOnly Cookie |
 | 화면 이동 의도 | Router | 로그인 전 원래 목적지 | 메모리성 location state |
+| 자동 온보딩 표시값 | Local Storage | 계정별 `auto-shown` 값 | 브라우저·WebView 로컬 저장소 |
+| 자동 온보딩 진입 허가 | Onboarding 모듈 | 회원가입 성공 직후의 일회성 admission | 현재 JavaScript 문서 메모리 |
 
 TanStack Query를 전역 상태 저장소처럼 사용하지 않는다. Query는 서버 응답과 요청 수명주기를 담당하고, token vault와 인증 phase external store는 작은 framework-neutral 인증 런타임 모듈이 담당한다. 사용자 객체를 다른 store에 복제하지 않으며 Zustand는 현재 인증 범위에 사용하지 않는다.
 
@@ -197,9 +201,11 @@ finally -> refreshPromise 비움
 
 1. 인증 메일 요청은 `POST /api/v1/auth/email-verifications`에 이메일만 전송한다. 개발 환경도 같은 서버 계약을 사용한다.
 2. 인증 완료 뒤 받은 `signUpToken`과 비밀번호는 화면 메모리에서만 최종 가입 요청까지 유지한다.
-3. 최종 가입 성공 시 Access Token을 메모리에 기록하고 `/users/me`를 조회한 뒤 홈으로 이동한다.
-4. `AUTH_011`은 계정 생성은 완료됐으나 브라우저 세션 발급에 실패한 결과이므로 최종 가입을 반복하지 않는다. 비밀번호를 전달하지 않고 이메일과 고정 안내 식별자만 Router state에 담아 로그인 화면으로 이동한다.
-5. network 또는 안정적인 오류 코드가 없는 5xx처럼 가입 결과가 불명확하면 Cookie 도착 여부를 확인하기 위해 refresh를 한 번만 호출한다. 성공하면 `/users/me` 조회 후 홈으로 이동하고, 실패하면 4번과 같은 로그인 안내로 이동한다.
+3. 최종 가입 성공 시 Access Token을 메모리에 기록하고 `/users/me`를 조회한다. 식별된 사용자 ID의 `nalq:onboarding:auto-shown:v1:{userId}`가 없으면 값을 기록하고, 현재 JavaScript 문서 메모리에 일회성 admission을 만든 뒤 `/onboarding`으로 replace 이동한다.
+4. admission은 Router state의 사용자 ID·난수 식별자와 문서 메모리 값을 함께 대조한다. 따라서 일반 로그인, 세션 복원, 직접 URL 진입과 새로고침은 로컬 표시값 유무와 관계없이 자동 온보딩을 열지 않는다.
+5. Local Storage 조회·기록이 실패하거나 이미 표시값이 있으면 자동 온보딩을 반복하지 않고 홈으로 replace 이동한다. 수동 `/profile/guide`는 이 저장소와 admission을 읽거나 변경하지 않는다.
+6. `AUTH_011`은 계정 생성은 완료됐으나 브라우저 세션 발급에 실패한 결과이므로 최종 가입을 반복하지 않는다. 비밀번호를 전달하지 않고 이메일과 고정 안내 식별자만 Router state에 담아 로그인 화면으로 이동한다.
+7. network 또는 안정적인 오류 코드가 없는 5xx처럼 가입 결과가 불명확하면 Cookie 도착 여부를 확인하기 위해 refresh를 한 번만 호출한다. 성공하면 `/users/me` 조회 후 3~5번의 신규 사용자 판단을 적용하고, 실패하면 6번과 같은 로그인 안내로 이동한다.
 
 ### 로그인
 
@@ -221,7 +227,15 @@ finally -> refreshPromise 비움
 
 1. transport는 body 없이 credentials 및 CSRF 헤더를 보내며 서버가 Refresh Cookie를 만료시킨다.
 2. FE는 응답 성공·실패와 무관하게 진행 중인 개인 Query를 취소한 뒤 token vault와 개인 cache를 제거한다.
-3. 공개 경로로 replace 이동한다.
+3. 공개 기본 주소 `/`로 replace 이동해 로그인 전 랜딩을 보여준다.
+
+### 공개 랜딩과 온보딩 라우트
+
+- `/`는 인증 phase 판정이 끝난 뒤 anonymous이면 공개 랜딩, authenticated이면 기존 홈 셸을 렌더링한다. `bootstrapping`과 `bootstrap-error` 동안 랜딩 카피를 먼저 노출하지 않는다.
+- 보호 URL의 anonymous 접근은 기존 `AuthGate`가 `/login`으로 보내고 안전한 내부 원래 목적지를 보존한다.
+- `/onboarding`은 `AuthGate` 밖으로 나가지 않되 일반 앱 셸 안에는 넣지 않아 하단 탭을 노출하지 않는다. 현재 사용자와 회원가입 직후 admission이 모두 일치할 때만 렌더링한다.
+- `/profile/guide`는 인증 앱 셸의 마이페이지 하위 경로다. 같은 콘텐츠 컴포넌트를 `guide` 모드로 사용하며 닫기와 안전한 뒤로 가기는 `/profile`로 수렴한다.
+- 캐러셀 상태는 화면의 React state 한 곳에서만 소유한다. URL과 history에는 장 번호를 저장하지 않으며, 비순환 버튼·수평 swipe·방향키가 같은 인접 장 전이를 호출한다.
 
 ## 11. 오류 처리
 
@@ -352,6 +366,10 @@ web/src/
 - 최종 가입의 network/코드 없는 5xx는 refresh를 한 번만 호출하고, `AUTH_011` 또는 복구 실패는 최종 가입을 반복하지 않고 로그인 화면으로 이동한다.
 - 가입 복구용 로그인 Router state에는 이메일과 고정 안내 식별자만 포함하며 비밀번호와 `signUpToken`은 포함하지 않는다.
 - Router의 원래 목적지 복귀가 외부 URL redirect를 허용하지 않는다.
+- anonymous `/`는 승인된 공개 랜딩만, authenticated `/`는 기존 홈을 보여준다.
+- 최종 가입과 가입 복구 성공만 계정별 표시값을 기록하고 `/onboarding` admission을 만들며, 일반 로그인과 세션 복원은 만들지 않는다.
+- 자동 온보딩을 나가거나 새로고침한 뒤 Router state만으로 다시 열리지 않는다.
+- `/profile/guide` 열람 전후로 계정별 자동 표시값이 바뀌지 않는다.
 
 ### 현재 브라우저·보안 검증
 

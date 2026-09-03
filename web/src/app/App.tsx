@@ -3,13 +3,22 @@ import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom'
 
 import { queryClient } from '@/app/providers/queryClient'
 import { AuthBootstrap } from '@/app/router/AuthBootstrap'
-import { AuthGate, PublicOnlyGate } from '@/app/router/AuthGate'
+import {
+  AuthBootstrapError,
+  AuthGate,
+  AuthLoading,
+  PublicOnlyGate,
+} from '@/app/router/AuthGate'
 import { AuthenticatedAppShell } from '@/app/shell/AuthenticatedAppShell'
+import { useAuthPhase } from '@/features/auth/model/useAuthPhase'
 import {
   quizMockEnabled,
   quizRoutesEnabled,
 } from '@/features/quiz/model/quizFeature'
 import { LoginPage } from '@/pages/login/LoginPage'
+import { PublicLandingPage } from '@/pages/landing/PublicLandingPage'
+import { AutomaticOnboardingRoute } from '@/pages/onboarding/AutomaticOnboardingRoute'
+import { OnboardingPage } from '@/pages/onboarding/OnboardingPage'
 import {
   QuizAttemptResultRoutePage,
   QuizFixturePage,
@@ -26,6 +35,11 @@ import { SignUpPage } from '@/pages/sign-up/SignUpPage'
 import { VerifyEmailPage } from '@/pages/verify-email/VerifyEmailPage'
 
 const router = createBrowserRouter([
+  ...(import.meta.env.DEV ? [
+    { path: '/landing-preview', element: <PublicLandingPage /> },
+    { path: '/onboarding-preview', element: <OnboardingPage mode="guide" onExit={() => undefined} /> },
+  ] : []),
+  { path: '/', element: <RootEntryRoute /> },
   {
     element: <PublicOnlyGate />,
     children: [
@@ -37,10 +51,10 @@ const router = createBrowserRouter([
   {
     element: <AuthGate />,
     children: [
+      { path: '/onboarding', element: <AutomaticOnboardingRoute /> },
       {
         element: <AuthenticatedAppShell />,
         children: [
-          { index: true, element: null },
           { path: '/learning', element: null },
           { path: '/learning/materials', element: null },
           { path: '/learning/materials/new', element: null },
@@ -49,6 +63,7 @@ const router = createBrowserRouter([
           { path: '/learning/quizzes', element: null },
           { path: '/learning/new', element: null },
           { path: '/profile', element: null },
+          { path: '/profile/guide', element: null },
           { path: '/profile/account', element: null },
           { path: '/profile/terms', element: null },
           { path: '/profile/privacy', element: null },
@@ -68,6 +83,16 @@ const router = createBrowserRouter([
   },
   { path: '*', element: <Navigate to="/" replace /> },
 ])
+
+function RootEntryRoute() {
+  const phase = useAuthPhase()
+
+  if (phase === 'bootstrapping') return <AuthLoading />
+  if (phase === 'bootstrap-error') return <AuthBootstrapError />
+  if (phase === 'anonymous') return <PublicLandingPage />
+
+  return <AuthenticatedAppShell />
+}
 
 export function App() {
   if (import.meta.env.DEV && window.location.pathname === '/quiz-preview') {

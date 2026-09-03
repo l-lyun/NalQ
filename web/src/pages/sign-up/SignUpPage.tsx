@@ -11,6 +11,7 @@ import {
   useRequestVerificationEmailMutation,
 } from '@/features/auth/model/auth.mutations'
 import { SIGN_UP_SESSION_RECOVERY_NOTICE } from '@/features/auth/model/loginRouteState'
+import { prepareAutomaticOnboarding } from '@/features/onboarding/model/automaticOnboarding'
 import { ApiClientError, getApiErrorMessage } from '@/shared/api/apiError'
 
 import {
@@ -274,6 +275,16 @@ export function SignUpPage() {
     })
   }
 
+  function navigateAfterCompletedSignUp(userId: number) {
+    const onboardingState = prepareAutomaticOnboarding(userId)
+    if (!onboardingState) {
+      navigate('/', { replace: true })
+      return
+    }
+
+    navigate('/onboarding', { replace: true, state: onboardingState })
+  }
+
   function handleComplete() {
     if (!canComplete || completeSignUp.isPending || recoverCompletedSignUp.isPending) return
     if (!signUpToken) {
@@ -295,7 +306,7 @@ export function SignUpPage() {
         ],
       },
       {
-        onSuccess: () => navigate('/', { replace: true }),
+        onSuccess: (user) => navigateAfterCompletedSignUp(user.id),
         onError: (error) => {
           if (error instanceof ApiClientError && error.code === 'AUTH_010') {
             setNicknameCheckStatus('unavailable')
@@ -315,7 +326,7 @@ export function SignUpPage() {
 
           if (resultIsUnclear) {
             recoverCompletedSignUp.mutate(undefined, {
-              onSuccess: () => navigate('/', { replace: true }),
+              onSuccess: (user) => navigateAfterCompletedSignUp(user.id),
               onError: navigateToSignUpRecoveryLogin,
             })
             return

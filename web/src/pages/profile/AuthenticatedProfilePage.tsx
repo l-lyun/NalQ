@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 
 import { useLogoutMutation } from '@/features/auth/model/auth.mutations'
 import { useCurrentUser } from '@/features/auth/model/auth.queries'
+import { OnboardingPage } from '@/pages/onboarding/OnboardingPage'
 
 import { ProfilePage } from './ProfilePage'
 import { AccountSettingsPage, PendingFeaturePage, TermsPage } from './ProfileSubPages'
@@ -39,6 +40,9 @@ export function AuthenticatedProfilePage() {
         onRetry={() => void currentUser.refetch()}
       />
     )
+  }
+  if (pathname === '/profile/guide') {
+    return <OnboardingPage mode="guide" onExit={back} />
   }
   if (pathname === '/profile/terms') {
     return <TermsPage termId="service" title="서비스 이용약관" onBack={back} />
@@ -89,6 +93,7 @@ export function AuthenticatedProfilePage() {
       logoutPending={logout.isPending}
       logoutError={logout.isError ? '로그아웃하지 못했어요. 다시 시도해주세요.' : undefined}
       onOpenAccount={() => navigate('/profile/account', { state: profileSubPageNavigationState })}
+      onOpenGuide={() => navigate('/profile/guide', { state: profileSubPageNavigationState })}
       onOpenTerms={() => navigate('/profile/terms', { state: profileSubPageNavigationState })}
       onOpenPrivacy={() => navigate('/profile/privacy', { state: profileSubPageNavigationState })}
       onOpenMarketing={() => navigate('/profile/marketing', { state: profileSubPageNavigationState })}
@@ -97,7 +102,9 @@ export function AuthenticatedProfilePage() {
       onLogout={() => {
         if (!window.confirm('이 기기에서 로그아웃할까요?')) return
         logout.reset()
-        logout.mutate()
+        logout.mutate(undefined, {
+          onSettled: () => navigate('/', { replace: true }),
+        })
       }}
       onRetry={() => void currentUser.refetch()}
     />

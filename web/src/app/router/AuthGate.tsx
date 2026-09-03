@@ -8,7 +8,7 @@ export type AuthReturnState = {
   from?: string
 }
 
-function AuthLoading() {
+export function AuthLoading() {
   return (
     <VStack minHeight="100dvh" align="center" justify="center" bg="bg.layerDefault" gap="x3">
       <Text role="status" textStyle="t5Regular" color="fg.neutralMuted">
@@ -18,7 +18,7 @@ function AuthLoading() {
   )
 }
 
-function AuthBootstrapError() {
+export function AuthBootstrapError() {
   return (
     <VStack minHeight="100dvh" align="center" justify="center" bg="bg.layerDefault" gap="x3">
       <Text role="alert" textStyle="t5Regular" color="fg.critical">
