@@ -3,7 +3,7 @@ import {
   IconCheckmarkCircleFill,
   IconExclamationmarkCircleFill,
 } from '@karrotmarket/react-monochrome-icon'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ActionButton,
   Icon,
@@ -26,7 +26,7 @@ import {
 import {
   claimSnackbarNotifications,
   clearPendingGeneration,
-  loadPendingGeneration,
+  loadPendingGenerations,
   subscribePendingGeneration,
 } from '@/features/notification/model/notificationStorage'
 import {
@@ -34,6 +34,7 @@ import {
   notificationKeys,
 } from '@/features/notification/model/notificationQueries'
 import { getQuizSet } from '@/features/quiz/api/quiz.api'
+import type { QuizSetState } from '@/features/quiz/api/quiz.types'
 import { quizManagementKeys } from '@/features/quiz/model/quizManagementQueries'
 import { quizQueryKeys } from '@/features/quiz/model/quizQueries'
 
@@ -87,7 +88,7 @@ function NotificationCenterRuntime() {
   const currentUser = useCurrentUser()
   const userId = currentUser.data?.id
   const [foreground, setForeground] = useState(() => document.visibilityState === 'visible' && navigator.onLine)
-  const [pending, setPending] = useState(() => userId ? loadPendingGeneration(userId) : null)
+  const [pending, setPending] = useState(() => userId ? loadPendingGenerations(userId) : [])
 
   useEffect(() => {
     const syncForeground = () => setForeground(document.visibilityState === 'visible' && navigator.onLine)
@@ -103,24 +104,26 @@ function NotificationCenterRuntime() {
 
   useEffect(() => {
     if (!userId) {
-      setPending(null)
+      setPending([])
       return
     }
-    const syncPending = () => setPending(loadPendingGeneration(userId))
+    const syncPending = () => setPending(loadPendingGenerations(userId))
     syncPending()
     return subscribePendingGeneration(syncPending)
   }, [userId])
 
-  const pendingQuery = useQuery({
-    queryKey: quizQueryKeys.quizSet(pending?.quizSetId ?? ''),
-    queryFn: ({ signal }) => getQuizSet(pending!.quizSetId, signal),
-    enabled: notificationsEnabled && Boolean(userId && pending && foreground),
-    refetchInterval: (query) => {
-      if (!foreground) return false
-      const data = query.state.data
-      return data?.status === 'GENERATING' ? data.pollAfterSeconds * 1_000 : false
-    },
-    refetchIntervalInBackground: false,
+  const pendingQueries = useQueries({
+    queries: pending.map((item) => ({
+      queryKey: quizQueryKeys.quizSet(item.quizSetId),
+      queryFn: ({ signal }) => getQuizSet(item.quizSetId, signal),
+      enabled: notificationsEnabled && Boolean(userId && foreground),
+      refetchInterval: (query: { state: { data?: QuizSetState } }) => {
+        if (!foreground) return false
+        const data = query.state.data
+        return data?.status === 'GENERATING' ? data.pollAfterSeconds * 1_000 : false
+      },
+      refetchIntervalInBackground: false,
+    })),
   })
 
   const notifications = useQuery({
@@ -129,12 +132,16 @@ function NotificationCenterRuntime() {
   })
 
   useEffect(() => {
-    const state = pendingQuery.data
-    if (!userId || !pending || !state || state.status === 'GENERATING') return
-    clearPendingGeneration(userId, pending.quizSetId)
+    if (!userId) return
+    const completed = pending.filter((_, index) => {
+      const state = pendingQueries[index]?.data
+      return state && state.status !== 'GENERATING'
+    })
+    if (completed.length === 0) return
+    completed.forEach((item) => clearPendingGeneration(userId, item.quizSetId))
     void queryClient.invalidateQueries({ queryKey: notificationKeys.all })
     void queryClient.invalidateQueries({ queryKey: quizManagementKeys.all })
-  }, [pending, pendingQuery.data, queryClient, userId])
+  }, [pending, pendingQueries, queryClient, userId])
 
   useEffect(() => {
     if (!userId || !foreground || !notifications.data) return

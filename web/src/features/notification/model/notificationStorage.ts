@@ -10,6 +10,14 @@ export type PendingQuizGeneration = {
   savedAt: string
 }
 
+function isPendingQuizGeneration(value: unknown): value is PendingQuizGeneration {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Partial<PendingQuizGeneration>
+  return typeof candidate.quizSetId === 'string'
+    && typeof candidate.materialId === 'string'
+    && typeof candidate.savedAt === 'string'
+}
+
 function pendingKey(userId: number) {
   return `${PENDING_PREFIX}:${userId}`
 }
@@ -36,37 +44,43 @@ export function subscribePendingGeneration(listener: () => void) {
 
 export function savePendingGeneration(userId: number, pending: Omit<PendingQuizGeneration, 'savedAt'>) {
   try {
-    localStorage.setItem(pendingKey(userId), JSON.stringify({ ...pending, savedAt: new Date().toISOString() }))
+    const saved = { ...pending, savedAt: new Date().toISOString() }
+    const existing = loadPendingGenerations(userId).filter((item) => item.quizSetId !== pending.quizSetId)
+    localStorage.setItem(pendingKey(userId), JSON.stringify([...existing, saved]))
     emitPendingChange()
   } catch {
     // 서버 작업은 계속되므로 로컬 보존 실패가 생성 요청을 막지 않는다.
   }
 }
 
-export function loadPendingGeneration(userId: number) {
+export function loadPendingGenerations(userId: number): PendingQuizGeneration[] {
   try {
     const raw = localStorage.getItem(pendingKey(userId))
-    if (!raw) return null
+    if (!raw) return []
     const value: unknown = JSON.parse(raw)
-    if (!value || typeof value !== 'object') throw new Error('invalid')
-    const candidate = value as Partial<PendingQuizGeneration>
-    if (typeof candidate.quizSetId !== 'string' || typeof candidate.materialId !== 'string' || typeof candidate.savedAt !== 'string') throw new Error('invalid')
-    return candidate as PendingQuizGeneration
+    if (Array.isArray(value) && value.every(isPendingQuizGeneration)) return value
+    if (isPendingQuizGeneration(value)) return [value]
+    throw new Error('invalid')
   } catch {
     try {
       localStorage.removeItem(pendingKey(userId))
     } catch {
       // 저장소 접근 자체가 차단된 환경에서는 메모리 상태만 사용한다.
     }
-    return null
+    return []
   }
 }
 
 export function clearPendingGeneration(userId: number, quizSetId?: string) {
   try {
-    const current = loadPendingGeneration(userId)
-    if (quizSetId && current?.quizSetId !== quizSetId) return
-    localStorage.removeItem(pendingKey(userId))
+    if (!quizSetId) {
+      localStorage.removeItem(pendingKey(userId))
+      emitPendingChange()
+      return
+    }
+    const remaining = loadPendingGenerations(userId).filter((item) => item.quizSetId !== quizSetId)
+    if (remaining.length === 0) localStorage.removeItem(pendingKey(userId))
+    else localStorage.setItem(pendingKey(userId), JSON.stringify(remaining))
     emitPendingChange()
   } catch {
     // 다음 알림 목록 조회가 terminal 결과를 복구한다.
