@@ -8,6 +8,8 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.UUID;
 
 @Entity
 @Table(
@@ -19,13 +21,13 @@ import java.time.Instant;
 )
 public class User extends BaseEntity {
 
-	@Column(nullable = false, length = 320)
+	@Column(length = 320)
 	private String email;
 
-	@Column(name = "normalized_email", nullable = false, length = 320)
+	@Column(name = "normalized_email", length = 320)
 	private String normalizedEmail;
 
-	@Column(name = "password_hash", nullable = false, length = 255)
+	@Column(name = "password_hash", length = 255)
 	private String passwordHash;
 
 	@Column(length = 10)
@@ -46,6 +48,15 @@ public class User extends BaseEntity {
 
 	@Column(name = "withdrawn_at")
 	private Instant withdrawnAt;
+
+	@Column(name = "withdrawal_request_id", length = 36, unique = true)
+	private String withdrawalRequestId;
+
+	@Column(name = "withdrawal_disposal_due_at")
+	private Instant withdrawalDisposalDueAt;
+
+	@Column(name = "withdrawal_disposal_completed_at")
+	private Instant withdrawalDisposalCompletedAt;
 
 	@Column(name = "service_terms_version", length = 64)
 	private String serviceTermsVersion;
@@ -111,6 +122,20 @@ public class User extends BaseEntity {
 		this.nickname = nickname;
 	}
 
+	public void withdraw(UUID requestId, Instant now) {
+		if (status != UserStatus.ACTIVE && status != UserStatus.SUSPENDED) {
+			throw new IllegalStateException("Only an active or suspended user can be withdrawn");
+		}
+		email = null;
+		normalizedEmail = null;
+		passwordHash = null;
+		nickname = null;
+		status = UserStatus.WITHDRAWN;
+		withdrawnAt = now;
+		withdrawalRequestId = requestId.toString();
+		withdrawalDisposalDueAt = now.plus(30, ChronoUnit.DAYS);
+	}
+
 	public String getEmail() { return email; }
 	public String getNormalizedEmail() { return normalizedEmail; }
 	public String getPasswordHash() { return passwordHash; }
@@ -120,6 +145,11 @@ public class User extends BaseEntity {
 	public Instant getActivatedAt() { return activatedAt; }
 	public Instant getSuspendedAt() { return suspendedAt; }
 	public Instant getWithdrawnAt() { return withdrawnAt; }
+	public UUID getWithdrawalRequestId() {
+		return withdrawalRequestId == null ? null : UUID.fromString(withdrawalRequestId);
+	}
+	public Instant getWithdrawalDisposalDueAt() { return withdrawalDisposalDueAt; }
+	public Instant getWithdrawalDisposalCompletedAt() { return withdrawalDisposalCompletedAt; }
 	public String getServiceTermsVersion() { return serviceTermsVersion; }
 	public Instant getServiceTermsAgreedAt() { return serviceTermsAgreedAt; }
 	public String getPrivacyTermsVersion() { return privacyTermsVersion; }

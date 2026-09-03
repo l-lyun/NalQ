@@ -3,6 +3,7 @@ package com.openmd.server.auth.repository.redis;
 import com.openmd.server.auth.repository.RefreshSessionStore;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 
@@ -77,6 +78,9 @@ public class RedisRefreshSessionStore implements RefreshSessionStore {
 			digest,
 			Long.toString(expiresAt.toEpochMilli())
 		);
+		String userSessionsKey = userSessionsKey(userId);
+		redisTemplate.opsForSet().add(userSessionsKey, sessionId);
+		redisTemplate.expireAt(userSessionsKey, expiresAt);
 	}
 
 	@Override
@@ -123,11 +127,25 @@ public class RedisRefreshSessionStore implements RefreshSessionStore {
 		);
 	}
 
+	@Override
+	public void revokeAll(long userId) {
+		String indexKey = userSessionsKey(userId);
+		Set<String> sessionIds = redisTemplate.opsForSet().members(indexKey);
+		if (sessionIds != null && !sessionIds.isEmpty()) {
+			redisTemplate.delete(sessionIds.stream().map(RedisRefreshSessionStore::sessionKey).toList());
+		}
+		redisTemplate.delete(indexKey);
+	}
+
 	static String sessionKey(String sessionId) {
 		return "auth:session:{" + sessionId + "}";
 	}
 
 	static String usedKey(String sessionId, String digest) {
 		return "auth:refresh-used:{" + sessionId + "}:" + digest;
+	}
+
+	static String userSessionsKey(long userId) {
+		return "auth:user-sessions:" + userId;
 	}
 }

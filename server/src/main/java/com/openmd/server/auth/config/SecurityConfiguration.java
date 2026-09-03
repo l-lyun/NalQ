@@ -5,6 +5,7 @@ import com.openmd.server.auth.error.AuthErrorCode;
 import com.openmd.server.auth.security.AccessTokenService;
 import com.openmd.server.auth.security.BearerAccessTokenFilter;
 import com.openmd.server.auth.security.BrowserSessionRequestGuard;
+import com.openmd.server.auth.repository.UserRepository;
 import com.openmd.server.global.api.ApiError;
 import com.openmd.server.global.api.ApiResponse;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -39,12 +40,13 @@ public class SecurityConfiguration {
 	SecurityFilterChain securityFilterChain(
 		HttpSecurity http,
 		AccessTokenService tokens,
+		UserRepository users,
 		ObjectMapper mapper,
 		@Value("${openmd.auth.browser.allowed-origins}") List<String> browserAllowedOrigins,
 		@Value("${springdoc.api-docs.enabled:false}") boolean apiDocsEnabled
 	)
 		throws Exception {
-		BearerAccessTokenFilter bearerFilter = new BearerAccessTokenFilter(tokens, mapper);
+		BearerAccessTokenFilter bearerFilter = new BearerAccessTokenFilter(tokens, users, mapper);
 		BrowserSessionRequestGuard browserSessionGuard = new BrowserSessionRequestGuard(
 			browserAllowedOrigins,
 			mapper

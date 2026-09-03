@@ -18,6 +18,12 @@ public enum AuthErrorCode implements ErrorCode {
 		HttpStatus.SERVICE_UNAVAILABLE,
 		"AUTH_011",
 		"가입은 완료되었지만 자동 로그인에 실패했습니다. 잠시 후 로그인해 주세요."
+	),
+	WITHDRAWAL_PASSWORD_MISMATCH(HttpStatus.UNAUTHORIZED, "AUTH_012", "현재 비밀번호를 확인해 주세요."),
+	WITHDRAWAL_PERSISTENCE_FAILED(
+		HttpStatus.SERVICE_UNAVAILABLE,
+		"AUTH_013",
+		"회원 탈퇴를 완료할 수 없습니다. 같은 요청으로 다시 시도해 주세요."
 	);
 
 	private final HttpStatus status;

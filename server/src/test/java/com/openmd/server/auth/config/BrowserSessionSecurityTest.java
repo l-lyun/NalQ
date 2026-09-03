@@ -13,6 +13,7 @@ import com.openmd.server.auth.service.AuthService;
 import com.openmd.server.auth.dto.response.SessionTokens;
 import com.openmd.server.auth.service.TwoStepSignUpService;
 import com.openmd.server.auth.security.AccessTokenService;
+import com.openmd.server.auth.repository.UserRepository;
 import com.openmd.server.global.error.GlobalExceptionHandler;
 import java.time.Clock;
 import java.time.Instant;
@@ -50,6 +51,7 @@ class BrowserSessionSecurityTest {
 	@MockitoBean AuthService authService;
 	@MockitoBean TwoStepSignUpService signUpService;
 	@MockitoBean AccessTokenService accessTokenService;
+	@MockitoBean UserRepository userRepository;
 
 	@SpringBootConfiguration
 	@EnableAutoConfiguration

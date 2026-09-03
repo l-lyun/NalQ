@@ -19,6 +19,11 @@ class RedisKeyContractTest {
 	}
 
 	@Test
+	void userSessionIndexContainsOnlyTheInternalUserId() {
+		assertEquals("auth:user-sessions:42", RedisRefreshSessionStore.userSessionsKey(42L));
+	}
+
+	@Test
 	void emailVerificationKeyContainsOnlyTheKeyedEmailDigest() {
 		assertEquals(
 			"auth:email-verification:email:{digest42}",
