@@ -29,8 +29,8 @@ export type ProfilePageProps = {
   onOpenGuide: () => void
   onOpenTerms: () => void
   onOpenPrivacy: () => void
-  onOpenMarketing: () => void
   onOpenInquiry: () => void
+  onOpenOpenSourceLicenses: () => void
   onOpenWithdrawal: () => void
   onLogout: () => void
   onRetry: () => void
@@ -47,8 +47,8 @@ export function ProfilePage({
   onOpenGuide,
   onOpenTerms,
   onOpenPrivacy,
-  onOpenMarketing,
   onOpenInquiry,
+  onOpenOpenSourceLicenses,
   onOpenWithdrawal,
   onLogout,
   onRetry,
@@ -77,10 +77,9 @@ export function ProfilePage({
                 </VStack>
               </HStack>
 
-              <SettingsSection title="계정관리" titleId="mypage-account-title">
+              <SettingsSection title="계정" titleId="mypage-account-title">
                 <SettingsRow label="계정설정" onClick={onOpenAccount} />
                 <SettingsRow label="로그아웃" onClick={onLogout} pending={logoutPending} trailing={false} />
-                <SettingsRow label="회원탈퇴" onClick={onOpenWithdrawal} />
               </SettingsSection>
               {logoutError ? (
                 <VStack align="flex-start" gap="x2" role="alert">
@@ -90,17 +89,23 @@ export function ProfilePage({
               ) : null}
 
               <Divider as="div" color="stroke.neutralSubtle" />
-              <SettingsSection title="앱 정보" titleId="mypage-service-title">
+              <SettingsSection title="서비스 정보" titleId="mypage-service-title">
                 <SettingsRow label="NalQ 가이드" onClick={onOpenGuide} />
                 <SettingsRow label="서비스 이용약관" onClick={onOpenTerms} />
                 <SettingsRow label="개인정보처리방침" onClick={onOpenPrivacy} />
-                <SettingsRow label="마케팅 수신동의" onClick={onOpenMarketing} />
-                <SettingsRow label="서비스 이용 문의하기" onClick={onOpenInquiry} />
+                <SettingsRow label="문의하기" onClick={onOpenInquiry} />
+                <SettingsRow label="오픈소스 라이선스" onClick={onOpenOpenSourceLicenses} />
                 <Flex className="profile-version-row" align="center" justify="space-between" gap="x4">
                   <Text textStyle="t5Medium" color="fg.neutral">앱 버전</Text>
                   <Text textStyle="t4Regular" color="fg.neutralMuted">{appVersion}</Text>
                 </Flex>
               </SettingsSection>
+
+              <Divider as="div" color="stroke.neutralSubtle" />
+              <SettingsSection title="계정 종료" titleId="mypage-withdrawal-title">
+                <SettingsRow label="회원 탈퇴" onClick={onOpenWithdrawal} />
+              </SettingsSection>
+              <Text textStyle="t4Regular" color="fg.neutralMuted">탈퇴하면 이전 학습 기록을 다시 이용할 수 없어요.</Text>
             </>
           )}
         </VStack>

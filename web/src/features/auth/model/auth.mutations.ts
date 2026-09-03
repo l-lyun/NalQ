@@ -6,16 +6,20 @@ import {
   requestVerificationEmail,
   resendVerificationEmail,
   updateCurrentUserNickname,
+  withdrawCurrentUser,
 } from '@/features/auth/api/auth.api'
+import type { AccountWithdrawalRequest } from '@/features/auth/api/auth.types'
 
 import {
   completeSignUpAndLoadCurrentUser,
   completeCurrentUserSession,
   loginAndLoadCurrentUser,
   logoutCurrentSession,
+  completeAccountWithdrawal,
   recoverCompletedSignUpSession,
 } from './authSession'
 import { currentUserQueryKey } from './auth.queries'
+import { shouldRetryAccountWithdrawal } from './accountWithdrawal'
 
 export function useLoginMutation() {
   return useMutation({ mutationFn: loginAndLoadCurrentUser, retry: false })
@@ -62,5 +66,16 @@ export function useUpdateCurrentUserNicknameMutation() {
       queryClient.setQueryData(currentUserQueryKey, currentUser)
       await queryClient.invalidateQueries({ queryKey: currentUserQueryKey })
     },
+  })
+}
+
+export function useAccountWithdrawalMutation() {
+  return useMutation({
+    mutationFn: async (payload: AccountWithdrawalRequest) => {
+      const result = await withdrawCurrentUser(payload)
+      await completeAccountWithdrawal()
+      return result
+    },
+    retry: shouldRetryAccountWithdrawal,
   })
 }

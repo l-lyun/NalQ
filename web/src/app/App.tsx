@@ -20,6 +20,12 @@ import { PublicLandingPage } from '@/pages/landing/PublicLandingPage'
 import { AutomaticOnboardingRoute } from '@/pages/onboarding/AutomaticOnboardingRoute'
 import { OnboardingPage } from '@/pages/onboarding/OnboardingPage'
 import {
+  OpenSourceLicensesPage,
+  PrivacyPage,
+  SupportPage,
+  TermsPage,
+} from '@/pages/public-service/PublicServicePages'
+import {
   QuizAttemptResultRoutePage,
   QuizFixturePage,
   QuizMaterialRoutePage,
@@ -40,6 +46,14 @@ const router = createBrowserRouter([
     { path: '/onboarding-preview', element: <OnboardingPage mode="guide" onExit={() => undefined} /> },
   ] : []),
   { path: '/', element: <RootEntryRoute /> },
+  { path: '/terms', element: <TermsPage /> },
+  { path: '/privacy', element: <PrivacyPage /> },
+  { path: '/support', element: <SupportPage /> },
+  { path: '/open-source-licenses', element: <OpenSourceLicensesPage /> },
+  { path: '/profile/terms', element: <Navigate to="/terms" replace /> },
+  { path: '/profile/privacy', element: <Navigate to="/privacy" replace /> },
+  { path: '/profile/inquiry', element: <Navigate to="/support" replace /> },
+  { path: '/profile/marketing', element: <Navigate to="/" replace /> },
   {
     element: <PublicOnlyGate />,
     children: [
@@ -66,10 +80,6 @@ const router = createBrowserRouter([
           { path: '/profile', element: null },
           { path: '/profile/guide', element: null },
           { path: '/profile/account', element: null },
-          { path: '/profile/terms', element: null },
-          { path: '/profile/privacy', element: null },
-          { path: '/profile/marketing', element: null },
-          { path: '/profile/inquiry', element: null },
           { path: '/profile/withdrawal', element: null },
         ],
       },
