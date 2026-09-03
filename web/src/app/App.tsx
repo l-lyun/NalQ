@@ -80,7 +80,7 @@ import { VerifyEmailPage } from '@/pages/verify-email/VerifyEmailPage'
           { path: '/profile', element: null },
           { path: '/profile/guide', element: null },
           { path: '/profile/account', element: null },
-          ...(import.meta.env.DEV ? [{ path: '/profile/withdrawal', element: null }] : []),
+          { path: '/profile/withdrawal', element: null },
         ],
       },
       ...(quizRoutesEnabled ? [

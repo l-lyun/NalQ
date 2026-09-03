@@ -34,9 +34,13 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-          cache-dependency-path: web/pnpm-lock.yaml
-      - name: Install dependencies
+          cache-dependency-path: |
+            web/pnpm-lock.yaml
+            app/pnpm-lock.yaml
+      - name: Install web dependencies
         run: pnpm install --frozen-lockfile
+      - name: Install app dependencies for license verification
+        run: pnpm --dir ../app install --frozen-lockfile
       - name: Run web verification
         run: pnpm verify
 

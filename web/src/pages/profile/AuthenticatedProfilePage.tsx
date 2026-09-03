@@ -67,7 +67,7 @@ export function AuthenticatedProfilePage() {
       onOpenAccount={() => navigate('/profile/account', { state: profileSubPageNavigationState })}
       onOpenGuide={() => navigate('/profile/guide', { state: profileSubPageNavigationState })}
       legalDocumentsAvailable={import.meta.env.DEV}
-      accountWithdrawalAvailable={import.meta.env.DEV}
+      accountWithdrawalAvailable
       onOpenTerms={() => navigate('/terms', { state: { returnTo: '/profile' } })}
       onOpenPrivacy={() => navigate('/privacy', { state: { returnTo: '/profile' } })}
       onOpenInquiry={() => navigate('/support', { state: { returnTo: '/profile' } })}

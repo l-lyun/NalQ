@@ -1,11 +1,20 @@
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 
-const root = path.resolve(import.meta.dirname, '..')
-const readText = async (file) => (await fs.readFile(file, 'utf8')).replace(/\r\n?/gu, '\n')
-const manifest = JSON.parse(await fs.readFile(path.join(root, 'package.json'), 'utf8'))
+const webRoot = path.resolve(import.meta.dirname, '..')
+const repositoryRoot = path.resolve(webRoot, '..')
+const projectRoots = [webRoot, path.join(repositoryRoot, 'app')]
+const readText = async (file) => (await fs.readFile(file, 'utf8'))
+  .replace(/\r\n?/gu, '\n')
+  .replace(/[\t ]+$/gmu, '')
 const packages = new Map()
-const queue = Object.keys(manifest.dependencies ?? {}).map((name) => ({ name, from: root }))
+const queue = []
+for (const projectRoot of projectRoots) {
+  const manifest = JSON.parse(await fs.readFile(path.join(projectRoot, 'package.json'), 'utf8'))
+  for (const name of Object.keys(manifest.dependencies ?? {})) {
+    queue.push({ name, from: projectRoot, projectRoot })
+  }
+}
 const mitTerms = (copyright) => `MIT License
 
 Copyright (c) ${copyright}
@@ -28,14 +37,14 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.`
 
-async function packageJsonPath(name, from) {
+async function packageJsonPath(name, from, projectRoot) {
   const candidates = [path.join(from, 'node_modules', ...name.split('/'), 'package.json')]
   for (let directory = from; directory !== path.dirname(directory); directory = path.dirname(directory)) {
     if (path.basename(directory) === 'node_modules') {
       candidates.push(path.join(directory, ...name.split('/'), 'package.json'))
     }
   }
-  candidates.push(path.join(root, 'node_modules', ...name.split('/'), 'package.json'))
+  candidates.push(path.join(projectRoot, 'node_modules', ...name.split('/'), 'package.json'))
   for (const candidate of candidates) {
     try {
       await fs.access(candidate)
@@ -48,15 +57,15 @@ async function packageJsonPath(name, from) {
 }
 
 while (queue.length > 0) {
-  const { name, from } = queue.shift()
-  const metadataPath = await packageJsonPath(name, from)
+  const { name, from, projectRoot } = queue.shift()
+  const metadataPath = await packageJsonPath(name, from, projectRoot)
   const packageDirectory = await fs.realpath(path.dirname(metadataPath))
   const metadata = JSON.parse(await fs.readFile(metadataPath, 'utf8'))
   const key = `${metadata.name}@${metadata.version}`
   if (packages.has(key)) continue
   packages.set(key, { metadata, packageDirectory })
   for (const dependency of Object.keys(metadata.dependencies ?? {})) {
-    queue.push({ name: dependency, from: packageDirectory })
+    queue.push({ name: dependency, from: packageDirectory, projectRoot })
   }
 }
 
@@ -92,8 +101,8 @@ for (const [key, { metadata, packageDirectory }] of [...packages].sort(([a], [b]
       ? [mitTerms(typeof metadata.author === 'string' ? metadata.author : metadata.author?.name ?? `${metadata.name} contributors`)]
       : metadata.name.startsWith('@seed-design/')
         ? [
-            `--- SEED Design LICENSE ---\n${await readText(path.join(root, 'src/pages/public-service/licenses/seed-license.txt'))}`,
-            `--- SEED Design NOTICE ---\n${await readText(path.join(root, 'src/pages/public-service/licenses/seed-notice.txt'))}`,
+            `--- SEED Design LICENSE ---\n${await readText(path.join(webRoot, 'src/pages/public-service/licenses/seed-license.txt'))}`,
+            `--- SEED Design NOTICE ---\n${await readText(path.join(webRoot, 'src/pages/public-service/licenses/seed-notice.txt'))}`,
           ]
         : [`No license file was included in the installed package. SPDX/package license: ${license}`]
   if (metadata.name.startsWith('@seed-design/') && license === '"UNKNOWN"') license = 'Apache-2.0'
@@ -101,16 +110,16 @@ for (const [key, { metadata, packageDirectory }] of [...packages].sort(([a], [b]
 }
 
 const output = [
-  'NalQ Web Third-Party Notices',
+  'NalQ Web and App Third-Party Notices',
   '',
-  'Generated from the production dependency graph in web/package.json.',
+  'Generated from the production dependency graphs in web/package.json and app/package.json.',
   'Package license files are reproduced below as shipped by each installed package.',
   '',
   ...sections.map((section) => `${'='.repeat(80)}\n${section}`),
   '',
 ].join('\n')
 
-const outputPath = path.join(root, 'src/pages/public-service/licenses/third-party-notices.txt')
+const outputPath = path.join(webRoot, 'src/pages/public-service/licenses/third-party-notices.txt')
 if (process.argv.includes('--check')) {
   const current = await fs.readFile(outputPath, 'utf8')
   if (current !== output) throw new Error('Third-party notices are out of date. Run pnpm licenses:generate.')
