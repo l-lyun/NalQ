@@ -61,7 +61,7 @@ class QuizSetManagementControllerTest {
             "review-active",
             2,
             activity);
-    when(queries.list(7L, 1, 6, " 운영체제 "))
+    when(queries.list(7L, 1, 6, " 운영체제 ", null))
         .thenReturn(new QuizSetPage(List.of(item), 1, 6, 1, 1));
 
     mvc.perform(get("/api/v1/quiz-sets").param("query", " 운영체제 "))
@@ -72,6 +72,16 @@ class QuizSetManagementControllerTest {
         .andExpect(jsonPath("$.data.items[0].activeReviewSessionId").value("review-active"))
         .andExpect(jsonPath("$.data.items[0].reviewQuestionCount").value(2))
         .andExpect(jsonPath("$.data.items[0].lastLearningActivityAt").value("2026-08-28T01:00:00Z"));
+  }
+
+  @Test
+  void forwardsTheQuizSetToFocusWithoutAQuery() throws Exception {
+    when(queries.list(7L, 1, 6, null, "set-1"))
+        .thenReturn(new QuizSetPage(List.of(), 2, 6, 9, 2));
+
+    mvc.perform(get("/api/v1/quiz-sets").param("focusQuizSetId", "set-1"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.page").value(2));
   }
 
   @Test

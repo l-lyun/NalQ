@@ -9,6 +9,7 @@ scope: shared
 - 소유 영역: 서버 학습자료·퀴즈·복습 도메인
 - 관련 기능명세: [학습자료 만들기](../prd/prd-content-import.md), [퀴즈 생성·풀이·결과·복습](../prd/prd-quiz-learning.md)
 - 관련 API: [학습자료·퀴즈·복습 API](contract-api-quiz-learning.md)
+- 생성 결과 알림 데이터: [알림 데이터 계약](contract-data-notifications.md)
 - 물리 구조 그림: [퀴즈·복습 ERD](../assets/quiz-erd.svg)
 
 ## 목적과 경계
@@ -133,13 +134,14 @@ HTTP 필드 모양과 공개 오류는 [학습자료·퀴즈·복습 API](contra
 - 기존 행은 새 migration 적용 시점에 연결된 학습자료의 현재 제목으로 같은 규칙을 적용해 backfill한다. backfill 완료 뒤 공개 조회에서 null·빈 문자열을 허용하지 않는다.
 - 물리 컬럼명, index와 동시 수정 방식은 서버 TRD와 migration이 책임진다. 현재 계약은 별도 revision이나 제목 변경 이력 원장을 요구하지 않는다.
 
-- 유형별 검증을 통과해 저장할 수 있는 문제가 하나 이상이면 `READY`다. 최대 문제 수보다 적거나 요청 유형 일부가 없어도 실패가 아니다.
-- 유효 문제가 0개면 `FAILED`이며 빈 문제 세트를 풀이 대상으로 공개하지 않는다.
+- 유형별 검증을 통과한 최종 문제가 요청 수의 80% 이상이면 `READY`다. 5·10·15·20문제의 최소 성공 수는 각각 4·8·12·16이다.
+- 최종 유효 문제가 80%에 미달하면 `FAILED`이며 불완전한 문제 세트를 풀이 대상으로 공개하거나 일부 저장하지 않는다.
 - 실패 뒤 재조회에서도 원인을 구분해야 하므로 `quiz_sets.failure_code`를 nullable 값으로 둔다. `FAILED`에서는 `SOURCE_INSUFFICIENT` 또는 `GENERATION_FAILED`, 그 외 상태에서는 `null`이다.
 - 공개 `message`와 `retryable`은 `failure_code`에 대한 서버 정책으로 계산하며 별도 컬럼으로 복제하지 않는다.
 - 선택 유형·난이도·최대 문제 수는 생성 요청 입력이며 서버 DB에 영속화하지 않는다. `requestedConfig`는 생성 접수 성공 응답에서 요청값을 echo할 때만 사용하고 이후 상태 조회에서는 반환하지 않는다.
 - 프론트는 `userId + quizSetId` 범위로 `selectedTypes`, `difficulty`, `maxQuestionCount`를 기기 로컬 상태에 보존할 수 있다. 이 값은 손실 가능한 화면 표시용 캐시이며 QuizSet 상태·문제 유효성·채점의 원장이 아니다.
 - 로컬 값이 없으면 `GENERATING`은 서버 상태만으로 표시하고, `READY`의 실제 문제 수와 포함 유형은 확정된 `quiz_questions`에서 계산하며, `FAILED`는 저장된 `failure_code`에 따른 일반 안내를 사용한다.
+- `FAILED` QuizSet은 실패 원장과 알림 복구 대상을 위해 서버에 유지하되 내 퀴즈 목록 projection에서는 제외한다. terminal 알림의 수명주기와 읽음은 [알림 데이터 계약](contract-data-notifications.md)이 책임진다.
 
 문제 하나를 유효하다고 확정하는 최소 조건은 다음과 같다.
 
@@ -152,7 +154,7 @@ HTTP 필드 모양과 공개 오류는 [학습자료·퀴즈·복습 API](contra
 
 공통 `prompt`, `topic`, `explanation`, `source_excerpt`도 비어 있지 않아야 한다. 외부 생성 결과는 후보 목록이며 후보가 보낸 문제 번호는 저장값으로 사용하지 않는다.
 
-서버는 원래 후보 배열 순서대로 공통 정보와 유형별 상세 구조를 검증한다. 검증을 통과한 후보만 같은 상대 순서로 모은 뒤 최종 `question_number=1..N`을 부여한다. 검증에서 제외된 후보에는 `quiz_questions`를 포함해 어떤 영속 행도 만들지 않는다. 제외된 후보가 있어도 유효 문제 하나 이상을 최종 저장하면 QuizSet은 `READY`이고, 유효 후보가 없으면 `FAILED`다.
+서버는 원래 후보 배열 순서대로 공통 정보와 유형별 상세 구조를 검증한다. 검증을 통과한 후보만 같은 상대 순서로 모은 뒤 최종 `question_number=1..N`을 부여한다. 검증에서 제외된 후보에는 `quiz_questions`를 포함해 어떤 영속 행도 만들지 않는다. 최종 유효 후보가 요청 수의 80% 이상일 때만 전체를 저장하고 QuizSet을 `READY`로 바꾸며, 미달하면 후보를 일부 저장하지 않고 `FAILED`로 종결한다.
 
 ## 본 퀴즈와 복습 attempt
 
@@ -242,7 +244,7 @@ MVP에서는 전체 사용자 수정 이력을 별도 테이블로 보존하지 
 - 복습 제출은 제출 답안, 복습 채점과 원본 `reviewResolvedAt` 갱신을 한 트랜잭션에서 처리한다.
 - 같은 UUID 재요청은 먼저 확정된 attempt를 반환하고 request hash·fingerprint·replay 테이블을 만들지 않는다.
 - 문제 생성은 외부 후보의 공통 정보와 해당 유형의 상세 구조를 먼저 검증하고, 유효 후보에 서버가 연속 `question_number`를 부여한 뒤 공통·상세 원장을 함께 저장한다. 무효 후보와 유형 상세 저장이 실패한 문제는 부분 문제로 남기지 않는다.
-- 유효 문제가 하나 이상이면 해당 문제들과 `quiz_sets.status=READY`, `failure_code=null`을 확정한다. 유효 문제가 없으면 문제 행을 공개 가능한 상태로 남기지 않고 `status=FAILED`와 `failure_code`를 확정한다.
+- 최종 유효 문제가 요청 수의 80% 이상이면 해당 문제들, `quiz_sets.status=READY`, `failure_code=null`과 성공 알림을 한 트랜잭션에서 확정한다. 미달하거나 생성 작업이 실패하면 문제 행을 공개 가능한 상태로 남기지 않고 `status=FAILED`, `failure_code`와 실패 알림을 한 트랜잭션에서 확정한다. QuizSet당 terminal 알림은 한 건뿐이며 세부 불변성은 [알림 데이터 계약](contract-data-notifications.md#트랜잭션-불변성)을 따른다.
 - 동일 QuizSet에 생성 worker가 중복 실행되는 상황을 위해 별도 worker lease, 전용 추가 락이나 새 원장을 MVP에 도입하지 않는다. 생성 저장은 기존 상태 확인과 일반 트랜잭션·unique 제약을 사용하며 이 결정이 생성 성공 판정 규칙을 바꾸지는 않는다.
 - 한 번 attempt가 연결된 문제 세트·문제·보기·빈칸·정답 가이드는 수정하거나 물리 삭제하지 않는다.
 
@@ -283,7 +285,7 @@ migration, Java entity·repository·service와 테스트는 같은 목표 구조
 - 문제 유형 서버 기준 값은 `FILL_IN_THE_BLANK`다.
 - 외부 후보의 문제 번호는 버리고 유효 후보의 원래 배열 순서에 따라 서버가 `question_number=1..N`을 부여한다.
 - 무효 후보는 `quiz_questions`와 유형별 하위 행을 모두 남기지 않는다.
-- 유효 문제 1개 이상은 `READY`, 0개는 `FAILED`다.
+- 최종 유효 문제가 요청 수의 80% 이상이면 `READY`, 미달하면 `FAILED`다.
 - `requestedConfig`는 서버 DB에 저장하지 않고 생성 접수 성공 응답에서만 echo하며, 프론트가 `userId + quizSetId` 범위의 기기 로컬 상태로 보존한다.
 - MVP는 별도 worker lease·전용 추가 락·복합 FK·유형별 제출 테이블을 추가하지 않는다.
 

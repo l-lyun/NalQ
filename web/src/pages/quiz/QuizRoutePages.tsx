@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams, type NavigateFunction } from 'react-router-dom'
 
 import { shouldRetryQuery } from '@/app/providers/queryClient'
+import { savePendingGeneration } from '@/features/notification/model/notificationStorage'
 import {
   createQuizSet,
   createReviewSession,
@@ -164,12 +165,18 @@ export function QuizMaterialRoutePage() {
 
   useEffect(() => {
     if (activeQuery.data?.quizSetId) {
+      if (currentUser.data) {
+        savePendingGeneration(currentUser.data.id, {
+          quizSetId: activeQuery.data.quizSetId,
+          materialId: activeQuery.data.materialId,
+        })
+      }
       navigate(`/quiz-sets/${activeQuery.data.quizSetId}`, {
         replace: true,
         state: { materialTitle },
       })
     }
-  }, [activeQuery.data, materialTitle, navigate])
+  }, [activeQuery.data, currentUser.data, materialTitle, navigate])
 
   const quizSetQuery = useQuery({
     queryKey: quizQueryKeys.quizSet(quizSetId!),
@@ -194,6 +201,10 @@ export function QuizMaterialRoutePage() {
     onSuccess: (created) => {
       if (currentUser.data) {
         saveRequestedConfig(currentUser.data.id, created.quizSetId, created.requestedConfig)
+        savePendingGeneration(currentUser.data.id, {
+          quizSetId: created.quizSetId,
+          materialId: created.materialId,
+        })
       }
       setQuizSetId(created.quizSetId)
       void queryClient.invalidateQueries({ queryKey: learningMaterialKeys.all })
@@ -347,7 +358,13 @@ export function QuizSetRoutePage() {
       return createQuizSet(materialId, conditions)
     },
     onSuccess: (created) => {
-      if (currentUser.data) saveRequestedConfig(currentUser.data.id, created.quizSetId, created.requestedConfig)
+      if (currentUser.data) {
+        saveRequestedConfig(currentUser.data.id, created.quizSetId, created.requestedConfig)
+        savePendingGeneration(currentUser.data.id, {
+          quizSetId: created.quizSetId,
+          materialId: created.materialId,
+        })
+      }
       void queryClient.invalidateQueries({ queryKey: learningMaterialKeys.all })
       void queryClient.invalidateQueries({ queryKey: quizQueryKeys.active(created.materialId) })
       navigate(`/quiz-sets/${created.quizSetId}`, { replace: true, state: { materialTitle } })
@@ -355,12 +372,18 @@ export function QuizSetRoutePage() {
   })
 
   useEffect(() => {
+    if (currentUser.data && stateQuery.data?.status === 'GENERATING') {
+      savePendingGeneration(currentUser.data.id, {
+        quizSetId: stateQuery.data.quizSetId,
+        materialId: stateQuery.data.materialId,
+      })
+    }
     if (!stateQuery.data || stateQuery.data.status === 'GENERATING') return
     void queryClient.invalidateQueries({ queryKey: learningMaterialKeys.all })
     void queryClient.invalidateQueries({
       queryKey: quizQueryKeys.active(stateQuery.data.materialId),
     })
-  }, [queryClient, stateQuery.data])
+  }, [currentUser.data, queryClient, stateQuery.data])
 
   if (
     stateQuery.isPending ||

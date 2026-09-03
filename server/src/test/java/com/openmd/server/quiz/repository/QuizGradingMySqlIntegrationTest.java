@@ -15,6 +15,9 @@ import com.openmd.server.global.error.CommonErrorCode;
 import com.openmd.server.learningmaterial.domain.LearningMaterial;
 import com.openmd.server.learningmaterial.domain.SourceType;
 import com.openmd.server.learningmaterial.repository.LearningMaterialRepository;
+import com.openmd.server.notification.domain.QuizGenerationNotification;
+import com.openmd.server.notification.repository.NotificationRepository;
+import com.openmd.server.notification.service.NotificationService;
 import com.openmd.server.quiz.domain.QuizGenerationCandidate;
 import com.openmd.server.quiz.domain.QuizGenerationCandidate.BlankCandidate;
 import com.openmd.server.quiz.domain.QuizGenerationCandidate.ChoiceCandidate;
@@ -98,6 +101,8 @@ class QuizGradingMySqlIntegrationTest {
   @Autowired QuizAttemptRepository attempts;
   @Autowired QuizAttemptQuestionRepository attemptQuestions;
   @Autowired QuizGenerationPersistenceService generation;
+  @Autowired NotificationRepository notifications;
+  @Autowired NotificationService notificationService;
   @Autowired QuizGenerationService generationAcceptance;
   @Autowired QuizAttemptSubmissionService submissions;
   @Autowired QuizAttemptResultService results;
@@ -108,6 +113,8 @@ class QuizGradingMySqlIntegrationTest {
   @BeforeEach
   void clear() {
     dropFailureCheck();
+    dropNotificationFailureCheck();
+    jdbc.update("DELETE FROM notifications");
     jdbc.update("DELETE FROM quiz_submitted_answers");
     jdbc.update("DELETE FROM quiz_attempt_questions WHERE source_attempt_question_id IS NOT NULL");
     jdbc.update("DELETE FROM quiz_attempt_questions");
@@ -190,7 +197,17 @@ class QuizGradingMySqlIntegrationTest {
     assertEquals(QuizSetStatus.READY.name(), status);
     assertTrue(System.nanoTime() - acceptedAt >= Duration.ofMillis(2500).toNanos());
     assertEquals(
-        List.of(QuestionType.MULTIPLE_CHOICE.name(), QuestionType.ESSAY.name()),
+        List.of(
+            QuestionType.MULTIPLE_CHOICE.name(),
+            QuestionType.ESSAY.name(),
+            QuestionType.MULTIPLE_CHOICE.name(),
+            QuestionType.ESSAY.name(),
+            QuestionType.MULTIPLE_CHOICE.name(),
+            QuestionType.ESSAY.name(),
+            QuestionType.MULTIPLE_CHOICE.name(),
+            QuestionType.ESSAY.name(),
+            QuestionType.MULTIPLE_CHOICE.name(),
+            QuestionType.ESSAY.name()),
         jdbc.queryForList(
             """
             SELECT q.question_type FROM quiz_questions q
@@ -221,6 +238,96 @@ class QuizGradingMySqlIntegrationTest {
             "SELECT failure_code FROM quiz_sets WHERE id = ?",
             String.class,
             interrupted.getId()));
+    assertEquals(
+        1L,
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM notifications WHERE quiz_set_id = ?",
+            Long.class,
+            interrupted.getPublicId()));
+  }
+
+  @Test
+  void rollsBackTerminalStateAndQuestionsWhenNotificationPersistenceFails() {
+    Fixture fixture = fixture();
+    QuizSet set =
+        sets.saveAndFlush(QuizSet.generating(fixture.userId(), fixture.materialId(), "자료 퀴즈"));
+    jdbc.execute(
+        "ALTER TABLE notifications ADD CONSTRAINT test_fail_notification "
+            + "CHECK (target_name <> '자료 퀴즈')");
+    try {
+      assertThrows(
+          DataIntegrityViolationException.class,
+          () ->
+              generation.complete(
+                  fixture.userId(), set.getPublicId(), List.of(shortAnswer()), 10));
+    } finally {
+      dropNotificationFailureCheck();
+    }
+
+    assertEquals(
+        QuizSetStatus.GENERATING.name(),
+        jdbc.queryForObject(
+            "SELECT status FROM quiz_sets WHERE public_id = ?", String.class, set.getPublicId()));
+    assertEquals(
+        0L,
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM quiz_questions WHERE quiz_set_id = ?",
+            Long.class,
+            set.getId()));
+    assertEquals(
+        0L,
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM notifications WHERE quiz_set_id = ?",
+            Long.class,
+            set.getPublicId()));
+  }
+
+  @Test
+  void pagesOnlyNotificationsFromTheLastNinetyDaysAndKeepsAnOpaqueStableCursor() {
+    Fixture fixture = fixture();
+    java.util.ArrayList<QuizGenerationNotification> created = new java.util.ArrayList<>();
+    for (int index = 0; index < 22; index++) {
+      QuizSet set =
+          sets.saveAndFlush(
+              QuizSet.ready(
+                  fixture.userId(), fixture.materialId(), "알림 페이지 " + index));
+      created.add(notifications.saveAndFlush(QuizGenerationNotification.from(set)));
+    }
+    jdbc.update(
+        "UPDATE notifications SET created_at = ? WHERE public_id = ?",
+        java.sql.Timestamp.from(Instant.now().minus(Duration.ofDays(91))),
+        created.getFirst().getPublicId());
+
+    var first = notificationService.list(fixture.userId(), null, 20);
+    var second = notificationService.list(fixture.userId(), first.nextCursor(), 20);
+
+    assertEquals(20, first.items().size());
+    assertTrue(first.hasNext());
+    assertNotNull(first.nextCursor());
+    assertEquals(1, second.items().size());
+    assertFalse(second.hasNext());
+    assertEquals(21L, first.unreadCount());
+    assertFalse(
+        first.items().stream()
+            .anyMatch(item -> item.notificationId().equals(created.getFirst().getPublicId())));
+  }
+
+  @Test
+  void databaseAllowsOnlyOneTerminalNotificationPerQuizSet() {
+    Fixture fixture = fixture();
+    QuizSet set =
+        sets.saveAndFlush(QuizSet.ready(fixture.userId(), fixture.materialId(), "중복 방지"));
+    notifications.saveAndFlush(QuizGenerationNotification.from(set));
+
+    assertThrows(
+        DataIntegrityViolationException.class,
+        () -> notifications.saveAndFlush(QuizGenerationNotification.from(set)));
+    assertEquals(
+        1L,
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM notifications WHERE quiz_set_id = ?",
+            Long.class,
+            set.getPublicId()));
   }
 
   @Test
@@ -253,7 +360,7 @@ class QuizGradingMySqlIntegrationTest {
             fixture.userId(),
             set.getPublicId(),
             List.of(multipleChoice(2), multipleChoice(3), fillBlank(), shortAnswer(), essay()),
-            15));
+            5));
 
     List<QuizQuestion> stored = questions.findAllByQuizSetIdOrderByNumber(set.getId());
     assertEquals(List.of(1, 2, 3, 4), stored.stream().map(QuizQuestion::getNumber).toList());
@@ -648,6 +755,20 @@ class QuizGradingMySqlIntegrationTest {
     return ready(fixture, shortAnswer());
   }
 
+  private void dropNotificationFailureCheck() {
+    Integer present =
+        jdbc.queryForObject(
+            """
+            SELECT COUNT(*) FROM information_schema.table_constraints
+            WHERE constraint_schema=DATABASE() AND table_name='notifications'
+              AND constraint_name='test_fail_notification'
+            """,
+            Integer.class);
+    if (present != null && present > 0) {
+      jdbc.execute("ALTER TABLE notifications DROP CHECK test_fail_notification");
+    }
+  }
+
   private ReadyQuiz readyMultipleChoice(Fixture fixture) {
     return ready(fixture, multipleChoice(3));
   }
@@ -655,7 +776,7 @@ class QuizGradingMySqlIntegrationTest {
   private ReadyQuiz ready(Fixture fixture, QuizGenerationCandidate candidate) {
     QuizSet set =
         sets.saveAndFlush(QuizSet.generating(fixture.userId(), fixture.materialId(), "자료 퀴즈"));
-    generation.complete(fixture.userId(), set.getPublicId(), List.of(candidate), 15);
+    generation.complete(fixture.userId(), set.getPublicId(), List.of(candidate), 1);
     return new ReadyQuiz(
         fixture.userId(),
         set.getPublicId(),

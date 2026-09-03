@@ -34,6 +34,7 @@ scope: repository
 | 이메일 기반 자체 인증 | [자체 인증 PRD](prd/prd-local-authentication.md) | 초안 |
 | 학습자료 만들기 | [학습자료 만들기 PRD](prd/prd-content-import.md) | 검토 중 |
 | 퀴즈 생성·풀이·결과·복습 | [퀴즈 PRD](prd/prd-quiz-learning.md) | 검토 중 |
+| 퀴즈 생성 결과 알림 | [퀴즈 생성 결과 알림 PRD](prd/prd-quiz-generation-notifications.md) | 검토 중 |
 
 ## UX
 
@@ -43,6 +44,8 @@ scope: repository
 | 학습자료 만들기 | [학습자료 만들기 흐름](ux/flow-content-import.md) | Flow | 검토 중 |
 | Notion 학습자료 가져오기 | [Notion 가져오기 화면](ux/screen-notion-import.md) | Screen Spec | 검토 중 |
 | 퀴즈 생성부터 복습까지 | [퀴즈 흐름](ux/flow-quiz-solving.md) | Flow | 검토 중 |
+| 퀴즈 생성 결과 알림과 복귀 | [퀴즈 생성 결과 알림 흐름](ux/flow-quiz-generation-notifications.md) | Flow | 검토 중 |
+| 전역 알림 목록과 생성 결과 안내 | [알림 목록과 생성 결과 Snackbar](ux/screen-notifications.md) | Screen Spec | 검토 중 |
 | 서술형 자기평가와 채점 결과 | [퀴즈 피드백 화면](ux/screen-quiz-feedback.md) | Screen Spec | 검토 중 |
 | 홈 | [홈 화면](ux/screen-home.md) | Screen Spec | 초안 |
 | 학습 | [학습 화면](ux/screen-learning.md) | Screen Spec | 초안 |
@@ -62,6 +65,8 @@ Flow는 여러 화면의 순서와 분기를, Screen Spec은 한 화면의 구�
 | 홈 연속 방문 요약 | [홈 방문 API](contracts/contract-api-home.md) | API Contract | 초안·서버 구현 |
 | 학습자료·퀴즈·복습 | [학습·퀴즈 API](contracts/contract-api-quiz-learning.md) | API Contract | 검토 중 |
 | 학습자료·퀴즈·복습 데이터 | [학습자료·퀴즈 데이터](contracts/contract-data-quiz-learning.md) | Data Contract | 검토 중 |
+| 퀴즈 생성 결과 알림 | [알림 API](contracts/contract-api-notifications.md) | API Contract | 검토 중 |
+| 퀴즈 생성 결과 알림 데이터 | [알림 데이터](contracts/contract-data-notifications.md) | Data Contract | 검토 중 |
 
 ## 애플리케이션 TRD
 

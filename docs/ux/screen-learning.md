@@ -12,8 +12,8 @@ scope: ux
 - 문서 상태: `draft`
 - 대상 플랫폼: 모바일 WebView 우선, 반응형 웹
 - 관련 제품 구조: [제품 기반의 전역 내비게이션](../product.md#전역-내비게이션)
-- 관련 기능: [학습자료 만들기](../prd/prd-content-import.md), [퀴즈 생성·풀이·결과·복습](../prd/prd-quiz-learning.md)
-- 관련 흐름: [학습자료 만들기](flow-content-import.md), [퀴즈 생성부터 복습까지](flow-quiz-solving.md)
+- 관련 기능: [학습자료 만들기](../prd/prd-content-import.md), [퀴즈 생성·풀이·결과·복습](../prd/prd-quiz-learning.md), [퀴즈 생성 결과 알림](../prd/prd-quiz-generation-notifications.md)
+- 관련 흐름: [학습자료 만들기](flow-content-import.md), [퀴즈 생성부터 복습까지](flow-quiz-solving.md), [퀴즈 생성 결과 알림](flow-quiz-generation-notifications.md)
 - 공유 계약: [학습자료·퀴즈·복습 API](../contracts/contract-api-quiz-learning.md)
 - 시각 기준: [NalQ Design System](../../DESIGN.md)
 - 검토용 산출물: [학습 영역 프로토타입](prototypes/learning-main.html)
@@ -221,7 +221,7 @@ route 이름은 UX 목적을 식별하기 위한 제안이며 정확한 React Ro
 
 카드 header 전체가 하나의 disclosure trigger이며 `aria-expanded`와 상세 영역의 관계를 전달한다. 여러 카드를 동시에 펼칠 수 있고 펼침 상태는 학습자료 카드의 검색·페이지·URL 보존 규칙을 재사용한다. 펼친 두 행동은 trigger와 분리된 독립 버튼으로 제공한다.
 
-`READY`에서는 두 행동을 활성화한다. `GENERATING`·`FAILED`도 펼칠 수 있지만 카드 콘텐츠 최상단에 옅은 비상호작용 overlay를 두고 두 행동을 모두 비활성화한다. `GENERATING`은 Activity Indicator와 `문제 생성 중`, `FAILED`는 움직이지 않는 실패 표시와 `문제 생성 실패`를 사용한다. overlay는 header의 펼치기·접기 조작을 막지 않으며 별도의 불가능 이유 문장을 추가하지 않는다.
+`READY`에서는 두 행동을 활성화한다. `GENERATING`은 펼칠 수 있지만 카드 콘텐츠 최상단에 옅은 비상호작용 overlay를 두고 두 행동을 모두 비활성화한다. Activity Indicator와 `문제 생성 중`을 함께 사용하며 overlay는 header의 펼치기·접기 조작을 막지 않는다. `FAILED` QuizSet은 서버에 유지하지만 이 목록에는 표시하지 않고 [알림 목록](screen-notifications.md)에서 실패 결과와 재생성 진입을 제공한다.
 
 ### 이름 변경 상태
 
@@ -238,7 +238,7 @@ route 이름은 UX 목적을 식별하기 위한 제안이며 정확한 React Ro
 | --- | --- | --- |
 | `READY` | 퀴즈 제목, 부모 자료명, 문제 수 | 펼치기·접기, 이름 변경, 새 `MAIN` 회차 시작 |
 | `GENERATING` | 퀴즈 제목, 부모 자료명, 옅은 overlay, Activity Indicator와 `문제 생성 중` | 펼치기·접기; 이름 변경·퀴즈 풀기 비활성 |
-| `FAILED` | 퀴즈 제목, 부모 자료명, 옅은 overlay, 정적 실패 표시와 `문제 생성 실패` | 펼치기·접기; 이름 변경·퀴즈 풀기 비활성 |
+| `FAILED` | 내 퀴즈 목록에 항목을 만들지 않음 | 우측 상단 알림에서 실패 확인·원본 자료 생성 조건으로 이동 |
 | 전체 없음 | `아직 만든 퀴즈가 없어요` | 화면 상단 `퀴즈 만들기` |
 | 검색 결과 없음 | 검색어와 일치하는 퀴즈 없음 | 검색어 지우기 |
 | 페이지 이동/갱신 | 기존 목록·검색 맥락 유지 | 기다리기 또는 다시 시도 |
@@ -356,7 +356,7 @@ route 이름은 UX 목적을 식별하기 위한 제안이며 정확한 React Ro
 - 펼친 카드 내부 버튼은 disclosure trigger 안에 중첩하지 않는다. trigger와 행동 영역은 DOM과 포커스 순서에서 분리한다.
 - 퀴즈 이름 변경 modal은 제목·입력 label·오류를 연결하고 focus trap을 제공한다. 열릴 때 입력으로 이동하며 취소·Escape·저장 성공 뒤 원래 `퀴즈 이름 변경` 버튼으로 돌아간다.
 - 검색 입력에는 항상 보이는 label 또는 프로그램적으로 연결된 label을 제공한다. 결과 수와 페이지 변경은 과도하지 않은 live region으로 알린다.
-- 생성 중과 실패는 overlay 색만으로 전달하지 않고 각각 `문제 생성 중`, `문제 생성 실패` 상태명을 제공한다. 생성 중만 움직이는 진행 표시를 사용한다.
+- 생성 중 overlay는 색과 움직임에만 의존하지 않고 `문제 생성 중` 상태명을 함께 제공한다. 실패 결과는 내 퀴즈 카드가 아니라 알림의 문구와 읽지 않음 상태로 전달한다.
 - 로딩 중 기존 콘텐츠를 유지하는 경우 `aria-busy`를 영역 단위로 전달한다.
 - 페이지 이동 뒤 새 목록의 제목 또는 첫 항목으로 예측 가능한 탐색 맥락을 제공한다.
 
@@ -370,7 +370,7 @@ route 이름은 UX 목적을 식별하기 위한 제안이며 정확한 React Ro
 | 새 문제 만들기·저장 | `ActionButton` | 화면/작업 영역당 한 개 prominent solid CTA |
 | 목록 행·이동 | `List`, `ListButtonItem`/`ListLinkItem` 후보 | 행 전체 한 행동, chevron 장식 |
 | 학습자료·퀴즈 disclosure | 공개 disclosure primitive 또는 SEED layout 조합 | `aria-expanded`, trigger와 내부 버튼 분리, 같은 상태 보존 규칙 |
-| 퀴즈 상태 overlay | `Box` composition + `ProgressCircle` 후보 | 생성 중만 진행 표시, 실패는 정적 상태, header 조작 보존 |
+| 퀴즈 상태 overlay | `Box` composition + `ProgressCircle` 후보 | 생성 중 진행 표시와 header 조작 보존; 실패 카드는 목록에서 제외 |
 | 검색·제목·본문 입력 | `TextField` 계열 | label, 오류, 설명, 글자 수 연결 |
 | 퀴즈 이름 변경 | `Dialog` 후보 | focus trap, 현재 제목, 저장·취소·오류, focus 복귀 |
 | 미저장 이탈 확인 | `AlertDialog` 후보 | focus trap, `계속 편집`을 안전한 기본값으로 |
@@ -383,8 +383,9 @@ route 이름은 UX 목적을 식별하기 위한 제안이며 정확한 React Ro
 - 학습자료 목록 검색·페이지 이동·상세·수정은 기존 `GET/PATCH /api/v1/learning-materials` 계약을 따른다.
 - 생성 중 본문 잠금과 제목 수정 가능 정책은 기존 `contentEditStatus` 및 학습자료 수정 계약을 따른다.
 - 특정 학습자료로 퀴즈 만들기는 기존 자료별 QuizSet 생성 흐름을 사용한다.
-- 내 퀴즈는 기존 `GET /api/v1/quiz-sets`의 `quizTitle`, `materialTitle`, `status`, `questionCount`만 화면 판단에 사용한다. 응답의 풀이·복습 관련 필드는 학습 메인 등 기존 소비자를 위해 유지하지만 내 퀴즈에는 표시하지 않는다.
-- 이름 변경은 기존 `PATCH /api/v1/quiz-sets/{quizSetId}`를 사용한다. 계약이 `GENERATING`·`FAILED` 변경도 허용하더라도 내 퀴즈 화면은 사용자 확정에 따라 `READY`에서만 행동을 활성화한다.
+- 내 퀴즈는 기존 `GET /api/v1/quiz-sets`의 `quizTitle`, `materialTitle`, `status`, `questionCount`만 화면 판단에 사용한다. 목록 응답은 `FAILED`를 제외하며, 응답의 풀이·복습 관련 필드는 학습 메인 등 기존 소비자를 위해 유지하지만 내 퀴즈에는 표시하지 않는다.
+- 이름 변경은 기존 `PATCH /api/v1/quiz-sets/{quizSetId}`를 사용한다. 계약이 `GENERATING`·`FAILED` 변경도 허용하더라도 내 퀴즈 화면은 사용자 확정에 따라 `READY`에서만 행동을 활성화하고 숨겨진 `FAILED`에 관리 행동을 만들지 않는다.
+- 성공 알림 진입은 `focusQuizSetId`로 해당 `READY` QuizSet이 포함된 page를 불러온 뒤 카드로 focus한다. 알림과 읽음 동작은 [알림 API](../contracts/contract-api-notifications.md)가 책임진다.
 - `퀴즈 풀기`는 기존 QuizSet 풀이 조회를 새 `MAIN` 시작 intent로 사용하며 과거 회차·결과·복습 기록을 변경하지 않는다.
 
 ### 학습 메인 복습 후보 계약
@@ -416,7 +417,7 @@ route 이름은 UX 목적을 식별하기 위한 제안이며 정확한 React Ro
 - [ ] `READY`의 펼친 카드에는 `퀴즈 이름 변경`, `퀴즈 풀기`만 나타나며 최근 풀이·결과·복습·미완료 자기평가 행동은 나타나지 않는다.
 - [ ] 퀴즈 이름 변경은 inline 입력이 아닌 modal에서 저장·취소·검증·로딩·실패·포커스 복귀 상태를 가진다.
 - [ ] `퀴즈 풀기`는 같은 QuizSet의 새 `MAIN` 회차를 시작하고 기존 회차·결과·복습 기록을 유지한다.
-- [ ] `GENERATING`·`FAILED` 카드는 옅은 overlay 아래 두 행동이 모두 비활성화되며, 생성 중에는 Activity Indicator가 움직이고 실패에는 무한 진행 표시가 없다.
+- [ ] `GENERATING` 카드는 옅은 overlay 아래 두 행동이 모두 비활성화되고 Activity Indicator와 상태 문구를 제공하며, `FAILED` QuizSet은 목록에 나타나지 않고 알림에서 실패와 복구 진입을 제공한다.
 - [ ] 상태 overlay가 있어도 카드 header를 펼치거나 접을 수 있고 상태명이 색이나 움직임 없이도 전달된다.
 - [ ] 전체 없음과 검색 결과 없음을 구분하고 로딩·부분 오류·인증 만료·페이지 실패에서도 탐색 맥락을 보존한다.
 - [ ] 320px, 큰 글자, 키보드, safe area, reduced motion과 44×44 CSS px 터치 영역을 고려한다.

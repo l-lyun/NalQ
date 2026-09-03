@@ -1,11 +1,14 @@
 package com.openmd.server.quiz.service;
 
 import com.openmd.server.global.error.*;
+import com.openmd.server.notification.domain.QuizGenerationNotification;
+import com.openmd.server.notification.repository.NotificationRepository;
 import com.openmd.server.quiz.domain.*;
 import com.openmd.server.quiz.domain.entity.*;
 import com.openmd.server.quiz.domain.type.*;
 import com.openmd.server.quiz.repository.*;
 import java.util.*;
+import java.util.stream.IntStream;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +26,7 @@ public class QuizGenerationPersistenceService {
   private final QuizEssayAnswerGuideRepository essays;
   private final QuizFillInTheBlankRepository blanks;
   private final QuizFillInTheBlankAnswerRepository blankAnswers;
+  private final NotificationRepository notifications;
 
   public QuizGenerationPersistenceService(
       QuizSetRepository sets,
@@ -31,7 +35,8 @@ public class QuizGenerationPersistenceService {
       QuizShortAnswerAnswerRepository shorts,
       QuizEssayAnswerGuideRepository essays,
       QuizFillInTheBlankRepository blanks,
-      QuizFillInTheBlankAnswerRepository blankAnswers) {
+      QuizFillInTheBlankAnswerRepository blankAnswers,
+      NotificationRepository notifications) {
     this.sets = sets;
     this.questions = questions;
     this.choices = choices;
@@ -39,6 +44,7 @@ public class QuizGenerationPersistenceService {
     this.essays = essays;
     this.blanks = blanks;
     this.blankAnswers = blankAnswers;
+    this.notifications = notifications;
   }
 
   /** TODO: 외부 문제 생성 모델 연동이 완료되면 이 임시 고정 후보 생성 경로를 제거한다. */
@@ -51,7 +57,11 @@ public class QuizGenerationPersistenceService {
     complete(
         userId,
         quizSetId,
-        selectedTypes.stream().map(this::temporaryCandidate).toList(),
+        selectedTypes.isEmpty()
+            ? List.of()
+            : IntStream.range(0, maxQuestionCount)
+                .mapToObj(index -> temporaryCandidate(selectedTypes.get(index % selectedTypes.size())))
+                .toList(),
         maxQuestionCount);
   }
 
@@ -73,12 +83,16 @@ public class QuizGenerationPersistenceService {
     }
     List<ValidatedQuizQuestion> valid =
         validator.validateAll(candidates).stream().limit(maxQuestionCount).toList();
-    if (valid.isEmpty()) {
+    int minimumValidQuestionCount =
+        Math.toIntExact((maxQuestionCount * 4L + 4L) / 5L);
+    if (valid.size() < minimumValidQuestionCount) {
       set.fail(QuizSetFailureCode.SOURCE_INSUFFICIENT);
+      notifications.save(QuizGenerationNotification.from(set));
       return 0;
     }
     for (ValidatedQuizQuestion value : valid) persist(set.getId(), value);
     set.ready();
+    notifications.save(QuizGenerationNotification.from(set));
     return valid.size();
   }
 
@@ -87,13 +101,20 @@ public class QuizGenerationPersistenceService {
     QuizSet set =
         sets.findOwnedForUpdate(quizSetId, userId)
             .orElseThrow(() -> new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND));
-    if (set.getStatus() == QuizSetStatus.GENERATING) set.fail(QuizSetFailureCode.GENERATION_FAILED);
+    if (set.getStatus() == QuizSetStatus.GENERATING) {
+      set.fail(QuizSetFailureCode.GENERATION_FAILED);
+      notifications.save(QuizGenerationNotification.from(set));
+    }
   }
 
   @Transactional
   public int failInterruptedGenerations() {
     List<QuizSet> interrupted = sets.findAllByStatus(QuizSetStatus.GENERATING);
-    interrupted.forEach(set -> set.fail(QuizSetFailureCode.GENERATION_FAILED));
+    interrupted.forEach(
+        set -> {
+          set.fail(QuizSetFailureCode.GENERATION_FAILED);
+          notifications.save(QuizGenerationNotification.from(set));
+        });
     return interrupted.size();
   }
 

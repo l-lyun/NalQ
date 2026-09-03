@@ -139,10 +139,15 @@ export async function listManagedQuizSets(
   const filtered = mockQuizSets.filter((item) =>
     item.quizTitle.toLocaleLowerCase('ko-KR').includes(query),
   )
-  const start = (params.page - 1) * size
+  const focusedIndex = params.focusQuizSetId
+    ? filtered.findIndex((item) => item.quizSetId === params.focusQuizSetId && item.status === 'READY')
+    : -1
+  if (params.focusQuizSetId && focusedIndex < 0) throw new Error('퀴즈를 찾지 못했어요.')
+  const resolvedPage = focusedIndex >= 0 ? Math.floor(focusedIndex / size) + 1 : params.page
+  const start = (resolvedPage - 1) * size
   return {
     items: filtered.slice(start, start + size).map((item) => ({ ...item })),
-    page: params.page,
+    page: resolvedPage,
     size,
     totalElements: filtered.length,
     totalPages: Math.ceil(filtered.length / size),

@@ -48,6 +48,7 @@ const router = createBrowserRouter([
           { path: '/learning/import/notion', element: null },
           { path: '/learning/quizzes', element: null },
           { path: '/learning/new', element: null },
+          { path: '/notifications', element: null },
           { path: '/profile', element: null },
           { path: '/profile/account', element: null },
           { path: '/profile/terms', element: null },

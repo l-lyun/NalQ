@@ -19,8 +19,26 @@ public interface QuizSetRepository extends JpaRepository<QuizSet, Long> {
 
   Page<QuizSet> findAllByUserId(long userId, Pageable pageable);
 
+  Page<QuizSet> findAllByUserIdAndStatusNot(
+      long userId, QuizSetStatus status, Pageable pageable);
+
+  List<QuizSet> findAllByPublicIdInAndUserId(Collection<String> publicIds, long userId);
+
+  @Query(
+      "select count(q) from QuizSet q where q.userId = :userId and q.status <> :excludedStatus"
+          + " and (q.updatedAt > :updatedAt"
+          + " or (q.updatedAt = :updatedAt and q.publicId > :publicId))")
+  long countVisibleBeforeFocus(
+      @Param("userId") long userId,
+      @Param("excludedStatus") QuizSetStatus excludedStatus,
+      @Param("updatedAt") java.time.Instant updatedAt,
+      @Param("publicId") String publicId);
+
   Page<QuizSet> findAllByUserIdAndQuizTitleContainingIgnoreCase(
       long userId, String quizTitle, Pageable pageable);
+
+  Page<QuizSet> findAllByUserIdAndStatusNotAndQuizTitleContainingIgnoreCase(
+      long userId, QuizSetStatus status, String quizTitle, Pageable pageable);
 
   List<QuizSet> findAllByStatus(QuizSetStatus status);
 

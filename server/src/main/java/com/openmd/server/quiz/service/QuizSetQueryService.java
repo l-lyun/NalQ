@@ -48,22 +48,48 @@ public class QuizSetQueryService {
 
   @Transactional(readOnly = true)
   public QuizSetPage list(long userId, int page, int size, String query) {
+    return list(userId, page, size, query, null);
+  }
+
+  @Transactional(readOnly = true)
+  public QuizSetPage list(
+      long userId, int page, int size, String query, String focusQuizSetId) {
     if (page < 1) throw invalid("page", "page는 1 이상이어야 합니다.");
     if (size < 1 || size > 20) throw invalid("size", "size는 1 이상 20 이하여야 합니다.");
     String normalizedQuery = trimUnicodeWhitespace(query);
+    String normalizedFocus = trimUnicodeWhitespace(focusQuizSetId);
+    if (!normalizedQuery.isEmpty() && !normalizedFocus.isEmpty()) {
+      throw invalid("focusQuizSetId", "focusQuizSetId는 query와 함께 사용할 수 없습니다.");
+    }
+    int resolvedPage =
+        normalizedFocus.isEmpty()
+            ? page
+            : focusPage(userId, normalizedFocus, size);
     PageRequest pageable =
         PageRequest.of(
-            page - 1,
+            resolvedPage - 1,
             size,
             Sort.by(Sort.Order.desc("updatedAt"), Sort.Order.desc("publicId")));
     Page<QuizSet> result =
         normalizedQuery.isEmpty()
-            ? sets.findAllByUserId(userId, pageable)
-            : sets.findAllByUserIdAndQuizTitleContainingIgnoreCase(
-                userId, normalizedQuery, pageable);
+            ? sets.findAllByUserIdAndStatusNot(userId, QuizSetStatus.FAILED, pageable)
+            : sets.findAllByUserIdAndStatusNotAndQuizTitleContainingIgnoreCase(
+                userId, QuizSetStatus.FAILED, normalizedQuery, pageable);
     List<QuizSet> pageSets = result.getContent();
     List<QuizSetListItem> items = listItems(userId, pageSets);
-    return new QuizSetPage(items, page, size, result.getTotalElements(), result.getTotalPages());
+    return new QuizSetPage(
+        items, resolvedPage, size, result.getTotalElements(), result.getTotalPages());
+  }
+
+  private int focusPage(long userId, String publicId, int size) {
+    QuizSet target =
+        sets.findByPublicIdAndUserId(publicId, userId)
+            .filter(set -> set.getStatus() == QuizSetStatus.READY)
+            .orElseThrow(() -> new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND));
+    long newer =
+        sets.countVisibleBeforeFocus(
+            userId, QuizSetStatus.FAILED, target.getUpdatedAt(), target.getPublicId());
+    return Math.toIntExact(newer / size) + 1;
   }
 
   @Transactional(readOnly = true)

@@ -2,6 +2,7 @@ package com.openmd.server.quiz.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -13,8 +14,10 @@ import static org.mockito.Mockito.when;
 import com.openmd.server.learningmaterial.domain.LearningMaterial;
 import com.openmd.server.learningmaterial.domain.SourceType;
 import com.openmd.server.learningmaterial.repository.LearningMaterialRepository;
+import com.openmd.server.global.error.BusinessException;
 import com.openmd.server.quiz.domain.entity.QuizAttempt;
 import com.openmd.server.quiz.domain.entity.QuizSet;
+import com.openmd.server.quiz.domain.type.QuizSetStatus;
 import com.openmd.server.quiz.repository.QuizAttemptQuestionRepository;
 import com.openmd.server.quiz.repository.QuizAttemptRepository;
 import com.openmd.server.quiz.repository.QuizFillInTheBlankRepository;
@@ -59,7 +62,8 @@ class QuizSetQueryServiceTest {
     QuizAttempt review = QuizAttempt.review(41L, 7L, 51L);
     entity(review, 53L, "2026-08-28T02:00:00Z", "2026-08-28T03:00:00Z");
 
-    when(sets.findAllByUserId(org.mockito.ArgumentMatchers.eq(7L), any()))
+    when(sets.findAllByUserIdAndStatusNot(
+            org.mockito.ArgumentMatchers.eq(7L), eq(QuizSetStatus.FAILED), any()))
         .thenReturn(new PageImpl<>(List.of(set)));
     when(materials.findAllByIdInAndUserId(List.of(31L), 7L)).thenReturn(List.of(material));
     when(attempts.findAllByQuizSetIdInAndUserId(List.of(41L), 7L))
@@ -91,7 +95,8 @@ class QuizSetQueryServiceTest {
         LearningMaterial.create(
             7L, "운영체제", "본문", SourceType.PASTE, new byte[32], new byte[32]);
     entity(material, 31L, "2026-08-20T00:00:00Z", "2026-08-27T00:00:00Z");
-    when(sets.findAllByUserId(org.mockito.ArgumentMatchers.eq(7L), any()))
+    when(sets.findAllByUserIdAndStatusNot(
+            org.mockito.ArgumentMatchers.eq(7L), eq(QuizSetStatus.FAILED), any()))
         .thenReturn(new PageImpl<>(List.of(set)));
     when(materials.findAllByIdInAndUserId(List.of(31L), 7L)).thenReturn(List.of(material));
     when(attempts.findAllByQuizSetIdInAndUserId(List.of(41L), 7L)).thenReturn(List.of());
@@ -122,7 +127,7 @@ class QuizSetQueryServiceTest {
             7L, "네트워크", "본문", SourceType.PASTE, new byte[32], new byte[32]);
     entity(secondMaterial, 32L, "2026-08-20T00:00:00Z", "2026-08-27T00:00:00Z");
 
-    when(sets.findAllByUserId(eq(7L), any()))
+    when(sets.findAllByUserIdAndStatusNot(eq(7L), eq(QuizSetStatus.FAILED), any()))
         .thenReturn(new PageImpl<>(List.of(first, second)));
     when(materials.findAllByIdInAndUserId(List.of(31L, 32L), 7L))
         .thenReturn(List.of(firstMaterial, secondMaterial));
@@ -140,6 +145,50 @@ class QuizSetQueryServiceTest {
         .findFirstByQuizSetIdAndUserIdOrderByUpdatedAtDesc(anyLong(), eq(7L));
     verify(questions, never()).countByQuizSetId(anyLong());
     verify(attemptQuestions, never()).findReviewCandidates(anyLong(), any());
+  }
+
+  @Test
+  void listExcludesFailedQuizSetsAtTheRepositoryBoundary() {
+    when(sets.findAllByUserIdAndStatusNot(eq(7L), eq(QuizSetStatus.FAILED), any()))
+        .thenReturn(new PageImpl<>(List.of()));
+
+    assertEquals(0, service.list(7L, 1, 6, null).totalElements());
+
+    verify(sets).findAllByUserIdAndStatusNot(eq(7L), eq(QuizSetStatus.FAILED), any());
+  }
+
+  @Test
+  void focusFindsThePageContainingTheOwnedReadyQuizSet() {
+    QuizSet target = QuizSet.ready(7L, 31L, "운영체제 퀴즈");
+    entity(target, 41L, "2026-08-26T00:10:00Z", "2026-08-28T00:10:00Z");
+    when(sets.findByPublicIdAndUserId(target.getPublicId(), 7L))
+        .thenReturn(java.util.Optional.of(target));
+    when(sets.countVisibleBeforeFocus(
+            7L, QuizSetStatus.FAILED, target.getUpdatedAt(), target.getPublicId()))
+        .thenReturn(7L);
+    when(sets.findAllByUserIdAndStatusNot(
+            eq(7L), eq(QuizSetStatus.FAILED),
+            org.mockito.ArgumentMatchers.argThat(page -> page.getPageNumber() == 1 && page.getPageSize() == 6)))
+        .thenReturn(new PageImpl<>(List.of()));
+
+    var result = service.list(7L, 1, 6, null, target.getPublicId());
+
+    assertEquals(2, result.page());
+  }
+
+  @Test
+  void focusRejectsFailedQuizSetsAndCannotBeCombinedWithSearch() {
+    QuizSet failed = QuizSet.generating(7L, 31L, "실패 퀴즈");
+    failed.fail(com.openmd.server.quiz.domain.type.QuizSetFailureCode.GENERATION_FAILED);
+    when(sets.findByPublicIdAndUserId(failed.getPublicId(), 7L))
+        .thenReturn(java.util.Optional.of(failed));
+
+    assertThrows(
+        BusinessException.class,
+        () -> service.list(7L, 1, 6, null, failed.getPublicId()));
+    assertThrows(
+        BusinessException.class,
+        () -> service.list(7L, 1, 6, "검색", "set-1"));
   }
 
   private void entity(Object entity, long id, String createdAt, String updatedAt) {

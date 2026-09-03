@@ -43,8 +43,12 @@ export async function createQuizSet(
 
 export const getActiveQuizSet = (materialId: string, signal?: AbortSignal) =>
   getData<ActiveQuizSet | null>(`/api/v1/learning-materials/${materialId}/quiz-sets/active`, signal)
-export const getQuizSet = (quizSetId: string, signal?: AbortSignal) =>
-  getData<QuizSetState>(`/api/v1/quiz-sets/${quizSetId}`, signal)
+export async function getQuizSet(quizSetId: string, signal?: AbortSignal) {
+  const response = await protectedApi.get<ApiResponse<QuizSetState>>(`/api/v1/quiz-sets/${quizSetId}`, {
+    signal,
+  })
+  return unwrapApiResponse(response.data)
+}
 
 export async function getQuizSets(params: GetQuizSetsParams, signal?: AbortSignal) {
   const query = params.query?.trim()
@@ -54,6 +58,7 @@ export async function getQuizSets(params: GetQuizSetsParams, signal?: AbortSigna
       page: params.page,
       size: params.size ?? 6,
       ...(query ? { query } : {}),
+      ...(params.focusQuizSetId ? { focusQuizSetId: params.focusQuizSetId } : {}),
     },
   })
   return unwrapApiResponse(response.data)
