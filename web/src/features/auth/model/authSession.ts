@@ -4,8 +4,9 @@ import {
   completeBrowserSignUpTransport,
   logoutSessionTransport,
 } from '@/features/auth/api/authTransport'
-import type { CompleteSignUpRequest, LoginRequest } from '@/features/auth/api/auth.types'
+import type { CompleteSignUpRequest, CurrentUser, LoginRequest } from '@/features/auth/api/auth.types'
 import { ApiClientError } from '@/shared/api/apiError'
+import { prepareAutomaticOnboarding } from '@/features/onboarding/model/automaticOnboarding'
 
 import { currentUserQueryOptions } from './auth.queries'
 import { refreshAccessToken } from './authRefresh'
@@ -27,18 +28,29 @@ export async function completeSignUpAndLoadCurrentUser(payload: CompleteSignUpRe
   const tokens = await completeBrowserSignUpTransport(payload)
   setSessionTokens(tokens)
   await clearAuthAndPrivateCaches()
-  return completeCurrentUserSession()
+  return completeNewUserSession()
 }
 
 export async function recoverCompletedSignUpSession() {
   await refreshAccessToken()
   await clearAuthAndPrivateCaches()
-  return completeCurrentUserSession()
+  return completeNewUserSession()
 }
 
 export async function completeCurrentUserSession() {
+  return loadAndActivateCurrentUser()
+}
+
+async function completeNewUserSession() {
+  return loadAndActivateCurrentUser((user) => {
+    prepareAutomaticOnboarding(user.id)
+  })
+}
+
+async function loadAndActivateCurrentUser(onLoaded?: (user: CurrentUser) => void) {
   try {
     const user = await queryClient.fetchQuery(currentUserQueryOptions)
+    onLoaded?.(user)
     setAuthPhase('authenticated')
     return user
   } catch (error) {
@@ -57,6 +69,7 @@ export async function logoutCurrentSession() {
       await endLocalSession()
     } finally {
       broadcastSessionEnded()
+      window.location.replace('/')
     }
   }
 }

@@ -62,6 +62,26 @@ export function shouldHandleWebViewBack(
   return isDocumentReady && canGoBack;
 }
 
+export function selectWebViewBackFallbackPath(
+  isDocumentReady: boolean,
+  currentUrl: string,
+  webOrigin: string,
+): '/' | '/profile' | null {
+  if (!isDocumentReady) {
+    return null;
+  }
+
+  const navigation = classifyNavigation(currentUrl, webOrigin);
+  if (navigation.action !== 'internal') {
+    return null;
+  }
+
+  const pathname = new URL(navigation.url).pathname.replace(/\/+$/, '') || '/';
+  if (pathname === '/onboarding') return '/';
+  if (pathname === '/profile/guide') return '/profile';
+  return null;
+}
+
 export function isPendingMainDocumentHttpError(
   failedUrl: string,
   statusCode: number,

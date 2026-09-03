@@ -15,6 +15,7 @@ import {
   classifyNavigation,
   isPendingMainDocumentHttpError,
   selectInternalRetryUrl,
+  selectWebViewBackFallbackPath,
   shouldHandleWebViewBack,
 } from './navigationPolicy';
 import { ShellStateView, type ShellState } from './ShellStateView';
@@ -62,6 +63,19 @@ export function OpenMdWebView({ webOrigin, webUrl }: OpenMdWebViewProps) {
     }
 
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      const fallbackPath = selectWebViewBackFallbackPath(
+        shellState === 'ready',
+        visibleMainDocumentUrlRef.current,
+        webOrigin,
+      );
+      if (fallbackPath) {
+        const fallbackUrl = new URL(fallbackPath, webOrigin).href;
+        webViewRef.current?.injectJavaScript(
+          `window.location.replace(${JSON.stringify(fallbackUrl)}); true;`,
+        );
+        return true;
+      }
+
       if (!shouldHandleWebViewBack(shellState === 'ready', canGoBack)) {
         return false;
       }
@@ -71,7 +85,7 @@ export function OpenMdWebView({ webOrigin, webUrl }: OpenMdWebViewProps) {
     });
 
     return () => subscription.remove();
-  }, [canGoBack, shellState]);
+  }, [canGoBack, shellState, webOrigin]);
 
   const openExternalUrl = useCallback(async (url: string) => {
     try {

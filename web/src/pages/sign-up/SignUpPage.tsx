@@ -295,7 +295,6 @@ export function SignUpPage() {
         ],
       },
       {
-        onSuccess: () => navigate('/', { replace: true }),
         onError: (error) => {
           if (error instanceof ApiClientError && error.code === 'AUTH_010') {
             setNicknameCheckStatus('unavailable')
@@ -314,10 +313,7 @@ export function SignUpPage() {
               (error.code === undefined && error.status !== undefined && error.status >= 500))
 
           if (resultIsUnclear) {
-            recoverCompletedSignUp.mutate(undefined, {
-              onSuccess: () => navigate('/', { replace: true }),
-              onError: navigateToSignUpRecoveryLogin,
-            })
+            recoverCompletedSignUp.mutate(undefined, { onError: navigateToSignUpRecoveryLogin })
             return
           }
 

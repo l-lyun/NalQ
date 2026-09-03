@@ -19,6 +19,7 @@ const {
   classifyNavigation,
   isPendingMainDocumentHttpError,
   selectInternalRetryUrl,
+  selectWebViewBackFallbackPath,
   shouldHandleWebViewBack,
 } = require('../src/shell/navigationPolicy.ts');
 const { DEFAULT_WEB_URL, resolveWebUrl } = require('../src/shell/webUrl.ts');
@@ -100,6 +101,35 @@ test('Android back is consumed only for a ready document with WebView history', 
   assert.equal(shouldHandleWebViewBack(true, false), false);
   assert.equal(shouldHandleWebViewBack(false, true), false);
   assert.equal(shouldHandleWebViewBack(false, false), false);
+});
+
+test('Android back selects a safe fallback for onboarding and direct guide entry', () => {
+  const origin = 'https://app.openmd.example';
+
+  assert.equal(
+    selectWebViewBackFallbackPath(true, `${origin}/onboarding`, origin),
+    '/',
+  );
+  assert.equal(
+    selectWebViewBackFallbackPath(true, `${origin}/onboarding/`, origin),
+    '/',
+  );
+  assert.equal(
+    selectWebViewBackFallbackPath(true, `${origin}/profile/guide`, origin),
+    '/profile',
+  );
+  assert.equal(
+    selectWebViewBackFallbackPath(true, `${origin}/profile/guide/`, origin),
+    '/profile',
+  );
+  assert.equal(
+    selectWebViewBackFallbackPath(false, `${origin}/onboarding`, origin),
+    null,
+  );
+  assert.equal(
+    selectWebViewBackFallbackPath(true, 'https://attacker.example/onboarding', origin),
+    null,
+  );
 });
 
 test('HTTP errors replace the shell only for the pending same-origin main document', () => {

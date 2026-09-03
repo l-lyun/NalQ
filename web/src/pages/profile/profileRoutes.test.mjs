@@ -9,6 +9,7 @@ import {
 
 test('마이페이지 하위 경로의 후행 슬래시를 제거한다', () => {
   assert.equal(normalizeProfilePath('/profile/account/'), '/profile/account')
+  assert.equal(normalizeProfilePath('/profile/guide/'), '/profile/guide')
   assert.equal(normalizeProfilePath('/profile/privacy///'), '/profile/privacy')
 })
 

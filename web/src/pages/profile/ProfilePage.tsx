@@ -26,6 +26,7 @@ export type ProfilePageProps = {
   logoutPending: boolean
   logoutError?: string
   onOpenAccount: () => void
+  onOpenGuide: () => void
   onOpenTerms: () => void
   onOpenPrivacy: () => void
   onOpenMarketing: () => void
@@ -43,6 +44,7 @@ export function ProfilePage({
   logoutPending,
   logoutError,
   onOpenAccount,
+  onOpenGuide,
   onOpenTerms,
   onOpenPrivacy,
   onOpenMarketing,
@@ -89,6 +91,7 @@ export function ProfilePage({
 
               <Divider as="div" color="stroke.neutralSubtle" />
               <SettingsSection title="앱 정보" titleId="mypage-service-title">
+                <SettingsRow label="NalQ 가이드" onClick={onOpenGuide} />
                 <SettingsRow label="서비스 이용약관" onClick={onOpenTerms} />
                 <SettingsRow label="개인정보처리방침" onClick={onOpenPrivacy} />
                 <SettingsRow label="마케팅 수신동의" onClick={onOpenMarketing} />

@@ -32,6 +32,7 @@ scope: repository
 | 제품 목표·범위·원칙·내비게이션·용어 | [NalQ 제품 기반](product.md) | 초안 |
 | 홈 | [홈 PRD](prd/prd-home.md) | 초안 |
 | 이메일 기반 자체 인증 | [자체 인증 PRD](prd/prd-local-authentication.md) | 초안 |
+| 마이페이지와 계정 관리 | [마이페이지 계정 관리 PRD](prd/prd-mypage-account-management.md) | 초안 |
 | 학습자료 만들기 | [학습자료 만들기 PRD](prd/prd-content-import.md) | 검토 중 |
 | 퀴즈 생성·풀이·결과·복습 | [퀴즈 PRD](prd/prd-quiz-learning.md) | 검토 중 |
 | 퀴즈 생성 결과 알림 | [퀴즈 생성 결과 알림 PRD](prd/prd-quiz-generation-notifications.md) | 검토 중 |
@@ -47,11 +48,13 @@ scope: repository
 | 퀴즈 생성 결과 알림과 복귀 | [퀴즈 생성 결과 알림 흐름](ux/flow-quiz-generation-notifications.md) | Flow | 검토 중 |
 | 전역 알림 목록과 생성 결과 안내 | [알림 목록과 생성 결과 Snackbar](ux/screen-notifications.md) | Screen Spec | 검토 중 |
 | 서술형 자기평가와 채점 결과 | [퀴즈 피드백 화면](ux/screen-quiz-feedback.md) | Screen Spec | 검토 중 |
+| 로그인 전 공개 진입 | [NalQ 공개 랜딩](ux/screen-public-landing.md) | Screen Spec | 확정 |
 | 홈 | [홈 화면](ux/screen-home.md) | Screen Spec | 초안 |
 | 학습 | [학습 화면](ux/screen-learning.md) | Screen Spec | 초안 |
 | 미완료 서술형 자기평가 재진입 | [미완료 서술형 자기평가 재진입 화면](ux/screen-quiz-resume.md) | Screen Spec | 초안 |
 | 틀린 문제 다시 풀기 | [틀린 문제 다시 풀기 화면](ux/screen-review.md) | Screen Spec | 초안 |
 | 마이페이지 | [마이페이지 화면](ux/screen-mypage.md) | Screen Spec | 초안 |
+| 신규 사용자 온보딩과 수동 가이드 | [첫 진입 온보딩과 NalQ 가이드](ux/screen-onboarding.md) | Screen Spec | 확정 |
 | 회원가입 | [회원가입 화면](ux/screen-signup.md) | Screen Spec | 초안 |
 
 Flow는 여러 화면의 순서와 분기를, Screen Spec은 한 화면의 구조와 사용자 가시 상태를 책임진다. 둘 다 PRD의 제품 정책을 복제하지 않는다.
