@@ -85,7 +85,7 @@ public class NotionConnectionService {
 		if (users.findByIdForUpdate(userId).isEmpty()) {
 			throw new BusinessException(CommonErrorCode.INVALID_INPUT);
 		}
-		Optional<NotionConnection> current = connections.findByUserId(userId);
+		Optional<NotionConnection> current = connections.findByUserIdForUpdate(userId);
 		current.ifPresent(this::clearPendingRevocation);
 		String rawState = newState();
 		Instant now = clock.instant();

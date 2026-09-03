@@ -43,6 +43,18 @@ class NotionMarkdownProcessorTest {
 	}
 
 	@Test
+	void escapedOrUnclosedBackticksDoNotHideIncompleteMarkers() {
+		for (String markdown : List.of(
+			"literal \\` backtick <unknown value=\"missing\"/>",
+			"unclosed ` code <unknown value=\"missing\"/>"
+		)) {
+			BusinessException exception = assertThrows(BusinessException.class,
+				() -> processor.process(new NotionMarkdown(markdown, false, List.of())));
+			assertEquals(NotionErrorCode.CONTENT_INCOMPLETE, exception.getErrorCode());
+		}
+	}
+
+	@Test
 	void rejectsIncompleteMarkersOutsideCodeWithoutReturningPartialContent() {
 		for (NotionMarkdown markdown : List.of(
 			new NotionMarkdown("partial", true, List.of()),

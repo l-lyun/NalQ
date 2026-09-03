@@ -26,6 +26,11 @@ public final class NotionMarkdownProcessor {
 			char current = markdown.charAt(index);
 			if (current == '`') {
 				int runLength = backtickRunLength(markdown, index);
+				if (isEscaped(markdown, index)) {
+					output.append(markdown, index, index + runLength);
+					index += runLength;
+					continue;
+				}
 				boolean fenceMarker = inlineDelimiterLength == 0 && isFenceMarkerPosition(markdown, index)
 					&& ((!fenced && runLength >= 3)
 						|| (fenced && runLength >= fenceDelimiterLength
@@ -47,7 +52,7 @@ public final class NotionMarkdownProcessor {
 					index += runLength;
 					continue;
 				}
-				if (inlineDelimiterLength == 0) {
+				if (inlineDelimiterLength == 0 && hasClosingInlineDelimiter(markdown, index + runLength, runLength)) {
 					inlineDelimiterLength = runLength;
 				} else if (runLength == inlineDelimiterLength) {
 					inlineDelimiterLength = 0;
@@ -99,6 +104,25 @@ public final class NotionMarkdownProcessor {
 		int end = start;
 		while (end < markdown.length() && markdown.charAt(end) == '`') end++;
 		return end - start;
+	}
+
+	private static boolean isEscaped(String markdown, int index) {
+		int slashes = 0;
+		for (int cursor = index - 1; cursor >= 0 && markdown.charAt(cursor) == '\\'; cursor--) slashes++;
+		return slashes % 2 == 1;
+	}
+
+	private static boolean hasClosingInlineDelimiter(String markdown, int start, int delimiterLength) {
+		for (int index = start; index < markdown.length();) {
+			if (markdown.charAt(index) != '`') {
+				index++;
+				continue;
+			}
+			int runLength = backtickRunLength(markdown, index);
+			if (!isEscaped(markdown, index) && runLength == delimiterLength) return true;
+			index += runLength;
+		}
+		return false;
 	}
 
 	private static boolean isFenceClosingLine(String markdown, int index) {

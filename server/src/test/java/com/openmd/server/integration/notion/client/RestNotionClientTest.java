@@ -121,6 +121,43 @@ class RestNotionClientTest {
 		assertEquals(false, client.introspect("access"));
 	}
 
+	@Test
+	void retriesRateLimitsForRevokeAndIntrospection() {
+		transport.respond(429, Map.of("Retry-After", List.of("0")), "{}");
+		transport.respond(200, "{}");
+		assertEquals(true, client.revoke("access"));
+
+		transport.respond(529, Map.of("Retry-After", List.of("0")), "{}");
+		transport.respond(200, "{\"active\":false}");
+		assertEquals(false, client.introspect("access"));
+		assertEquals(4, transport.requests.size());
+	}
+
+	@Test
+	void rejectsMissingOrWrongTypedMarkdownCompletenessFields() {
+		for (String body : List.of(
+			"{\"markdown\":\"body\",\"truncated\":false}",
+			"{\"markdown\":\"body\",\"truncated\":\"false\",\"unknown_block_ids\":[]}",
+			"{\"markdown\":7,\"truncated\":false,\"unknown_block_ids\":[]}"
+		)) {
+			transport.respond(200, body);
+			assertThrows(NotionClientException.class, () -> client.retrieveMarkdown("access", "page"));
+		}
+	}
+
+	@Test
+	void mapsOnlyExplicitInvalidGrantRefreshErrorsToInvalidGrant() {
+		transport.respond(400, "{\"error\":\"temporarily_unavailable\"}");
+		NotionClientException temporary = assertThrows(NotionClientException.class,
+			() -> client.refresh("refresh"));
+		assertEquals(NotionClientFailure.TEMPORARY, temporary.failure());
+
+		transport.respond(400, "{\"error\":\"invalid_grant\"}");
+		NotionClientException invalid = assertThrows(NotionClientException.class,
+			() -> client.refresh("refresh"));
+		assertEquals(NotionClientFailure.INVALID_GRANT, invalid.failure());
+	}
+
 	private record Request(String method, String path, Map<String, String> headers,
 		Map<String, Object> body, Duration timeout) {}
 	private record Scripted(NotionHttpResponse response, Duration advance) {}

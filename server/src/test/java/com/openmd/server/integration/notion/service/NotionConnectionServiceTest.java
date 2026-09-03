@@ -148,7 +148,7 @@ class NotionConnectionServiceTest {
 		existing.rememberPendingRevocation(
 			"workspace-b", new EncryptedToken(new byte[]{2}, new byte[12], "v1"), clock.instant()
 		);
-		when(connections.findByUserId(7L)).thenReturn(Optional.of(existing));
+		when(connections.findByUserIdForUpdate(7L)).thenReturn(Optional.of(existing));
 		when(client.revoke("access-token")).thenReturn(true);
 		when(client.authorizationUrl(any())).thenReturn("https://notion.test/authorize");
 
@@ -156,6 +156,7 @@ class NotionConnectionServiceTest {
 
 		assertFalse(existing.hasPendingRevocation());
 		verify(client).revoke("access-token");
+		verify(connections, never()).findByUserId(7L);
 		verify(states).save(any(), any(), any());
 	}
 

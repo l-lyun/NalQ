@@ -69,7 +69,8 @@ public final class RestNotionClient implements NotionClient {
 
 	@Override public boolean revoke(String accessToken) {
 		return within(() -> {
-			NotionHttpResponse response = oauthPost("/v1/oauth/revoke", Map.of("token", accessToken));
+			NotionHttpResponse response = retryOnce(
+				() -> oauthPost("/v1/oauth/revoke", Map.of("token", accessToken)), false);
 			ensureOAuthSuccess(response);
 			return true;
 		});
@@ -77,7 +78,8 @@ public final class RestNotionClient implements NotionClient {
 
 	@Override public boolean introspect(String accessToken) {
 		return within(() -> {
-			NotionHttpResponse response = oauthPost("/v1/oauth/introspect", Map.of("token", accessToken));
+			NotionHttpResponse response = retryOnce(
+				() -> oauthPost("/v1/oauth/introspect", Map.of("token", accessToken)), false);
 			ensureOAuthSuccess(response);
 			JsonNode active = json(response).get("active");
 			if (active == null || !active.isBoolean()) {
@@ -117,16 +119,31 @@ public final class RestNotionClient implements NotionClient {
 		return within(() -> {
 			JsonNode root = contentJson(() -> request("GET", "/v1/pages/" + path(pageId)
 				+ "/markdown?include_transcript=false", bearer(accessToken), null), true);
+			JsonNode markdown = root.get("markdown");
+			JsonNode truncated = root.get("truncated");
+			JsonNode unknownIds = root.get("unknown_block_ids");
+			if (markdown == null || !markdown.isTextual() || truncated == null || !truncated.isBoolean()
+				|| unknownIds == null || !unknownIds.isArray()) {
+				throw new NotionClientException(NotionClientFailure.TEMPORARY);
+			}
 			List<String> unknown = new ArrayList<>();
-			for (JsonNode id : root.path("unknown_block_ids")) unknown.add(id.asText());
-			return new NotionMarkdown(root.path("markdown").asText(""),
-				root.path("truncated").asBoolean(false), unknown);
+			for (JsonNode id : unknownIds) {
+				if (!id.isTextual()) throw new NotionClientException(NotionClientFailure.TEMPORARY);
+				unknown.add(id.asText());
+			}
+			return new NotionMarkdown(markdown.asText(), truncated.asBoolean(), unknown);
 		});
 	}
 
 	private NotionTokenGrant token(Map<String, Object> body) {
 		NotionHttpResponse response = oauthPost("/v1/oauth/token", body);
-		if (response.status() == 400) throw new NotionClientException(NotionClientFailure.INVALID_GRANT);
+		if (response.status() == 400) {
+			JsonNode error = json(response).get("error");
+			if (error != null && error.isTextual() && "invalid_grant".equals(error.asText())) {
+				throw new NotionClientException(NotionClientFailure.INVALID_GRANT);
+			}
+			throw new NotionClientException(NotionClientFailure.TEMPORARY);
+		}
 		ensureOAuthSuccess(response);
 		JsonNode root = json(response);
 		return new NotionTokenGrant(root.path("access_token").asText(), nullableText(root.get("refresh_token")),
