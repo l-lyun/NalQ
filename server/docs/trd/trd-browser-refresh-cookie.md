@@ -131,6 +131,8 @@ Set-Cookie: __Host-openmd_refresh=<opaque>; Path=/; Max-Age=<remaining-seconds>;
 - `Domain`을 생략해 API host 전용으로 제한한다.
 - `Path`는 Cookie 기밀성 경계가 아니므로 서버는 모든 요청에서 Cookie 원문을 로깅하지 않아야 한다.
 - 운영 topology가 same-site가 아니면 `SameSite=None`만 바꾸는 것으로 끝내지 않고 CSRF 정책을 함께 강화한다.
+- 확정된 첫 운영 topology는 CloudFront의 `app` 또는 기준 `www` host와 단일 EC2/Nginx의 `api` host를 같은 등록 가능 도메인 아래 HTTPS로 분리한다. Nginx는 Certbot/Let's Encrypt certificate로 HTTPS를 종료하고 비공개 Spring Boot `8080`으로 reverse proxy한다. cross-origin이지만 same-site이므로 `SameSite=Lax`와 API host-only `__Host-` Cookie를 유지한다.
+- 운영 서버의 정확한 browser origin allowlist에는 선택한 web custom origin 하나만 넣고 S3 URL, CloudFront 기본 domain과 wildcard를 넣지 않는다. 상세 경계는 [첫 운영 배포 인프라 실행 계획](../../../docs/plans/plan-production-deployment-infrastructure.md)을 따른다.
 
 ### 로컬 개발
 
@@ -307,7 +309,6 @@ INVALID     세션 없음·상태 불일치
 
 ## 14. 열린 질문
 
-- 운영 웹과 API가 same-site인지, `SameSite=Lax`를 사용할 수 있는지
 - 로컬 개발을 HTTPS로 통일할지 HTTP localhost 예외를 둘지
 - 기존 Cookie가 있는 상태의 새 로그인에서 이전 session/family를 폐기할지
 - native body surface의 폐기 조건과 일정

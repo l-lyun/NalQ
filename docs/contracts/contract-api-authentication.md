@@ -337,6 +337,11 @@ Set-Cookie: __Host-openmd_refresh=<redacted>; Path=/; HttpOnly; Secure; SameSite
 | `Path` | 운영 `__Host-` 사용 시 `/` | Cookie는 더 넓게 전송되지만 서버는 웹 세션 endpoint에서만 읽는다. 좁은 Path가 더 중요하면 `__Secure-` 이름으로 바꾸는 선택을 별도 검토한다. |
 | `Max-Age` | Redis 세션의 남은 절대 수명 | 회전할 때 최초 세션의 절대 만료를 연장하지 않는다. 서버 시각을 기준으로 계산한다. |
 
+- 첫 운영 배포는 `https://app.<service-domain>`(또는 기준 `www`)의 CloudFront 웹과 `https://api.<service-domain>`의 단일 EC2/Nginx API를 사용한다. Nginx는 HTTPS를 종료하고 비공개 Spring Boot `8080`으로 reverse proxy한다. 두 host는 cross-origin이지만 HTTPS와 등록 가능 도메인이 같은 same-site topology다.
+- 이 topology에서는 `SameSite=Lax`, `Secure`, `HttpOnly`, `Path=/`, `Domain` 생략을 사용한다. host-only Refresh Cookie는 API host에만 저장·전송하며 web host와 공유하지 않는다.
+- 브라우저와 WebView의 웹 코드는 API 요청에 credentials를 포함하고, 서버는 기준 web origin 하나만 정확히 허용한다. 서로 다른 site로 분리하는 변경은 `SameSite=None; Secure`, WebView third-party Cookie와 CSRF 설계를 다시 승인하기 전에는 허용하지 않는다.
+- 상세 배포·검증 절차는 [첫 운영 배포 인프라 실행 계획](../plans/plan-production-deployment-infrastructure.md)을 따른다.
+
 - 운영과 로컬 Cookie 이름·속성은 환경설정으로 명시하고, 발급·회전·삭제가 반드시 같은 설정 객체를 사용해야 한다.
 - Refresh Token 원문과 전체 `Set-Cookie` 값은 애플리케이션 로그, 프록시 로그, 오류 추적 payload와 OpenAPI 예제에 남기지 않는다.
 - Cookie의 절대 수명은 Redis session/family와 tombstone 수명을 넘지 않는다.
@@ -492,7 +497,6 @@ Origin/CSRF 검증 실패는 `403 AUTH_009`를 사용한다. 클라이언트는 
 ## 열린 질문
 
 - Refresh Token의 최종 절대 수명과 즉시 로그아웃을 위한 Access Token 차단 수준
-- 운영 웹과 API의 실제 site 관계. same-site이면 `SameSite=Lax`를 권장하고, cross-site이면 `SameSite=None; Secure` 및 더 강한 CSRF 검증이 필요하다.
 - 로컬 개발을 HTTPS로 통일해 운영과 같은 `__Host-` Cookie 이름을 쓸지, HTTP localhost 전용 이름과 `Secure=false` 예외를 둘지
 - 기존 Cookie가 있는 상태에서 다른 계정 로그인에 성공할 때 이전 session/family를 즉시 폐기할지
 - 네이티브 앱과 WebView의 실제 호출 경계를 언제 확정하고 기존 body surface를 언제 폐기할지
