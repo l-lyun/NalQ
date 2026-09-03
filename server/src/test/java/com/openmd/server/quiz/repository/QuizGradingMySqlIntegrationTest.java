@@ -197,7 +197,17 @@ class QuizGradingMySqlIntegrationTest {
     assertEquals(QuizSetStatus.READY.name(), status);
     assertTrue(System.nanoTime() - acceptedAt >= Duration.ofMillis(2500).toNanos());
     assertEquals(
-        List.of(QuestionType.MULTIPLE_CHOICE.name(), QuestionType.ESSAY.name()),
+        List.of(
+            QuestionType.MULTIPLE_CHOICE.name(),
+            QuestionType.ESSAY.name(),
+            QuestionType.MULTIPLE_CHOICE.name(),
+            QuestionType.ESSAY.name(),
+            QuestionType.MULTIPLE_CHOICE.name(),
+            QuestionType.ESSAY.name(),
+            QuestionType.MULTIPLE_CHOICE.name(),
+            QuestionType.ESSAY.name(),
+            QuestionType.MULTIPLE_CHOICE.name(),
+            QuestionType.ESSAY.name()),
         jdbc.queryForList(
             """
             SELECT q.question_type FROM quiz_questions q
@@ -350,7 +360,7 @@ class QuizGradingMySqlIntegrationTest {
             fixture.userId(),
             set.getPublicId(),
             List.of(multipleChoice(2), multipleChoice(3), fillBlank(), shortAnswer(), essay()),
-            15));
+            5));
 
     List<QuizQuestion> stored = questions.findAllByQuizSetIdOrderByNumber(set.getId());
     assertEquals(List.of(1, 2, 3, 4), stored.stream().map(QuizQuestion::getNumber).toList());
@@ -766,7 +776,7 @@ class QuizGradingMySqlIntegrationTest {
   private ReadyQuiz ready(Fixture fixture, QuizGenerationCandidate candidate) {
     QuizSet set =
         sets.saveAndFlush(QuizSet.generating(fixture.userId(), fixture.materialId(), "자료 퀴즈"));
-    generation.complete(fixture.userId(), set.getPublicId(), List.of(candidate), 15);
+    generation.complete(fixture.userId(), set.getPublicId(), List.of(candidate), 1);
     return new ReadyQuiz(
         fixture.userId(),
         set.getPublicId(),
