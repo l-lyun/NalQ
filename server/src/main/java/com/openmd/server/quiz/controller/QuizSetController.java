@@ -36,8 +36,10 @@ public class QuizSetController {
       @AuthenticationPrincipal AccessPrincipal principal,
       @RequestParam(defaultValue = "1") int page,
       @RequestParam(defaultValue = "6") int size,
-      @RequestParam(required = false) String query) {
-    return ApiResponse.success(service.list(principal.userId(), page, size, query));
+      @RequestParam(required = false) String query,
+      @RequestParam(required = false) String focusQuizSetId) {
+    return ApiResponse.success(
+        service.list(principal.userId(), page, size, query, focusQuizSetId));
   }
 
   @GetMapping("/{quizSetId}")

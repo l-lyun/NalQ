@@ -146,6 +146,7 @@ export type GetQuizSetsParams = {
   page: number
   size?: number
   query?: string
+  focusQuizSetId?: string
 }
 
 export type RenameQuizSetResponse = {

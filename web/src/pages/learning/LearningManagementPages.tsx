@@ -898,7 +898,12 @@ export function QuizManagementPage() {
     [searchParams],
   )
   const quizzes = useQuery({
-    ...quizManagementQueryOptions.list({ page, size: QUIZ_SET_PAGE_SIZE, query }),
+    ...quizManagementQueryOptions.list({
+      page,
+      size: QUIZ_SET_PAGE_SIZE,
+      query,
+      focusQuizSetId: focusedQuizId ?? undefined,
+    }),
     placeholderData: keepPreviousData,
     refetchOnWindowFocus: false,
   })
