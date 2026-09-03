@@ -29,6 +29,7 @@ BearerAccessTokenFilter
 ```
 
 - 컨트롤러는 인증된 `userId`와 검증된 요청 필드를 서비스에 전달하고, 성공할 때 브라우저 Refresh Cookie를 만료한다.
+- 분리된 웹·API origin에서도 만료 `Set-Cookie`가 반영되도록 `/api/v1/users/me`는 정확한 일반·브라우저 origin에 한해 credentialed CORS를 허용한다. 인증 근거는 계속 Bearer Access Token이며 `Authorization`과 `Content-Type`만 허용한다.
 - 서비스는 UUID와 정확한 `회원탈퇴` 문구를 먼저 검증한 뒤 사용자 행을 비관적 잠금으로 조회한다.
 - 같은 요청 ID로 이미 확정된 탈퇴는 저장된 시각과 기한을 반환한다. 다른 요청 ID이거나 비활성 계정이면 `AUTH_005`로 처리한다.
 - 최초 확정은 현재 비밀번호 확인, 식별·자격 필드 null 처리, `WITHDRAWN`, 탈퇴 시각, 요청 ID와 30일 처리 기한 저장을 한 DB 트랜잭션에서 수행한다.

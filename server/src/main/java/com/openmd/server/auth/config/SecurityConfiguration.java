@@ -103,6 +103,15 @@ public class SecurityConfiguration {
 		browser.setAllowCredentials(true);
 		browser.setMaxAge(3600L);
 
+		CorsConfiguration account = new CorsConfiguration();
+		account.setAllowedOrigins(java.util.stream.Stream.concat(
+			allowedOrigins.stream(), browserAllowedOrigins.stream()
+		).distinct().toList());
+		account.setAllowedMethods(List.of("GET", "PATCH", "DELETE", "OPTIONS"));
+		account.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+		account.setAllowCredentials(true);
+		account.setMaxAge(3600L);
+
 		CorsConfiguration general = new CorsConfiguration();
 		general.setAllowedOrigins(List.copyOf(allowedOrigins));
 		general.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
@@ -112,6 +121,7 @@ public class SecurityConfiguration {
 
 		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
 		source.registerCorsConfiguration("/api/v1/auth/web/**", browser);
+		source.registerCorsConfiguration("/api/v1/users/me", account);
 		source.registerCorsConfiguration("/**", general);
 		return source;
 	}
