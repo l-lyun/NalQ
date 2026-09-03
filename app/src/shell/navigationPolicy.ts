@@ -62,6 +62,24 @@ export function shouldHandleWebViewBack(
   return isDocumentReady && canGoBack;
 }
 
+export function shouldExitOnboardingOnBack(
+  isDocumentReady: boolean,
+  currentUrl: string,
+  webOrigin: string,
+): boolean {
+  if (!isDocumentReady) {
+    return false;
+  }
+
+  const navigation = classifyNavigation(currentUrl, webOrigin);
+  if (navigation.action !== 'internal') {
+    return false;
+  }
+
+  const pathname = new URL(navigation.url).pathname.replace(/\/+$/, '') || '/';
+  return pathname === '/onboarding';
+}
+
 export function isPendingMainDocumentHttpError(
   failedUrl: string,
   statusCode: number,

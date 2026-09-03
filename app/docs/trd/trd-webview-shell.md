@@ -9,7 +9,7 @@ scope: app
 - 상태: 1단계 구현 동기화 — 실기기 검증 필요
 - 소유 애플리케이션: `app/`
 - 관련 제품 기반: [NalQ 제품 기반](../../../docs/product.md)
-- 관련 UX: [홈 화면](../../../docs/ux/screen-home.md), [학습 화면](../../../docs/ux/screen-learning.md), [인증 흐름](../../../docs/ux/flow-authentication.md)
+- 관련 UX: [홈 화면](../../../docs/ux/screen-home.md), [학습 화면](../../../docs/ux/screen-learning.md), [인증 흐름](../../../docs/ux/flow-authentication.md), [첫 진입 온보딩과 NalQ 가이드](../../../docs/ux/screen-onboarding.md)
 - 관련 Contract: [인증 API](../../../docs/contracts/contract-api-authentication.md)
 - 관련 App TRD: [WebView 퀴즈 상태](trd-quiz-solving.md)
 - 관련 Web TRD: [웹 인증 상태·토큰·API 통합](../../../web/docs/trd/trd-authentication.md)
@@ -112,6 +112,7 @@ Expo Router는 네이티브 화면이 하나인 1차 셸에는 추가하지 않�
 - `onNavigationStateChange` 또는 로드 진행 이벤트에서 `canGoBack`을 네이티브 상태로 유지한다.
 - Android 뒤로 가기에서 WebView history가 있으면 `goBack()`하고 앱 종료를 막는다.
 - history가 없으면 이벤트를 소비하지 않아 OS 기본 앱 종료 동작을 따른다.
+- 현재 동일-origin 문서가 `/onboarding`이면 history 유무보다 먼저 시스템 뒤로 가기를 소비하고 웹 문서를 `/`로 `replace`한다. 회원가입이나 공개 랜딩으로 돌아가지 않으며 이후 웹 인증 route가 로그인된 홈을 표시한다.
 - 웹이 이미 `popstate`, 작성 중 이탈 확인과 화면 내부 history를 관리하는 경우 네이티브에서 같은 이동을 다시 실행하지 않는다.
 - iOS의 back/forward gesture는 가입 2단계와 작성 중 이탈 확인이 검증되지 않은 1차 셸에서는 비활성화한다. 이후 실제 기기에서 검증한 뒤 활성화를 다시 제안할 수 있다.
 - Android predictive back은 현재 앱 설정을 유지하고 WebView history 연결을 검증한 뒤 별도 활성화한다.
@@ -196,6 +197,7 @@ Android `BackHandler`와 WebView ref의 실제 결합은 렌더러가 필요한 
 - iOS와 Android에서 앱 시작 → 로그인 → 종료 → 재실행 뒤 세션 bootstrap이 복구된다.
 - 로그인, refresh 회전과 logout 뒤 HttpOnly Cookie가 각 플랫폼에서 유지·갱신·삭제된다.
 - 홈 → 학습 → 하위 입력 → 시스템 뒤로 가기의 history와 작성 중 이탈 확인이 중복 실행되지 않는다.
+- 가입 완료 → `/onboarding`에서 Android 시스템 뒤로 가기를 누르면 회원가입·공개 랜딩이 아니라 로그인된 홈으로 이동한다.
 - 외부 HTTPS, `mailto:`와 `tel:`이 WebView를 이탈해 적절한 앱으로 열리고 복귀 시 기존 화면을 유지한다.
 - 최초 로드와 이후 동일-origin 최상위 문서 탐색의 네트워크 중단·HTTP 오류, renderer 종료 뒤 재시도가 동작한다.
 - 노치, Android edge-to-edge, 홈 인디케이터와 키보드에서 상단 제목·하단 탭·고정 행동이 가려지거나 이중 padding되지 않는다.

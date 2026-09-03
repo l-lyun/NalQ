@@ -19,6 +19,7 @@ const {
   classifyNavigation,
   isPendingMainDocumentHttpError,
   selectInternalRetryUrl,
+  shouldExitOnboardingOnBack,
   shouldHandleWebViewBack,
 } = require('../src/shell/navigationPolicy.ts');
 const { DEFAULT_WEB_URL, resolveWebUrl } = require('../src/shell/webUrl.ts');
@@ -100,6 +101,31 @@ test('Android back is consumed only for a ready document with WebView history', 
   assert.equal(shouldHandleWebViewBack(true, false), false);
   assert.equal(shouldHandleWebViewBack(false, true), false);
   assert.equal(shouldHandleWebViewBack(false, false), false);
+});
+
+test('Android back exits the authenticated onboarding route to home', () => {
+  const origin = 'https://app.openmd.example';
+
+  assert.equal(
+    shouldExitOnboardingOnBack(true, `${origin}/onboarding`, origin),
+    true,
+  );
+  assert.equal(
+    shouldExitOnboardingOnBack(true, `${origin}/onboarding/`, origin),
+    true,
+  );
+  assert.equal(
+    shouldExitOnboardingOnBack(true, `${origin}/profile/guide`, origin),
+    false,
+  );
+  assert.equal(
+    shouldExitOnboardingOnBack(false, `${origin}/onboarding`, origin),
+    false,
+  );
+  assert.equal(
+    shouldExitOnboardingOnBack(true, 'https://attacker.example/onboarding', origin),
+    false,
+  );
 });
 
 test('HTTP errors replace the shell only for the pending same-origin main document', () => {
