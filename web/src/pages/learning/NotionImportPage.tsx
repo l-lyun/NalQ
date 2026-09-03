@@ -435,7 +435,7 @@ export function NotionImportPage() {
                     {committedQuery ? `‘${committedQuery}’와 일치하는 페이지가 없어요` : '가져올 수 있는 페이지가 없어요'}
                   </Text>
                   <Text as="p" textStyle="t4Regular" color="fg.neutralMuted">
-                    노션에서 OpenMD가 접근할 페이지를 추가해 주세요.
+                    노션에서 NalQ가 접근할 페이지를 추가해 주세요.
                   </Text>
                   {committedQuery ? (
                     <ActionButton type="button" size="small" variant="ghost" onClick={() => updateRawQuery('')}>검색어 지우기</ActionButton>

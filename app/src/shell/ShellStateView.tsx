@@ -17,10 +17,10 @@ const COPY: Record<
 > = {
   'configuration-error': {
     title: '앱 설정을 확인해 주세요',
-    description: 'OpenMD 웹 주소가 올바르지 않습니다.',
+    description: 'NalQ 웹 주소가 올바르지 않습니다.',
   },
   'load-error': {
-    title: 'OpenMD를 불러오지 못했어요',
+    title: 'NalQ를 불러오지 못했어요',
     description: '페이지를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.',
   },
   'renderer-error': {
@@ -33,13 +33,13 @@ export function ShellStateView({ onRetry, state }: ShellStateViewProps) {
   if (state === 'loading') {
     return (
       <View
-        accessibilityLabel="OpenMD를 불러오는 중입니다"
+        accessibilityLabel="NalQ를 불러오는 중입니다"
         accessibilityLiveRegion="polite"
         accessibilityRole="progressbar"
         style={styles.container}
       >
         <ActivityIndicator color="#FF6600" size="large" />
-        <Text style={styles.loadingText}>OpenMD를 불러오는 중이에요</Text>
+        <Text style={styles.loadingText}>NalQ를 불러오는 중이에요</Text>
       </View>
     );
   }
@@ -57,7 +57,7 @@ export function ShellStateView({ onRetry, state }: ShellStateViewProps) {
       <Text style={styles.description}>{copy.description}</Text>
       {onRetry ? (
         <Pressable
-          accessibilityHint="OpenMD 첫 화면을 다시 불러옵니다"
+          accessibilityHint="NalQ 첫 화면을 다시 불러옵니다"
           accessibilityRole="button"
           hitSlop={8}
           onPress={onRetry}

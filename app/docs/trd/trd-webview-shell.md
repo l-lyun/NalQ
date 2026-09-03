@@ -8,7 +8,7 @@ scope: app
 
 - 상태: 1단계 구현 동기화 — 실기기 검증 필요
 - 소유 애플리케이션: `app/`
-- 관련 제품 기반: [OpenMD 제품 기반](../../../docs/product.md)
+- 관련 제품 기반: [NalQ 제품 기반](../../../docs/product.md)
 - 관련 UX: [홈 화면](../../../docs/ux/screen-home.md), [학습 화면](../../../docs/ux/screen-learning.md), [인증 흐름](../../../docs/ux/flow-authentication.md)
 - 관련 Contract: [인증 API](../../../docs/contracts/contract-api-authentication.md)
 - 관련 App TRD: [WebView 퀴즈 상태](trd-quiz-solving.md)
@@ -16,7 +16,7 @@ scope: app
 
 ## 문서 책임
 
-이 문서는 Expo 앱이 원격 OpenMD 웹 애플리케이션을 하나의 WebView로 실행할 때 네이티브 셸이 소유할 URL, 수명주기, 시스템 UI, 뒤로 가기와 복구 경계를 정의한다.
+이 문서는 Expo 앱이 원격 NalQ 웹 애플리케이션을 하나의 WebView로 실행할 때 네이티브 셸이 소유할 URL, 수명주기, 시스템 UI, 뒤로 가기와 복구 경계를 정의한다.
 
 웹 화면의 라우팅·인증 상태·API 호출과 사용자 가시 기능은 `web/` 및 상위 원장이 책임진다. 이 문서는 웹 화면을 React Native 화면으로 다시 구현하거나 제품 동작을 새로 정하지 않는다.
 
@@ -34,7 +34,7 @@ scope: app
 ### 비범위
 
 - 푸시 알림, 카메라, 파일 선택, 공유, 생체 인증과 백그라운드 작업
-- React Native에서 OpenMD API를 직접 호출하거나 Refresh Token을 네이티브 저장소로 옮기는 것
+- React Native에서 NalQ API를 직접 호출하거나 Refresh Token을 네이티브 저장소로 옮기는 것
 - Expo Router 기반의 여러 네이티브 화면과 네이티브 하단 탭
 - 네이티브-웹 메시지 브리지와 임의 JavaScript 주입
 - 오프라인 콘텐츠 캐시와 오프라인 편집·동기화
@@ -81,7 +81,7 @@ App
 │  ├─ ready
 │  └─ recoverable error
 └─ OpenMdWebView
-   └─ deployed OpenMD web
+   └─ deployed NalQ web
       ├─ BrowserRouter
       ├─ browser Cookie authentication
       └─ web-owned screens and API clients

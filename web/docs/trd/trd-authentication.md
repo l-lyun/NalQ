@@ -14,7 +14,7 @@ scope: web
   - [인증 흐름](../../../docs/ux/flow-authentication.md)
   - [인증 API 계약](../../../docs/contracts/contract-api-authentication.md)
   - [사용자·인증 데이터 계약](../../../docs/contracts/contract-data-authentication.md)
-  - [OpenMD 디자인 기준](../../../DESIGN.md)
+  - [NalQ 디자인 기준](../../../DESIGN.md)
 
 ## 1. 목적
 

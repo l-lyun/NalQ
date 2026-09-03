@@ -22,8 +22,8 @@ public class SpringMailVerificationEmailSender implements VerificationEmailSende
 		SimpleMailMessage message = new SimpleMailMessage();
 		message.setFrom(from);
 		message.setTo(email);
-		message.setSubject("OpenMD 이메일 인증 코드");
-		message.setText("OpenMD 이메일 인증 코드는 " + code + " 입니다. 10분 안에 입력해 주세요.");
+		message.setSubject("NalQ 이메일 인증 코드");
+		message.setText("NalQ 이메일 인증 코드는 " + code + " 입니다. 10분 안에 입력해 주세요.");
 		try {
 			mailSender.send(message);
 		} catch (MailException exception) {

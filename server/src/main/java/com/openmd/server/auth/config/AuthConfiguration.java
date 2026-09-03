@@ -87,7 +87,7 @@ public class AuthConfiguration {
 		@Value("${spring.mail.host}") String host
 	) {
 		if (from == null || from.isBlank()) {
-			throw new IllegalArgumentException("OpenMD mail sender address must be configured");
+			throw new IllegalArgumentException("NalQ mail sender address must be configured");
 		}
 		if (host == null || host.isBlank()) {
 			throw new IllegalArgumentException("SMTP host must be configured");

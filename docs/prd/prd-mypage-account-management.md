@@ -8,7 +8,7 @@ last_updated: 2026-09-01
 # [PRD] 마이페이지와 계정 관리
 
 - 담당/검토자: 제품 기획 / 사용자 검토 대기
-- 관련 제품 원장: [OpenMD 제품 기반](../product.md)
+- 관련 제품 원장: [NalQ 제품 기반](../product.md)
 - 관련 요구사항: [이메일 기반 자체 인증](prd-local-authentication.md)
 - 관련 화면/계약: [마이페이지 화면 명세](../ux/screen-mypage.md), [사용자·인증 데이터 계약](../contracts/contract-data-authentication.md)
 

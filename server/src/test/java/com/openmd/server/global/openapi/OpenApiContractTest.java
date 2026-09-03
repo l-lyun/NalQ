@@ -81,7 +81,7 @@ class OpenApiContractTest {
 		mockMvc.perform(get("/v3/api-docs"))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.openapi").value("3.1.0"))
-			.andExpect(jsonPath("$.info.title").value("OpenMD API"))
+			.andExpect(jsonPath("$.info.title").value("NalQ API"))
 			.andExpect(jsonPath("$.components.securitySchemes.bearerAuth.type").value("http"))
 			.andExpect(jsonPath("$.components.securitySchemes.bearerAuth.scheme").value("bearer"))
 			.andExpect(jsonPath("$.security[0].bearerAuth").isArray())
