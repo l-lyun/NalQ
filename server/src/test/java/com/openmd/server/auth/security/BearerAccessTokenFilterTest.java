@@ -8,6 +8,8 @@ import static org.mockito.Mockito.when;
 import com.openmd.server.auth.domain.User;
 import com.openmd.server.auth.domain.UserStatus;
 import com.openmd.server.auth.repository.UserRepository;
+import com.openmd.server.auth.error.AuthErrorCode;
+import com.openmd.server.global.error.BusinessException;
 import java.util.Optional;
 
 import java.time.Clock;
@@ -113,6 +115,26 @@ class BearerAccessTokenFilterTest {
 
 		assertEquals(401, response.getStatus());
 		assertTrue(response.getContentAsString().contains("AUTH_005"));
+	}
+
+	@Test
+	void letsBusinessErrorsFromTheAuthenticatedRequestReachTheGlobalHandler() throws Exception {
+		AccessTokenService tokens = AccessTokenService.create(SECRET, Clock.fixed(NOW, ZoneOffset.UTC));
+		String token = tokens.issue(42L, "session-id").token();
+		BearerAccessTokenFilter filter = new BearerAccessTokenFilter(
+			tokens, activeUsers(42L), JsonMapper.builder().build()
+		);
+		MockHttpServletRequest request = new MockHttpServletRequest("DELETE", "/api/v1/users/me");
+		request.addHeader("Authorization", "Bearer " + token);
+
+		BusinessException failure = org.junit.jupiter.api.Assertions.assertThrows(
+			BusinessException.class,
+			() -> filter.doFilter(request, new MockHttpServletResponse(), (incoming, outgoing) -> {
+				throw new BusinessException(AuthErrorCode.WITHDRAWAL_PASSWORD_MISMATCH);
+			})
+		);
+
+		assertEquals(AuthErrorCode.WITHDRAWAL_PASSWORD_MISMATCH, failure.getErrorCode());
 	}
 
 	@Test

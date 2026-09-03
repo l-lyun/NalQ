@@ -3,10 +3,17 @@ ALTER TABLE users
     MODIFY COLUMN email VARCHAR(320) NULL,
     MODIFY COLUMN normalized_email VARCHAR(320) NULL,
     MODIFY COLUMN password_hash VARCHAR(255) NULL,
-    ADD COLUMN withdrawal_request_id CHAR(36) NULL,
+    ADD COLUMN withdrawal_request_id VARCHAR(36) NULL,
     ADD COLUMN withdrawal_disposal_due_at TIMESTAMP(6) NULL,
     ADD COLUMN withdrawal_disposal_completed_at TIMESTAMP(6) NULL,
     ADD CONSTRAINT uk_users_withdrawal_request_id UNIQUE (withdrawal_request_id);
+
+UPDATE users
+SET email_verified_at = COALESCE(email_verified_at, activated_at, suspended_at, updated_at, created_at, CURRENT_TIMESTAMP(6)),
+    activated_at = COALESCE(activated_at, email_verified_at, suspended_at, updated_at, created_at, CURRENT_TIMESTAMP(6)),
+    updated_at = CURRENT_TIMESTAMP(6)
+WHERE status = 'SUSPENDED'
+  AND (email_verified_at IS NULL OR activated_at IS NULL);
 
 UPDATE users
 SET email = NULL,
