@@ -135,10 +135,12 @@ HTTP 필드 모양과 공개 오류는 [학습자료·퀴즈·복습 API](contra
 - 물리 컬럼명, index와 동시 수정 방식은 서버 TRD와 migration이 책임진다. 현재 계약은 별도 revision이나 제목 변경 이력 원장을 요구하지 않는다.
 
 - 유형별 검증을 통과한 최종 문제가 요청 수의 80% 이상이면 `READY`다. 5·10·15·20문제의 최소 성공 수는 각각 4·8·12·16이다.
+- 유형별 가중치로 계산한 수는 선호 배분이다. 한 유형이 부족하면 사용자가 선택한 다른 유형의 유효 문제로 보충할 수 있지만, 선택하지 않은 유형과 요청 수를 초과한 문제는 최종 후보에 포함하지 않는다.
 - 최종 유효 문제가 80%에 미달하면 `FAILED`이며 불완전한 문제 세트를 풀이 대상으로 공개하거나 일부 저장하지 않는다.
 - 실패 뒤 재조회에서도 원인을 구분해야 하므로 `quiz_sets.failure_code`를 nullable 값으로 둔다. `FAILED`에서는 `SOURCE_INSUFFICIENT` 또는 `GENERATION_FAILED`, 그 외 상태에서는 `null`이다.
 - 공개 `message`와 `retryable`은 `failure_code`에 대한 서버 정책으로 계산하며 별도 컬럼으로 복제하지 않는다.
-- 선택 유형·난이도·최대 문제 수는 생성 요청 입력이며 서버 DB에 영속화하지 않는다. `requestedConfig`는 생성 접수 성공 응답에서 요청값을 echo할 때만 사용하고 이후 상태 조회에서는 반환하지 않는다.
+- 선택 유형·난이도·최대 문제 수와 `generationPrompt`는 생성 요청 입력이며 서버 DB에 영속화하지 않는다. `requestedConfig`는 생성 접수 성공 응답에서 유형·난이도·문제 수만 echo할 때 사용하고 이후 상태 조회에서는 반환하지 않는다.
+- QuizSet은 생성 품질 회귀 분석을 위한 내부 `generation_model`과 `prompt_version`을 보존한다. 두 값은 공개 API에 노출하지 않는다.
 - 프론트는 `userId + quizSetId` 범위로 `selectedTypes`, `difficulty`, `maxQuestionCount`를 기기 로컬 상태에 보존할 수 있다. 이 값은 손실 가능한 화면 표시용 캐시이며 QuizSet 상태·문제 유효성·채점의 원장이 아니다.
 - 로컬 값이 없으면 `GENERATING`은 서버 상태만으로 표시하고, `READY`의 실제 문제 수와 포함 유형은 확정된 `quiz_questions`에서 계산하며, `FAILED`는 저장된 `failure_code`에 따른 일반 안내를 사용한다.
 - `FAILED` QuizSet은 실패 원장과 알림 복구 대상을 위해 서버에 유지하되 내 퀴즈 목록 projection에서는 제외한다. terminal 알림의 수명주기와 읽음은 [알림 데이터 계약](contract-data-notifications.md)이 책임진다.
@@ -298,6 +300,5 @@ migration, Java entity·repository·service와 테스트는 같은 목표 구조
 ### 열린 질문
 
 - 사용자 계정이나 학습자료를 삭제할 때 파생 문제 세트와 풀이 이력을 삭제·익명화·기간 보존 중 어떻게 처리할지
-- 생성·채점 모델과 평가 근거를 어느 수준까지 추적해야 결과를 재현하고 감사할 수 있는지
 
 위 열린 질문은 데이터 보존 범위를 바꾸므로 구현에서 임의로 확정하지 않는다.
