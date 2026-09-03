@@ -131,7 +131,7 @@ export function AccountWithdrawalPage({
   onBack: () => void
   onCompleted: () => void
 }) {
-  const withdrawal = useAccountWithdrawalMutation()
+  const withdrawal = useAccountWithdrawalMutation(onCompleted)
   const requestId = useRef<string | null>(null)
   const [step, setStep] = useState<'impact' | 'confirm'>('impact')
   const [password, setPassword] = useState('')
@@ -154,14 +154,11 @@ export function AccountWithdrawalPage({
     if (!window.confirm('계정을 탈퇴할까요? 이 작업은 되돌릴 수 없고 이전 학습 기록은 복구되지 않아요.')) return
 
     requestId.current ??= window.crypto.randomUUID()
-    withdrawal.mutate(
-      {
-        withdrawalRequestId: requestId.current,
-        currentPassword: password,
-        confirmation: '회원탈퇴',
-      },
-      { onSuccess: onCompleted },
-    )
+    withdrawal.mutate({
+      withdrawalRequestId: requestId.current,
+      currentPassword: password,
+      confirmation: '회원탈퇴',
+    })
   }
 
   return (

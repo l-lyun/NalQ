@@ -10,19 +10,25 @@ const footerLinks = [
   { to: '/open-source-licenses', label: '오픈소스 라이선스' },
 ] as const
 
-export function PublicServiceFooter() {
+export function PublicServiceFooter({ preserveContext = false }: { preserveContext?: boolean }) {
   const { pathname } = useLocation()
+  const visibleLinks = import.meta.env.DEV
+    ? footerLinks
+    : footerLinks.filter((item) => item.to !== '/terms' && item.to !== '/privacy')
 
   return (
     <Box as="footer" className="public-service-footer" px="spacingX.globalGutter" py="x6">
       <VStack className="public-service-footer__content" gap="x2" align="flex-start">
         <Text textStyle="t5Bold" color="fg.neutral">NalQ</Text>
         <nav className="public-service-footer__links" aria-label="서비스 정보">
-          {footerLinks.map((item) => (
+          {visibleLinks.map((item) => (
             <Link
               key={item.to}
               className="public-service-link"
               to={item.to}
+              state={{ returnTo: pathname }}
+              target={preserveContext ? '_blank' : undefined}
+              rel={preserveContext ? 'noreferrer' : undefined}
               aria-current={pathname === item.to ? 'page' : undefined}
             >
               {item.label}

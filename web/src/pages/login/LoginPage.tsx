@@ -60,9 +60,11 @@ export function LoginPage() {
           : '테스트용 인증 화면입니다. 로그인하면 기존 홈 화면으로 이동해요.'
       }
       footer={
-        <AuthTextLink to="/sign-up" state={{ from: state?.from }}>
-          계정이 없나요? 회원가입
-        </AuthTextLink>
+        import.meta.env.DEV ? (
+          <AuthTextLink to="/sign-up" state={{ from: state?.from }}>
+            계정이 없나요? 회원가입
+          </AuthTextLink>
+        ) : undefined
       }
     >
       <AuthForm

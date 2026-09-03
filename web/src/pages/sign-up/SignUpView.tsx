@@ -163,7 +163,7 @@ function SignUpShell({
           {footer}
         </VStack>
       </Box>
-      <PublicServiceFooter />
+      <PublicServiceFooter preserveContext />
     </VStack>
   )
 }
