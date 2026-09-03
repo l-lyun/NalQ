@@ -11,6 +11,7 @@ import {
   VStack,
 } from '@seed-design/react'
 import { type FormEvent, useEffect, useRef, useState } from 'react'
+import { useBlocker } from 'react-router-dom'
 
 import {
   useAccountWithdrawalMutation,
@@ -131,7 +132,12 @@ export function AccountWithdrawalPage({
   onBack: () => void
   onCompleted: () => void
 }) {
-  const withdrawal = useAccountWithdrawalMutation(onCompleted)
+  const allowCompletionNavigation = useRef(false)
+  const withdrawal = useAccountWithdrawalMutation(() => {
+    allowCompletionNavigation.current = true
+    onCompleted()
+  })
+  const blocker = useBlocker(() => withdrawal.isPending && !allowCompletionNavigation.current)
   const requestId = useRef<string | null>(null)
   const [step, setStep] = useState<'impact' | 'confirm'>('impact')
   const [password, setPassword] = useState('')
@@ -147,6 +153,10 @@ export function AccountWithdrawalPage({
     : withdrawal.error instanceof ApiClientError
       ? withdrawal.error.fields.find((item) => item.field === 'confirmation')?.reason
       : undefined
+
+  useEffect(() => {
+    if (blocker.state === 'blocked' && !withdrawal.isPending) blocker.reset()
+  }, [blocker, withdrawal.isPending])
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
