@@ -11,6 +11,12 @@ import {
 } from '@/features/quiz/model/quizFeature'
 import { LoginPage } from '@/pages/login/LoginPage'
 import {
+  OpenSourceLicensesPage,
+  PrivacyPage,
+  SupportPage,
+  TermsPage,
+} from '@/pages/public-service/PublicServicePages'
+import {
   QuizAttemptResultRoutePage,
   QuizFixturePage,
   QuizMaterialRoutePage,
@@ -26,11 +32,21 @@ import { SignUpPage } from '@/pages/sign-up/SignUpPage'
 import { VerifyEmailPage } from '@/pages/verify-email/VerifyEmailPage'
 
 const router = createBrowserRouter([
+  ...(import.meta.env.DEV ? [
+    { path: '/terms', element: <TermsPage /> },
+    { path: '/privacy', element: <PrivacyPage /> },
+  ] : []),
+  { path: '/support', element: <SupportPage /> },
+  { path: '/open-source-licenses', element: <OpenSourceLicensesPage /> },
+  { path: '/profile/terms', element: <Navigate to={import.meta.env.DEV ? '/terms' : '/support'} replace /> },
+  { path: '/profile/privacy', element: <Navigate to={import.meta.env.DEV ? '/privacy' : '/support'} replace /> },
+  { path: '/profile/inquiry', element: <Navigate to="/support" replace /> },
+  { path: '/profile/marketing', element: <Navigate to="/" replace /> },
   {
     element: <PublicOnlyGate />,
     children: [
       { path: '/login', element: <LoginPage /> },
-      { path: '/sign-up', element: <SignUpPage /> },
+      ...(import.meta.env.DEV ? [{ path: '/sign-up', element: <SignUpPage /> }] : []),
       { path: '/verify-email', element: <VerifyEmailPage /> },
     ],
   },
@@ -50,11 +66,7 @@ const router = createBrowserRouter([
           { path: '/learning/new', element: null },
           { path: '/profile', element: null },
           { path: '/profile/account', element: null },
-          { path: '/profile/terms', element: null },
-          { path: '/profile/privacy', element: null },
-          { path: '/profile/marketing', element: null },
-          { path: '/profile/inquiry', element: null },
-          { path: '/profile/withdrawal', element: null },
+          ...(import.meta.env.DEV ? [{ path: '/profile/withdrawal', element: null }] : []),
         ],
       },
       ...(quizRoutesEnabled ? [

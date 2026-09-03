@@ -8,11 +8,13 @@
     "node": "^20.19.0 || >=22.12.0"
   },
   "scripts": {
+    "licenses:generate": "node scripts/generate-third-party-notices.mjs",
+    "licenses:check": "node scripts/generate-third-party-notices.mjs --check",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b --pretty false",
     "lint": "oxlint",
-    "verify": "pnpm typecheck && pnpm lint && pnpm build",
+    "verify": "pnpm licenses:check && pnpm typecheck && pnpm lint && pnpm build",
     "preview": "vite preview"
   },
   "dependencies": {

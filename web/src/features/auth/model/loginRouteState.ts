@@ -1,9 +1,10 @@
 export const SIGN_UP_SESSION_RECOVERY_NOTICE = 'SIGN_UP_SESSION_RECOVERY' as const
+export const ACCOUNT_WITHDRAWAL_COMPLETED_NOTICE = 'ACCOUNT_WITHDRAWAL_COMPLETED' as const
 
 export type LoginRouteState = {
   from?: string
   email?: string
-  notice?: typeof SIGN_UP_SESSION_RECOVERY_NOTICE
+  notice?: typeof SIGN_UP_SESSION_RECOVERY_NOTICE | typeof ACCOUNT_WITHDRAWAL_COMPLETED_NOTICE
 }
 
 export function readLoginRouteState(value: unknown): LoginRouteState {
@@ -18,6 +19,8 @@ export function readLoginRouteState(value: unknown): LoginRouteState {
     notice:
       candidate.notice === SIGN_UP_SESSION_RECOVERY_NOTICE
         ? SIGN_UP_SESSION_RECOVERY_NOTICE
-        : undefined,
+        : candidate.notice === ACCOUNT_WITHDRAWAL_COMPLETED_NOTICE
+          ? ACCOUNT_WITHDRAWAL_COMPLETED_NOTICE
+          : undefined,
   }
 }
