@@ -1,9 +1,11 @@
 import { IconChevronRightLine } from '@karrotmarket/react-monochrome-icon'
 import {
   ActionButton,
+  BottomSheet,
   Box,
   Flex,
   Icon,
+  Portal,
   Skeleton,
   Text,
   VStack,
@@ -62,12 +64,17 @@ import {
 } from '@/features/quiz/model/learningReviewActions'
 
 import {
+  LearningActionList,
   LearningField,
   LearningNotice,
   LearningScreenHeader,
   LearningTextInput,
   LearningTextarea,
 } from './components/LearningPrimitives'
+import {
+  resolveLearningMaterialsReturnTo,
+  resolveLearningQuizzesReturnTo,
+} from './learningRoutes'
 import { QuizManagementCard } from './components/QuizManagementCard'
 import { countUnicodeCodePoints } from './learning.text'
 import './learning.css'
@@ -416,6 +423,8 @@ function ReviewCandidateRow({
 
 export function LearningMaterialsPage() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const pageRef = useRef<HTMLDivElement>(null)
   const back = usePageBack()
   const [searchParams, setSearchParams] = useSearchParams()
   const query = searchParams.get('query') ?? ''
@@ -455,10 +464,34 @@ export function LearningMaterialsPage() {
     updateParams({ expanded: [...next].join(',') || null })
   }
 
+  const returnTo = resolveLearningMaterialsReturnTo(`${location.pathname}${location.search}`)
+    ?? '/learning/materials'
+  const restoreScrollTop = (() => {
+    const value = (location.state as { restoreScrollTop?: unknown } | null)?.restoreScrollTop
+    return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined
+  })()
+
+  useEffect(() => {
+    if (restoreScrollTop === undefined || materials.isPending) return
+    const frame = requestAnimationFrame(() => pageRef.current?.scrollTo({ top: restoreScrollTop }))
+    return () => cancelAnimationFrame(frame)
+  }, [materials.isPending, restoreScrollTop])
+
+  const creationState = () => ({
+    returnTo,
+    returnScrollTop: pageRef.current?.scrollTop ?? 0,
+  })
+
   return (
-    <Box as="main" className="learning-management-page" bg="bg.layerDefault" minHeight="100dvh" pt="safeArea">
+    <Box ref={pageRef} as="main" className="learning-management-page" bg="bg.layerDefault" minHeight="100dvh" pt="safeArea">
       <VStack className="learning-content" px="spacingX.globalGutter" pt="x4" pb="spacingY.screenBottom" gap="x5">
         <LearningScreenHeader title="내 학습자료" onBack={back} />
+        <LearningMaterialAddSheet
+          onNotion={() => navigate('/learning/import/notion', { state: creationState() })}
+          onDirect={() => navigate('/learning/materials/new', {
+            state: { sourceType: 'PASTE', title: '', content: '', ...creationState() },
+          })}
+        />
         <LearningField label="학습자료 제목 검색">
           <LearningTextInput
             type="search"
@@ -522,6 +555,63 @@ export function LearningMaterialsPage() {
         ) : null}
       </VStack>
     </Box>
+  )
+}
+
+function LearningMaterialAddSheet({ onNotion, onDirect }: {
+  onNotion: () => void
+  onDirect: () => void
+}) {
+  return (
+    <BottomSheet.Root>
+      <BottomSheet.Trigger asChild>
+        <ActionButton
+          className="learning-full-width-action"
+          type="button"
+          size="large"
+          variant="brandSolid"
+        >
+          학습자료 추가하기
+        </ActionButton>
+      </BottomSheet.Trigger>
+      <Portal>
+        <BottomSheet.Backdrop />
+        <BottomSheet.Positioner>
+          <BottomSheet.Content>
+            <BottomSheet.Header>
+              <BottomSheet.Title>학습자료 추가하기</BottomSheet.Title>
+              <BottomSheet.Description>자료를 가져올 방법을 선택해 주세요.</BottomSheet.Description>
+            </BottomSheet.Header>
+            <BottomSheet.Body>
+              <LearningActionList
+                label="학습자료 추가 방법"
+                rows={[
+                  {
+                    id: 'notion',
+                    title: '노션에서 가져오기',
+                    detail: '노션 페이지 하나를 복사해 확인·수정해요',
+                    onClick: onNotion,
+                  },
+                  {
+                    id: 'direct',
+                    title: '직접 입력하기',
+                    detail: '제목과 본문을 직접 작성해요',
+                    onClick: onDirect,
+                  },
+                ]}
+              />
+            </BottomSheet.Body>
+            <BottomSheet.Footer>
+              <BottomSheet.CloseButton asChild>
+                <ActionButton type="button" size="large" variant="neutralWeak">
+                  취소
+                </ActionButton>
+              </BottomSheet.CloseButton>
+            </BottomSheet.Footer>
+          </BottomSheet.Content>
+        </BottomSheet.Positioner>
+      </Portal>
+    </BottomSheet.Root>
   )
 }
 
@@ -656,8 +746,17 @@ export function LearningMaterialEditPage({ materialId }: { materialId: string })
         queryClient.invalidateQueries({ queryKey: ['private', 'quiz-review'] }),
         queryClient.invalidateQueries({ queryKey: ['private', 'home'] }),
       ])
-      const returnTo = (location.state as { returnTo?: string } | null)?.returnTo
-      navigate(returnTo ?? '/learning/materials', { replace: true, state: { saved: true } })
+      const returnTo = resolveLearningMaterialsReturnTo(
+        (location.state as { returnTo?: unknown } | null)?.returnTo,
+      )
+      const returnScrollTop = (location.state as { returnScrollTop?: unknown } | null)?.returnScrollTop
+      navigate(returnTo ?? '/learning/materials', {
+        replace: true,
+        state: {
+          saved: true,
+          ...(typeof returnScrollTop === 'number' ? { restoreScrollTop: returnScrollTop } : {}),
+        },
+      })
     },
     onError: (error) => {
       setSaveError(error instanceof Error ? error.message : '학습자료를 저장하지 못했어요. 다시 시도해주세요.')
@@ -692,8 +791,13 @@ export function LearningMaterialEditPage({ materialId }: { materialId: string })
 
   const goBack = () => {
     if (dirty && !window.confirm('변경사항을 버리고 나갈까요?')) return
-    const returnTo = (location.state as { returnTo?: string } | null)?.returnTo
-    navigate(returnTo ?? '/learning/materials')
+    const returnTo = resolveLearningMaterialsReturnTo(
+      (location.state as { returnTo?: unknown } | null)?.returnTo,
+    )
+    const returnScrollTop = (location.state as { returnScrollTop?: unknown } | null)?.returnScrollTop
+    navigate(returnTo ?? '/learning/materials', {
+      state: typeof returnScrollTop === 'number' ? { restoreScrollTop: returnScrollTop } : undefined,
+    })
   }
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -783,6 +887,8 @@ export function QuizManagementPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
+  const pageRef = useRef<HTMLDivElement>(null)
   const query = searchParams.get('query') ?? ''
   const requestedPage = Number(searchParams.get('page') ?? '1')
   const page = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1
@@ -800,6 +906,16 @@ export function QuizManagementPage() {
   const [draftTitle, setDraftTitle] = useState('')
   const [renameError, setRenameError] = useState<string>()
   const [savedMessage, setSavedMessage] = useState<string>()
+  const restoreScrollTop = (() => {
+    const value = (location.state as { restoreScrollTop?: unknown } | null)?.restoreScrollTop
+    return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined
+  })()
+
+  useEffect(() => {
+    if (restoreScrollTop === undefined || quizzes.isPending) return
+    const frame = requestAnimationFrame(() => pageRef.current?.scrollTo({ top: restoreScrollTop }))
+    return () => cancelAnimationFrame(frame)
+  }, [quizzes.isPending, restoreScrollTop])
   useEffect(() => {
     if (!focusedQuizId) return
     requestAnimationFrame(() => document.getElementById(`quiz-card-${focusedQuizId}`)?.focus())
@@ -859,10 +975,29 @@ export function QuizManagementPage() {
     updateSearch({ expanded: [...next].join(',') || null })
   }
 
+  const openQuizCreation = () => {
+    const returnTo = resolveLearningQuizzesReturnTo(`${location.pathname}${location.search}`)
+    navigate('/learning/new', {
+      state: {
+        ...(returnTo ? { returnTo } : {}),
+        returnScrollTop: pageRef.current?.scrollTop ?? 0,
+      },
+    })
+  }
+
   return (
-    <Box as="main" className="learning-management-page" bg="bg.layerDefault" minHeight="100dvh" pt="safeArea">
+    <Box ref={pageRef} as="main" className="learning-management-page" bg="bg.layerDefault" minHeight="100dvh" pt="safeArea">
       <VStack className="learning-content" px="spacingX.globalGutter" pt="x4" pb="spacingY.screenBottom" gap="x5">
         <LearningScreenHeader title="내 퀴즈" onBack={back} />
+        <ActionButton
+          className="learning-full-width-action"
+          type="button"
+          size="large"
+          variant="brandSolid"
+          onClick={openQuizCreation}
+        >
+          퀴즈 만들기
+        </ActionButton>
         <LearningField label="퀴즈 제목 검색">
           <LearningTextInput
             type="search"
@@ -896,11 +1031,7 @@ export function QuizManagementPage() {
               <ActionButton type="button" size="medium" variant="neutralWeak" onClick={() => updateSearch({ query: null, page: null })}>
                 검색어 지우기
               </ActionButton>
-            ) : (
-              <ActionButton type="button" size="medium" variant="neutralWeak" onClick={() => navigate('/learning')}>
-                학습으로 돌아가기
-              </ActionButton>
-            )}
+            ) : undefined}
           >
             {query.trim() ? `“${query.trim()}”와 일치하는 퀴즈가 없어요.` : '아직 만든 퀴즈가 없어요.'}
           </EmptyState>

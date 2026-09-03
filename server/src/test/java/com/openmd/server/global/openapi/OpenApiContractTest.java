@@ -17,9 +17,12 @@ import com.openmd.server.auth.service.TwoStepSignUpService;
 import com.openmd.server.auth.config.SecurityConfiguration;
 import com.openmd.server.auth.security.AccessTokenService;
 import com.openmd.server.learningmaterial.controller.LearningMaterialController;
+import com.openmd.server.learningmaterial.controller.NotionLearningMaterialImportController;
 import com.openmd.server.learningmaterial.service.LearningMaterialService;
 import com.openmd.server.learningmaterial.service.LearningMaterialQueryService;
 import com.openmd.server.learningmaterial.service.LearningMaterialUpdateService;
+import com.openmd.server.integration.notion.controller.NotionIntegrationController;
+import com.openmd.server.integration.notion.service.NotionConnectionService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootConfiguration;
@@ -36,6 +39,7 @@ import org.springframework.test.web.servlet.MockMvc;
 		"springdoc.api-docs.enabled=true",
 		"springdoc.swagger-ui.enabled=true",
 		"springdoc.paths-to-match=/api/v1/**",
+		"openmd.notion.enabled=true",
 		"openmd.auth.browser.cookie.name=openmd_refresh",
 		"spring.autoconfigure.exclude="
 			+ "org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration,"
@@ -55,6 +59,7 @@ class OpenApiContractTest {
 	@MockitoBean LearningMaterialService learningMaterialService;
 	@MockitoBean LearningMaterialQueryService learningMaterialQueryService;
 	@MockitoBean LearningMaterialUpdateService learningMaterialUpdateService;
+	@MockitoBean NotionConnectionService notionConnectionService;
 
 	@SpringBootConfiguration
 	@EnableAutoConfiguration
@@ -63,6 +68,8 @@ class OpenApiContractTest {
 		BrowserAuthController.class,
 		UserController.class,
 		LearningMaterialController.class,
+		NotionLearningMaterialImportController.class,
+		NotionIntegrationController.class,
 		SecurityConfiguration.class,
 		OpenApiConfiguration.class
 	})
@@ -162,6 +169,16 @@ class OpenApiContractTest {
 				.value("#/components/schemas/ApiResponseLearningMaterialDetail"))
 			.andExpect(jsonPath("$.paths['/api/v1/learning-materials/{materialId}'].get.responses['404'].content"
 				+ ".['application/json'].schema.$ref").value("#/components/schemas/ApiResponse"))
+			.andExpect(jsonPath("$.paths['/api/v1/integrations/notion/callback'].get.operationId")
+				.value("completeNotionAuthorization"))
+			.andExpect(jsonPath("$.paths['/api/v1/integrations/notion/callback'].get.security").isEmpty())
+			.andExpect(jsonPath("$.paths['/api/v1/integrations/notion/callback'].get.responses['302']").exists())
+			.andExpect(jsonPath("$.paths['/api/v1/integrations/notion/authorizations'].post.responses['201']")
+				.exists())
+			.andExpect(jsonPath("$.paths['/api/v1/integrations/notion/connection'].get.security[0].bearerAuth")
+				.isArray())
+			.andExpect(jsonPath("$.paths['/api/v1/learning-material-imports/notion'].post.security[0].bearerAuth")
+				.isArray())
 			.andExpect(jsonPath("$.components.schemas.RefreshTokenRequest.properties.refreshToken.maxLength")
 				.value(128))
 			.andExpect(jsonPath("$.components.schemas.SessionTokens.properties.accessToken.type").value("string"))

@@ -36,6 +36,7 @@ export type LearningPageCallbacks = {
   onRestartQuiz?: (review: LearningReviewSummary) => void
   onOpenQuizConditions?: (material: Pick<LearningMaterialSummary, 'materialId' | 'title'>) => void
   onStartNotionImport?: () => void
+  onStartDirectInput?: () => void
   onCreateMaterial?: (
     draft: LearningMaterialDraft,
   ) => Promise<Pick<LearningMaterialSummary, 'materialId' | 'title'>>

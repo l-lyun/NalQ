@@ -431,7 +431,7 @@ Headers: `Authorization`, `Content-Type: application/json`, `Idempotency-Key`
 - 성공 응답은 프론트 편집용 값이며 서버 학습자료·draft·import job을 만들지 않는다.
 - 빈 `content`도 가져오기 성공으로 반환한다. 서버는 제목과 본문을 길이 때문에 자르지 않고 전체 반환한다.
 - 성공 응답 `data`는 `sourceType`, `title`, `content`만 포함한다. `contentLength`, `pageId`, Notion URL, workspace 정보와 `warnings`를 추가하지 않는다.
-- 클라이언트는 제목의 앞뒤 Unicode 공백을 제거한 값이 1..255 code point이고, 본문에 Unicode 비공백 문자가 하나 이상 있으며 전체 본문이 1..20,000 code point일 때만 `저장하고 퀴즈 만들기`와 `자료만 저장`을 활성화한다. 서버는 최종 `POST /api/v1/learning-materials`에서 같은 저장 제한을 다시 검증한다.
+- 클라이언트는 제목의 앞뒤 Unicode 공백을 제거한 값이 1..255 code point이고, 본문에 Unicode 비공백 문자가 하나 이상 있으며 전체 본문이 1..20,000 code point일 때만 `저장하고 퀴즈 만들기`와 `자료 저장`을 활성화한다. 서버는 최종 `POST /api/v1/learning-materials`에서 같은 저장 제한을 다시 검증한다.
 - 자동·수동 동기화 엔드포인트는 제공하지 않는다.
 
 ## 문제 세트 생성
