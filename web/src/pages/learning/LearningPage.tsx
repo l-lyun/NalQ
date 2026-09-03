@@ -296,14 +296,17 @@ export function LearningPage({
               rows={[
                 {
                   id: 'notion',
-                  title: 'Notion에서 가져오기',
+                  title: '노션에서 가져오기',
                   detail: '페이지 하나를 복사해 확인·수정해요',
                   onClick: () => {
-                    callbacks?.onStartNotionImport?.()
+                    if (callbacks?.onStartNotionImport) {
+                      callbacks.onStartNotionImport()
+                      return
+                    }
                     push({
                       id: 'handoff',
-                      title: 'Notion에서 가져오기',
-                      description: '연결과 권한 확인, 단일 페이지 선택 화면은 Notion 연동 단계에서 이어집니다. 가져온 페이지는 한 번 복사되며 이후 자동 동기화되지 않습니다.',
+                      title: '노션에서 가져오기',
+                      description: '연결과 권한 확인, 단일 페이지 선택 화면은 노션 연동 단계에서 이어집니다. 가져온 페이지는 한 번 복사되며 이후 자동 동기화되지 않습니다.',
                     })
                   },
                 },
@@ -311,7 +314,9 @@ export function LearningPage({
                   id: 'paste',
                   title: '직접 입력하기',
                   detail: '제목과 본문을 직접 작성해요',
-                  onClick: () => push({ id: 'direct-input' }),
+                  onClick: () => callbacks?.onStartDirectInput
+                    ? callbacks.onStartDirectInput()
+                    : push({ id: 'direct-input' }),
                 },
               ]}
             />
