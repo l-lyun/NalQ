@@ -9,6 +9,7 @@ scope: shared
 - 소유 영역: 서버 학습자료·퀴즈·복습 도메인
 - 관련 기능명세: [학습자료 만들기](../prd/prd-content-import.md), [퀴즈 생성·풀이·결과·복습](../prd/prd-quiz-learning.md)
 - 관련 API: [학습자료·퀴즈·복습 API](contract-api-quiz-learning.md)
+- 생성 결과 알림 데이터: [알림 데이터 계약](contract-data-notifications.md)
 - 물리 구조 그림: [퀴즈·복습 ERD](../assets/quiz-erd.svg)
 
 ## 목적과 경계
@@ -140,6 +141,7 @@ HTTP 필드 모양과 공개 오류는 [학습자료·퀴즈·복습 API](contra
 - 선택 유형·난이도·최대 문제 수는 생성 요청 입력이며 서버 DB에 영속화하지 않는다. `requestedConfig`는 생성 접수 성공 응답에서 요청값을 echo할 때만 사용하고 이후 상태 조회에서는 반환하지 않는다.
 - 프론트는 `userId + quizSetId` 범위로 `selectedTypes`, `difficulty`, `maxQuestionCount`를 기기 로컬 상태에 보존할 수 있다. 이 값은 손실 가능한 화면 표시용 캐시이며 QuizSet 상태·문제 유효성·채점의 원장이 아니다.
 - 로컬 값이 없으면 `GENERATING`은 서버 상태만으로 표시하고, `READY`의 실제 문제 수와 포함 유형은 확정된 `quiz_questions`에서 계산하며, `FAILED`는 저장된 `failure_code`에 따른 일반 안내를 사용한다.
+- `FAILED` QuizSet은 실패 원장과 알림 복구 대상을 위해 서버에 유지하되 내 퀴즈 목록 projection에서는 제외한다. terminal 알림의 수명주기와 읽음은 [알림 데이터 계약](contract-data-notifications.md)이 책임진다.
 
 문제 하나를 유효하다고 확정하는 최소 조건은 다음과 같다.
 
@@ -242,7 +244,7 @@ MVP에서는 전체 사용자 수정 이력을 별도 테이블로 보존하지 
 - 복습 제출은 제출 답안, 복습 채점과 원본 `reviewResolvedAt` 갱신을 한 트랜잭션에서 처리한다.
 - 같은 UUID 재요청은 먼저 확정된 attempt를 반환하고 request hash·fingerprint·replay 테이블을 만들지 않는다.
 - 문제 생성은 외부 후보의 공통 정보와 해당 유형의 상세 구조를 먼저 검증하고, 유효 후보에 서버가 연속 `question_number`를 부여한 뒤 공통·상세 원장을 함께 저장한다. 무효 후보와 유형 상세 저장이 실패한 문제는 부분 문제로 남기지 않는다.
-- 유효 문제가 하나 이상이면 해당 문제들과 `quiz_sets.status=READY`, `failure_code=null`을 확정한다. 유효 문제가 없으면 문제 행을 공개 가능한 상태로 남기지 않고 `status=FAILED`와 `failure_code`를 확정한다.
+- 유효 문제가 하나 이상이면 해당 문제들, `quiz_sets.status=READY`, `failure_code=null`과 성공 알림을 한 트랜잭션에서 확정한다. 유효 문제가 없거나 생성 작업이 실패하면 문제 행을 공개 가능한 상태로 남기지 않고 `status=FAILED`, `failure_code`와 실패 알림을 한 트랜잭션에서 확정한다. QuizSet당 terminal 알림은 한 건뿐이며 세부 불변성은 [알림 데이터 계약](contract-data-notifications.md#트랜잭션-불변성)을 따른다.
 - 동일 QuizSet에 생성 worker가 중복 실행되는 상황을 위해 별도 worker lease, 전용 추가 락이나 새 원장을 MVP에 도입하지 않는다. 생성 저장은 기존 상태 확인과 일반 트랜잭션·unique 제약을 사용하며 이 결정이 생성 성공 판정 규칙을 바꾸지는 않는다.
 - 한 번 attempt가 연결된 문제 세트·문제·보기·빈칸·정답 가이드는 수정하거나 물리 삭제하지 않는다.
 

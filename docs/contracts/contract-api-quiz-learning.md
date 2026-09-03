@@ -11,6 +11,7 @@ scope: shared
 - 관련 기능명세: [학습자료 만들기](../prd/prd-content-import.md), [퀴즈 생성·풀이·결과·복습](../prd/prd-quiz-learning.md)
 - 관련 흐름: [학습자료 만들기](../ux/flow-content-import.md), [퀴즈 생성부터 복습까지](../ux/flow-quiz-solving.md)
 - 공유 데이터 의미: [학습자료와 퀴즈 데이터 계약](contract-data-quiz-learning.md)
+- 생성 결과 알림 경계: [알림 API 계약](contract-api-notifications.md)
 
 ## 문서 책임
 
@@ -519,7 +520,7 @@ Headers: `Authorization`, `Content-Type: application/json`
 `GET /api/v1/quiz-sets/{quizSetId}`
 
 - 모든 상태는 `quizSetId`, `materialId`, 비어 있지 않은 `quizTitle`, `status`를 반환하며 `requestedConfig`는 반환하지 않는다.
-- `GENERATING`은 공통 필드와 다음 조회 권고값 `pollAfterSeconds`만 반환한다. 로컬 요청 조건이 없으면 클라이언트는 일반 생성 진행 상태를 표시한다.
+- `GENERATING`은 공통 필드와 다음 조회 권고값 `pollAfterSeconds`만 반환한다. foreground·online 클라이언트는 이 값을 다음 조회 간격의 단일 기준으로 사용하고 별도 고정 간격을 만들지 않는다. background에서는 polling을 중단한다. 로컬 요청 조건이 없으면 클라이언트는 일반 생성 진행 상태를 표시한다.
 - `READY`는 공통 필드와 `questions`를 반환한다. 유효 문제가 1개 이상이라는 뜻이며 클라이언트는 로컬 요청 조건 유무와 관계없이 `questions`에서 실제 문제 수와 포함 유형을 계산한다. 실제 수가 최대 문제 수보다 적거나 요청한 유형 일부가 포함되지 않아도 된다.
 - `FAILED`는 공통 필드와 `failure`만 반환하고 문제를 포함하지 않는다. 로컬 요청 조건이 없으면 일반 실패 안내와 새 조건 선택 행동을 제공하며, 외부 생성 서비스 상세는 노출하지 않는다.
 - 외부 생성 후보의 문제 번호는 공개 계약에 사용하지 않는다. 서버는 유형별 검증을 통과한 후보의 원래 배열 순서에 따라 `number=1..N`을 새로 부여한다.
@@ -566,6 +567,7 @@ Headers: `Authorization`, `Content-Type: application/json`
 - `GENERATION_FAILED`: 접수 뒤 내부 생성 작업에서 최종 확정할 유효 문제를 하나도 남기지 못했다. 검증과 저장을 마친 유효 문제가 1개 이상이면 일부 결과를 사용할 수 없어도 `READY`다. 내부·LLM 상세는 숨기고 재시도가 가능하면 `retryable=true`다.
 - 상태 재조회에서도 같은 실패 의미를 반환할 수 있도록 서버는 QuizSet의 `failure_code`를 보존한다. `message`와 `retryable`은 저장된 코드에 대한 공개 정책으로 계산한다.
 - 두 값은 비동기 QuizSet 작업 결과이지 HTTP `ApiError.code`가 아니다. 네트워크 실패를 `FAILED`로 추정해서는 안 된다.
+- QuizSet terminal 상태와 사용자 알림의 원자성·중복 방지는 [알림 데이터 계약](contract-data-notifications.md#트랜잭션-불변성)을 따른다.
 
 `READY`의 각 문제 공통 필드:
 
@@ -624,8 +626,11 @@ Headers: `Authorization`, `Content-Type: application/json`
 
 `GET /api/v1/quiz-sets?page=1&size=6&query=운영체제`
 
-- 현재 인증 사용자가 소유한 QuizSet만 반환한다.
+성공 알림에서 특정 QuizSet을 찾을 때는 `GET /api/v1/quiz-sets?size=6&focusQuizSetId=qset_123`을 사용한다.
+
+- 현재 인증 사용자가 소유한 QuizSet 중 `READY`와 `GENERATING`만 반환한다. `FAILED`는 서버 상태와 알림 근거로 유지하지만 내 퀴즈 목록에서는 제외한다.
 - `query`는 선택이며 앞뒤 공백을 제거한 뒤 `quizTitle`을 대소문자 구분 없이 부분 검색한다. `materialTitle` 검색은 이 parameter의 의미에 포함하지 않는다.
+- `focusQuizSetId`는 선택이며 `query`와 함께 보내지 않는다. 현재 정렬과 요청 `size`에서 해당 `READY` QuizSet을 포함하는 page를 찾아 반환하며 이때 `page`는 보내지 않는다. 대상이 없거나 다른 사용자 소유이거나 `FAILED`이면 `404 COMMON_003`이다.
 - 기본 정렬은 `updatedAt DESC, quizSetId DESC`다. 이름 변경 성공 시 `updatedAt`이 바뀌므로 목록 상단 순서가 바뀔 수 있다.
 - `page`는 1부터 시작하고 `size`의 기본값은 6이다.
 
@@ -659,8 +664,8 @@ Headers: `Authorization`, `Content-Type: application/json`
 }
 ```
 
-- `status`는 `GENERATING | READY | FAILED`다.
-- `questionCount`는 `READY`에서 1 이상이고 그 외 상태에서는 `null`이다.
+- 이 목록 응답의 `status`는 `GENERATING | READY`다. 개별 QuizSet 상태 조회는 기존 `FAILED`를 계속 지원한다.
+- `questionCount`는 `READY`에서 1 이상이고 `GENERATING`에서는 `null`이다.
 - `latestCompletedAttemptId`는 해당 QuizSet에서 가장 최근에 완료된 현재 사용자의 `MAIN` attempt ID이며 완료 회차가 없으면 `null`이다. 전체 결과 또는 다시 풀기 맥락에 사용한다.
 - `pendingSelfAssessmentAttemptId`는 해당 QuizSet에서 가장 최근의 `SELF_ASSESSMENT_REQUIRED` `MAIN` attempt ID이며 없으면 `null`이다. 서술형 자기평가 재진입에 사용한다.
 - `activeReviewSessionId`는 해당 QuizSet에서 `COMPLETED`가 아닌 가장 최근 `REVIEW` attempt의 공개 ID이며 없으면 `null`이다. 활성 복습 재개에 사용한다.
@@ -668,6 +673,7 @@ Headers: `Authorization`, `Content-Type: application/json`
 - `lastLearningActivityAt`은 해당 QuizSet에서 현재 사용자의 `MAIN|REVIEW` attempt 중 가장 최근 `updatedAt`이며 시도 이력이 없으면 `null`이다. QuizSet 이름 변경 시각과 혼용하지 않는다.
 - 목록은 문제 본문, 정답, 제출 답안과 전체 학습자료 본문을 포함하지 않는다.
 - 검색 결과 없음은 같은 page 모양에서 `items=[]`, `totalElements=0`, `totalPages=0`으로 반환한다.
+- `totalElements`와 `totalPages`는 `FAILED`를 제외한 목록을 기준으로 계산한다.
 
 ### 퀴즈 이름 변경
 
