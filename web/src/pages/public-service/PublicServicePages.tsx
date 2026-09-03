@@ -5,6 +5,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 
 import seedLicense from './licenses/seed-license.txt?raw'
 import seedNotice from './licenses/seed-notice.txt?raw'
+import thirdPartyNoticesUrl from './licenses/third-party-notices.txt?url'
 import { privacyPolicyDraft, serviceTermsDraft, type LegalDocument } from './legalContent'
 import { PublicServiceFooter } from './PublicServiceFooter'
 import { readPublicReturnPath } from './publicServiceNavigation'
@@ -45,6 +46,7 @@ function PublicPage({ title, children }: { title: string; children: React.ReactN
 }
 
 function LegalDocumentPage({ document }: { document: LegalDocument }) {
+  const location = useLocation()
   return (
     <PublicPage title={document.title}>
       <Box role="status" bg="bg.warningWeak" borderRadius="r3" p="x4">
@@ -68,7 +70,7 @@ function LegalDocumentPage({ document }: { document: LegalDocument }) {
       </VStack>
       <Divider as="div" color="stroke.neutralSubtle" />
       <Text textStyle="t4Regular" color="fg.neutralMuted">
-        문서 내용에 관한 문의는 <Link className="public-service-link" to="/support">문의하기</Link>에서 접수해 주세요.
+        문서 내용에 관한 문의는 <Link className="public-service-link" to="/support" state={{ returnTo: location.pathname }}>문의하기</Link>에서 접수해 주세요.
       </Text>
     </PublicPage>
   )
@@ -150,6 +152,15 @@ export function OpenSourceLicensesPage() {
           <summary>SEED NOTICE 전문 보기</summary>
           <pre>{seedNotice}</pre>
         </details>
+        <VStack gap="x2" align="flex-start">
+          <Text textStyle="t5Bold" color="fg.neutral">전체 제3자 소프트웨어 고지</Text>
+          <Text textStyle="t4Regular" color="fg.neutralMuted">
+            운영 웹 번들에 포함된 패키지 이름·버전·출처와 라이선스 전문을 한 파일에서 확인할 수 있어요.
+          </Text>
+          <a className="public-service-link" href={thirdPartyNoticesUrl} target="_blank" rel="noreferrer">
+            전체 제3자 라이선스 및 고지 열기
+          </a>
+        </VStack>
       </VStack>
     </PublicPage>
   )
