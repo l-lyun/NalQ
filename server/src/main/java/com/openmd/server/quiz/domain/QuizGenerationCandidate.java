@@ -4,7 +4,6 @@ import com.openmd.server.quiz.domain.type.QuestionType;
 import java.util.List;
 
 public record QuizGenerationCandidate(
-    Integer proposedNumber,
     QuestionType type,
     String topic,
     String prompt,

@@ -89,6 +89,60 @@ class QuizGradingMigrationTest {
 	}
 
 	@Test
+	void allowsOnlyOneGeneratingQuizSetPerUserAndAddsGenerationMetadata() {
+		jdbc.update("""
+			INSERT INTO users (
+				id, email, normalized_email, password_hash, email_verified_at, status,
+				activated_at, suspended_at, withdrawn_at, created_at, updated_at
+			) VALUES (2, 'generation@example.com', 'generation@example.com', 'hash',
+				NOW(6), 'ACTIVE', NOW(6), NULL, NULL, NOW(6), NOW(6))
+			""");
+		for (int id = 2; id <= 3; id++) {
+			jdbc.update("""
+				INSERT INTO learning_materials (
+					id, user_id, title, content, source_type,
+					idempotency_key_hash, request_fingerprint, created_at, updated_at
+				) VALUES (?, 2, '자료', '내용', 'PASTE',
+					UNHEX(SHA2(CONCAT('key', ?), 256)), UNHEX(SHA2(CONCAT('body', ?), 256)),
+					NOW(6), NOW(6))
+				""", id, id, id);
+		}
+		insertQuizSet(30, 2, 2, "00000000-0000-0000-0000-000000000030", "GENERATING", null);
+		assertThrows(DataAccessException.class, () ->
+			insertQuizSet(31, 2, 3, "00000000-0000-0000-0000-000000000031", "GENERATING", null));
+		insertQuizSet(32, 2, 3, "00000000-0000-0000-0000-000000000032", "READY", null);
+
+		assertColumns(
+			"quiz_sets",
+			"generation_model",
+			"prompt_version",
+			"generation_started_at",
+			"active_generation_user_id");
+	}
+
+	@Test
+	void createsOneTerminalNotificationPerQuizSet() {
+		insertQuizSet(40, "00000000-0000-0000-0000-000000000040", "READY", null);
+		jdbc.update("""
+			INSERT INTO quiz_generation_notifications (
+				public_id, user_id, notification_type, quiz_set_public_id, material_id,
+				target_name, failure_code, action_type, read_at, created_at, updated_at
+			) VALUES ('00000000-0000-0000-0000-000000000140', 1,
+				'QUIZ_GENERATION_READY', '00000000-0000-0000-0000-000000000040', 1,
+				'자료 퀴즈', NULL, 'FOCUS_QUIZ_IN_LIST', NULL, NOW(6), NOW(6))
+			""");
+
+		assertThrows(DataAccessException.class, () -> jdbc.update("""
+			INSERT INTO quiz_generation_notifications (
+				public_id, user_id, notification_type, quiz_set_public_id, material_id,
+				target_name, failure_code, action_type, read_at, created_at, updated_at
+			) VALUES ('00000000-0000-0000-0000-000000000141', 1,
+				'QUIZ_GENERATION_READY', '00000000-0000-0000-0000-000000000040', 1,
+				'자료 퀴즈', NULL, 'FOCUS_QUIZ_IN_LIST', NULL, NOW(6), NOW(6))
+			"""));
+	}
+
+	@Test
 	void quizSetFailureCodeMustMatchTheSetStatus() {
 		insertQuizSet(10, "00000000-0000-0000-0000-000000000010", "GENERATING", null);
 		insertQuizSet(11, "00000000-0000-0000-0000-000000000011", "READY", null);
@@ -174,11 +228,16 @@ class QuizGradingMigrationTest {
 	}
 
 	private static void insertQuizSet(long id, String publicId, String status, String failureCode) {
+		insertQuizSet(id, 1, 1, publicId, status, failureCode);
+	}
+
+	private static void insertQuizSet(
+		long id, long userId, long materialId, String publicId, String status, String failureCode) {
 		jdbc.update("""
 			INSERT INTO quiz_sets
 				(id, public_id, user_id, learning_material_id, quiz_title, status, failure_code, created_at, updated_at)
-			VALUES (?, ?, 1, 1, '자료 퀴즈', ?, ?, NOW(6), NOW(6))
-			""", id, publicId, status, failureCode);
+			VALUES (?, ?, ?, ?, '자료 퀴즈', ?, ?, NOW(6), NOW(6))
+			""", id, publicId, userId, materialId, status, failureCode);
 	}
 
 	private static void insertQuestion(long id, long quizSetId, String publicId, String type) {

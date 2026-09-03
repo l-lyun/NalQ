@@ -66,6 +66,7 @@ import org.testcontainers.utility.DockerImageName;
 @SpringBootTest(
     properties = {
       "openmd.auth.enabled=false",
+      "openmd.quiz.generation.enabled=false",
       "spring.jpa.open-in-view=false",
       "spring.autoconfigure.exclude="
           + "org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration,"
@@ -116,6 +117,7 @@ class QuizGradingMySqlIntegrationTest {
     dropNotificationFailureCheck();
     jdbc.update("DELETE FROM notifications");
     jdbc.update("DELETE FROM quiz_submitted_answers");
+    jdbc.update("DELETE FROM quiz_generation_notifications");
     jdbc.update("DELETE FROM quiz_attempt_questions WHERE source_attempt_question_id IS NOT NULL");
     jdbc.update("DELETE FROM quiz_attempt_questions");
     jdbc.update("DELETE FROM quiz_attempts WHERE source_attempt_id IS NOT NULL");
@@ -136,15 +138,13 @@ class QuizGradingMySqlIntegrationTest {
   }
 
   @Test
-  void acceptsAndFindsAnActiveGenerationThenTemporarilyCompletesItAfterThreeSeconds()
-      throws InterruptedException {
+  void acceptsOneGenerationPerUserAndAtomicallyCompletesItWithANotification() {
     Fixture owner = fixture();
     Fixture other = fixture();
     QuizGenerationConfig config =
         new QuizGenerationConfig(
             List.of(QuestionType.MULTIPLE_CHOICE, QuestionType.ESSAY), QuizDifficulty.NORMAL, 10);
 
-    long acceptedAt = System.nanoTime();
     var accepted =
         generationAcceptance.accept(owner.userId(), Long.toString(owner.materialId()), config);
 
@@ -173,7 +173,9 @@ class QuizGradingMySqlIntegrationTest {
             BusinessException.class,
             () ->
                 generationAcceptance.accept(
-                    owner.userId(), Long.toString(owner.materialId()), config));
+                    owner.userId(),
+                    Long.toString(materials.saveAndFlush(material(owner.userId())).getId()),
+                    config));
     assertEquals(QuizErrorCode.GENERATION_ACTIVE, active.getErrorCode());
 
     BusinessException foreign =
@@ -182,20 +184,13 @@ class QuizGradingMySqlIntegrationTest {
             () -> generationAcceptance.active(other.userId(), Long.toString(owner.materialId())));
     assertEquals(CommonErrorCode.RESOURCE_NOT_FOUND, foreign.getErrorCode());
 
-    long deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos();
-    String status;
-    do {
-      status =
-          jdbc.queryForObject(
-              "SELECT status FROM quiz_sets WHERE public_id = ?",
-              String.class,
-              accepted.quizSetId());
-      if (QuizSetStatus.READY.name().equals(status)) break;
-      Thread.sleep(100);
-    } while (System.nanoTime() < deadline);
+    generation.complete(
+        owner.userId(), accepted.quizSetId(), List.of(multipleChoice(3), essay()), 10);
+    String status =
+        jdbc.queryForObject(
+            "SELECT status FROM quiz_sets WHERE public_id = ?", String.class, accepted.quizSetId());
 
     assertEquals(QuizSetStatus.READY.name(), status);
-    assertTrue(System.nanoTime() - acceptedAt >= Duration.ofMillis(2500).toNanos());
     assertEquals(
         List.of(
             QuestionType.MULTIPLE_CHOICE.name(),
@@ -215,6 +210,12 @@ class QuizGradingMySqlIntegrationTest {
             WHERE s.public_id = ? ORDER BY q.question_number
             """,
             String.class,
+            accepted.quizSetId()));
+    assertEquals(
+        1L,
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM quiz_generation_notifications WHERE quiz_set_public_id = ?",
+            Long.class,
             accepted.quizSetId()));
   }
 
@@ -789,7 +790,6 @@ class QuizGradingMySqlIntegrationTest {
             .mapToObj(i -> new ChoiceCandidate("보기 " + i, i == 1))
             .toList();
     return new QuizGenerationCandidate(
-        8,
         QuestionType.MULTIPLE_CHOICE,
         "객관식",
         "정답?",
@@ -798,13 +798,12 @@ class QuizGradingMySqlIntegrationTest {
         values,
         List.of(),
         List.of(),
-        null,
+        "",
         List.of());
   }
 
   private QuizGenerationCandidate fillBlank() {
     return new QuizGenerationCandidate(
-        9,
         QuestionType.FILL_IN_THE_BLANK,
         "빈칸",
         "큐는 [1]이다.",
@@ -813,13 +812,12 @@ class QuizGradingMySqlIntegrationTest {
         List.of(),
         List.of(),
         List.of(new BlankCandidate(1, List.of("FIFO"))),
-        null,
+        "",
         List.of());
   }
 
   private QuizGenerationCandidate shortAnswer() {
     return new QuizGenerationCandidate(
-        10,
         QuestionType.SHORT_ANSWER,
         "단답",
         "처리 순서?",
@@ -828,13 +826,12 @@ class QuizGradingMySqlIntegrationTest {
         List.of(),
         List.of("fifo", "FIFO"),
         List.of(),
-        null,
+        "",
         List.of());
   }
 
   private QuizGenerationCandidate essay() {
     return new QuizGenerationCandidate(
-        11,
         QuestionType.ESSAY,
         "서술",
         "설명하세요.",

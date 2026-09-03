@@ -4,8 +4,6 @@ import com.openmd.server.global.api.FieldError;
 import com.openmd.server.global.error.BusinessException;
 import com.openmd.server.global.error.CommonErrorCode;
 import com.openmd.server.learningmaterial.repository.LearningMaterialRepository;
-import com.openmd.server.learningmaterial.domain.LearningMaterial;
-import com.openmd.server.quiz.domain.QuizTitlePolicy;
 import com.openmd.server.quiz.domain.entity.QuizSet;
 import com.openmd.server.quiz.domain.type.QuestionType;
 import com.openmd.server.quiz.domain.type.QuizSetStatus;
@@ -19,8 +17,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,45 +25,45 @@ import org.springframework.transaction.annotation.Transactional;
 @ConditionalOnProperty(name = "openmd.quiz.enabled", havingValue = "true", matchIfMissing = true)
 public class QuizGenerationService {
   private static final int POLL_AFTER_SECONDS = 3;
-  private static final Set<Integer> ALLOWED_COUNTS = Set.of(5, 10, 15);
+  private static final Set<Integer> ALLOWED_COUNTS = Set.of(5, 10, 15, 20);
+  private static final String ACTIVE_CONSTRAINT = "uk_quiz_sets_active_generation_user";
 
   private final LearningMaterialRepository materials;
   private final QuizSetRepository quizSets;
-  private final ApplicationEventPublisher events;
+  private final QuizGenerationAcceptanceTransaction acceptance;
+  private final QuizGenerationCapacity capacity;
 
   public QuizGenerationService(
       LearningMaterialRepository materials,
       QuizSetRepository quizSets,
-      ApplicationEventPublisher events) {
+      QuizGenerationAcceptanceTransaction acceptance,
+      QuizGenerationCapacity capacity) {
     this.materials = materials;
     this.quizSets = quizSets;
-    this.events = events;
+    this.acceptance = acceptance;
+    this.capacity = capacity;
   }
 
-  @Transactional
   public AcceptedQuizGeneration accept(
       long userId, String materialPublicId, QuizGenerationConfig requestedConfig) {
     long materialId = materialId(materialPublicId);
     QuizGenerationConfig config = validated(requestedConfig);
-    LearningMaterial material = materials
-        .findOwnedForUpdate(materialId, userId)
-        .orElseThrow(() -> new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND));
-    if (activeSet(userId, materialId) != null) {
-      throw new BusinessException(QuizErrorCode.GENERATION_ACTIVE);
+    if (!capacity.tryAcquire()) {
+      throw new BusinessException(QuizErrorCode.GENERATION_UNAVAILABLE);
     }
     QuizSet quizSet;
     try {
-      quizSet = quizSets.saveAndFlush(
-          QuizSet.generating(userId, materialId, QuizTitlePolicy.defaultTitle(material.getTitle())));
-    } catch (DataAccessException exception) {
-      throw new BusinessException(QuizErrorCode.GENERATION_UNAVAILABLE);
+      quizSet = acceptance.accept(userId, materialId, config);
+    } catch (DataIntegrityViolationException exception) {
+      capacity.release();
+      if (hasConstraint(exception, ACTIVE_CONSTRAINT)) {
+        throw new BusinessException(QuizErrorCode.GENERATION_ACTIVE);
+      }
+      throw exception;
+    } catch (RuntimeException exception) {
+      capacity.release();
+      throw exception;
     }
-    events.publishEvent(
-        new TemporaryQuizGenerationRequested(
-            userId,
-            quizSet.getPublicId(),
-            config.selectedTypes(),
-            config.maxQuestionCount()));
     return new AcceptedQuizGeneration(
         quizSet.getPublicId(),
         materialPublicId,
@@ -84,7 +81,11 @@ public class QuizGenerationService {
     materials
         .findByIdAndUserId(materialId, userId)
         .orElseThrow(() -> new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND));
-    QuizSet quizSet = activeSet(userId, materialId);
+    QuizSet quizSet =
+        quizSets
+            .findFirstByLearningMaterialIdAndUserIdAndStatusOrderByCreatedAtDesc(
+                materialId, userId, QuizSetStatus.GENERATING)
+            .orElse(null);
     return quizSet == null
         ? null
         : new ActiveQuizGeneration(
@@ -93,13 +94,6 @@ public class QuizGenerationService {
             quizSet.getQuizTitle(),
             quizSet.getStatus(),
             POLL_AFTER_SECONDS);
-  }
-
-  private QuizSet activeSet(long userId, long materialId) {
-    return quizSets
-        .findFirstByLearningMaterialIdAndUserIdAndStatusOrderByCreatedAtDesc(
-            materialId, userId, QuizSetStatus.GENERATING)
-        .orElse(null);
   }
 
   private QuizGenerationConfig validated(QuizGenerationConfig config) {
@@ -111,14 +105,24 @@ public class QuizGenerationService {
     if (new HashSet<>(types).size() != types.size()) {
       throw invalid("selectedTypes", "selectedTypes에는 중복이 없어야 합니다.");
     }
-    if (config.difficulty() == null) {
-      throw invalid("difficulty", "difficulty가 필요합니다.");
-    }
+    if (config.difficulty() == null) throw invalid("difficulty", "difficulty가 필요합니다.");
     if (config.maxQuestionCount() == null || !ALLOWED_COUNTS.contains(config.maxQuestionCount())) {
-      throw invalid("maxQuestionCount", "maxQuestionCount는 5, 10, 15 중 하나여야 합니다.");
+      throw invalid("maxQuestionCount", "maxQuestionCount는 5, 10, 15, 20 중 하나여야 합니다.");
     }
+    String prompt = config.generationPrompt() == null ? null : config.generationPrompt().strip();
+    if (prompt != null && prompt.codePointCount(0, prompt.length()) > 300) {
+      throw invalid("generationPrompt", "generationPrompt는 300자 이하여야 합니다.");
+    }
+    if (prompt != null && prompt.isEmpty()) prompt = null;
     return new QuizGenerationConfig(
-        List.copyOf(types), config.difficulty(), config.maxQuestionCount());
+        List.copyOf(types), config.difficulty(), config.maxQuestionCount(), prompt);
+  }
+
+  private boolean hasConstraint(Throwable exception, String constraint) {
+    for (Throwable current = exception; current != null; current = current.getCause()) {
+      if (current.getMessage() != null && current.getMessage().contains(constraint)) return true;
+    }
+    return false;
   }
 
   private long materialId(String value) {

@@ -6,7 +6,7 @@ scope: server
 
 # [TRD · Server] LLM 퀴즈 생성 워커
 
-- 상태: 목표 설계 확정, 구현 전
+- 상태: MVP 구현 동기화
 - 소유 애플리케이션: `server/`
 - 관련 PRD: [퀴즈 생성·풀이·결과·복습](../../../docs/prd/prd-quiz-learning.md)
 - 관련 흐름: [퀴즈 생성부터 복습까지](../../../docs/ux/flow-quiz-solving.md)
@@ -17,7 +17,7 @@ scope: server
 
 이 문서는 OpenAI API를 호출하는 퀴즈 생성 워커의 접수, 동시성, 큐, 호출, 검증, 트랜잭션, 재시도와 복구 구조를 소유한다. 사용자에게 보이는 생성 정책과 오류 의미는 PRD와 API Contract가 원장이며, 이 문서는 그 정책을 서버에서 어떻게 안전하게 구현할지를 정의한다.
 
-문서는 구현 전 설계를 기준으로 한다. 구현 기준 버전은 Spring AI `2.0.x`다. Spring AI 2.0.x는 현재 서버의 Spring Boot 4.1.x를 공식 지원하며, `ChatClient.responseEntity(...)`, provider-native Structured Output과 Java 타입 기반 JSON Schema 생성을 사용할 수 있다. 실제 클래스명은 구현 중 조정할 수 있지만, 이 문서의 상태·동시성·오류 불변식을 바꾸지 않는다.
+문서는 현재 MVP 구현과 동기화한다. 구현 기준 버전은 Spring AI `2.0.x`다. Spring AI 2.0.x는 현재 서버의 Spring Boot 4.1.x를 공식 지원하며, `ChatClient.responseEntity(...)`, provider-native Structured Output과 Java 타입 기반 JSON Schema 생성을 사용할 수 있다. 이후 클래스명을 조정하더라도 이 문서의 상태·동시성·오류 불변식은 유지한다.
 
 ## 2. 한눈에 보는 처리 흐름
 
@@ -85,7 +85,7 @@ Semaphore는 이 서버가 받을 수 있는 총 작업 수를 제한한다. 사
 
 ### 4.2 사용자당 생성 1개
 
-비관적 잠금이나 `users.generation_in_progress` boolean을 사용하지 않는다. `quiz_sets.status`에서 파생된 generated column과 UNIQUE 제약으로 DB가 동시 접수를 원자적으로 판정한다.
+사용자당 중복 생성을 제어하기 위한 사용자 행 비관적 잠금이나 `users.generation_in_progress` boolean을 사용하지 않는다. `quiz_sets.status`에서 파생된 generated column과 UNIQUE 제약으로 DB가 동시 접수를 원자적으로 판정한다. 생성 접수 시 학습자료 행에 거는 짧은 잠금은 본문 편집과 스냅샷 확정을 조율하기 위한 별도 경계이며, LLM 호출 전에 종료한다.
 
 ```sql
 active_generation_user_id BIGINT
@@ -608,13 +608,13 @@ API key는 전용 환경변수·secret에서만 주입한다. 설정 객체 `toS
 
 MVP에서는 `QuizGenerator` 인터페이스 하나만 외부 경계로 둔다. prompt builder, retry service와 provider mapper를 각각 독립 클래스로 미리 나누지 않고 `OpenAiQuizGenerator` 내부의 좁은 private 책임으로 시작한다. 독립 테스트나 두 번째 provider가 실제로 필요해질 때 분리한다.
 
-현재 구현과 목표 설계의 차이는 다음 구현 PR에서 의도적으로 변경한다.
+이번 MVP 구현에서 다음 전환을 완료한다.
 
 - 허용 문제 수 `5|10|15`에 `20`을 추가한다.
 - `QuizGenerationCandidate.proposedNumber`를 제거하고 서버가 검증 뒤 `1..N`을 부여한다.
 - `ThreadPoolTaskScheduler(1)` 기반 지연 stub을 `ThreadPoolTaskExecutor(4)`와 용량 20 큐로 교체한다.
 - 같은 학습자료 기준의 생성 중 확인을 사용자 전체 기준 DB UNIQUE 불변식으로 바꾼다.
-- 사용자·학습자료 행의 비관적 잠금으로 중복 생성을 직렬화하지 않는다.
+- 사용자 행의 비관적 잠금으로 중복 생성을 직렬화하지 않는다. 학습자료 행 잠금은 접수 시점 본문 스냅샷 확정에만 짧게 사용한다.
 - 임시 문제 생성과 고정 지연을 제거하고 실제 `QuizGenerator` 결과만 저장한다.
 
 ## 14. 검증 전략
