@@ -81,7 +81,8 @@ public final class AccountWithdrawalService {
 			}
 			throw invalidCredential();
 		}
-		if (user.getStatus() != UserStatus.ACTIVE || user.getEmailVerifiedAt() == null) {
+		if ((user.getStatus() != UserStatus.ACTIVE && user.getStatus() != UserStatus.SUSPENDED)
+			|| user.getEmailVerifiedAt() == null) {
 			throw invalidCredential();
 		}
 		if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {

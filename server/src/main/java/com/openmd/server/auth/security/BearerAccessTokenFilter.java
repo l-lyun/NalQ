@@ -53,19 +53,21 @@ public class BearerAccessTokenFilter extends OncePerRequestFilter {
 			chain.doFilter(request, response);
 			return;
 		}
+		AccessPrincipal principal;
 		try {
-			AccessPrincipal principal = accessTokenService.verify(authorization.substring(7));
+			principal = accessTokenService.verify(authorization.substring(7));
 			if (!isWithdrawalRequest(request) && !isActiveUser(principal.userId())) {
 				throw new BusinessException(AuthErrorCode.INVALID_CREDENTIAL);
 			}
-			SecurityContextHolder.getContext().setAuthentication(
-				new UsernamePasswordAuthenticationToken(principal, null, List.of())
-			);
-			chain.doFilter(request, response);
 		} catch (BusinessException exception) {
 			SecurityContextHolder.clearContext();
 			writeUnauthorized(response);
+			return;
 		}
+		SecurityContextHolder.getContext().setAuthentication(
+			new UsernamePasswordAuthenticationToken(principal, null, List.of())
+		);
+		chain.doFilter(request, response);
 	}
 
 	private boolean isWithdrawalRequest(HttpServletRequest request) {

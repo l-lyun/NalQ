@@ -80,6 +80,24 @@ class AccountWithdrawalServiceTest {
 	}
 
 	@Test
+	void withdrawsASuspendedAccountAfterTheSameIdentityChecks() throws Exception {
+		User user = activeUser(42L);
+		Field status = User.class.getDeclaredField("status");
+		status.setAccessible(true);
+		status.set(user, UserStatus.SUSPENDED);
+		when(users.findByIdForUpdate(42L)).thenReturn(Optional.of(user));
+		when(passwords.matches("password1", "argon2-hash")).thenReturn(true);
+
+		AccountWithdrawalResult result = service.withdraw(
+			42L, REQUEST_ID.toString(), "password1", "회원탈퇴"
+		);
+
+		assertEquals(UserStatus.WITHDRAWN, result.status());
+		verify(users).flush();
+		verify(refreshTokens).revokeAll(42L);
+	}
+
+	@Test
 	void replaysTheOriginalResultForTheSameRequestWithoutRecheckingTheRemovedPassword() throws Exception {
 		User user = activeUser(42L);
 		user.withdraw(REQUEST_ID, NOW);
