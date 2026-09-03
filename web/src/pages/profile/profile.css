@@ -8,3 +8,4 @@
 .profile-list-button:disabled { cursor: not-allowed; }
 .profile-list-button:focus-visible { outline: var(--seed-dimension-x0_5) solid var(--seed-color-stroke-focus-ring); outline-offset: var(--seed-dimension-x0_5); border-radius: var(--seed-radius-r2); }
 .profile-version-row { min-height: 48px; }
+.profile-impact-list { margin: 0; padding-left: var(--seed-dimension-x5); }

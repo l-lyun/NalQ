@@ -61,6 +61,14 @@ export async function logoutCurrentSession() {
   }
 }
 
+export async function completeAccountWithdrawal() {
+  try {
+    await endLocalSession()
+  } finally {
+    broadcastSessionEnded()
+  }
+}
+
 async function executeBootstrap() {
   try {
     await refreshAccessToken()
