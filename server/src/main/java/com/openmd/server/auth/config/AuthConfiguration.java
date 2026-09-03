@@ -13,6 +13,7 @@ import com.openmd.server.auth.security.AccessTokenService;
 import com.openmd.server.auth.security.VerificationCodeDigest;
 import com.openmd.server.auth.security.VerificationCodeGenerator;
 import com.openmd.server.auth.service.AuthService;
+import com.openmd.server.auth.service.AccountWithdrawalService;
 import com.openmd.server.auth.service.RefreshTokenService;
 import com.openmd.server.auth.service.TwoStepSignUpService;
 import com.openmd.server.auth.service.VerificationEmailSender;
@@ -103,6 +104,23 @@ public class AuthConfiguration {
 		AccessTokenService accessTokens
 	) {
 		return new AuthService(users, passwordEncoder, refreshTokens, accessTokens);
+	}
+
+	@Bean
+	AccountWithdrawalService accountWithdrawalService(
+		UserRepository users,
+		PasswordEncoder passwordEncoder,
+		RefreshTokenService refreshTokens,
+		Clock clock,
+		PlatformTransactionManager transactionManager
+	) {
+		return new AccountWithdrawalService(
+			users,
+			passwordEncoder,
+			refreshTokens,
+			clock,
+			new TransactionTemplate(transactionManager)
+		);
 	}
 
 	@Bean

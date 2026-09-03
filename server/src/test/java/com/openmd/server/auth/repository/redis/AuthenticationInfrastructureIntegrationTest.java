@@ -92,7 +92,7 @@ class AuthenticationInfrastructureIntegrationTest {
 	@Test
 	void appliesFlywayMigrationAndEnforcesHibernateUniqueAndCheckContractsOnMySql84() {
 		Integer migrationSucceeded = jdbcTemplate.queryForObject(
-			"SELECT success FROM flyway_schema_history WHERE version = '4'",
+			"SELECT success FROM flyway_schema_history WHERE version = '9'",
 			Integer.class
 		);
 		assertEquals(1, migrationSucceeded);
@@ -150,6 +150,45 @@ class AuthenticationInfrastructureIntegrationTest {
 			"other-study@example.com", "other-study@example.com", "$argon2id$other-hash", "study7",
 			"TEMP-2026-08-20", "TEMP-2026-08-20"
 		));
+	}
+
+	@Test
+	void withdrawalReleasesEmailAndNicknameAndPersistsTheThirtyDayDeadlineOnMySql84() {
+		Instant now = Instant.parse("2026-09-03T06:00:00Z");
+		User withdrawn = userRepository.saveAndFlush(User.active(
+			"reuse@example.com",
+			"reuse@example.com",
+			"$argon2id$old-hash",
+			"Reuse7",
+			now.minusSeconds(30),
+			"TEMP-2026-08-20",
+			"TEMP-2026-08-20",
+			now.minusSeconds(20)
+		));
+		withdrawn.withdraw(java.util.UUID.fromString("018f5f95-61c7-7d7b-9f8c-6cb4a9b16731"), now);
+		userRepository.saveAndFlush(withdrawn);
+
+		assertEquals("WITHDRAWN", jdbcTemplate.queryForObject(
+			"SELECT status FROM users WHERE id = ?", String.class, withdrawn.getId()
+		));
+		assertEquals(0, jdbcTemplate.queryForObject(
+			"SELECT COUNT(*) FROM users WHERE id = ? AND (email IS NOT NULL OR normalized_email IS NOT NULL OR password_hash IS NOT NULL OR nickname IS NOT NULL)",
+			Integer.class,
+			withdrawn.getId()
+		));
+		assertEquals(now.plus(Duration.ofDays(30)), withdrawn.getWithdrawalDisposalDueAt());
+
+		User replacement = userRepository.saveAndFlush(User.active(
+			"reuse@example.com",
+			"reuse@example.com",
+			"$argon2id$new-hash",
+			"Reuse7",
+			now,
+			"TEMP-2026-08-20",
+			"TEMP-2026-08-20",
+			now
+		));
+		assertNotEquals(withdrawn.getId(), replacement.getId());
 	}
 
 	@Test
@@ -255,6 +294,23 @@ class AuthenticationInfrastructureIntegrationTest {
 		assertEquals(AuthErrorCode.INVALID_CREDENTIAL, reused.getErrorCode());
 		assertFalse(Boolean.TRUE.equals(redisTemplate.hasKey(sessionKey)));
 		assertTrue(Boolean.TRUE.equals(redisTemplate.hasKey(tombstoneKey)));
+	}
+
+	@Test
+	void indexesAndRevokesEveryRefreshSessionForAWithdrawnUserInRedis74() {
+		RedisRefreshSessionStore store = new RedisRefreshSessionStore(redisTemplate);
+		RefreshTokenService service = new RefreshTokenService(store, Clock.systemUTC(), Duration.ofSeconds(20));
+		IssuedRefreshToken first = service.issue(7L);
+		IssuedRefreshToken second = service.issue(7L);
+		IssuedRefreshToken other = service.issue(8L);
+
+		assertEquals(2L, redisTemplate.opsForSet().size(RedisRefreshSessionStore.userSessionsKey(7L)));
+		service.revokeAll(7L);
+
+		assertFalse(Boolean.TRUE.equals(redisTemplate.hasKey(RedisRefreshSessionStore.sessionKey(first.sessionId()))));
+		assertFalse(Boolean.TRUE.equals(redisTemplate.hasKey(RedisRefreshSessionStore.sessionKey(second.sessionId()))));
+		assertFalse(Boolean.TRUE.equals(redisTemplate.hasKey(RedisRefreshSessionStore.userSessionsKey(7L))));
+		assertTrue(Boolean.TRUE.equals(redisTemplate.hasKey(RedisRefreshSessionStore.sessionKey(other.sessionId()))));
 	}
 
 	@Test

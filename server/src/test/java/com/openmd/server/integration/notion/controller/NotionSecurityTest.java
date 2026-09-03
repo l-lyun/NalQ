@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.openmd.server.auth.config.SecurityConfiguration;
 import com.openmd.server.auth.security.AccessTokenService;
+import com.openmd.server.auth.repository.UserRepository;
 import com.openmd.server.global.error.GlobalExceptionHandler;
 import com.openmd.server.integration.notion.dto.response.NotionConnectionView;
 import com.openmd.server.integration.notion.service.NotionConnectionService;
@@ -39,6 +40,7 @@ class NotionSecurityTest {
 
 	@Autowired MockMvc mockMvc;
 	@MockitoBean AccessTokenService accessTokenService;
+	@MockitoBean UserRepository userRepository;
 	@MockitoBean NotionConnectionService service;
 
 	@SpringBootConfiguration
