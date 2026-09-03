@@ -521,7 +521,7 @@ Headers: `Authorization`, `Content-Type: application/json`
 
 - 모든 상태는 `quizSetId`, `materialId`, 비어 있지 않은 `quizTitle`, `status`를 반환하며 `requestedConfig`는 반환하지 않는다.
 - `GENERATING`은 공통 필드와 다음 조회 권고값 `pollAfterSeconds`만 반환한다. foreground·online 클라이언트는 이 값을 다음 조회 간격의 단일 기준으로 사용하고 별도 고정 간격을 만들지 않는다. background에서는 polling을 중단한다. 로컬 요청 조건이 없으면 클라이언트는 일반 생성 진행 상태를 표시한다.
-- `READY`는 공통 필드와 `questions`를 반환한다. 유효 문제가 1개 이상이라는 뜻이며 클라이언트는 로컬 요청 조건 유무와 관계없이 `questions`에서 실제 문제 수와 포함 유형을 계산한다. 실제 수가 최대 문제 수보다 적거나 요청한 유형 일부가 포함되지 않아도 된다.
+- `READY`는 공통 필드와 `questions`를 반환한다. 최종 유효 문제가 요청 수의 80% 이상이라는 뜻이며 클라이언트는 로컬 요청 조건 유무와 관계없이 `questions`에서 실제 문제 수와 포함 유형을 계산한다. 실제 수가 최대 문제 수보다 적거나 요청한 유형 일부가 포함되지 않아도 된다.
 - `FAILED`는 공통 필드와 `failure`만 반환하고 문제를 포함하지 않는다. 로컬 요청 조건이 없으면 일반 실패 안내와 새 조건 선택 행동을 제공하며, 외부 생성 서비스 상세는 노출하지 않는다.
 - 외부 생성 후보의 문제 번호는 공개 계약에 사용하지 않는다. 서버는 유형별 검증을 통과한 후보의 원래 배열 순서에 따라 `number=1..N`을 새로 부여한다.
 - 검증에서 제외된 후보는 `questions`에 포함하지 않으며 문제는 빈 번호 없이 `number` 오름차순으로 반환한다.
@@ -563,8 +563,8 @@ Headers: `Authorization`, `Content-Type: application/json`
 ```
 
 - `failure.code`는 `SOURCE_INSUFFICIENT` 또는 `GENERATION_FAILED`다.
-- `SOURCE_INSUFFICIENT`: 품질 기준을 충족한 유효 문제가 0개다. 같은 입력의 즉시 반복보다 자료·조건 확인을 안내하며 기본 `retryable=false`다.
-- `GENERATION_FAILED`: 접수 뒤 내부 생성 작업에서 최종 확정할 유효 문제를 하나도 남기지 못했다. 검증과 저장을 마친 유효 문제가 1개 이상이면 일부 결과를 사용할 수 없어도 `READY`다. 내부·LLM 상세는 숨기고 재시도가 가능하면 `retryable=true`다.
+- `SOURCE_INSUFFICIENT`: 학습자료 근거 부족으로 최종 유효 문제가 요청 수의 80%에 미달했다. 같은 입력의 즉시 반복보다 자료·조건 확인을 안내하며 기본 `retryable=false`다.
+- `GENERATION_FAILED`: 접수 뒤 내부 생성 작업이 실패했거나 최종 유효 문제가 요청 수의 80%에 미달했다. 내부·LLM 상세는 숨기고 재시도가 가능하면 `retryable=true`다.
 - 상태 재조회에서도 같은 실패 의미를 반환할 수 있도록 서버는 QuizSet의 `failure_code`를 보존한다. `message`와 `retryable`은 저장된 코드에 대한 공개 정책으로 계산한다.
 - 두 값은 비동기 QuizSet 작업 결과이지 HTTP `ApiError.code`가 아니다. 네트워크 실패를 `FAILED`로 추정해서는 안 된다.
 - QuizSet terminal 상태와 사용자 알림의 원자성·중복 방지는 [알림 데이터 계약](contract-data-notifications.md#트랜잭션-불변성)을 따른다.
