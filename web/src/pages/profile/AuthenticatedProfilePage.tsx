@@ -66,10 +66,12 @@ export function AuthenticatedProfilePage() {
       logoutError={logout.isError ? '로그아웃하지 못했어요. 다시 시도해주세요.' : undefined}
       onOpenAccount={() => navigate('/profile/account', { state: profileSubPageNavigationState })}
       onOpenGuide={() => navigate('/profile/guide', { state: profileSubPageNavigationState })}
-      onOpenTerms={() => navigate('/terms')}
-      onOpenPrivacy={() => navigate('/privacy')}
-      onOpenInquiry={() => navigate('/support')}
-      onOpenOpenSourceLicenses={() => navigate('/open-source-licenses')}
+      legalDocumentsAvailable={import.meta.env.DEV}
+      accountWithdrawalAvailable={import.meta.env.DEV}
+      onOpenTerms={() => navigate('/terms', { state: { returnTo: '/profile' } })}
+      onOpenPrivacy={() => navigate('/privacy', { state: { returnTo: '/profile' } })}
+      onOpenInquiry={() => navigate('/support', { state: { returnTo: '/profile' } })}
+      onOpenOpenSourceLicenses={() => navigate('/open-source-licenses', { state: { returnTo: '/profile' } })}
       onOpenWithdrawal={() => navigate('/profile/withdrawal', { state: profileSubPageNavigationState })}
       onLogout={() => {
         if (!window.confirm('이 기기에서 로그아웃할까요?')) return

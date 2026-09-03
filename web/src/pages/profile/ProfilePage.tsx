@@ -25,6 +25,8 @@ export type ProfilePageProps = {
   appVersion: string
   logoutPending: boolean
   logoutError?: string
+  legalDocumentsAvailable: boolean
+  accountWithdrawalAvailable: boolean
   onOpenAccount: () => void
   onOpenGuide: () => void
   onOpenTerms: () => void
@@ -43,6 +45,8 @@ export function ProfilePage({
   appVersion,
   logoutPending,
   logoutError,
+  legalDocumentsAvailable,
+  accountWithdrawalAvailable,
   onOpenAccount,
   onOpenGuide,
   onOpenTerms,
@@ -91,8 +95,8 @@ export function ProfilePage({
               <Divider as="div" color="stroke.neutralSubtle" />
               <SettingsSection title="서비스 정보" titleId="mypage-service-title">
                 <SettingsRow label="NalQ 가이드" onClick={onOpenGuide} />
-                <SettingsRow label="서비스 이용약관" onClick={onOpenTerms} />
-                <SettingsRow label="개인정보처리방침" onClick={onOpenPrivacy} />
+                {legalDocumentsAvailable ? <SettingsRow label="서비스 이용약관" onClick={onOpenTerms} /> : null}
+                {legalDocumentsAvailable ? <SettingsRow label="개인정보처리방침" onClick={onOpenPrivacy} /> : null}
                 <SettingsRow label="문의하기" onClick={onOpenInquiry} />
                 <SettingsRow label="오픈소스 라이선스" onClick={onOpenOpenSourceLicenses} />
                 <Flex className="profile-version-row" align="center" justify="space-between" gap="x4">
@@ -101,11 +105,15 @@ export function ProfilePage({
                 </Flex>
               </SettingsSection>
 
-              <Divider as="div" color="stroke.neutralSubtle" />
-              <SettingsSection title="계정 종료" titleId="mypage-withdrawal-title">
-                <SettingsRow label="회원 탈퇴" onClick={onOpenWithdrawal} />
-              </SettingsSection>
-              <Text textStyle="t4Regular" color="fg.neutralMuted">탈퇴하면 이전 학습 기록을 다시 이용할 수 없어요.</Text>
+              {accountWithdrawalAvailable ? (
+                <>
+                  <Divider as="div" color="stroke.neutralSubtle" />
+                  <SettingsSection title="계정 종료" titleId="mypage-withdrawal-title">
+                    <SettingsRow label="회원 탈퇴" onClick={onOpenWithdrawal} />
+                  </SettingsSection>
+                  <Text textStyle="t4Regular" color="fg.neutralMuted">탈퇴하면 이전 학습 기록을 다시 이용할 수 없어요.</Text>
+                </>
+              ) : null}
             </>
           )}
         </VStack>

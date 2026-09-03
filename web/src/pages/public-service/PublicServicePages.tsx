@@ -7,6 +7,7 @@ import seedLicense from './licenses/seed-license.txt?raw'
 import seedNotice from './licenses/seed-notice.txt?raw'
 import { privacyPolicyDraft, serviceTermsDraft, type LegalDocument } from './legalContent'
 import { PublicServiceFooter } from './PublicServiceFooter'
+import { readPublicReturnPath } from './publicServiceNavigation'
 import './public-service.css'
 
 const SUPPORT_EMAIL = 'kimdohyun032@gmail.com'
@@ -14,6 +15,7 @@ const SUPPORT_EMAIL = 'kimdohyun032@gmail.com'
 function PublicPage({ title, children }: { title: string; children: React.ReactNode }) {
   const navigate = useNavigate()
   const location = useLocation()
+  const returnTo = readPublicReturnPath(location.state)
   return (
     <VStack className="public-service-shell" minHeight="100dvh" bg="bg.layerBasement">
       <Box as="main" className="public-service-main" bg="bg.layerDefault" width="full" pt="safeArea">
@@ -26,8 +28,7 @@ function PublicPage({ title, children }: { title: string; children: React.ReactN
               layout="iconOnly"
               aria-label="이전 화면으로 돌아가기"
               onClick={() => {
-                if (location.key !== 'default') navigate(-1)
-                else navigate('/login', { replace: true })
+                navigate(returnTo, { replace: true })
               }}
             >
               <Icon svg={<IconArrowLeftLine />} size="x5" />

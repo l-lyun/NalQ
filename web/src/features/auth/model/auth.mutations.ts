@@ -69,7 +69,7 @@ export function useUpdateCurrentUserNicknameMutation() {
   })
 }
 
-export function useAccountWithdrawalMutation() {
+export function useAccountWithdrawalMutation(onCompleted: () => void) {
   return useMutation({
     mutationFn: async (payload: AccountWithdrawalRequest) => {
       const result = await withdrawCurrentUser(payload)
@@ -77,5 +77,6 @@ export function useAccountWithdrawalMutation() {
       return result
     },
     retry: shouldRetryAccountWithdrawal,
+    onSuccess: onCompleted,
   })
 }
