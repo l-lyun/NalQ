@@ -13,6 +13,8 @@ import com.openmd.server.auth.controller.BrowserAuthController;
 import com.openmd.server.auth.controller.support.BrowserRefreshCookie;
 import com.openmd.server.auth.controller.UserController;
 import com.openmd.server.auth.service.AuthService;
+import com.openmd.server.auth.service.AccountWithdrawalService;
+import com.openmd.server.auth.repository.UserRepository;
 import com.openmd.server.auth.service.TwoStepSignUpService;
 import com.openmd.server.auth.config.SecurityConfiguration;
 import com.openmd.server.auth.security.AccessTokenService;
@@ -53,6 +55,8 @@ class OpenApiContractTest {
 
 	@Autowired MockMvc mockMvc;
 	@MockitoBean AuthService authService;
+	@MockitoBean AccountWithdrawalService accountWithdrawalService;
+	@MockitoBean UserRepository userRepository;
 	@MockitoBean TwoStepSignUpService signUpService;
 	@MockitoBean AccessTokenService accessTokenService;
 	@MockitoBean BrowserRefreshCookie browserRefreshCookie;
@@ -122,6 +126,11 @@ class OpenApiContractTest {
 				+ ".['application/json'].schema.$ref").value("#/components/schemas/RefreshTokenRequest"))
 			.andExpect(jsonPath("$.paths['/api/v1/users/me'].get.operationId").value("getCurrentUser"))
 			.andExpect(jsonPath("$.paths['/api/v1/users/me'].get.security").doesNotExist())
+			.andExpect(jsonPath("$.paths['/api/v1/users/me'].delete.operationId").value("withdrawCurrentUser"))
+			.andExpect(jsonPath("$.paths['/api/v1/users/me'].delete.requestBody.content"
+				+ ".['application/json'].schema.$ref").value("#/components/schemas/AccountWithdrawalRequest"))
+			.andExpect(jsonPath("$.paths['/api/v1/users/me'].delete.responses['200']").exists())
+			.andExpect(jsonPath("$.paths['/api/v1/users/me'].delete.responses['503']").exists())
 			.andExpect(jsonPath("$.components.schemas.CurrentUser.properties.nickname.type").value("string"))
 			.andExpect(jsonPath("$.paths['/api/v1/learning-materials'].post.operationId")
 				.value("createLearningMaterial"))

@@ -83,3 +83,16 @@ export type CurrentUser = {
 export type UpdateCurrentUserNicknameRequest = {
   nickname: string
 }
+
+export type AccountWithdrawalRequest = {
+  withdrawalRequestId: string
+  currentPassword: string
+  confirmation: '회원탈퇴'
+}
+
+export type AccountWithdrawalResult = {
+  withdrawalRequestId: string
+  status: 'WITHDRAWN'
+  withdrawnAt: string
+  dataDisposalDeadline: string
+}

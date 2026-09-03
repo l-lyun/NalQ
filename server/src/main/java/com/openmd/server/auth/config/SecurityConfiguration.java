@@ -5,6 +5,7 @@ import com.openmd.server.auth.error.AuthErrorCode;
 import com.openmd.server.auth.security.AccessTokenService;
 import com.openmd.server.auth.security.BearerAccessTokenFilter;
 import com.openmd.server.auth.security.BrowserSessionRequestGuard;
+import com.openmd.server.auth.repository.UserRepository;
 import com.openmd.server.global.api.ApiError;
 import com.openmd.server.global.api.ApiResponse;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -39,12 +40,13 @@ public class SecurityConfiguration {
 	SecurityFilterChain securityFilterChain(
 		HttpSecurity http,
 		AccessTokenService tokens,
+		UserRepository users,
 		ObjectMapper mapper,
 		@Value("${openmd.auth.browser.allowed-origins}") List<String> browserAllowedOrigins,
 		@Value("${springdoc.api-docs.enabled:false}") boolean apiDocsEnabled
 	)
 		throws Exception {
-		BearerAccessTokenFilter bearerFilter = new BearerAccessTokenFilter(tokens, mapper);
+		BearerAccessTokenFilter bearerFilter = new BearerAccessTokenFilter(tokens, users, mapper);
 		BrowserSessionRequestGuard browserSessionGuard = new BrowserSessionRequestGuard(
 			browserAllowedOrigins,
 			mapper
@@ -101,6 +103,15 @@ public class SecurityConfiguration {
 		browser.setAllowCredentials(true);
 		browser.setMaxAge(3600L);
 
+		CorsConfiguration account = new CorsConfiguration();
+		account.setAllowedOrigins(java.util.stream.Stream.concat(
+			allowedOrigins.stream(), browserAllowedOrigins.stream()
+		).distinct().toList());
+		account.setAllowedMethods(List.of("GET", "PATCH", "DELETE", "OPTIONS"));
+		account.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+		account.setAllowCredentials(true);
+		account.setMaxAge(3600L);
+
 		CorsConfiguration general = new CorsConfiguration();
 		general.setAllowedOrigins(List.copyOf(allowedOrigins));
 		general.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
@@ -110,6 +121,7 @@ public class SecurityConfiguration {
 
 		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
 		source.registerCorsConfiguration("/api/v1/auth/web/**", browser);
+		source.registerCorsConfiguration("/api/v1/users/me", account);
 		source.registerCorsConfiguration("/**", general);
 		return source;
 	}

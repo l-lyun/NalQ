@@ -73,6 +73,24 @@ class RefreshTokenServiceTest {
 		assertThrows(BusinessException.class, () -> service.rotate(rotated.refreshToken().token()));
 	}
 
+	@Test
+	void revokesEveryRefreshSessionOwnedByAUser() {
+		FakeRefreshSessionStore store = new FakeRefreshSessionStore();
+		RefreshTokenService service = new RefreshTokenService(
+			store,
+			Clock.fixed(Instant.parse("2026-08-19T00:00:00Z"), ZoneOffset.UTC),
+			Duration.ofDays(30)
+		);
+		service.issue(7L);
+		service.issue(7L);
+		service.issue(8L);
+
+		service.revokeAll(7L);
+
+		assertEquals(1, store.sessions.size());
+		assertEquals(8L, store.sessions.values().iterator().next().userId());
+	}
+
 	private static final class FakeRefreshSessionStore implements RefreshSessionStore {
 		private final Map<String, Session> sessions = new HashMap<>();
 		private final Set<String> used = new HashSet<>();
@@ -121,6 +139,11 @@ class RefreshTokenServiceTest {
 			if (session != null && session.digest().equals(digest)) {
 				sessions.remove(sessionId);
 			}
+		}
+
+		@Override
+		public void revokeAll(long userId) {
+			sessions.entrySet().removeIf(entry -> entry.getValue().userId() == userId);
 		}
 
 		private record Session(long userId, String digest) {

@@ -8,6 +8,7 @@ import {
 } from '@seed-design/react'
 import type { ComponentProps, FormEvent, PropsWithChildren, ReactNode } from 'react'
 import { Link } from 'react-router-dom'
+import { PublicServiceFooter } from '@/pages/public-service/PublicServiceFooter'
 
 import { ApiClientError, getApiErrorMessage } from '@/shared/api/apiError'
 
@@ -21,26 +22,29 @@ type AuthPageProps = PropsWithChildren<{
 
 export function AuthPage({ title, description, footer, children }: AuthPageProps) {
   return (
-    <Box as="main" minHeight="100dvh" bg="bg.layerDefault" pt="safeArea">
-      <VStack
-        className="auth-page"
-        px="spacingX.globalGutter"
-        pt="x10"
-        pb="spacingY.screenBottom"
-        gap="x6"
-      >
-        <VStack as="header" gap="x2">
-          <Text as="h1" textStyle="t12Bold" color="fg.neutral">
-            {title}
-          </Text>
-          <Text textStyle="t5Regular" color="fg.neutralMuted">
-            {description}
-          </Text>
+    <VStack className="auth-public-layout" bg="bg.layerDefault">
+      <Box as="main" pt="safeArea">
+        <VStack
+          className="auth-page"
+          px="spacingX.globalGutter"
+          pt="x10"
+          pb="spacingY.screenBottom"
+          gap="x6"
+        >
+          <VStack as="header" gap="x2">
+            <Text as="h1" textStyle="t12Bold" color="fg.neutral">
+              {title}
+            </Text>
+            <Text textStyle="t5Regular" color="fg.neutralMuted">
+              {description}
+            </Text>
+          </VStack>
+          {children}
+          {footer}
         </VStack>
-        {children}
-        {footer}
-      </VStack>
-    </Box>
+      </Box>
+      <PublicServiceFooter />
+    </VStack>
   )
 }
 

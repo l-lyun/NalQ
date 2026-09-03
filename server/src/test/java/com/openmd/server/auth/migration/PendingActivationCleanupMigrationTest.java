@@ -27,7 +27,7 @@ class PendingActivationCleanupMigrationTest {
 		.withStartupTimeout(Duration.ofMinutes(2));
 
 	@Test
-	void v4RemovesUnreferencedPendingRowsPreservesActiveRowsAndSafelyTombstonesReferencedPendingRows() {
+	void migrationsPreserveLegacyRowsAndBackfillSuspendedAccountsBeforeTheWithdrawalConstraint() {
 		Flyway.configure()
 			.dataSource(MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword())
 			.target(MigrationVersion.fromVersion("3"))
@@ -78,6 +78,23 @@ class PendingActivationCleanupMigrationTest {
 			) VALUES ('referenced@example.com', 'referenced@example.com', 'hash',
 			  'PENDING_ACTIVATION', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
 			"""));
+
+		Flyway.configure()
+			.dataSource(MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword())
+			.target(MigrationVersion.fromVersion("11"))
+			.load()
+			.migrate();
+
+		assertEquals(1, count(jdbc, """
+			SELECT COUNT(*) FROM users
+			WHERE id = 104 AND status = 'SUSPENDED'
+			  AND email_verified_at IS NOT NULL AND activated_at IS NOT NULL
+			"""));
+		assertEquals("varchar", jdbc.queryForObject("""
+			SELECT DATA_TYPE FROM information_schema.COLUMNS
+			WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'
+			  AND COLUMN_NAME = 'withdrawal_request_id'
+			""", String.class));
 	}
 
 	private JdbcTemplate jdbc() {

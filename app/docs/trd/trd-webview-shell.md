@@ -62,7 +62,9 @@ scope: app
 ### 배포와 인증
 
 - 운영 WebView와 API는 HTTPS를 사용해야 한다.
-- 운영에서는 웹과 API를 같은 origin으로 reverse proxy하는 구성을 우선한다. 별도 host가 필요하면 최소한 same-site topology, 정확한 CORS/브라우저 Origin 허용목록과 Cookie 속성을 함께 검증한다.
+- 첫 운영 배포는 private S3를 origin으로 하는 CloudFront의 `app` 또는 기준 `www` host를 WebView 시작 URL로 사용하고, Certbot/Let's Encrypt certificate와 Nginx를 사용하는 단일 EC2의 `api` host를 같은 등록 가능 도메인 아래 HTTPS로 분리한다. Nginx만 비공개 Spring Boot `8080`으로 reverse proxy하며 두 host는 cross-origin이지만 same-site다.
+- WebView cookie jar는 API host-only `__Host-` Refresh Cookie를 사용한다. 웹 JavaScript는 credentials와 기존 CSRF header를 포함하고 서버는 기준 web custom origin만 정확히 허용한다. S3 URL이나 CloudFront 기본 domain을 앱 시작 URL 또는 운영 CORS origin으로 사용하지 않는다.
+- 상세 topology와 production-like 검증은 [첫 운영 배포 인프라 실행 계획](../../../docs/plans/plan-production-deployment-infrastructure.md)을 따른다.
 - 웹은 `BrowserRouter`를 사용하므로 운영 호스팅은 `/learning/...`, `/quiz-sets/...` 같은 직접 접근과 새로고침을 `index.html`로 돌리는 SPA fallback을 제공해야 한다.
 - 로컬 실기기에서 `localhost`는 Mac이 아니라 기기 자신을 가리킨다. 웹 URL과 웹 번들에 주입되는 API URL은 Mac의 LAN 주소나 HTTPS 개발 주소를 사용하고 서버의 정확한 Origin 허용목록도 같은 값으로 맞춰야 한다.
 - HTTP 로컬 개발은 운영 `__Host-` Cookie를 사용할 수 없다. 서버 개발 설정의 별도 Cookie 이름과 `Secure=false` 예외를 사용한다.
@@ -227,7 +229,6 @@ Android `BackHandler`와 WebView ref의 실제 결합은 렌더러가 필요한 
 ## 열린 질문
 
 - 1차 출시를 iOS와 Android에 동시에 할지, 한 플랫폼부터 실기기 검증할지
-- 운영 웹/API를 완전한 same-origin으로 배포할지, same-site의 별도 host로 배포할지
 - iPad를 지원할지와 현재 `supportsTablet=true`를 유지할지
 - 현재 중립적인 native loading·error 문구를 최종 문구로 확정할지와 별도 브랜드 자산이 필요한지
 - iOS back/forward gesture를 가입·작성 중 이탈 흐름에도 활성화할지

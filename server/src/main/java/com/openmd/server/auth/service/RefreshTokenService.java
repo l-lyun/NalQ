@@ -73,6 +73,10 @@ public final class RefreshTokenService {
 		}
 	}
 
+	public void revokeAll(long userId) {
+		store.revokeAll(userId);
+	}
+
 	private Parts parse(String token) {
 		if (token == null) {
 			throw new BusinessException(AuthErrorCode.INVALID_CREDENTIAL);

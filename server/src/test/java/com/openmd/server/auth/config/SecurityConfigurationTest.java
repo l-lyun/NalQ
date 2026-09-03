@@ -96,6 +96,27 @@ class SecurityConfigurationTest {
 	}
 
 	@Test
+	void accountWithdrawalCorsAllowsTheBrowserOriginToExpireTheRefreshCookie() throws Exception {
+		CorsFilter filter = new CorsFilter(SecurityConfiguration.buildCorsConfigurationSource(
+			List.of("https://api.nalq.example"),
+			List.of("https://app.nalq.example")
+		));
+		MockHttpServletRequest request = new MockHttpServletRequest("OPTIONS", "/api/v1/users/me");
+		request.addHeader("Origin", "https://app.nalq.example");
+		request.addHeader("Access-Control-Request-Method", "DELETE");
+		request.addHeader("Access-Control-Request-Headers", "authorization,content-type");
+		MockHttpServletResponse response = new MockHttpServletResponse();
+
+		filter.doFilter(request, response, new MockFilterChain());
+
+		assertEquals(200, response.getStatus());
+		assertEquals("https://app.nalq.example", response.getHeader("Access-Control-Allow-Origin"));
+		assertEquals("true", response.getHeader("Access-Control-Allow-Credentials"));
+		assertTrue(response.getHeader("Access-Control-Allow-Methods").contains("DELETE"));
+		assertTrue(response.getHeader("Access-Control-Allow-Headers").contains("authorization"));
+	}
+
+	@Test
 	void nativeBodyCorsDoesNotAllowCredentials() throws Exception {
 		CorsFilter filter = new CorsFilter(SecurityConfiguration.buildCorsConfigurationSource(
 			List.of("http://localhost:5173"),

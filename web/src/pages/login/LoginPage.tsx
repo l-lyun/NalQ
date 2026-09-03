@@ -8,6 +8,7 @@ import {
   useLoginMutation,
 } from '@/features/auth/model/auth.mutations'
 import {
+  ACCOUNT_WITHDRAWAL_COMPLETED_NOTICE,
   readLoginRouteState,
   SIGN_UP_SESSION_RECOVERY_NOTICE,
 } from '@/features/auth/model/loginRouteState'
@@ -52,14 +53,18 @@ export function LoginPage() {
     <AuthPage
       title="로그인"
       description={
-        state.notice === SIGN_UP_SESSION_RECOVERY_NOTICE
+        state.notice === ACCOUNT_WITHDRAWAL_COMPLETED_NOTICE
+          ? '회원탈퇴가 완료됐어요. 이전 학습 기록은 복구되지 않으며 같은 이메일로 새로 가입할 수 있어요.'
+          : state.notice === SIGN_UP_SESSION_RECOVERY_NOTICE
           ? '가입은 완료됐지만 로그인 처리에 실패했어요. 잠시 후 다시 로그인해 주세요.'
           : '테스트용 인증 화면입니다. 로그인하면 기존 홈 화면으로 이동해요.'
       }
       footer={
-        <AuthTextLink to="/sign-up" state={{ from: state?.from }}>
-          계정이 없나요? 회원가입
-        </AuthTextLink>
+        import.meta.env.DEV ? (
+          <AuthTextLink to="/sign-up" state={{ from: state?.from }}>
+            계정이 없나요? 회원가입
+          </AuthTextLink>
+        ) : undefined
       }
     >
       <AuthForm

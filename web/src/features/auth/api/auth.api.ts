@@ -1,5 +1,7 @@
 import type {
   ApiResponse,
+  AccountWithdrawalRequest,
+  AccountWithdrawalResult,
   CurrentUser,
   EmailVerificationEmailRequest,
   EmailVerificationRequest,
@@ -65,6 +67,18 @@ export async function getCurrentUser(signal?: AbortSignal) {
 export async function updateCurrentUserNickname(payload: UpdateCurrentUserNicknameRequest) {
   try {
     const response = await protectedApi.patch<ApiResponse<CurrentUser>>('/api/v1/users/me', payload)
+    return unwrapApiResponse(response.data)
+  } catch (error) {
+    throw toApiClientError(error)
+  }
+}
+
+export async function withdrawCurrentUser(payload: AccountWithdrawalRequest) {
+  try {
+    const response = await protectedApi.delete<ApiResponse<AccountWithdrawalResult>>(
+      '/api/v1/users/me',
+      { data: payload, withCredentials: true },
+    )
     return unwrapApiResponse(response.data)
   } catch (error) {
     throw toApiClientError(error)

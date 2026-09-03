@@ -12,6 +12,8 @@ public interface RefreshSessionStore {
 
 	void revoke(String sessionId, String digest);
 
+	void revokeAll(long userId);
+
 	record InspectionResult(Status status, Long userId, Instant expiresAt) {
 		public enum Status { VALID, INVALID, REUSED }
 		public static InspectionResult valid(long userId, Instant expiresAt) {

@@ -1,6 +1,8 @@
 import { ActionButton, Box, Flex, Text, VStack } from '@seed-design/react'
 import { useNavigate } from 'react-router-dom'
 
+import { PublicServiceFooter } from '@/pages/public-service/PublicServiceFooter'
+
 import './public-landing.css'
 
 export function PublicLandingPage() {
@@ -38,15 +40,17 @@ export function PublicLandingPage() {
           </VStack>
 
           <VStack width="full" gap="x2">
-            <ActionButton
-              className="public-landing-primary"
-              type="button"
-              size="large"
-              variant="brandSolid"
-              onClick={() => navigate('/sign-up')}
-            >
-              가입하고 시작하기
-            </ActionButton>
+            {import.meta.env.DEV ? (
+              <ActionButton
+                className="public-landing-primary"
+                type="button"
+                size="large"
+                variant="brandSolid"
+                onClick={() => navigate('/sign-up')}
+              >
+                가입하고 시작하기
+              </ActionButton>
+            ) : null}
             <ActionButton
               className="public-landing-login"
               type="button"
@@ -59,6 +63,7 @@ export function PublicLandingPage() {
           </VStack>
         </VStack>
       </Box>
+      <PublicServiceFooter />
     </VStack>
   )
 }

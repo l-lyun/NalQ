@@ -14,6 +14,7 @@ import {
 import type { FormEvent, ReactNode } from 'react'
 
 import { signUpTerms, type SignUpTermId } from './termsContent'
+import { PublicServiceFooter } from '@/pages/public-service/PublicServiceFooter'
 
 import './sign-up-page.css'
 
@@ -118,14 +119,15 @@ function SignUpShell({
   footer,
 }: SignUpShellProps) {
   return (
-    <Box as="main" minHeight="100dvh" bg="bg.layerDefault" pt="safeArea">
-      <VStack
-        className="sign-up-page"
-        px="spacingX.globalGutter"
-        pt="x4"
-        pb="spacingY.screenBottom"
-        gap="x4"
-      >
+    <VStack className="sign-up-public-layout" bg="bg.layerDefault">
+      <Box as="main" pt="safeArea">
+        <VStack
+          className="sign-up-page"
+          px="spacingX.globalGutter"
+          pt="x4"
+          pb="spacingY.screenBottom"
+          gap="x4"
+        >
         <ActionButton
           className="sign-up-back-button"
           type="button"
@@ -157,10 +159,12 @@ function SignUpShell({
           </VStack>
         </VStack>
 
-        {children}
-        {footer}
-      </VStack>
-    </Box>
+          {children}
+          {footer}
+        </VStack>
+      </Box>
+      <PublicServiceFooter preserveContext />
+    </VStack>
   )
 }
 

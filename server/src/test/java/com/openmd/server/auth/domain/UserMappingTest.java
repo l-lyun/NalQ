@@ -3,6 +3,7 @@ package com.openmd.server.auth.domain;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import jakarta.persistence.Column;
@@ -15,7 +16,7 @@ import org.junit.jupiter.api.Test;
 class UserMappingTest {
 
 	@Test
-	void normalizedEmailIsUniqueAndPasswordHashIsRequired() throws Exception {
+	void directCredentialsRemainMappedButCanBeClearedForAWithdrawnTombstone() throws Exception {
 		Table table = User.class.getAnnotation(Table.class);
 		assertNotNull(table);
 		assertEquals("users", table.name());
@@ -27,8 +28,11 @@ class UserMappingTest {
 			.noneMatch(columns -> Arrays.equals(columns, new String[]{"nickname"})));
 
 		Field passwordHash = User.class.getDeclaredField("passwordHash");
-		assertFalse(passwordHash.getAnnotation(Column.class).nullable());
+		assertTrue(passwordHash.getAnnotation(Column.class).nullable());
 		assertEquals(255, passwordHash.getAnnotation(Column.class).length());
+		Field withdrawalRequestId = User.class.getDeclaredField("withdrawalRequestId");
+		assertTrue(withdrawalRequestId.getAnnotation(Column.class).unique());
+		assertEquals(36, withdrawalRequestId.getAnnotation(Column.class).length());
 		Field nickname = User.class.getDeclaredField("nickname");
 		assertEquals(10, nickname.getAnnotation(Column.class).length());
 		assertThrows(NoSuchFieldException.class, () -> User.class.getDeclaredField("normalizedNickname"));
