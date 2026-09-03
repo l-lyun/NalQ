@@ -17,7 +17,9 @@ final class QuizGenerationTaskRegistry {
 
   void execute(Executor executor, String quizSetId, Runnable work) {
     AtomicBoolean released = new AtomicBoolean();
+    AtomicBoolean started = new AtomicBoolean();
     FutureTask<Void> future = new FutureTask<>(() -> {
+      started.set(true);
       try {
         work.run();
       } finally {
@@ -25,7 +27,7 @@ final class QuizGenerationTaskRegistry {
       }
       return null;
     });
-    TrackedTask tracked = new TrackedTask(future, released);
+    TrackedTask tracked = new TrackedTask(future, released, started);
     if (tasks.putIfAbsent(quizSetId, tracked) != null) {
       release(released);
       throw new IllegalStateException("Quiz generation task is already tracked");
@@ -46,7 +48,7 @@ final class QuizGenerationTaskRegistry {
       TrackedTask tracked = tasks.remove(quizSetId);
       if (tracked == null) continue;
       tracked.future().cancel(true);
-      release(tracked.released());
+      if (!tracked.started().get()) release(tracked.released());
       cancelled++;
     }
     return cancelled;
@@ -67,5 +69,6 @@ final class QuizGenerationTaskRegistry {
     if (released.compareAndSet(false, true)) capacity.release();
   }
 
-  private record TrackedTask(FutureTask<Void> future, AtomicBoolean released) {}
+  private record TrackedTask(
+      FutureTask<Void> future, AtomicBoolean released, AtomicBoolean started) {}
 }

@@ -61,7 +61,11 @@ public final class QuizGenerationCandidateValidator {
         && choices.size() >= 3
         && choices.size() <= 5
         && choices.stream().allMatch(choice -> choice != null && !invalid(choice.text(), 300))
-        && choices.stream().map(choice -> normalize(choice.text())).distinct().count() == choices.size()
+        && choices.stream()
+                .map(choice -> normalize(normalizeWhitespace(choice.text())))
+                .distinct()
+                .count()
+            == choices.size()
         && choices.stream().filter(ChoiceCandidate::correct).count() == 1
         && empty(value.acceptedAnswers())
         && empty(value.blanks())
@@ -161,10 +165,7 @@ public final class QuizGenerationCandidateValidator {
   }
 
   private String normalizedPrompt(String value) {
-    return normalize(value).codePoints()
-        .filter(Character::isLetterOrDigit)
-        .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append)
-        .toString();
+    return normalize(normalizeWhitespace(value));
   }
 
   private String normalize(String value) {

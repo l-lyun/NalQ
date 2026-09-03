@@ -549,10 +549,11 @@ Spring AI 외측 재시도, provider client 재시도와 OpenAI SDK 재시도를
 | queue capacity | 20 |
 | stale execution | 10분 |
 | prompt version | `quiz-generation-v1` |
-| generation enabled | `true` |
+| generation enabled | `false` |
 
 API key는 전용 환경변수·secret에서만 주입한다. 설정 객체 `toString()`, actuator, 예외 메시지와 로그에 노출하지 않는다.
 `generation enabled=false`이면 워커뿐 아니라 생성 POST와 활성 생성 조회 API도 등록하지 않아 처리 주체 없는 `GENERATING` 행을 만들지 않는다.
+확인 UI가 배포된 환경에서만 `OPENMD_QUIZ_GENERATION_ENABLED=true`를 명시해 기능을 활성화한다.
 
 ## 12. 로그와 계측
 

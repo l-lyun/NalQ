@@ -94,6 +94,30 @@ class QuizGenerationCandidateValidatorTest {
   }
 
   @Test
+  void rejectsChoicesThatDifferOnlyByUnicodeWhitespace() {
+    QuizGenerationCandidate candidate =
+        candidate(
+            QuestionType.MULTIPLE_CHOICE,
+            List.of(choice("TCP", true), choice(" TCP ", false), choice("UDP", false)),
+            List.of(),
+            List.of(),
+            "",
+            List.of());
+
+    assertEquals(0, validator.validateAll(List.of(candidate)).size());
+  }
+
+  @Test
+  void preservesMeaningfulOperatorsWhenDetectingDuplicatePrompts() {
+    QuizGenerationCandidate less = shortAnswerWithPrompt("a < b인가요?");
+    QuizGenerationCandidate greater = shortAnswerWithPrompt("a > b인가요?");
+    QuizGenerationCandidate c = shortAnswerWithPrompt("C의 특징은?");
+    QuizGenerationCandidate cpp = shortAnswerWithPrompt("C++의 특징은?");
+
+    assertEquals(4, validator.validateAll(List.of(less, greater, c, cpp)).size());
+  }
+
+  @Test
   void rejectsOverflowingBlankMarkersWithoutThrowing() {
     QuizGenerationCandidate candidate =
         new QuizGenerationCandidate(
@@ -211,7 +235,7 @@ class QuizGenerationCandidateValidatorTest {
         new QuizGenerationCandidate(
             QuestionType.SHORT_ANSWER,
             "다른 주제",
-            "뮤텍스의 목적은!!!",
+            " 뮤텍스의   목적은? ",
             "해설",
             "뮤텍스는 상호 배제를 제공한다.",
             List.of(),
@@ -257,5 +281,19 @@ class QuizGenerationCandidateValidatorTest {
 
   private ChoiceCandidate choice(String text, boolean correct) {
     return new ChoiceCandidate(text, correct);
+  }
+
+  private QuizGenerationCandidate shortAnswerWithPrompt(String prompt) {
+    return new QuizGenerationCandidate(
+        QuestionType.SHORT_ANSWER,
+        "기호",
+        prompt,
+        "해설",
+        "근거",
+        List.of(),
+        List.of("답"),
+        List.of(),
+        "",
+        List.of());
   }
 }

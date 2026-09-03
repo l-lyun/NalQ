@@ -26,13 +26,29 @@ public record GenerateQuizRequest(
 
   private String normalizePrompt(List<FieldError> fields) {
     if (generationPrompt == null) return null;
-    String normalized = generationPrompt.strip();
+    String normalized = trimUnicodeWhitespace(generationPrompt);
     if (normalized.isEmpty()) return null;
     if (normalized.codePointCount(0, normalized.length()) > 300) {
       fields.add(new FieldError("generationPrompt", "generationPrompt는 300자 이하여야 합니다."));
       return null;
     }
     return normalized;
+  }
+
+  private String trimUnicodeWhitespace(String value) {
+    int start = 0;
+    int end = value.length();
+    while (start < end) {
+      int codePoint = value.codePointAt(start);
+      if (!Character.isWhitespace(codePoint) && !Character.isSpaceChar(codePoint)) break;
+      start += Character.charCount(codePoint);
+    }
+    while (start < end) {
+      int codePoint = value.codePointBefore(end);
+      if (!Character.isWhitespace(codePoint) && !Character.isSpaceChar(codePoint)) break;
+      end -= Character.charCount(codePoint);
+    }
+    return value.substring(start, end);
   }
 
   private List<QuestionType> parseTypes(List<FieldError> fields) {

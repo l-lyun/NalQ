@@ -109,13 +109,30 @@ public class QuizGenerationService {
     if (config.maxQuestionCount() == null || !ALLOWED_COUNTS.contains(config.maxQuestionCount())) {
       throw invalid("maxQuestionCount", "maxQuestionCount는 5, 10, 15, 20 중 하나여야 합니다.");
     }
-    String prompt = config.generationPrompt() == null ? null : config.generationPrompt().strip();
+    String prompt =
+        config.generationPrompt() == null ? null : trimUnicodeWhitespace(config.generationPrompt());
     if (prompt != null && prompt.codePointCount(0, prompt.length()) > 300) {
       throw invalid("generationPrompt", "generationPrompt는 300자 이하여야 합니다.");
     }
     if (prompt != null && prompt.isEmpty()) prompt = null;
     return new QuizGenerationConfig(
         List.copyOf(types), config.difficulty(), config.maxQuestionCount(), prompt);
+  }
+
+  private String trimUnicodeWhitespace(String value) {
+    int start = 0;
+    int end = value.length();
+    while (start < end) {
+      int codePoint = value.codePointAt(start);
+      if (!Character.isWhitespace(codePoint) && !Character.isSpaceChar(codePoint)) break;
+      start += Character.charCount(codePoint);
+    }
+    while (start < end) {
+      int codePoint = value.codePointBefore(end);
+      if (!Character.isWhitespace(codePoint) && !Character.isSpaceChar(codePoint)) break;
+      end -= Character.charCount(codePoint);
+    }
+    return value.substring(start, end);
   }
 
   private boolean hasConstraint(Throwable exception, String constraint) {
