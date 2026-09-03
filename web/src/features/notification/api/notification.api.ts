@@ -12,7 +12,6 @@ export async function getNotifications(cursor?: string, signal?: AbortSignal) {
   const response = await protectedApi.get<ApiResponse<NotificationPage>>('/api/v1/notifications', {
     signal,
     params: cursor ? { cursor } : undefined,
-    headers: { 'Cache-Control': 'no-cache' },
   })
   return unwrapApiResponse(response.data)
 }

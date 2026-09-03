@@ -2,6 +2,7 @@ package com.openmd.server.notification.service;
 
 import com.openmd.server.global.error.BusinessException;
 import com.openmd.server.global.error.CommonErrorCode;
+import com.openmd.server.global.api.FieldError;
 import com.openmd.server.learningmaterial.domain.LearningMaterial;
 import com.openmd.server.learningmaterial.repository.LearningMaterialRepository;
 import com.openmd.server.notification.domain.NotificationType;
@@ -63,6 +64,7 @@ public class NotificationService {
     int size = Math.min(requestedSize, PAGE_SIZE);
     NotificationCursor cursor = NotificationCursor.decode(encodedCursor);
     Instant retainedSince = retainedSince();
+    validateCursor(userId, cursor, retainedSince);
     List<QuizGenerationNotification> fetched =
         notifications.findPage(
             userId,
@@ -119,6 +121,20 @@ public class NotificationService {
 
   private Instant retainedSince() {
     return clock.instant().minus(RETENTION);
+  }
+
+  private void validateCursor(long userId, NotificationCursor cursor, Instant retainedSince) {
+    if (cursor == null) return;
+    boolean valid =
+        notifications
+            .findOwnedRetained(cursor.notificationId(), userId, retainedSince)
+            .map(notification -> notification.getCreatedAt().equals(cursor.createdAt()))
+            .orElse(false);
+    if (!valid) {
+      throw new BusinessException(
+          CommonErrorCode.INVALID_INPUT,
+          List.of(new FieldError("cursor", "cursor가 올바르지 않습니다.")));
+    }
   }
 
   private Availability availability(

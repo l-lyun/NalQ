@@ -139,42 +139,43 @@ function NotificationCenterRuntime() {
   useEffect(() => {
     if (!userId || !foreground || !notifications.data) return
     const unseen = notifications.data.items.filter((item) => item.readAt === null)
-    const claimedIds = claimSnackbarNotifications(userId, unseen.map((item) => item.notificationId))
-    if (claimedIds.length === 0) return
-    const claimed = unseen.filter((item) => claimedIds.includes(item.notificationId))
-    if (isGenerationRoute(location.pathname)) return
+    void claimSnackbarNotifications(userId, unseen.map((item) => item.notificationId)).then((claimedIds) => {
+      if (claimedIds.length === 0) return
+      const claimed = unseen.filter((item) => claimedIds.includes(item.notificationId))
+      if (isGenerationRoute(location.pathname)) return
 
-    if (claimed.length > 1) {
+      if (claimed.length > 1) {
+        snackbar.create({
+          render: () => (
+            <AppSnackbar
+              message={`새 퀴즈 알림이 ${claimed.length}개 있어요.`}
+              actionLabel="알림보기"
+              onAction={() => {
+                snackbar.dismiss()
+                navigate('/notifications')
+              }}
+            />
+          ),
+        })
+        return
+      }
+
+      const notification = claimed[0]
+      if (!notification) return
+      const omitAction = location.pathname === '/learning/quizzes'
       snackbar.create({
         render: () => (
           <AppSnackbar
-            message={`새 퀴즈 알림이 ${claimed.length}개 있어요.`}
-            actionLabel="알림보기"
-            onAction={() => {
+            notification={notification}
+            message={notificationMessage(notification)}
+            actionLabel={omitAction ? undefined : notificationActionLabel(notification)}
+            onAction={omitAction ? undefined : () => {
               snackbar.dismiss()
-              navigate('/notifications')
+              navigate(notificationDestination(notification))
             }}
           />
         ),
       })
-      return
-    }
-
-    const notification = claimed[0]
-    if (!notification) return
-    const omitAction = location.pathname === '/learning/quizzes'
-    snackbar.create({
-      render: () => (
-        <AppSnackbar
-          notification={notification}
-          message={notificationMessage(notification)}
-          actionLabel={omitAction ? undefined : notificationActionLabel(notification)}
-          onAction={omitAction ? undefined : () => {
-            snackbar.dismiss()
-            navigate(notificationDestination(notification))
-          }}
-        />
-      ),
     })
   }, [foreground, location.pathname, navigate, notifications.data, snackbar, userId])
 

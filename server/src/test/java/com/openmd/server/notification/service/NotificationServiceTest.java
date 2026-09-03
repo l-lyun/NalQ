@@ -140,6 +140,20 @@ class NotificationServiceTest {
     assertEquals("cursor", error.getFields().getFirst().field());
   }
 
+  @Test
+  void rejectsAWellFormedCursorThatDoesNotBelongToTheCurrentUsersRetainedNotifications() {
+    QuizGenerationNotification foreign =
+        notification("00000000-0000-0000-0000-000000000020", 20L);
+
+    BusinessException error =
+        assertThrows(
+            BusinessException.class,
+            () -> service.list(7L, NotificationCursor.encode(foreign), 20));
+
+    assertEquals(CommonErrorCode.INVALID_INPUT, error.getErrorCode());
+    assertEquals("cursor", error.getFields().getFirst().field());
+  }
+
   private QuizGenerationNotification notification(String publicId, long suffix) {
     QuizSet set = QuizSet.ready(7L, suffix, "퀴즈 " + suffix);
     ReflectionTestUtils.setField(set, "publicId", "set-" + suffix);

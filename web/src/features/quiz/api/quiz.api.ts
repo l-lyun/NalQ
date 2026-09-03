@@ -46,7 +46,6 @@ export const getActiveQuizSet = (materialId: string, signal?: AbortSignal) =>
 export async function getQuizSet(quizSetId: string, signal?: AbortSignal) {
   const response = await protectedApi.get<ApiResponse<QuizSetState>>(`/api/v1/quiz-sets/${quizSetId}`, {
     signal,
-    headers: { 'Cache-Control': 'no-cache' },
   })
   return unwrapApiResponse(response.data)
 }

@@ -9,8 +9,10 @@ import static org.mockito.Mockito.when;
 
 import com.openmd.server.notification.domain.QuizGenerationNotification;
 import com.openmd.server.notification.repository.NotificationRepository;
+import com.openmd.server.quiz.domain.QuizGenerationCandidate;
 import com.openmd.server.quiz.domain.entity.QuizSet;
 import com.openmd.server.quiz.domain.type.QuizSetFailureCode;
+import com.openmd.server.quiz.domain.type.QuestionType;
 import com.openmd.server.quiz.repository.QuizEssayAnswerGuideRepository;
 import com.openmd.server.quiz.repository.QuizFillInTheBlankAnswerRepository;
 import com.openmd.server.quiz.repository.QuizFillInTheBlankRepository;
@@ -25,10 +27,11 @@ import org.junit.jupiter.api.Test;
 class QuizGenerationNotificationTest {
   private final QuizSetRepository sets = mock(QuizSetRepository.class);
   private final NotificationRepository notifications = mock(NotificationRepository.class);
+  private final QuizQuestionRepository questions = mock(QuizQuestionRepository.class);
   private final QuizGenerationPersistenceService service =
       new QuizGenerationPersistenceService(
           sets,
-          mock(QuizQuestionRepository.class),
+          questions,
           mock(QuizQuestionChoiceRepository.class),
           mock(QuizShortAnswerAnswerRepository.class),
           mock(QuizEssayAnswerGuideRepository.class),
@@ -56,5 +59,32 @@ class QuizGenerationNotificationTest {
     service.failGeneration(7L, set.getPublicId());
 
     verify(notifications, never()).save(any());
+  }
+
+  @Test
+  void fewerThanEightyPercentValidQuestionsFailsWithoutPersistingPartialResults() {
+    QuizSet set = QuizSet.generating(7L, 31L, "운영체제 퀴즈");
+    when(sets.findOwnedForUpdate(set.getPublicId(), 7L)).thenReturn(Optional.of(set));
+    QuizGenerationCandidate oneValidQuestion =
+        new QuizGenerationCandidate(
+            null,
+            QuestionType.SHORT_ANSWER,
+            "운영체제",
+            "프로세스란 무엇인가요?",
+            "실행 중인 프로그램입니다.",
+            "프로세스는 실행 중인 프로그램이다.",
+            List.of(),
+            List.of("실행 중인 프로그램"),
+            List.of(),
+            null,
+            List.of());
+
+    assertEquals(
+        0,
+        service.complete(7L, set.getPublicId(), List.of(oneValidQuestion), 10));
+
+    assertEquals(QuizSetFailureCode.SOURCE_INSUFFICIENT, set.getFailureCode());
+    verify(questions, never()).saveAndFlush(any());
+    verify(notifications).save(any(QuizGenerationNotification.class));
   }
 }

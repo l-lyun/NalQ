@@ -29,6 +29,7 @@ import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 
 class NotificationControllerTest {
+  private static final String NOTIFICATION_ID = "00000000-0000-4000-8000-000000000001";
   private final NotificationService service = mock(NotificationService.class);
   private MockMvc mvc;
 
@@ -68,17 +69,27 @@ class NotificationControllerTest {
   @Test
   void marksOnlyThroughTheVisibleNotificationRead() throws Exception {
     Instant readAt = Instant.parse("2026-09-03T01:08:00Z");
-    when(service.readAll(7L, "notification-1"))
+    when(service.readAll(7L, NOTIFICATION_ID))
         .thenReturn(new NotificationReadAllResult(readAt, 4, 1L));
 
     mvc.perform(
             put("/api/v1/notifications/read-all")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"throughNotificationId\":\"notification-1\"}"))
+                .content("{\"throughNotificationId\":\"" + NOTIFICATION_ID + "\"}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.updatedCount").value(4))
         .andExpect(jsonPath("$.data.unreadCount").value(1));
-    verify(service).readAll(7L, "notification-1");
+    verify(service).readAll(7L, NOTIFICATION_ID);
+  }
+
+  @Test
+  void rejectsAMalformedReadAllBoundaryBeforeCallingTheService() throws Exception {
+    mvc.perform(
+            put("/api/v1/notifications/read-all")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"throughNotificationId\":\"not-a-uuid\"}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("COMMON_001"));
   }
 
   @Test

@@ -8,6 +8,7 @@ import com.openmd.server.quiz.domain.entity.*;
 import com.openmd.server.quiz.domain.type.*;
 import com.openmd.server.quiz.repository.*;
 import java.util.*;
+import java.util.stream.IntStream;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -56,7 +57,11 @@ public class QuizGenerationPersistenceService {
     complete(
         userId,
         quizSetId,
-        selectedTypes.stream().map(this::temporaryCandidate).toList(),
+        selectedTypes.isEmpty()
+            ? List.of()
+            : IntStream.range(0, maxQuestionCount)
+                .mapToObj(index -> temporaryCandidate(selectedTypes.get(index % selectedTypes.size())))
+                .toList(),
         maxQuestionCount);
   }
 
@@ -78,7 +83,9 @@ public class QuizGenerationPersistenceService {
     }
     List<ValidatedQuizQuestion> valid =
         validator.validateAll(candidates).stream().limit(maxQuestionCount).toList();
-    if (valid.isEmpty()) {
+    int minimumValidQuestionCount =
+        Math.toIntExact((maxQuestionCount * 4L + 4L) / 5L);
+    if (valid.size() < minimumValidQuestionCount) {
       set.fail(QuizSetFailureCode.SOURCE_INSUFFICIENT);
       notifications.save(QuizGenerationNotification.from(set));
       return 0;

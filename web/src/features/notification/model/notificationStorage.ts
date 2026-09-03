@@ -53,7 +53,11 @@ export function loadPendingGeneration(userId: number) {
     if (typeof candidate.quizSetId !== 'string' || typeof candidate.materialId !== 'string' || typeof candidate.savedAt !== 'string') throw new Error('invalid')
     return candidate as PendingQuizGeneration
   } catch {
-    localStorage.removeItem(pendingKey(userId))
+    try {
+      localStorage.removeItem(pendingKey(userId))
+    } catch {
+      // 저장소 접근 자체가 차단된 환경에서는 메모리 상태만 사용한다.
+    }
     return null
   }
 }
@@ -69,7 +73,7 @@ export function clearPendingGeneration(userId: number, quizSetId?: string) {
   }
 }
 
-export function claimSnackbarNotifications(userId: number, notificationIds: string[], now = Date.now()) {
+function claimSnackbarNotificationsFromStorage(userId: number, notificationIds: string[], now: number) {
   try {
     const raw = localStorage.getItem(deliveredKey(userId))
     const parsed: unknown = raw ? JSON.parse(raw) : []
@@ -88,5 +92,15 @@ export function claimSnackbarNotifications(userId: number, notificationIds: stri
     claimed.forEach((id) => delivered.add(id))
     fallbackClaims.set(userId, delivered)
     return claimed
+  }
+}
+
+export async function claimSnackbarNotifications(userId: number, notificationIds: string[], now = Date.now()) {
+  const claim = () => claimSnackbarNotificationsFromStorage(userId, notificationIds, now)
+  if (!navigator.locks) return claim()
+  try {
+    return await navigator.locks.request(`${DELIVERED_PREFIX}:${userId}`, { mode: 'exclusive' }, claim)
+  } catch {
+    return claim()
   }
 }

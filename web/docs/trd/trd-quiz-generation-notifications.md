@@ -10,12 +10,13 @@ scope: web
 
 - 서버 알림 원장을 foreground에서 조회하고 종 badge, Snackbar, 별도 알림 페이지에 같은 상태를 제공한다.
 - 생성 요청의 `quizSetId`를 사용자별 localStorage에 한 건 보존해 생성 화면을 떠난 뒤에도 terminal 상태를 확인한다.
-- Snackbar 전달 이력은 서버 `readAt`과 분리해 같은 사용자·기기에서 `notificationId`당 한 번만 표시한다.
+- Snackbar 전달 이력은 서버 `readAt`과 분리해 같은 사용자·기기에서 `notificationId`당 한 번만 표시한다. 여러 탭의 claim은 Web Locks로 직렬화하고, 지원하지 않는 환경에서는 기존 localStorage claim으로 낮춘다.
 
 ## 상태 경계
 
 - `openmd.quiz-generation.pending.v1:{userId}`: 현재 기기의 pending `quizSetId`, `materialId`, 저장 시각. 생성 요청 성공과 활성 생성 복원에서 갱신하고 terminal 확인 뒤 제거한다.
 - `openmd.notification.snackbar-delivered.v1:{userId}`: 최근 90일의 Snackbar claim. 최대 200건으로 제한하며 서버 읽음 상태를 변경하지 않는다.
+- localStorage가 보안 정책으로 차단된 환경에서는 shell을 중단하지 않고 pending은 서버 알림 목록으로 복구하며, Snackbar 중복 방지는 현재 탭의 메모리 Set으로 유지한다.
 - TanStack Query `['private', 'notifications']`: 첫 페이지 badge·Snackbar 상태와 알림 페이지 pagination을 무효화하는 공통 prefix다.
 
 ## 실행 흐름
