@@ -18,6 +18,7 @@ import com.openmd.server.global.error.BusinessException;
 import com.openmd.server.quiz.domain.entity.QuizAttempt;
 import com.openmd.server.quiz.domain.entity.QuizSet;
 import com.openmd.server.quiz.domain.type.QuizSetStatus;
+import com.openmd.server.quiz.domain.type.QuizSetFailureCode;
 import com.openmd.server.quiz.repository.QuizAttemptQuestionRepository;
 import com.openmd.server.quiz.repository.QuizAttemptRepository;
 import com.openmd.server.quiz.repository.QuizFillInTheBlankRepository;
@@ -44,6 +45,25 @@ class QuizSetQueryServiceTest {
   private final QuizSetQueryService service =
       new QuizSetQueryService(
           sets, questions, choices, blanks, materials, attempts, attemptQuestions);
+
+  @Test
+  void failedQuizSetUsesThePublicMessagesFromTheApiContract() {
+    QuizSet insufficient = QuizSet.generating(7L, 31L, "부족 퀴즈");
+    insufficient.fail(QuizSetFailureCode.SOURCE_INSUFFICIENT);
+    QuizSet failed = QuizSet.generating(7L, 32L, "실패 퀴즈");
+    failed.fail(QuizSetFailureCode.GENERATION_FAILED);
+    when(sets.findByPublicIdAndUserId(insufficient.getPublicId(), 7L))
+        .thenReturn(java.util.Optional.of(insufficient));
+    when(sets.findByPublicIdAndUserId(failed.getPublicId(), 7L))
+        .thenReturn(java.util.Optional.of(failed));
+
+    assertEquals(
+        "학습 자료에서 충분한 문제를 만들지 못했어요.",
+        service.get(7L, insufficient.getPublicId()).failure().message());
+    assertEquals(
+        "문제를 만드는 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.",
+        service.get(7L, failed.getPublicId()).failure().message());
+  }
 
   @Test
   void listProjectsTheIdsNeededToChooseTheNextLearningScreen() {

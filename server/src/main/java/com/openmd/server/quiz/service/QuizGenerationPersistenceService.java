@@ -7,8 +7,8 @@ import com.openmd.server.quiz.domain.*;
 import com.openmd.server.quiz.domain.entity.*;
 import com.openmd.server.quiz.domain.type.*;
 import com.openmd.server.quiz.repository.*;
+import java.time.Instant;
 import java.util.*;
-import java.util.stream.IntStream;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,24 +47,6 @@ public class QuizGenerationPersistenceService {
     this.notifications = notifications;
   }
 
-  /** TODO: 외부 문제 생성 모델 연동이 완료되면 이 임시 고정 후보 생성 경로를 제거한다. */
-  @Transactional
-  public void completeWithTemporaryStub(
-      long userId,
-      String quizSetId,
-      List<QuestionType> selectedTypes,
-      int maxQuestionCount) {
-    complete(
-        userId,
-        quizSetId,
-        selectedTypes.isEmpty()
-            ? List.of()
-            : IntStream.range(0, maxQuestionCount)
-                .mapToObj(index -> temporaryCandidate(selectedTypes.get(index % selectedTypes.size())))
-                .toList(),
-        maxQuestionCount);
-  }
-
   @Transactional
   public int complete(
       long userId,
@@ -74,8 +56,7 @@ public class QuizGenerationPersistenceService {
     QuizSet set =
         sets.findOwnedForUpdate(quizSetId, userId)
             .orElseThrow(() -> new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND));
-    if (set.getStatus() != QuizSetStatus.GENERATING)
-      throw new IllegalStateException("Quiz set is already finalized");
+    if (set.getStatus() != QuizSetStatus.GENERATING) return 0;
     if (maxQuestionCount < 1) {
       throw new BusinessException(
           CommonErrorCode.INVALID_INPUT,
@@ -98,18 +79,34 @@ public class QuizGenerationPersistenceService {
 
   @Transactional
   public void failGeneration(long userId, String quizSetId) {
+    failGeneration(userId, quizSetId, QuizSetFailureCode.GENERATION_FAILED);
+  }
+
+  @Transactional
+  public void failGeneration(long userId, String quizSetId, QuizSetFailureCode failureCode) {
     QuizSet set =
         sets.findOwnedForUpdate(quizSetId, userId)
             .orElseThrow(() -> new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND));
     if (set.getStatus() == QuizSetStatus.GENERATING) {
-      set.fail(QuizSetFailureCode.GENERATION_FAILED);
+      set.fail(failureCode);
       notifications.save(QuizGenerationNotification.from(set));
     }
   }
 
   @Transactional
-  public int failInterruptedGenerations() {
-    List<QuizSet> interrupted = sets.findAllByStatus(QuizSetStatus.GENERATING);
+  public boolean markStarted(long userId, String quizSetId) {
+    QuizSet set =
+        sets.findOwnedForUpdate(quizSetId, userId)
+            .orElseThrow(() -> new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND));
+    if (set.getStatus() != QuizSetStatus.GENERATING) return false;
+    set.markGenerationStarted(Instant.now());
+    return true;
+  }
+
+  @Transactional
+  public int failInterruptedGenerations(Instant startupAt) {
+    List<QuizSet> interrupted =
+        sets.findInterruptedForUpdate(QuizSetStatus.GENERATING, startupAt);
     interrupted.forEach(
         set -> {
           set.fail(QuizSetFailureCode.GENERATION_FAILED);
@@ -118,64 +115,16 @@ public class QuizGenerationPersistenceService {
     return interrupted.size();
   }
 
-  private QuizGenerationCandidate temporaryCandidate(QuestionType type) {
-    return switch (type) {
-      case MULTIPLE_CHOICE ->
-          new QuizGenerationCandidate(
-              null,
-              type,
-              "임시 객관식",
-              "NalQ의 임시 퀴즈 정답을 고르세요.",
-              "외부 모델 연동 전 사용하는 임시 해설입니다.",
-              "외부 모델 연동 전 사용하는 임시 원문 근거입니다.",
-              List.of(
-                  new QuizGenerationCandidate.ChoiceCandidate("정답", true),
-                  new QuizGenerationCandidate.ChoiceCandidate("오답 1", false),
-                  new QuizGenerationCandidate.ChoiceCandidate("오답 2", false)),
-              List.of(),
-              List.of(),
-              null,
-              List.of());
-      case FILL_IN_THE_BLANK ->
-          new QuizGenerationCandidate(
-              null,
-              type,
-              "임시 빈칸",
-              "NalQ의 임시 빈칸 정답은 [1]입니다.",
-              "외부 모델 연동 전 사용하는 임시 해설입니다.",
-              "외부 모델 연동 전 사용하는 임시 원문 근거입니다.",
-              List.of(),
-              List.of(),
-              List.of(new QuizGenerationCandidate.BlankCandidate(1, List.of("정답"))),
-              null,
-              List.of());
-      case SHORT_ANSWER ->
-          new QuizGenerationCandidate(
-              null,
-              type,
-              "임시 단답형",
-              "NalQ의 임시 단답형 정답을 입력하세요.",
-              "외부 모델 연동 전 사용하는 임시 해설입니다.",
-              "외부 모델 연동 전 사용하는 임시 원문 근거입니다.",
-              List.of(),
-              List.of("정답"),
-              List.of(),
-              null,
-              List.of());
-      case ESSAY ->
-          new QuizGenerationCandidate(
-              null,
-              type,
-              "임시 서술형",
-              "NalQ의 임시 서술형 답안을 작성하세요.",
-              "외부 모델 연동 전 사용하는 임시 해설입니다.",
-              "외부 모델 연동 전 사용하는 임시 원문 근거입니다.",
-              List.of(),
-              List.of(),
-              List.of(),
-              "외부 모델 연동 전 사용하는 임시 모범 답안입니다.",
-              List.of("임시 핵심 포인트"));
-    };
+  @Transactional
+  public List<String> failStaleGenerations(Instant cutoff) {
+    List<QuizSet> stale =
+        sets.findStaleForUpdate(QuizSetStatus.GENERATING, cutoff);
+    stale.forEach(
+        set -> {
+          set.fail(QuizSetFailureCode.GENERATION_FAILED);
+          notifications.save(QuizGenerationNotification.from(set));
+        });
+    return stale.stream().map(QuizSet::getPublicId).toList();
   }
 
   private void persist(long setId, ValidatedQuizQuestion validated) {

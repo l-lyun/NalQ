@@ -51,7 +51,7 @@ class QuizGenerationControllerTest {
             List.of(QuestionType.MULTIPLE_CHOICE, QuestionType.ESSAY), QuizDifficulty.NORMAL, 10);
     QuizGenerationConfig command =
         new QuizGenerationConfig(
-            config.selectedTypes(), config.difficulty(), config.maxQuestionCount());
+            config.selectedTypes(), config.difficulty(), config.maxQuestionCount(), "동시성에 집중");
     when(service.accept(7L, "123", command))
         .thenReturn(
             new AcceptedQuizGeneration(
@@ -70,7 +70,8 @@ class QuizGenerationControllerTest {
                 .content(
                     """
                     {"selectedTypes":["MULTIPLE_CHOICE","ESSAY"],
-                     "difficulty":"NORMAL","maxQuestionCount":10}
+                     "difficulty":"NORMAL","maxQuestionCount":10,
+                     "generationPrompt":"  동시성에 집중  "}
                     """))
         .andExpect(status().isAccepted())
         .andExpect(jsonPath("$.data.quizSetId").value("set-1"))
@@ -78,6 +79,22 @@ class QuizGenerationControllerTest {
         .andExpect(jsonPath("$.data.requestedConfig.selectedTypes[1]").value("ESSAY"))
         .andExpect(jsonPath("$.data.idempotencyKey").doesNotExist());
     verify(service).accept(7L, "123", command);
+  }
+
+  @Test
+  void acceptsTwentyQuestionsAndRejectsGenerationPromptsOverThreeHundredCodePoints()
+      throws Exception {
+    mvc.perform(
+            post("/api/v1/learning-materials/123/quiz-sets")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"selectedTypes":["ESSAY"],"difficulty":"HARD",
+                     "maxQuestionCount":20,"generationPrompt":"%s"}
+                    """.formatted("😀".repeat(301))))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("COMMON_001"))
+        .andExpect(jsonPath("$.error.fields[0].field").value("generationPrompt"));
   }
 
   @Test

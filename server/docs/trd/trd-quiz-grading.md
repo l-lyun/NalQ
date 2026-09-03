@@ -28,14 +28,14 @@ scope: server
 - 사용자 제출은 유형별 정답 원장과 분리된 `quiz_submitted_answers`에 저장한다.
 - 문제 유형 값은 현재 서버 `QuestionType`과 같은 `MULTIPLE_CHOICE|FILL_IN_THE_BLANK|SHORT_ANSWER|ESSAY`를 사용한다.
 - 외부 생성 결과의 문제 번호는 저장하지 않는다. 유형별 검증을 통과한 후보만 원래 배열 순서대로 모아 서버가 `question_number=1..N`을 부여한다.
-- 생성 요청 수나 유형별 목표 수를 성공 조건으로 저장하지 않는다. 유형별 원장이 완전한 유효 문제 하나 이상을 확정하면 `READY`, 하나도 없으면 `FAILED`다.
+- 생성 요청 수와 유형별 목표 수는 DB에 저장하지 않지만 현재 작업 메모리에서 80% 성공선을 계산한다. 생성 워커의 세부 정책은 [LLM 퀴즈 생성 워커 TRD](trd-llm-quiz-generation-worker.md)가 소유한다.
 - 생성 실패 원인은 `quiz_sets.failure_code`에 보존하고 메시지와 재시도 가능 여부는 서버 정책으로 계산한다.
 - 최초 자동 판정과 현재 최종 판정을 `automatic_grading_result`, `final_grading_result`로 구분한다.
 - `grading_method`는 최종 판정의 출처이며 조회 시 항상 `final_grading_result`를 사용한다.
 - 복습 성공은 원본 `MAIN` 문항의 `review_resolved_at`으로 기록하고 원래 오답 판정은 바꾸지 않는다.
 - `attemptId`는 클라이언트가 정한 불변 `MAIN` 회차의 공개 식별자다. 같은 경로에 이미 존재하는 회차는 저장된 현재 상태를 반환하며 별도 request hash·fingerprint·replay 원장은 만들지 않는다.
-- 생성 요청의 `requestedConfig`는 서버 DB에 저장하지 않는다. 생성 접수 성공 응답에서만 요청값을 echo하고 이후 상태 조회는 서버 상태와 실제 확정 문제 정보만 반환한다.
-- MVP에는 worker lease·별도 생성 잠금 테이블, 교차 문제 참조를 막는 복합 FK, 유형별 제출 테이블을 추가하지 않는다. 일반 트랜잭션과 기존 unique/check 제약, 제출 서비스의 문제 소속 검증을 사용한다.
+- 생성 요청의 `requestedConfig`와 `generationPrompt`는 서버 DB에 저장하지 않는다. 생성 접수 성공 응답에서는 유형·난이도·문제 수만 echo하고 이후 상태 조회는 서버 상태와 실제 확정 문제 정보만 반환한다.
+- MVP에는 worker lease·별도 생성 잠금 테이블, 교차 문제 참조를 막는 복합 FK, 유형별 제출 테이블을 추가하지 않는다. 사용자당 활성 생성은 `quiz_sets.status`에서 파생된 generated column의 UNIQUE 제약으로 보장한다.
 - 성능 개선용 보조 인덱스는 이번 migration에 추가하지 않는다.
 
 ## 3. 물리 데이터 모델
@@ -127,7 +127,7 @@ MVP는 문제당 보기 3개 이상 5개 이하, `is_correct=true`인 보기 정
 4. 유효 후보에 `question_number=1..N`을 새로 부여한다.
 5. 짧은 최종 트랜잭션에서 공통 문제·유형별 하위 행·QuizSet 상태를 함께 저장한다.
 
-무효 후보에는 `quiz_questions`와 유형별 하위 행을 만들지 않는다. 일부 후보가 제외되어도 유효 후보가 하나 이상이면 `READY`, 하나도 없으면 `FAILED`다.
+무효 후보에는 `quiz_questions`와 유형별 하위 행을 만들지 않는다. 보완 생성과 검증을 마친 최종 유효 후보가 요청 수의 80% 이상일 때만 전체를 저장하고 `READY`로 확정한다. 미달하면 일부 후보를 저장하지 않는다.
 
 ### 3.7 `quiz_attempts`
 

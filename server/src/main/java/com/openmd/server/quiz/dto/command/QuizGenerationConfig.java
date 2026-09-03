@@ -5,4 +5,13 @@ import com.openmd.server.quiz.domain.type.QuizDifficulty;
 import java.util.List;
 
 public record QuizGenerationConfig(
-    List<QuestionType> selectedTypes, QuizDifficulty difficulty, Integer maxQuestionCount) {}
+    List<QuestionType> selectedTypes,
+    QuizDifficulty difficulty,
+    Integer maxQuestionCount,
+    String generationPrompt) {
+
+  public QuizGenerationConfig(
+      List<QuestionType> selectedTypes, QuizDifficulty difficulty, Integer maxQuestionCount) {
+    this(selectedTypes, difficulty, maxQuestionCount, null);
+  }
+}

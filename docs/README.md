@@ -45,6 +45,7 @@ scope: repository
 | 학습자료 만들기 | [학습자료 만들기 흐름](ux/flow-content-import.md) | Flow | 검토 중 |
 | Notion 학습자료 가져오기 | [Notion 가져오기 화면](ux/screen-notion-import.md) | Screen Spec | 검토 중 |
 | 퀴즈 생성부터 복습까지 | [퀴즈 흐름](ux/flow-quiz-solving.md) | Flow | 검토 중 |
+| 퀴즈 생성 조건과 OpenAI 전송 확인 | [퀴즈 생성 화면](ux/screen-quiz-generation.md) | Screen Spec | 검토 중 |
 | 퀴즈 생성 결과 알림과 복귀 | [퀴즈 생성 결과 알림 흐름](ux/flow-quiz-generation-notifications.md) | Flow | 검토 중 |
 | 전역 알림 목록과 생성 결과 안내 | [알림 목록과 생성 결과 Snackbar](ux/screen-notifications.md) | Screen Spec | 검토 중 |
 | 서술형 자기평가와 채점 결과 | [퀴즈 피드백 화면](ux/screen-quiz-feedback.md) | Screen Spec | 검토 중 |
@@ -83,6 +84,7 @@ TRD는 각 애플리케이션의 `docs/trd/trd-*.md`에 두며, 파일명과 제
 | Server | 패키지 구조 | [서버 패키지 구조 TRD](../server/docs/trd/trd-package-structure.md) | 구현 동기화 |
 | Server | 학습자료 생성·조회 | [학습자료 생성·조회 TRD](../server/docs/trd/trd-learning-material-creation.md) | 구현 동기화 |
 | Server | Notion 단일 페이지 가져오기 | [Notion 가져오기 TRD](../server/docs/trd/trd-notion-page-import.md) | 검토 중 |
+| Server | LLM 퀴즈 생성 워커 | [LLM 퀴즈 생성 워커 TRD](../server/docs/trd/trd-llm-quiz-generation-worker.md) | 구현 동기화 |
 | Server | 퀴즈·복습 통합 저장 모델 | [퀴즈 채점 TRD](../server/docs/trd/trd-quiz-grading.md) | 목표 설계 확정, V5 SQL 반영·Java 구현 동기화 전 |
 | Web | 인증 상태·토큰·API 통합 | [웹 인증 TRD](../web/docs/trd/trd-authentication.md) | 구현 동기화 |
 | Web | 앱 셸·최상위 탭 상태 보존 | [웹 앱 셸 TRD](../web/docs/trd/trd-app-shell-navigation.md) | 구현 동기화 |

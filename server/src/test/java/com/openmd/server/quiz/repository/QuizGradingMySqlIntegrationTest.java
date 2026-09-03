@@ -66,6 +66,7 @@ import org.testcontainers.utility.DockerImageName;
 @SpringBootTest(
     properties = {
       "openmd.auth.enabled=false",
+      "openmd.quiz.generation.enabled=false",
       "spring.jpa.open-in-view=false",
       "spring.autoconfigure.exclude="
           + "org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration,"
@@ -136,15 +137,13 @@ class QuizGradingMySqlIntegrationTest {
   }
 
   @Test
-  void acceptsAndFindsAnActiveGenerationThenTemporarilyCompletesItAfterThreeSeconds()
-      throws InterruptedException {
+  void acceptsOneGenerationPerUserAndAtomicallyCompletesItWithANotification() {
     Fixture owner = fixture();
     Fixture other = fixture();
     QuizGenerationConfig config =
         new QuizGenerationConfig(
             List.of(QuestionType.MULTIPLE_CHOICE, QuestionType.ESSAY), QuizDifficulty.NORMAL, 10);
 
-    long acceptedAt = System.nanoTime();
     var accepted =
         generationAcceptance.accept(owner.userId(), Long.toString(owner.materialId()), config);
 
@@ -173,7 +172,9 @@ class QuizGradingMySqlIntegrationTest {
             BusinessException.class,
             () ->
                 generationAcceptance.accept(
-                    owner.userId(), Long.toString(owner.materialId()), config));
+                    owner.userId(),
+                    Long.toString(materials.saveAndFlush(material(owner.userId())).getId()),
+                    config));
     assertEquals(QuizErrorCode.GENERATION_ACTIVE, active.getErrorCode());
 
     BusinessException foreign =
@@ -182,20 +183,26 @@ class QuizGradingMySqlIntegrationTest {
             () -> generationAcceptance.active(other.userId(), Long.toString(owner.materialId())));
     assertEquals(CommonErrorCode.RESOURCE_NOT_FOUND, foreign.getErrorCode());
 
-    long deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos();
-    String status;
-    do {
-      status =
-          jdbc.queryForObject(
-              "SELECT status FROM quiz_sets WHERE public_id = ?",
-              String.class,
-              accepted.quizSetId());
-      if (QuizSetStatus.READY.name().equals(status)) break;
-      Thread.sleep(100);
-    } while (System.nanoTime() < deadline);
+    generation.complete(
+        owner.userId(),
+        accepted.quizSetId(),
+        List.of(
+            numbered(multipleChoice(3), 1),
+            numbered(essay(), 2),
+            numbered(multipleChoice(3), 3),
+            numbered(essay(), 4),
+            numbered(multipleChoice(3), 5),
+            numbered(essay(), 6),
+            numbered(multipleChoice(3), 7),
+            numbered(essay(), 8),
+            numbered(multipleChoice(3), 9),
+            numbered(essay(), 10)),
+        10);
+    String status =
+        jdbc.queryForObject(
+            "SELECT status FROM quiz_sets WHERE public_id = ?", String.class, accepted.quizSetId());
 
     assertEquals(QuizSetStatus.READY.name(), status);
-    assertTrue(System.nanoTime() - acceptedAt >= Duration.ofMillis(2500).toNanos());
     assertEquals(
         List.of(
             QuestionType.MULTIPLE_CHOICE.name(),
@@ -223,8 +230,9 @@ class QuizGradingMySqlIntegrationTest {
     Fixture fixture = fixture();
     QuizSet interrupted =
         sets.saveAndFlush(QuizSet.generating(fixture.userId(), fixture.materialId(), "자료 퀴즈"));
+    Instant startup = Instant.now().plusSeconds(1);
 
-    assertEquals(1, generation.failInterruptedGenerations());
+    assertEquals(1, generation.failInterruptedGenerations(startup));
 
     assertEquals(
         QuizSetStatus.FAILED.name(),
@@ -244,6 +252,22 @@ class QuizGradingMySqlIntegrationTest {
             "SELECT COUNT(*) FROM notifications WHERE quiz_set_id = ?",
             Long.class,
             interrupted.getPublicId()));
+  }
+
+  @Test
+  void startupRecoveryLeavesGenerationsAcceptedAfterTheProcessStarted() {
+    Fixture fixture = fixture();
+    Instant startup = Instant.now();
+    QuizSet acceptedAfterStartup =
+        sets.saveAndFlush(QuizSet.generating(fixture.userId(), fixture.materialId(), "새 퀴즈"));
+
+    assertEquals(0, generation.failInterruptedGenerations(startup));
+    assertEquals(
+        QuizSetStatus.GENERATING.name(),
+        jdbc.queryForObject(
+            "SELECT status FROM quiz_sets WHERE id = ?",
+            String.class,
+            acceptedAfterStartup.getId()));
   }
 
   @Test
@@ -789,7 +813,6 @@ class QuizGradingMySqlIntegrationTest {
             .mapToObj(i -> new ChoiceCandidate("보기 " + i, i == 1))
             .toList();
     return new QuizGenerationCandidate(
-        8,
         QuestionType.MULTIPLE_CHOICE,
         "객관식",
         "정답?",
@@ -798,13 +821,26 @@ class QuizGradingMySqlIntegrationTest {
         values,
         List.of(),
         List.of(),
-        null,
+        "",
         List.of());
+  }
+
+  private QuizGenerationCandidate numbered(QuizGenerationCandidate candidate, int number) {
+    return new QuizGenerationCandidate(
+        candidate.type(),
+        candidate.topic(),
+        candidate.prompt() + " " + number,
+        candidate.explanation(),
+        candidate.sourceExcerpt(),
+        candidate.choices(),
+        candidate.acceptedAnswers(),
+        candidate.blanks(),
+        candidate.modelAnswer(),
+        candidate.keyPoints());
   }
 
   private QuizGenerationCandidate fillBlank() {
     return new QuizGenerationCandidate(
-        9,
         QuestionType.FILL_IN_THE_BLANK,
         "빈칸",
         "큐는 [1]이다.",
@@ -813,13 +849,12 @@ class QuizGradingMySqlIntegrationTest {
         List.of(),
         List.of(),
         List.of(new BlankCandidate(1, List.of("FIFO"))),
-        null,
+        "",
         List.of());
   }
 
   private QuizGenerationCandidate shortAnswer() {
     return new QuizGenerationCandidate(
-        10,
         QuestionType.SHORT_ANSWER,
         "단답",
         "처리 순서?",
@@ -828,13 +863,12 @@ class QuizGradingMySqlIntegrationTest {
         List.of(),
         List.of("fifo", "FIFO"),
         List.of(),
-        null,
+        "",
         List.of());
   }
 
   private QuizGenerationCandidate essay() {
     return new QuizGenerationCandidate(
-        11,
         QuestionType.ESSAY,
         "서술",
         "설명하세요.",

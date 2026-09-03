@@ -2,11 +2,11 @@ package com.openmd.server.quiz.repository;
 
 import com.openmd.server.quiz.domain.entity.QuizSet;
 import com.openmd.server.quiz.domain.type.QuizSetStatus;
-import jakarta.persistence.LockModeType;
+import java.util.Collection;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-import java.util.Collection;
-import java.util.List;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -40,7 +40,15 @@ public interface QuizSetRepository extends JpaRepository<QuizSet, Long> {
   Page<QuizSet> findAllByUserIdAndStatusNotAndQuizTitleContainingIgnoreCase(
       long userId, QuizSetStatus status, String quizTitle, Pageable pageable);
 
-  List<QuizSet> findAllByStatus(QuizSetStatus status);
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("select q from QuizSet q where q.status = :status and q.createdAt < :startupAt")
+  List<QuizSet> findInterruptedForUpdate(
+      @Param("status") QuizSetStatus status, @Param("startupAt") Instant startupAt);
+
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("select q from QuizSet q where q.status = :status and q.generationStartedAt < :cutoff")
+  List<QuizSet> findStaleForUpdate(
+      @Param("status") QuizSetStatus status, @Param("cutoff") Instant cutoff);
 
   Optional<QuizSet> findByPublicIdAndUserId(String publicId, long userId);
 

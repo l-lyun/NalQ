@@ -134,8 +134,8 @@ public class QuizSetQueryService {
 
   private QuizFailureView failure(QuizSetFailureCode code) {
     return code == QuizSetFailureCode.SOURCE_INSUFFICIENT
-        ? new QuizFailureView(code, "학습자료에서 문제를 만들지 못했어요. 자료나 조건을 확인해 주세요.", false)
-        : new QuizFailureView(code, "문제 생성에 실패했어요. 다시 시도해 주세요.", true);
+        ? new QuizFailureView(code, "학습 자료에서 충분한 문제를 만들지 못했어요.", false)
+        : new QuizFailureView(code, "문제를 만드는 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.", true);
   }
 
   private List<QuizSetListItem> listItems(long userId, List<QuizSet> pageSets) {

@@ -447,19 +447,21 @@ Headers: `Authorization`, `Content-Type: application/json`
 {
   "selectedTypes": ["MULTIPLE_CHOICE", "FILL_IN_THE_BLANK", "SHORT_ANSWER", "ESSAY"],
   "difficulty": "NORMAL",
-  "maxQuestionCount": 10
+  "maxQuestionCount": 10,
+  "generationPrompt": "네트워크 부분에 집중해서 자격증 시험 스타일로 내줘."
 }
 ```
 
 - `selectedTypes`: 중복 없는 1개 이상. 값은 서버 `QuestionType`과 같은 `MULTIPLE_CHOICE`, `FILL_IN_THE_BLANK`, `SHORT_ANSWER`, `ESSAY`.
 - `difficulty`: `EASY`, `NORMAL`, `HARD`.
-- `maxQuestionCount`: 필수, `5`, `10`, `15` 중 하나.
+- `maxQuestionCount`: 필수, `5`, `10`, `15`, `20` 중 하나.
+- `generationPrompt`: 선택. 앞뒤 Unicode 공백을 제거한 값이 비어 있으면 `null`로 취급하고, 비어 있지 않으면 최대 300 Unicode code point다. 출제 초점과 스타일 선호이며 선택 유형·난이도·문제 수·학습자료 근거·보안 규칙을 바꾸지 못한다.
 - 요청을 접수하면 새 불변 `quizSetId`를 만들고 학습자료 본문을 원자적으로 잠근다.
 - 접수 시점의 학습자료 제목으로 `{학습자료명} 퀴즈` 기본 이름을 만들어 QuizSet에 저장한다. 전체가 255 Unicode code point를 넘으면 학습자료 제목 부분만 최대 252 code point로 줄여 ` 퀴즈` 접미사를 보존한다.
-- 같은 학습자료에 `GENERATING` 세트가 있으면 새 요청을 받지 않는다.
-- 서버가 생성 작업 자체를 접수할 수 없으면 `503 QUIZ_002`를 반환하고 QuizSet을 만들거나 본문 잠금 상태를 바꾸지 않는다.
+- 같은 사용자에게 학습자료와 관계없이 `GENERATING` 세트가 있으면 새 요청을 받지 않는다.
+- 서버가 트랜잭션 전에 worker·queue capacity를 예약할 수 없으면 `503 QUIZ_002`를 반환하고 QuizSet을 만들거나 본문 잠금 상태를 바꾸지 않는다. reservation 뒤 commit된 작업이 서버 종료 경쟁 등으로 executor에서 예외적으로 거절되면 성공 응답을 소급해 바꾸지 않고 해당 QuizSet을 `FAILED / GENERATION_FAILED`와 실패 알림으로 종결한다.
 - 이 요청은 `Idempotency-Key`를 받지 않는다. 접수 응답 유실 여부는 [자료의 활성 생성 조회](#자료의-활성-생성-조회)로 확인하며, 활성 생성이 없을 때만 새 QuizSet 생성을 요청한다.
-- 성공 응답의 `requestedConfig`는 이 요청의 입력값을 그대로 echo하는 값이다. 서버는 이를 DB에 영속화하지 않으며 이후 GET 응답에서는 반환하지 않는다.
+- 성공 응답의 `requestedConfig`는 선택 유형·난이도·최대 문제 수만 echo한다. `generationPrompt`는 응답하거나 DB에 영속화하지 않고 현재 생성 작업의 메모리 데이터로만 사용한다.
 - 클라이언트는 성공 응답의 `quizSetId`와 `requestedConfig`를 현재 사용자 범위의 기기 로컬 상태에 연결할 수 있다. 이 값은 생성 중·성공 화면의 요청 조건 표시용이며 서버 상태나 성공 판정의 근거가 아니다.
 
 ```json
@@ -554,7 +556,7 @@ Headers: `Authorization`, `Content-Type: application/json`
     "status": "FAILED",
     "failure": {
       "code": "SOURCE_INSUFFICIENT",
-      "message": "학습자료에서 문제를 만들지 못했어요. 자료나 조건을 확인해 주세요.",
+      "message": "학습 자료에서 충분한 문제를 만들지 못했어요.",
       "retryable": false
     }
   },
@@ -563,8 +565,8 @@ Headers: `Authorization`, `Content-Type: application/json`
 ```
 
 - `failure.code`는 `SOURCE_INSUFFICIENT` 또는 `GENERATION_FAILED`다.
-- `SOURCE_INSUFFICIENT`: 학습자료 근거 부족으로 최종 유효 문제가 요청 수의 80%에 미달했다. 같은 입력의 즉시 반복보다 자료·조건 확인을 안내하며 기본 `retryable=false`다.
-- `GENERATION_FAILED`: 접수 뒤 내부 생성 작업이 실패했거나 최종 유효 문제가 요청 수의 80%에 미달했다. 내부·LLM 상세는 숨기고 재시도가 가능하면 `retryable=true`다.
+- `SOURCE_INSUFFICIENT`: 두 번의 정상 구조 LLM 응답이 모두 학습자료 근거 부족을 표시하고 최종 유효 문제가 요청 수의 80%에 미달했다. 공개 메시지는 자료 자체의 결함을 단정하지 않고 `학습 자료에서 충분한 문제를 만들지 못했어요.`를 사용한다. 기본 `retryable=false`다.
+- `GENERATION_FAILED`: 네트워크 재시도 소진, 거절, 응답 잘림·구조 오류, 검증·보완 후 80% 미달 또는 저장·워커 실패다. 자료 부족과 모델 품질 문제가 애매하면 이 값을 사용한다. 내부·LLM 상세는 숨기고 공개 메시지는 `문제를 만드는 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.`를 사용한다. `retryable=true`다.
 - 상태 재조회에서도 같은 실패 의미를 반환할 수 있도록 서버는 QuizSet의 `failure_code`를 보존한다. `message`와 `retryable`은 저장된 코드에 대한 공개 정책으로 계산한다.
 - 두 값은 비동기 QuizSet 작업 결과이지 HTTP `ApiError.code`가 아니다. 네트워크 실패를 `FAILED`로 추정해서는 안 된다.
 - QuizSet terminal 상태와 사용자 알림의 원자성·중복 방지는 [알림 데이터 계약](contract-data-notifications.md#트랜잭션-불변성)을 따른다.
@@ -1220,7 +1222,7 @@ Headers: `Authorization`, `Content-Type: application/json`
 | Notion timeout·rate limit·일시 장애 또는 연결 해제 철회 결과를 확인할 수 없음 | `503` | `NOTION_TEMPORARILY_UNAVAILABLE` | 연결·선택·편집 상태를 보존하고 같은 작업을 재시도하거나 붙여넣기로 전환 |
 | 생성 중인 학습자료 본문 수정 | `409` | `MATERIAL_001` | 제목만 수정하거나 생성 종료를 확인한 뒤 본문 저장 재시도 |
 | 학습자료 본문 20,000자 초과 | `413` | `MATERIAL_002` | 본문을 줄인 뒤 같은 저장 흐름 재시도 |
-| 같은 학습자료에 이미 `GENERATING` 작업이 있음 | `409` | `QUIZ_001` | 기존 생성 상태 확인 |
+| 같은 사용자에게 이미 `GENERATING` 작업이 있음 | `409` | `QUIZ_001` | 기존 생성 상태 확인 |
 | 생성 작업을 접수할 수 없는 일시적 서버 상태 | `503` | `QUIZ_002` | 새 QuizSet과 본문 잠금이 생기지 않았으므로 같은 조건으로 새 생성 요청 |
 | `READY`가 아닌 세트 제출, attempt UUID의 소유자·QuizSet 불일치, 자기평가 상태 또는 수정 불가 자동 채점 문항 | `409` | `ATTEMPT_001` | 최신 문제 세트·attempt 상태와 결과 확인 |
 | 완료된 복습 세션 재변경 또는 이미 확정된 서술형 평가 변경 | `409` | `REVIEW_001` | 세션과 결과 재조회 |

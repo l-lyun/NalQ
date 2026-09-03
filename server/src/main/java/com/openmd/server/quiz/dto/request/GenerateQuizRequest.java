@@ -9,15 +9,46 @@ import com.openmd.server.quiz.dto.command.QuizGenerationConfig;
 import java.util.List;
 
 public record GenerateQuizRequest(
-    List<String> selectedTypes, String difficulty, Integer maxQuestionCount) {
+    List<String> selectedTypes,
+    String difficulty,
+    Integer maxQuestionCount,
+    String generationPrompt) {
   public QuizGenerationConfig toCommand() {
     List<FieldError> fields = new java.util.ArrayList<>();
     List<QuestionType> parsedTypes = parseTypes(fields);
     QuizDifficulty parsedDifficulty = parseDifficulty(fields);
+    String normalizedPrompt = normalizePrompt(fields);
     if (!fields.isEmpty()) {
       throw new BusinessException(CommonErrorCode.INVALID_INPUT, fields);
     }
-    return new QuizGenerationConfig(parsedTypes, parsedDifficulty, maxQuestionCount);
+    return new QuizGenerationConfig(parsedTypes, parsedDifficulty, maxQuestionCount, normalizedPrompt);
+  }
+
+  private String normalizePrompt(List<FieldError> fields) {
+    if (generationPrompt == null) return null;
+    String normalized = trimUnicodeWhitespace(generationPrompt);
+    if (normalized.isEmpty()) return null;
+    if (normalized.codePointCount(0, normalized.length()) > 300) {
+      fields.add(new FieldError("generationPrompt", "generationPrompt는 300자 이하여야 합니다."));
+      return null;
+    }
+    return normalized;
+  }
+
+  private String trimUnicodeWhitespace(String value) {
+    int start = 0;
+    int end = value.length();
+    while (start < end) {
+      int codePoint = value.codePointAt(start);
+      if (!Character.isWhitespace(codePoint) && !Character.isSpaceChar(codePoint)) break;
+      start += Character.charCount(codePoint);
+    }
+    while (start < end) {
+      int codePoint = value.codePointBefore(end);
+      if (!Character.isWhitespace(codePoint) && !Character.isSpaceChar(codePoint)) break;
+      end -= Character.charCount(codePoint);
+    }
+    return value.substring(start, end);
   }
 
   private List<QuestionType> parseTypes(List<FieldError> fields) {
