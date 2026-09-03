@@ -38,7 +38,7 @@ BearerAccessTokenFilter
 
 ## 영속성과 Redis
 
-- V9 migration은 탈퇴 계정에서 `email`, `normalized_email`, `password_hash`, `nickname`을 null로 만들 수 있게 하고 탈퇴 요청 ID, 처리 기한과 처리 완료 시각을 추가한다.
+- V11 migration은 탈퇴 계정에서 `email`, `normalized_email`, `password_hash`, `nickname`을 null로 만들 수 있게 하고 탈퇴 요청 ID, 처리 기한과 처리 완료 시각을 추가한다.
 - `withdrawal_request_id`는 전역 unique이며, 상태 check는 탈퇴 tombstone의 직접 식별·자격 제거와 필수 처리 메타데이터를 강제한다.
 - Refresh 세션 발급 시 `auth:user-sessions:{userId}` 의미의 사용자별 set에 session ID를 추가하고 가장 늦은 세션 절대 만료까지 TTL을 갱신한다. 전체 폐기는 set에 포함된 session key와 index를 삭제한다.
 - 회전 tombstone과 로그아웃 뒤 남은 index member는 원래 TTL로 자연 만료하며 인증 자격으로 사용할 수 없다.
@@ -48,7 +48,7 @@ BearerAccessTokenFilter
 - `AccountWithdrawalServiceTest`: 입력, 비밀번호, 원자 상태 전이, 멱등 결과와 Redis 재시도
 - `UserControllerTest`, `OpenApiContractTest`: HTTP 응답, Cookie 만료와 공개 schema
 - `BearerAccessTokenFilterTest`: 탈퇴 후 보호 API 차단과 동일 요청 재확인 예외
-- `AuthenticationInfrastructureIntegrationTest`: MySQL V9 불변식·이메일/닉네임 재사용과 Redis 전체 세션 폐기
+- `AuthenticationInfrastructureIntegrationTest`: MySQL V11 불변식·이메일/닉네임 재사용과 Redis 전체 세션 폐기
 - 기본 회귀: `gradlew.bat fastTest`
 - 운영 의존성: `gradlew.bat integrationTest`
 - 전체 서버: `gradlew.bat test`

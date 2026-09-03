@@ -81,7 +81,7 @@ class PendingActivationCleanupMigrationTest {
 
 		Flyway.configure()
 			.dataSource(MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword())
-			.target(MigrationVersion.fromVersion("9"))
+			.target(MigrationVersion.fromVersion("11"))
 			.load()
 			.migrate();
 
