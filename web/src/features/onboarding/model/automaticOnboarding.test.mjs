@@ -2,7 +2,9 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  createAutomaticOnboardingLifecycle,
   finishAutomaticOnboarding,
+  getAutomaticOnboardingAdmission,
   hasAutomaticOnboardingAdmission,
   prepareAutomaticOnboarding,
   resetAutomaticOnboardingAdmissionForTest,
@@ -50,5 +52,28 @@ test('종료한 자동 온보딩은 같은 history state로 다시 열리지 않
   assert.ok(state)
 
   finishAutomaticOnboarding()
+  assert.equal(hasAutomaticOnboardingAdmission(7, state), false)
+})
+
+test('인증 전 준비한 admission은 라우트 가드가 조회할 수 있다', () => {
+  resetAutomaticOnboardingAdmissionForTest()
+  const state = prepareAutomaticOnboarding(7, memoryStorage())
+
+  assert.deepEqual(getAutomaticOnboardingAdmission(), state)
+})
+
+test('StrictMode의 effect 재실행은 admission을 지우지 않고 실제 이탈만 종료한다', async () => {
+  resetAutomaticOnboardingAdmissionForTest()
+  const state = prepareAutomaticOnboarding(7, memoryStorage())
+  const lifecycle = createAutomaticOnboardingLifecycle()
+
+  lifecycle.mount()
+  lifecycle.unmount()
+  lifecycle.mount()
+  await Promise.resolve()
+  assert.equal(hasAutomaticOnboardingAdmission(7, state), true)
+
+  lifecycle.unmount()
+  await Promise.resolve()
   assert.equal(hasAutomaticOnboardingAdmission(7, state), false)
 })

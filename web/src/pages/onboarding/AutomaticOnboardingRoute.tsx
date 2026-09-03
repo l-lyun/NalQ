@@ -1,9 +1,10 @@
 import { ActionButton, Text, VStack } from '@seed-design/react'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 
 import { useCurrentUser } from '@/features/auth/model/auth.queries'
 import {
+  createAutomaticOnboardingLifecycle,
   finishAutomaticOnboarding,
   hasAutomaticOnboardingAdmission,
 } from '@/features/onboarding/model/automaticOnboarding'
@@ -14,10 +15,12 @@ export function AutomaticOnboardingRoute() {
   const location = useLocation()
   const navigate = useNavigate()
   const currentUser = useCurrentUser()
+  const [lifecycle] = useState(createAutomaticOnboardingLifecycle)
 
-  useEffect(() => () => {
-    finishAutomaticOnboarding()
-  }, [])
+  useEffect(() => {
+    lifecycle.mount()
+    return lifecycle.unmount
+  }, [lifecycle])
 
   if (currentUser.isPending && !currentUser.data) {
     return (

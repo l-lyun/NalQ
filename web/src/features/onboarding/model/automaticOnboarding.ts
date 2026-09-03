@@ -49,6 +49,26 @@ export function hasAutomaticOnboardingAdmission(userId: number, state: unknown) 
     && candidate.admissionId === pendingAdmission.admissionId
 }
 
+export function getAutomaticOnboardingAdmission() {
+  return pendingAdmission
+}
+
+export function createAutomaticOnboardingLifecycle() {
+  let mounted = false
+
+  return {
+    mount() {
+      mounted = true
+    },
+    unmount() {
+      mounted = false
+      queueMicrotask(() => {
+        if (!mounted) finishAutomaticOnboarding()
+      })
+    },
+  }
+}
+
 export function finishAutomaticOnboarding() {
   pendingAdmission = null
 }

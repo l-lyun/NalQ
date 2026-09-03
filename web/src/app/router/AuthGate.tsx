@@ -3,6 +3,7 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom'
 
 import { useAuthPhase } from '@/features/auth/model/useAuthPhase'
 import { bootstrapAuthSession } from '@/features/auth/model/authSession'
+import { getAutomaticOnboardingAdmission } from '@/features/onboarding/model/automaticOnboarding'
 
 export type AuthReturnState = {
   from?: string
@@ -55,7 +56,12 @@ export function PublicOnlyGate() {
 
   if (phase === 'bootstrapping') return <AuthLoading />
   if (phase === 'bootstrap-error') return <AuthBootstrapError />
-  if (phase === 'authenticated') return <Navigate to="/" replace />
+  if (phase === 'authenticated') {
+    const onboardingState = getAutomaticOnboardingAdmission()
+    return onboardingState
+      ? <Navigate to="/onboarding" replace state={onboardingState} />
+      : <Navigate to="/" replace />
+  }
 
   return <Outlet />
 }
