@@ -17,7 +17,9 @@ require.extensions['.ts'] = (module, filename) => {
 
 const {
   classifyNavigation,
+  isPendingMainDocumentHttpError,
   selectInternalRetryUrl,
+  shouldHandleWebViewBack,
 } = require('../src/shell/navigationPolicy.ts');
 const { DEFAULT_WEB_URL, resolveWebUrl } = require('../src/shell/webUrl.ts');
 
@@ -90,5 +92,34 @@ test('retry keeps a failed internal document URL and rejects unsafe candidates',
   assert.equal(
     selectInternalRetryUrl(null, 'http://insecure.example', origin),
     null,
+  );
+});
+
+test('Android back is consumed only for a ready document with WebView history', () => {
+  assert.equal(shouldHandleWebViewBack(true, true), true);
+  assert.equal(shouldHandleWebViewBack(true, false), false);
+  assert.equal(shouldHandleWebViewBack(false, true), false);
+  assert.equal(shouldHandleWebViewBack(false, false), false);
+});
+
+test('HTTP errors replace the shell only for the pending same-origin main document', () => {
+  const origin = 'https://app.openmd.example';
+  const pendingUrl = `${origin}/learning/42`;
+
+  assert.equal(
+    isPendingMainDocumentHttpError(pendingUrl, 404, pendingUrl, origin),
+    true,
+  );
+  assert.equal(
+    isPendingMainDocumentHttpError(`${origin}/api/materials`, 500, pendingUrl, origin),
+    false,
+  );
+  assert.equal(
+    isPendingMainDocumentHttpError('https://cdn.example/asset.js', 500, pendingUrl, origin),
+    false,
+  );
+  assert.equal(
+    isPendingMainDocumentHttpError(pendingUrl, 399, pendingUrl, origin),
+    false,
   );
 });
