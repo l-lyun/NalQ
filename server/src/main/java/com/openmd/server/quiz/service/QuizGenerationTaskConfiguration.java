@@ -31,4 +31,9 @@ class QuizGenerationTaskConfiguration {
   QuizGenerationCapacity quizGenerationCapacity(QuizGenerationProperties properties) {
     return new QuizGenerationCapacity(properties.workerCount() + properties.queueCapacity());
   }
+
+  @Bean
+  QuizGenerationTaskRegistry quizGenerationTaskRegistry(QuizGenerationCapacity capacity) {
+    return new QuizGenerationTaskRegistry(capacity);
+  }
 }

@@ -97,8 +97,8 @@ public class OpenAiQuizGenerator implements QuizGenerator {
           ? QuizGeneratedBatch.generated(result.questions())
           : QuizGeneratedBatch.failed();
     }
-    return result.insufficiencyReason() != InsufficiencyReason.NONE && result.questions().isEmpty()
-        ? QuizGeneratedBatch.sourceInsufficient()
+    return result.insufficiencyReason() != InsufficiencyReason.NONE
+        ? QuizGeneratedBatch.sourceInsufficient(result.questions())
         : QuizGeneratedBatch.failed();
   }
 

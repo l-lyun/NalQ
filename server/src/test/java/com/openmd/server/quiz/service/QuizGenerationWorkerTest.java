@@ -24,7 +24,8 @@ class QuizGenerationWorkerTest {
   private final QuizGenerationCapacity capacity = new QuizGenerationCapacity(1);
   private final Executor direct = Runnable::run;
   private final QuizGenerationWorker worker =
-      new QuizGenerationWorker(generator, persistence, direct, capacity);
+      new QuizGenerationWorker(
+          generator, persistence, direct, new QuizGenerationTaskRegistry(capacity));
 
   @Test
   void supplementsOnceAndCompletesWhenCombinedCandidatesReachEightyPercent() {
@@ -78,7 +79,11 @@ class QuizGenerationWorkerTest {
     rejectedCapacity.tryAcquire();
     Executor rejected = task -> { throw new TaskRejectedException("queue full"); };
     QuizGenerationWorker rejectedWorker =
-        new QuizGenerationWorker(generator, persistence, rejected, rejectedCapacity);
+        new QuizGenerationWorker(
+            generator,
+            persistence,
+            rejected,
+            new QuizGenerationTaskRegistry(rejectedCapacity));
 
     rejectedWorker.scheduleAfterCommit(request());
 

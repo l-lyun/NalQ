@@ -67,7 +67,6 @@ class QuizGenerationNotificationTest {
     when(sets.findOwnedForUpdate(set.getPublicId(), 7L)).thenReturn(Optional.of(set));
     QuizGenerationCandidate oneValidQuestion =
         new QuizGenerationCandidate(
-            null,
             QuestionType.SHORT_ANSWER,
             "운영체제",
             "프로세스란 무엇인가요?",
@@ -76,7 +75,7 @@ class QuizGenerationNotificationTest {
             List.of(),
             List.of("실행 중인 프로그램"),
             List.of(),
-            null,
+            "",
             List.of());
 
     assertEquals(

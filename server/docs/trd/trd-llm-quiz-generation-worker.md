@@ -109,7 +109,8 @@ QuizSet 트랜잭션이 commit된 후에만 워커를 등록한다. `@Transactio
 
 - commit 전 실행으로 워커가 아직 보이지 않는 QuizSet을 조회하는 경쟁을 막는다.
 - `@Async` 기본 executor에 암묵적으로 위임하지 않고, 퀴즈 전용 풀·큐·거절 정책을 명시한다.
-- AFTER_COMMIT 리스너는 큐 거절 예외를 요청 스레드 밖으로 전파하지 않고, 이미 commit된 QuizSet을 실패 상태로 종결한다.
+- 접수 전 capacity reservation 실패만 `503 QUIZ_002`로 응답하며 QuizSet을 만들지 않는다.
+- reservation 뒤 commit된 작업이 executor 종료 경쟁 등으로 예외적으로 거절되면 이미 성공 응답 경계가 지났으므로 `503`으로 바꾸지 않는다. QuizSet과 실패 알림을 같은 후속 트랜잭션에서 `FAILED / GENERATION_FAILED`로 종결한다.
 
 ## 5. 워커와 트랜잭션 경계
 
@@ -117,7 +118,7 @@ QuizSet 트랜잭션이 commit된 후에만 워커를 등록한다. `@Transactio
 
 1. **입력 조회**: 짧은 read-only 트랜잭션에서 QuizSet이 아직 `GENERATING`인지 확인하고 학습자료를 읽는다.
 2. **LLM 호출**: 트랜잭션 밖에서 실행한다. 호출·재시도·보완 중 DB 커넥션을 점유하지 않는다.
-3. **결과 확정**: 짧은 쓰기 트랜잭션에서 QuizSet을 다시 확인한다. 여전히 `GENERATING`일 때만 모든 문항을 저장하고 `READY`로 바꾼다.
+3. **결과 확정**: 짧은 쓰기 트랜잭션에서 QuizSet을 다시 확인한다. 여전히 `GENERATING`일 때만 모든 문항 저장·`READY`·성공 알림을 함께 확정한다. 실패 finalizer와 stale/startup recovery도 `FAILED`·실패 코드·실패 알림을 같은 트랜잭션에서 확정한다. `notifications.quiz_set_id` UNIQUE가 QuizSet별 terminal 알림 한 건을 보장한다.
 
 문항 공통 행, 객관식 보기, 허용 답안, 빈칸, 서술형 가이드와 `READY` 변경은 하나의 트랜잭션이다. 일부만 저장하지 않는다.
 
@@ -214,7 +215,7 @@ record BlankCandidate(
 LLM 출력에는 문제 번호와 공개 ID를 포함하지 않는다. 배열 순서는 제안 순서일 뿐이며, 검증을 통과한 문항에 서버가 최종 번호 `1..N`과 ID를 부여한다.
 
 - `GENERATED`: `insufficiencyReason=NONE`이고 `questions`가 비어 있지 않아야 한다.
-- `SOURCE_INSUFFICIENT`: `insufficiencyReason`은 `NONE`이 아니고 `questions`는 빈 배열이어야 한다.
+- `SOURCE_INSUFFICIENT`: `insufficiencyReason`은 `NONE`이 아니며, `questions`에는 최소 성공선에 못 미치더라도 검증 가능한 부분 후보를 보존할 수 있다.
 - `SOURCE_INSUFFICIENT`와 그 사유는 LLM의 내부 신호이며 서버가 무조건 신뢰하는 사실이 아니다.
 - `insufficiencyReason`은 API·DB에 저장하지 않는다. 보완 호출 판단과 허용 목록 기반 메트릭 label에만 사용할 수 있다.
 - 위 조합을 어긴 응답은 구조가 JSON Schema에 맞더라도 의미가 모순된 응답이므로 서버 검증에서 거절한다.
@@ -324,7 +325,7 @@ Schema는 JSON의 필드·타입·enum·필수 여부를 보장한다. 다음 �
 - GENERATED이면 insufficiencyReason은 NONE이고 questions에는
   minimumAcceptableTotal개 이상 targetTotal개 이하의 문제를 담는다.
 - 재배분해도 minimumAcceptableTotal을 만들 수 없을 때만 SOURCE_INSUFFICIENT를 반환한다.
-- SOURCE_INSUFFICIENT이면 questions는 빈 배열이고 가장 가까운 부족 사유를 선택한다.
+- SOURCE_INSUFFICIENT이면 검증 가능한 부분 후보는 questions에 보존하고 가장 가까운 부족 사유를 선택한다. 유효 후보가 없을 때만 빈 배열을 반환한다.
 - excludedQuestions와 같거나 실질적으로 동일한 문제는 생성하지 않는다.
 ```
 
@@ -361,7 +362,7 @@ Schema는 JSON의 필드·타입·enum·필수 여부를 보장한다. 다음 �
 
 ### 7.4 품질 보완 user payload
 
-최초 응답의 유효 문항이 80%에 미달할 때 같은 system prompt로 보완 요청을 한 번 보낸다. 이미 확보한 전체 답안은 다시 보내지 않고 중복 방지에 필요한 최소 정보만 보낸다.
+최초 응답의 유효 문항이 80%에 미달할 때 같은 system prompt로 보완 요청을 한 번 보낸다. `SOURCE_INSUFFICIENT` 응답의 부분 후보도 서버 검증을 거쳐 메모리에 유지한다. 이미 확보한 전체 답안은 다시 보내지 않고 중복 방지에 필요한 최소 정보만 보낸다.
 
 ```json
 {
@@ -392,7 +393,7 @@ Schema는 JSON의 필드·타입·enum·필수 여부를 보장한다. 다음 �
 - `minimumAcceptableTotal`은 최종 80% 성공선에 도달하기 위해 최소한 추가로 필요한 수다.
 - `excludedQuestions`에는 유효 후보의 `type`, `topic`, `prompt`, `sourceExcerpt`만 넣는다.
 - 보완 결과에도 최초 호출과 동일한 schema와 검증 규칙을 적용한다.
-- 최초 응답이 `SOURCE_INSUFFICIENT`면 `excludedQuestions=[]`로 같은 조건의 확인 호출을 한 번 수행한다. 두 응답이 모두 정상 구조의 `SOURCE_INSUFFICIENT`일 때만 공개 실패를 `SOURCE_INSUFFICIENT`로 확정한다.
+- 최초 응답이 `SOURCE_INSUFFICIENT`여도 검증된 부분 후보를 `excludedQuestions`에 포함하고 부족분만 확인 호출한다. 두 응답이 모두 정상 구조의 `SOURCE_INSUFFICIENT`이고 결합 결과도 기준에 미달할 때만 공개 실패를 `SOURCE_INSUFFICIENT`로 확정한다.
 
 ### 7.5 프롬프트 인젝션 방어
 
@@ -495,7 +496,7 @@ Spring AI 외측 재시도, provider client 재시도와 OpenAI SDK 재시도를
 - 복구 주기: 1분
 - 대기 큐에서 아직 시작하지 않은 작업은 `generation_started_at IS NULL`이므로 실행 timeout 대상으로 오인하지 않는다.
 
-복구 작업이 먼저 `FAILED`로 바꾼 후 LLM 결과가 돌아오면, 결과 확정 트랜잭션의 상태 재검사가 늦은 결과를 폐기한다.
+각 제출 작업은 QuizSet ID로 `Future`를 등록한다. 복구 작업이 stale QuizSet을 알림과 함께 `FAILED`로 확정한 뒤 대응 Future를 `cancel(true)`로 중단하고, 같은 작업의 semaphore reservation을 원자적으로 한 번만 반환한다. 정상 완료와 취소가 경합해도 이중 반환하지 않는다. OpenAI client의 60초 요청 timeout이 외부 I/O의 실행 상한이고, 10분 stale 취소는 그 상한이 지켜지지 않은 비정상 작업의 마지막 안전망이다. 늦은 결과가 돌아와도 결과 확정 트랜잭션의 상태 재검사가 폐기한다.
 
 ### 9.3 출력 토큰과 잘림
 
@@ -636,7 +637,7 @@ MVP에서는 `QuizGenerator` 인터페이스 하나만 외부 경계로 둔다. 
 - 근거 문장 원문 포함 검증
 - 중복 제거 후 80% 계산
 - 품질 보완이 부족한 유형을 우선하고 선택된 다른 유형으로 보충함
-- `GENERATED`/`SOURCE_INSUFFICIENT`와 questions의 모순 검증
+- `GENERATED`/`SOURCE_INSUFFICIENT`와 insufficiencyReason의 모순 검증, 부분 questions 보존
 - `insufficiencyReason` 허용 enum과 outcome 조합 검증
 - `responseEntity()`의 entity·response 누락 처리와 usage metadata 추출
 - native structured output이 활성화된 요청의 Java wrapper 역직렬화

@@ -70,6 +70,29 @@ class OpenAiQuizGeneratorTest {
   }
 
   @Test
+  void preservesPartialCandidatesWhenTheSourceCannotReachTheRequestedMinimum() {
+    QuizGenerationCandidate partial = new QuizGenerationCandidate(
+        QuestionType.SHORT_ANSWER,
+        "운영체제",
+        "프로세스란 무엇인가요?",
+        "실행 중인 프로그램입니다.",
+        "프로세스는 실행 중인 프로그램이다.",
+        List.of(),
+        List.of("실행 중인 프로그램"),
+        List.of(),
+        "",
+        List.of());
+
+    QuizGeneratedBatch batch = generator.mapped(new QuizGenerationResult(
+        GenerationOutcome.SOURCE_INSUFFICIENT,
+        InsufficiencyReason.INSUFFICIENT_DISTINCT_FACTS,
+        List.of(partial)));
+
+    assertEquals(QuizGeneratedBatch.Outcome.SOURCE_INSUFFICIENT, batch.outcome());
+    assertEquals(List.of(partial), batch.candidates());
+  }
+
+  @Test
   void generatedSchemaIsAWrapperAndDoesNotExposeServerIdentifiers() {
     String schema = new BeanOutputConverter<>(QuizGenerationResult.class).getJsonSchema();
 

@@ -121,28 +121,6 @@ class QuizGradingMigrationTest {
 	}
 
 	@Test
-	void createsOneTerminalNotificationPerQuizSet() {
-		insertQuizSet(40, "00000000-0000-0000-0000-000000000040", "READY", null);
-		jdbc.update("""
-			INSERT INTO quiz_generation_notifications (
-				public_id, user_id, notification_type, quiz_set_public_id, material_id,
-				target_name, failure_code, action_type, read_at, created_at, updated_at
-			) VALUES ('00000000-0000-0000-0000-000000000140', 1,
-				'QUIZ_GENERATION_READY', '00000000-0000-0000-0000-000000000040', 1,
-				'자료 퀴즈', NULL, 'FOCUS_QUIZ_IN_LIST', NULL, NOW(6), NOW(6))
-			""");
-
-		assertThrows(DataAccessException.class, () -> jdbc.update("""
-			INSERT INTO quiz_generation_notifications (
-				public_id, user_id, notification_type, quiz_set_public_id, material_id,
-				target_name, failure_code, action_type, read_at, created_at, updated_at
-			) VALUES ('00000000-0000-0000-0000-000000000141', 1,
-				'QUIZ_GENERATION_READY', '00000000-0000-0000-0000-000000000040', 1,
-				'자료 퀴즈', NULL, 'FOCUS_QUIZ_IN_LIST', NULL, NOW(6), NOW(6))
-			"""));
-	}
-
-	@Test
 	void quizSetFailureCodeMustMatchTheSetStatus() {
 		insertQuizSet(10, "00000000-0000-0000-0000-000000000010", "GENERATING", null);
 		insertQuizSet(11, "00000000-0000-0000-0000-000000000011", "READY", null);

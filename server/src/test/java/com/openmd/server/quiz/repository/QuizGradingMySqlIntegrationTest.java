@@ -117,7 +117,6 @@ class QuizGradingMySqlIntegrationTest {
     dropNotificationFailureCheck();
     jdbc.update("DELETE FROM notifications");
     jdbc.update("DELETE FROM quiz_submitted_answers");
-    jdbc.update("DELETE FROM quiz_generation_notifications");
     jdbc.update("DELETE FROM quiz_attempt_questions WHERE source_attempt_question_id IS NOT NULL");
     jdbc.update("DELETE FROM quiz_attempt_questions");
     jdbc.update("DELETE FROM quiz_attempts WHERE source_attempt_id IS NOT NULL");
@@ -185,7 +184,20 @@ class QuizGradingMySqlIntegrationTest {
     assertEquals(CommonErrorCode.RESOURCE_NOT_FOUND, foreign.getErrorCode());
 
     generation.complete(
-        owner.userId(), accepted.quizSetId(), List.of(multipleChoice(3), essay()), 10);
+        owner.userId(),
+        accepted.quizSetId(),
+        List.of(
+            numbered(multipleChoice(3), 1),
+            numbered(essay(), 2),
+            numbered(multipleChoice(3), 3),
+            numbered(essay(), 4),
+            numbered(multipleChoice(3), 5),
+            numbered(essay(), 6),
+            numbered(multipleChoice(3), 7),
+            numbered(essay(), 8),
+            numbered(multipleChoice(3), 9),
+            numbered(essay(), 10)),
+        10);
     String status =
         jdbc.queryForObject(
             "SELECT status FROM quiz_sets WHERE public_id = ?", String.class, accepted.quizSetId());
@@ -210,12 +222,6 @@ class QuizGradingMySqlIntegrationTest {
             WHERE s.public_id = ? ORDER BY q.question_number
             """,
             String.class,
-            accepted.quizSetId()));
-    assertEquals(
-        1L,
-        jdbc.queryForObject(
-            "SELECT COUNT(*) FROM quiz_generation_notifications WHERE quiz_set_public_id = ?",
-            Long.class,
             accepted.quizSetId()));
   }
 
@@ -800,6 +806,20 @@ class QuizGradingMySqlIntegrationTest {
         List.of(),
         "",
         List.of());
+  }
+
+  private QuizGenerationCandidate numbered(QuizGenerationCandidate candidate, int number) {
+    return new QuizGenerationCandidate(
+        candidate.type(),
+        candidate.topic(),
+        candidate.prompt() + " " + number,
+        candidate.explanation(),
+        candidate.sourceExcerpt(),
+        candidate.choices(),
+        candidate.acceptedAnswers(),
+        candidate.blanks(),
+        candidate.modelAnswer(),
+        candidate.keyPoints());
   }
 
   private QuizGenerationCandidate fillBlank() {

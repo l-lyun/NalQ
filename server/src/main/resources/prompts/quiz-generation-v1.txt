@@ -49,5 +49,5 @@
 - 선택된 유형으로 재배분한 결과가 minimumAcceptableTotal 이상이면 GENERATED를 반환한다.
 - GENERATED이면 insufficiencyReason은 NONE이고 questions에는 minimumAcceptableTotal개 이상 targetTotal개 이하의 문제를 담는다.
 - 재배분해도 minimumAcceptableTotal을 만들 수 없을 때만 SOURCE_INSUFFICIENT를 반환한다.
-- SOURCE_INSUFFICIENT이면 questions는 빈 배열이고 가장 가까운 부족 사유를 선택한다.
+- SOURCE_INSUFFICIENT이면 minimumAcceptableTotal에는 못 미치더라도 검증 가능한 문제는 questions에 보존하고 가장 가까운 부족 사유를 선택한다. 유효 후보가 하나도 없을 때만 빈 배열을 반환한다.
 - excludedQuestions와 같거나 실질적으로 동일한 문제는 생성하지 않는다.

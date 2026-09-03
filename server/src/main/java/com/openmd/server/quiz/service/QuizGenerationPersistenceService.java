@@ -115,7 +115,7 @@ public class QuizGenerationPersistenceService {
   }
 
   @Transactional
-  public int failStaleGenerations(Instant cutoff) {
+  public List<String> failStaleGenerations(Instant cutoff) {
     List<QuizSet> stale =
         sets.findStaleForUpdate(QuizSetStatus.GENERATING, cutoff);
     stale.forEach(
@@ -123,7 +123,7 @@ public class QuizGenerationPersistenceService {
           set.fail(QuizSetFailureCode.GENERATION_FAILED);
           notifications.save(QuizGenerationNotification.from(set));
         });
-    return stale.size();
+    return stale.stream().map(QuizSet::getPublicId).toList();
   }
 
   private void persist(long setId, ValidatedQuizQuestion validated) {

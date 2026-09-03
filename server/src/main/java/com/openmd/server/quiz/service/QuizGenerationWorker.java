@@ -35,7 +35,7 @@ public class QuizGenerationWorker {
   private final QuizGenerator generator;
   private final QuizGenerationPersistenceService persistence;
   private final Executor executor;
-  private final QuizGenerationCapacity capacity;
+  private final QuizGenerationTaskRegistry tasks;
   private final QuizGenerationCandidateValidator validator = new QuizGenerationCandidateValidator();
   private final QuizGenerationPolicy policy = new QuizGenerationPolicy();
 
@@ -43,24 +43,20 @@ public class QuizGenerationWorker {
       QuizGenerator generator,
       QuizGenerationPersistenceService persistence,
       @Qualifier("quizGenerationTaskExecutor") Executor executor,
-      QuizGenerationCapacity capacity) {
+      QuizGenerationTaskRegistry tasks) {
     this.generator = generator;
     this.persistence = persistence;
     this.executor = executor;
-    this.capacity = capacity;
+    this.tasks = tasks;
   }
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void scheduleAfterCommit(QuizGenerationRequested request) {
     try {
-      executor.execute(() -> generate(request));
+      tasks.execute(executor, request.quizSetId(), () -> generate(request));
     } catch (TaskRejectedException exception) {
       log.warn("Quiz generation queue rejected quizSetId={}", request.quizSetId());
-      try {
-        failSafely(request, QuizSetFailureCode.GENERATION_FAILED);
-      } finally {
-        capacity.release();
-      }
+      failSafely(request, QuizSetFailureCode.GENERATION_FAILED);
     }
   }
 
@@ -122,9 +118,11 @@ public class QuizGenerationWorker {
     } catch (RuntimeException exception) {
       log.error("Quiz generation failed quizSetId={}", request.quizSetId(), exception);
       failSafely(request, QuizSetFailureCode.GENERATION_FAILED);
-    } finally {
-      capacity.release();
     }
+  }
+
+  int cancel(List<String> quizSetIds) {
+    return tasks.cancel(quizSetIds);
   }
 
   private List<ValidatedQuizQuestion> validate(

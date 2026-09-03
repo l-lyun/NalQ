@@ -459,7 +459,7 @@ Headers: `Authorization`, `Content-Type: application/json`
 - 요청을 접수하면 새 불변 `quizSetId`를 만들고 학습자료 본문을 원자적으로 잠근다.
 - 접수 시점의 학습자료 제목으로 `{학습자료명} 퀴즈` 기본 이름을 만들어 QuizSet에 저장한다. 전체가 255 Unicode code point를 넘으면 학습자료 제목 부분만 최대 252 code point로 줄여 ` 퀴즈` 접미사를 보존한다.
 - 같은 사용자에게 학습자료와 관계없이 `GENERATING` 세트가 있으면 새 요청을 받지 않는다.
-- 서버가 생성 작업 자체를 접수할 수 없으면 `503 QUIZ_002`를 반환하고 QuizSet을 만들거나 본문 잠금 상태를 바꾸지 않는다.
+- 서버가 트랜잭션 전에 worker·queue capacity를 예약할 수 없으면 `503 QUIZ_002`를 반환하고 QuizSet을 만들거나 본문 잠금 상태를 바꾸지 않는다. reservation 뒤 commit된 작업이 서버 종료 경쟁 등으로 executor에서 예외적으로 거절되면 성공 응답을 소급해 바꾸지 않고 해당 QuizSet을 `FAILED / GENERATION_FAILED`와 실패 알림으로 종결한다.
 - 이 요청은 `Idempotency-Key`를 받지 않는다. 접수 응답 유실 여부는 [자료의 활성 생성 조회](#자료의-활성-생성-조회)로 확인하며, 활성 생성이 없을 때만 새 QuizSet 생성을 요청한다.
 - 성공 응답의 `requestedConfig`는 선택 유형·난이도·최대 문제 수만 echo한다. `generationPrompt`는 응답하거나 DB에 영속화하지 않고 현재 생성 작업의 메모리 데이터로만 사용한다.
 - 클라이언트는 성공 응답의 `quizSetId`와 `requestedConfig`를 현재 사용자 범위의 기기 로컬 상태에 연결할 수 있다. 이 값은 생성 중·성공 화면의 요청 조건 표시용이며 서버 상태나 성공 판정의 근거가 아니다.

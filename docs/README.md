@@ -45,6 +45,7 @@ scope: repository
 | 학습자료 만들기 | [학습자료 만들기 흐름](ux/flow-content-import.md) | Flow | 검토 중 |
 | Notion 학습자료 가져오기 | [Notion 가져오기 화면](ux/screen-notion-import.md) | Screen Spec | 검토 중 |
 | 퀴즈 생성부터 복습까지 | [퀴즈 흐름](ux/flow-quiz-solving.md) | Flow | 검토 중 |
+| 퀴즈 생성 조건과 OpenAI 전송 확인 | [퀴즈 생성 화면](ux/screen-quiz-generation.md) | Screen Spec | 검토 중 |
 | 퀴즈 생성 결과 알림과 복귀 | [퀴즈 생성 결과 알림 흐름](ux/flow-quiz-generation-notifications.md) | Flow | 검토 중 |
 | 전역 알림 목록과 생성 결과 안내 | [알림 목록과 생성 결과 Snackbar](ux/screen-notifications.md) | Screen Spec | 검토 중 |
 | 서술형 자기평가와 채점 결과 | [퀴즈 피드백 화면](ux/screen-quiz-feedback.md) | Screen Spec | 검토 중 |

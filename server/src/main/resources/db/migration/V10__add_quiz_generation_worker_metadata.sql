@@ -1,3 +1,38 @@
+INSERT INTO notifications (
+    public_id,
+    user_id,
+    payload_version,
+    notification_type,
+    quiz_set_id,
+    material_id,
+    target_name,
+    failure_code,
+    action_type,
+    read_at,
+    created_at,
+    updated_at
+)
+SELECT UUID(),
+       target.user_id,
+       1,
+       'QUIZ_GENERATION_FAILED',
+       target.public_id,
+       CAST(target.learning_material_id AS CHAR),
+       target.quiz_title,
+       'GENERATION_FAILED',
+       'RECONFIGURE_QUIZ',
+       NULL,
+       CURRENT_TIMESTAMP(6),
+       CURRENT_TIMESTAMP(6)
+FROM quiz_sets target
+JOIN (
+    SELECT id,
+           ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY created_at DESC, id DESC) AS generation_rank
+    FROM quiz_sets
+    WHERE status = 'GENERATING'
+) ranked ON ranked.id = target.id
+WHERE ranked.generation_rank > 1;
+
 UPDATE quiz_sets target
 JOIN (
     SELECT id,

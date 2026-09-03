@@ -16,6 +16,10 @@ public record QuizGeneratedBatch(Outcome outcome, List<QuizGenerationCandidate> 
     return new QuizGeneratedBatch(Outcome.SOURCE_INSUFFICIENT, List.of());
   }
 
+  public static QuizGeneratedBatch sourceInsufficient(List<QuizGenerationCandidate> candidates) {
+    return new QuizGeneratedBatch(Outcome.SOURCE_INSUFFICIENT, candidates);
+  }
+
   public static QuizGeneratedBatch failed() {
     return new QuizGeneratedBatch(Outcome.FAILED, List.of());
   }
