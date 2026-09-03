@@ -21,7 +21,11 @@ export function PublicServiceFooter({ preserveContext = false }: { preserveConte
       <VStack className="public-service-footer__content" gap="x2" align="flex-start">
         <Text textStyle="t5Bold" color="fg.neutral">NalQ</Text>
         <nav className="public-service-footer__links" aria-label="서비스 정보">
-          {visibleLinks.map((item) => (
+          {visibleLinks.map((item) => pathname === item.to ? (
+            <span key={item.to} className="public-service-link" aria-current="page">
+              {item.label}
+            </span>
+          ) : (
             <Link
               key={item.to}
               className="public-service-link"
@@ -29,7 +33,6 @@ export function PublicServiceFooter({ preserveContext = false }: { preserveConte
               state={{ returnTo: pathname }}
               target={preserveContext ? '_blank' : undefined}
               rel={preserveContext ? 'noreferrer' : undefined}
-              aria-current={pathname === item.to ? 'page' : undefined}
             >
               {item.label}
             </Link>

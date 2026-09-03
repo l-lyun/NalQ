@@ -77,7 +77,7 @@ export async function withdrawCurrentUser(payload: AccountWithdrawalRequest) {
   try {
     const response = await protectedApi.delete<ApiResponse<AccountWithdrawalResult>>(
       '/api/v1/users/me',
-      { data: payload },
+      { data: payload, withCredentials: true },
     )
     return unwrapApiResponse(response.data)
   } catch (error) {
