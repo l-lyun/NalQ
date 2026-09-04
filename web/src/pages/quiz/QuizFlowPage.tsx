@@ -29,6 +29,7 @@ import {
   GENERATION_PROMPT_MAX_CODE_POINTS,
   getQuizGenerationRecoveryMode,
   isQuizGenerationActiveConflict,
+  isQuizGenerationContentRevisionConflict,
   sliceGenerationPrompt,
 } from '@/features/quiz/model/quizGenerationRequest'
 import { registerQuizGenerationScene } from '@/features/quiz/model/quizGenerationScenePresence'
@@ -346,6 +347,12 @@ export function QuizFlowPage({
       if (isQuizGenerationActiveConflict(error)) {
         setScene('CONDITIONS')
         callbacks?.onGenerationActive?.()
+        return
+      }
+      if (isQuizGenerationContentRevisionConflict(error)) {
+        setDisclosureConfirmed(false)
+        setScene('CONDITIONS')
+        await callbacks?.onGenerationDisclosureExpired?.()
         return
       }
       setGeneration({

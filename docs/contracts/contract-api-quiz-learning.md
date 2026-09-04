@@ -448,7 +448,8 @@ Headers: `Authorization`, `Content-Type: application/json`
   "selectedTypes": ["MULTIPLE_CHOICE", "FILL_IN_THE_BLANK", "SHORT_ANSWER", "ESSAY"],
   "difficulty": "NORMAL",
   "maxQuestionCount": 10,
-  "generationPrompt": "네트워크 부분에 집중해서 자격증 시험 스타일로 내줘."
+  "generationPrompt": "네트워크 부분에 집중해서 자격증 시험 스타일로 내줘.",
+  "contentRevision": "8ae74b792008072a214e1e571fff8b049f283ed70382d8e192518c18231ff2f0"
 }
 ```
 
@@ -456,7 +457,9 @@ Headers: `Authorization`, `Content-Type: application/json`
 - `difficulty`: `EASY`, `NORMAL`, `HARD`.
 - `maxQuestionCount`: 필수, `5`, `10`, `15`, `20` 중 하나.
 - `generationPrompt`: 선택. 앞뒤 Unicode 공백을 제거한 값이 비어 있으면 `null`로 취급하고, 비어 있지 않으면 최대 300 Unicode code point다. 출제 초점과 스타일 선호이며 선택 유형·난이도·문제 수·학습자료 근거·보안 규칙을 바꾸지 못한다.
-- 요청을 접수하면 새 불변 `quizSetId`를 만들고 학습자료 본문을 원자적으로 잠근다.
+- `contentRevision`: 필수. 사용자가 OpenAI 전송 범위를 확인한 학습자료 본문의 UTF-8 바이트를 SHA-256으로 계산한 64자 lowercase hex다. 제목은 revision 계산에 포함하지 않는다.
+- 요청을 접수하면 서버는 현재 사용자 소유의 학습자료 행을 트랜잭션 안에서 잠근 뒤 현재 본문의 `contentRevision`을 계산해 요청값과 원자적으로 대조한다. 일치할 때만 새 불변 `quizSetId`를 만들고 생성 이벤트를 발행한다.
+- 현재 revision이 요청값과 다르면 `409 QUIZ_003`을 반환하고 QuizSet이나 OpenAI 생성 작업을 만들지 않는다. 클라이언트는 최신 본문과 전송 범위를 다시 확인한 뒤 새 revision으로 요청한다.
 - 접수 시점의 학습자료 제목으로 `{학습자료명} 퀴즈` 기본 이름을 만들어 QuizSet에 저장한다. 전체가 255 Unicode code point를 넘으면 학습자료 제목 부분만 최대 252 code point로 줄여 ` 퀴즈` 접미사를 보존한다.
 - 같은 사용자에게 학습자료와 관계없이 `GENERATING` 세트가 있으면 새 요청을 받지 않는다.
 - 서버가 트랜잭션 전에 worker·queue capacity를 예약할 수 없으면 `503 QUIZ_002`를 반환하고 QuizSet을 만들거나 본문 잠금 상태를 바꾸지 않는다. reservation 뒤 commit된 작업이 서버 종료 경쟁 등으로 executor에서 예외적으로 거절되면 성공 응답을 소급해 바꾸지 않고 해당 QuizSet을 `FAILED / GENERATION_FAILED`와 실패 알림으로 종결한다.
@@ -1224,10 +1227,11 @@ Headers: `Authorization`, `Content-Type: application/json`
 | 학습자료 본문 20,000자 초과 | `413` | `MATERIAL_002` | 본문을 줄인 뒤 같은 저장 흐름 재시도 |
 | 같은 사용자에게 이미 `GENERATING` 작업이 있음 | `409` | `QUIZ_001` | 기존 생성 상태 확인 |
 | 생성 작업을 접수할 수 없는 일시적 서버 상태 | `503` | `QUIZ_002` | 새 QuizSet과 본문 잠금이 생기지 않았으므로 같은 조건으로 새 생성 요청 |
+| 확인한 학습자료 본문 revision과 현재 본문이 다름 | `409` | `QUIZ_003` | 최신 본문과 전송 범위를 다시 확인한 뒤 새 revision으로 생성 요청 |
 | `READY`가 아닌 세트 제출, attempt UUID의 소유자·QuizSet 불일치, 자기평가 상태 또는 수정 불가 자동 채점 문항 | `409` | `ATTEMPT_001` | 최신 문제 세트·attempt 상태와 결과 확인 |
 | 완료된 복습 세션 재변경 또는 이미 확정된 서술형 평가 변경 | `409` | `REVIEW_001` | 세션과 결과 재조회 |
 
-- MVP의 안정 오류 코드는 `COMMON_001/002/003/999`, `AUTH_005`, `MATERIAL_001/002`, `NOTION_CONNECTION_REQUIRED`, `NOTION_REAUTH_REQUIRED`, `NOTION_WORKSPACE_MISMATCH`, `NOTION_PAGE_NOT_ACCESSIBLE`, `NOTION_CONTENT_INCOMPLETE`, `NOTION_TEMPORARILY_UNAVAILABLE`, `QUIZ_001/002`, `ATTEMPT_001`, `REVIEW_001`로 제한한다.
+- MVP의 안정 오류 코드는 `COMMON_001/002/003/999`, `AUTH_005`, `MATERIAL_001/002`, `NOTION_CONNECTION_REQUIRED`, `NOTION_REAUTH_REQUIRED`, `NOTION_WORKSPACE_MISMATCH`, `NOTION_PAGE_NOT_ACCESSIBLE`, `NOTION_CONTENT_INCOMPLETE`, `NOTION_TEMPORARILY_UNAVAILABLE`, `QUIZ_001/002/003`, `ATTEMPT_001`, `REVIEW_001`로 제한한다.
 - Notion 오류는 위 여섯 가지 사용자 복구 의미로만 공개한다. 제공자 원시 오류명, HTTP 본문, 세부 block 타입, token 갱신 실패 원문과 내부 예외를 새 공개 코드나 `fields`로 전달하지 않는다.
 - 공개 `401 AUTH_005`는 NalQ Access Token 인증 실패에만 사용한다. Notion `401`은 내부 갱신 뒤 성공하거나 `409 NOTION_REAUTH_REQUIRED`로 변환한다.
 - 비동기 생성 실패는 정상 상태 조회의 `status=FAILED`로 전달한다. HTTP 오류와 혼용하지 않는다.

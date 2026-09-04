@@ -9,6 +9,7 @@ import com.openmd.server.global.error.BusinessException;
 import com.openmd.server.learningmaterial.repository.LearningMaterialRepository;
 import com.openmd.server.quiz.domain.type.QuestionType;
 import com.openmd.server.quiz.domain.type.QuizDifficulty;
+import com.openmd.server.quiz.dto.command.QuizGenerationCommand;
 import com.openmd.server.quiz.dto.command.QuizGenerationConfig;
 import com.openmd.server.quiz.error.QuizErrorCode;
 import com.openmd.server.quiz.repository.QuizSetRepository;
@@ -35,8 +36,10 @@ class QuizGenerationServiceTest {
                 service.accept(
                     7L,
                     "1",
-                    new QuizGenerationConfig(
-                        List.of(QuestionType.SHORT_ANSWER), QuizDifficulty.NORMAL, 5)));
+                    new QuizGenerationCommand(
+                        "cb0f24046b508710d6315e71bd9b21b920cf15301b0cf055dc9569c507576ea3",
+                        new QuizGenerationConfig(
+                            List.of(QuestionType.SHORT_ANSWER), QuizDifficulty.NORMAL, 5))));
 
     assertEquals(QuizErrorCode.GENERATION_UNAVAILABLE, exception.getErrorCode());
     verifyNoInteractions(materials, quizSets, acceptance);

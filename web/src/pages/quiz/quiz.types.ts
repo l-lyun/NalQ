@@ -106,6 +106,7 @@ export type QuizEssayAssessmentResult = {
 export type QuizPresentationCallbacks = {
   onConditionsChange?: (conditions: QuizConditions) => void
   onConfirmGenerationDisclosure?: () => void | Promise<void>
+  onGenerationDisclosureExpired?: () => void | Promise<void>
   onGenerate?: (conditions: QuizConditions) => void | Promise<QuizGenerationReady | void>
   onGenerationActive?: () => void
   onRetryGeneration?: (failure: QuizGenerationFailure) => void | Promise<QuizGenerationReady | void>

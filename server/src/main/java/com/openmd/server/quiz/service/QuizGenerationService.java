@@ -3,10 +3,12 @@ package com.openmd.server.quiz.service;
 import com.openmd.server.global.api.FieldError;
 import com.openmd.server.global.error.BusinessException;
 import com.openmd.server.global.error.CommonErrorCode;
+import com.openmd.server.learningmaterial.domain.LearningMaterialContentRevision;
 import com.openmd.server.learningmaterial.repository.LearningMaterialRepository;
 import com.openmd.server.quiz.domain.entity.QuizSet;
 import com.openmd.server.quiz.domain.type.QuestionType;
 import com.openmd.server.quiz.domain.type.QuizSetStatus;
+import com.openmd.server.quiz.dto.command.QuizGenerationCommand;
 import com.openmd.server.quiz.dto.command.QuizGenerationConfig;
 import com.openmd.server.quiz.dto.response.AcceptedQuizGeneration;
 import com.openmd.server.quiz.dto.response.ActiveQuizGeneration;
@@ -45,15 +47,16 @@ public class QuizGenerationService {
   }
 
   public AcceptedQuizGeneration accept(
-      long userId, String materialPublicId, QuizGenerationConfig requestedConfig) {
+      long userId, String materialPublicId, QuizGenerationCommand requested) {
     long materialId = materialId(materialPublicId);
-    QuizGenerationConfig config = validated(requestedConfig);
+    QuizGenerationCommand command = validated(requested);
+    QuizGenerationConfig config = command.config();
     if (!capacity.tryAcquire()) {
       throw new BusinessException(QuizErrorCode.GENERATION_UNAVAILABLE);
     }
     QuizSet quizSet;
     try {
-      quizSet = acceptance.accept(userId, materialId, config);
+      quizSet = acceptance.accept(userId, materialId, command.contentRevision(), config);
     } catch (DataIntegrityViolationException exception) {
       capacity.release();
       if (hasConstraint(exception, ACTIVE_CONSTRAINT)) {
@@ -117,6 +120,14 @@ public class QuizGenerationService {
     if (prompt != null && prompt.isEmpty()) prompt = null;
     return new QuizGenerationConfig(
         List.copyOf(types), config.difficulty(), config.maxQuestionCount(), prompt);
+  }
+
+  private QuizGenerationCommand validated(QuizGenerationCommand command) {
+    if (command == null) throw invalid("request", "생성 조건이 필요합니다.");
+    if (!LearningMaterialContentRevision.isValid(command.contentRevision())) {
+      throw invalid("contentRevision", "contentRevision은 lowercase SHA-256 형식이어야 합니다.");
+    }
+    return new QuizGenerationCommand(command.contentRevision(), validated(command.config()));
   }
 
   private String trimUnicodeWhitespace(String value) {

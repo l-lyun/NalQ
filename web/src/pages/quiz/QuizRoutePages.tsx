@@ -49,6 +49,7 @@ import {
   latestReviewQueryOptions,
   quizQueryKeys,
 } from '@/features/quiz/model/quizQueries'
+import { toCreateQuizSetRequest } from '@/features/quiz/model/quizGenerationRequest'
 
 import { QuizFlowPage } from './QuizFlowPage'
 import type {
@@ -207,12 +208,17 @@ function useQuizGenerationDisclosure(
   })
 
   return {
+    revision: disclosure.data?.revision,
     confirmed: disclosure.data?.confirmed === true,
     isPending: enabled && (material.isPending || disclosure.isPending),
     isError: enabled && (material.isError || disclosure.isError),
     retry: async () => {
       if (material.isError) await material.refetch()
       else await disclosure.refetch()
+    },
+    refresh: async () => {
+      const result = await material.refetch()
+      if (result.error) throw result.error
     },
     confirm: () => {
       if (!userId || !materialId || !material.data || !disclosure.data) return
@@ -282,7 +288,11 @@ export function QuizMaterialRoutePage() {
   const createMutation = useMutation({
     mutationFn: async (conditions: QuizConditions) => {
       lastConditionsRef.current = conditions
-      return createQuizSet(materialId!, conditions)
+      if (!generationDisclosure.revision) throw new Error('Missing learning material revision')
+      return createQuizSet(
+        materialId!,
+        toCreateQuizSetRequest(conditions, generationDisclosure.revision),
+      )
     },
     onSuccess: (created) => {
       if (currentUser.data) {
@@ -341,10 +351,12 @@ export function QuizMaterialRoutePage() {
       questions={questions}
       result={emptyResult}
       initialScene={quizSetId ? 'GENERATION' : 'CONDITIONS'}
+      initialConditions={lastConditionsRef.current}
       generationDisclosureConfirmed={generationDisclosure.confirmed}
       generationState={generationState}
       callbacks={{
         onConfirmGenerationDisclosure: generationDisclosure.confirm,
+        onGenerationDisclosureExpired: generationDisclosure.refresh,
         onGenerate: async (conditions) => { await createMutation.mutateAsync(conditions) },
         onGenerationActive: showAnotherQuizGeneration,
         onRetryGeneration: async (_failure: QuizGenerationFailure) => {
@@ -452,7 +464,11 @@ export function QuizSetRoutePage() {
   const createMutation = useMutation({
     mutationFn: async ({ materialId, conditions }: { materialId: string; conditions: QuizConditions }) => {
       createConditionsRef.current = conditions
-      return createQuizSet(materialId, conditions)
+      if (!generationDisclosure.revision) throw new Error('Missing learning material revision')
+      return createQuizSet(
+        materialId,
+        toCreateQuizSetRequest(conditions, generationDisclosure.revision),
+      )
     },
     onSuccess: (created) => {
       if (currentUser.data) {
@@ -533,13 +549,14 @@ export function QuizSetRoutePage() {
       questions={questions}
       result={resumedResult}
       initialScene={resolveQuizSetInitialScene(state.status, pending, restartMain)}
-      initialConditions={requestedConfig}
+      initialConditions={createConditionsRef.current ?? requestedConfig}
       generationDisclosureConfirmed={generationDisclosure.confirmed}
       generationState={pending ? undefined : generationStateFrom(state, requestedConfig)}
       initialResourceId={pending?.attemptId}
       initialPendingEssayQuestionIds={pending?.pendingEssayQuestionIds}
       callbacks={{
         onConfirmGenerationDisclosure: generationDisclosure.confirm,
+        onGenerationDisclosureExpired: generationDisclosure.refresh,
         onGenerate: async (conditions) => {
           await createMutation.mutateAsync({ materialId: state.materialId, conditions })
         },

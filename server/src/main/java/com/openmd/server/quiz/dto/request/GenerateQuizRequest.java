@@ -3,8 +3,10 @@ package com.openmd.server.quiz.dto.request;
 import com.openmd.server.global.api.FieldError;
 import com.openmd.server.global.error.BusinessException;
 import com.openmd.server.global.error.CommonErrorCode;
+import com.openmd.server.learningmaterial.domain.LearningMaterialContentRevision;
 import com.openmd.server.quiz.domain.type.QuestionType;
 import com.openmd.server.quiz.domain.type.QuizDifficulty;
+import com.openmd.server.quiz.dto.command.QuizGenerationCommand;
 import com.openmd.server.quiz.dto.command.QuizGenerationConfig;
 import java.util.List;
 
@@ -12,16 +14,25 @@ public record GenerateQuizRequest(
     List<String> selectedTypes,
     String difficulty,
     Integer maxQuestionCount,
-    String generationPrompt) {
-  public QuizGenerationConfig toCommand() {
+    String generationPrompt,
+    String contentRevision) {
+  public QuizGenerationCommand toCommand() {
     List<FieldError> fields = new java.util.ArrayList<>();
     List<QuestionType> parsedTypes = parseTypes(fields);
     QuizDifficulty parsedDifficulty = parseDifficulty(fields);
     String normalizedPrompt = normalizePrompt(fields);
+    if (!LearningMaterialContentRevision.isValid(contentRevision)) {
+      fields.add(
+          new FieldError(
+              "contentRevision", "contentRevision은 lowercase SHA-256 형식이어야 합니다."));
+    }
     if (!fields.isEmpty()) {
       throw new BusinessException(CommonErrorCode.INVALID_INPUT, fields);
     }
-    return new QuizGenerationConfig(parsedTypes, parsedDifficulty, maxQuestionCount, normalizedPrompt);
+    return new QuizGenerationCommand(
+        contentRevision,
+        new QuizGenerationConfig(
+            parsedTypes, parsedDifficulty, maxQuestionCount, normalizedPrompt));
   }
 
   private String normalizePrompt(List<FieldError> fields) {

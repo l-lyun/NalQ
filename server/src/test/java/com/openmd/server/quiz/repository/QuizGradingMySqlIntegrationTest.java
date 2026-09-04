@@ -13,6 +13,7 @@ import com.openmd.server.auth.repository.UserRepository;
 import com.openmd.server.global.error.BusinessException;
 import com.openmd.server.global.error.CommonErrorCode;
 import com.openmd.server.learningmaterial.domain.LearningMaterial;
+import com.openmd.server.learningmaterial.domain.LearningMaterialContentRevision;
 import com.openmd.server.learningmaterial.domain.SourceType;
 import com.openmd.server.learningmaterial.repository.LearningMaterialRepository;
 import com.openmd.server.notification.domain.QuizGenerationNotification;
@@ -31,6 +32,7 @@ import com.openmd.server.quiz.domain.type.QuizAttemptStatus;
 import com.openmd.server.quiz.domain.type.QuizDifficulty;
 import com.openmd.server.quiz.domain.type.QuizSetFailureCode;
 import com.openmd.server.quiz.domain.type.QuizSetStatus;
+import com.openmd.server.quiz.dto.command.QuizGenerationCommand;
 import com.openmd.server.quiz.dto.command.QuizGenerationConfig;
 import com.openmd.server.quiz.dto.request.BlankAnswerRequest;
 import com.openmd.server.quiz.dto.request.QuizResponseRequest;
@@ -145,7 +147,8 @@ class QuizGradingMySqlIntegrationTest {
             List.of(QuestionType.MULTIPLE_CHOICE, QuestionType.ESSAY), QuizDifficulty.NORMAL, 10);
 
     var accepted =
-        generationAcceptance.accept(owner.userId(), Long.toString(owner.materialId()), config);
+        generationAcceptance.accept(
+            owner.userId(), Long.toString(owner.materialId()), command(config));
 
     assertEquals(QuizSetStatus.GENERATING, accepted.status());
     assertEquals(config.selectedTypes(), accepted.requestedConfig().selectedTypes());
@@ -174,7 +177,7 @@ class QuizGradingMySqlIntegrationTest {
                 generationAcceptance.accept(
                     owner.userId(),
                     Long.toString(materials.saveAndFlush(material(owner.userId())).getId()),
-                    config));
+                    command(config)));
     assertEquals(QuizErrorCode.GENERATION_ACTIVE, active.getErrorCode());
 
     BusinessException foreign =
@@ -355,6 +358,25 @@ class QuizGradingMySqlIntegrationTest {
   }
 
   @Test
+  void rejectsAStaleContentRevisionWithoutCreatingAQuizSet() {
+    Fixture fixture = fixture();
+    QuizGenerationConfig config =
+        new QuizGenerationConfig(List.of(QuestionType.ESSAY), QuizDifficulty.NORMAL, 5);
+
+    BusinessException conflict =
+        assertThrows(
+            BusinessException.class,
+            () ->
+                generationAcceptance.accept(
+                    fixture.userId(),
+                    Long.toString(fixture.materialId()),
+                    new QuizGenerationCommand("0".repeat(64), config)));
+
+    assertEquals(QuizErrorCode.CONTENT_REVISION_CONFLICT, conflict.getErrorCode());
+    assertEquals(0L, jdbc.queryForObject("SELECT COUNT(*) FROM quiz_sets", Long.class));
+  }
+
+  @Test
   void rejectsInvalidGenerationConfigWithoutCreatingAQuizSet() {
     Fixture fixture = fixture();
     QuizGenerationConfig duplicateTypes =
@@ -366,7 +388,9 @@ class QuizGradingMySqlIntegrationTest {
             BusinessException.class,
             () ->
                 generationAcceptance.accept(
-                    fixture.userId(), Long.toString(fixture.materialId()), duplicateTypes));
+                    fixture.userId(),
+                    Long.toString(fixture.materialId()),
+                    command(duplicateTypes)));
 
     assertEquals(CommonErrorCode.INVALID_INPUT, invalid.getErrorCode());
     assertEquals("selectedTypes", invalid.getFields().getFirst().field());
@@ -897,6 +921,10 @@ class QuizGradingMySqlIntegrationTest {
     idempotency[0] = (byte) seed;
     fingerprint[0] = (byte) (seed + 1);
     return LearningMaterial.create(userId, "자료", "내용", SourceType.PASTE, idempotency, fingerprint);
+  }
+
+  private QuizGenerationCommand command(QuizGenerationConfig config) {
+    return new QuizGenerationCommand(LearningMaterialContentRevision.from("내용"), config);
   }
 
   private String uuid(int suffix) {

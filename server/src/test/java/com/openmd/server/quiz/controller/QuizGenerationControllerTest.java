@@ -9,14 +9,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.openmd.server.auth.security.AccessPrincipal;
+import com.openmd.server.global.error.BusinessException;
 import com.openmd.server.global.error.GlobalExceptionHandler;
 import com.openmd.server.quiz.domain.type.QuestionType;
 import com.openmd.server.quiz.domain.type.QuizDifficulty;
 import com.openmd.server.quiz.domain.type.QuizSetStatus;
+import com.openmd.server.quiz.dto.command.QuizGenerationCommand;
 import com.openmd.server.quiz.dto.command.QuizGenerationConfig;
 import com.openmd.server.quiz.dto.response.AcceptedQuizGeneration;
 import com.openmd.server.quiz.dto.response.ActiveQuizGeneration;
 import com.openmd.server.quiz.dto.response.RequestedQuizConfig;
+import com.openmd.server.quiz.error.QuizErrorCode;
 import com.openmd.server.quiz.service.QuizGenerationService;
 import java.time.Instant;
 import java.util.List;
@@ -49,9 +52,16 @@ class QuizGenerationControllerTest {
     RequestedQuizConfig config =
         new RequestedQuizConfig(
             List.of(QuestionType.MULTIPLE_CHOICE, QuestionType.ESSAY), QuizDifficulty.NORMAL, 10);
-    QuizGenerationConfig command =
-        new QuizGenerationConfig(
-            config.selectedTypes(), config.difficulty(), config.maxQuestionCount(), "동시성에 집중");
+    String contentRevision =
+        "cb0f24046b508710d6315e71bd9b21b920cf15301b0cf055dc9569c507576ea3";
+    QuizGenerationCommand command =
+        new QuizGenerationCommand(
+            contentRevision,
+            new QuizGenerationConfig(
+                config.selectedTypes(),
+                config.difficulty(),
+                config.maxQuestionCount(),
+                "동시성에 집중"));
     when(service.accept(7L, "123", command))
         .thenReturn(
             new AcceptedQuizGeneration(
@@ -71,8 +81,10 @@ class QuizGenerationControllerTest {
                     """
                     {"selectedTypes":["MULTIPLE_CHOICE","ESSAY"],
                      "difficulty":"NORMAL","maxQuestionCount":10,
-                     "generationPrompt":"  동시성에 집중  "}
-                    """))
+                     "generationPrompt":"  동시성에 집중  ",
+                     "contentRevision":"%s"}
+                    """
+                        .formatted(contentRevision)))
         .andExpect(status().isAccepted())
         .andExpect(jsonPath("$.data.quizSetId").value("set-1"))
         .andExpect(jsonPath("$.data.quizTitle").value("운영체제 퀴즈"))
@@ -95,6 +107,56 @@ class QuizGenerationControllerTest {
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error.code").value("COMMON_001"))
         .andExpect(jsonPath("$.error.fields[0].field").value("generationPrompt"));
+  }
+
+  @Test
+  void requiresTheConfirmedContentRevisionAsLowercaseSha256() throws Exception {
+    mvc.perform(
+            post("/api/v1/learning-materials/123/quiz-sets")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"selectedTypes":["ESSAY"],"difficulty":"NORMAL","maxQuestionCount":5}
+                    """))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("COMMON_001"))
+        .andExpect(jsonPath("$.error.fields[0].field").value("contentRevision"));
+
+    mvc.perform(
+            post("/api/v1/learning-materials/123/quiz-sets")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"selectedTypes":["ESSAY"],"difficulty":"NORMAL","maxQuestionCount":5,
+                     "contentRevision":"ABCDEF"}
+                    """))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("COMMON_001"))
+        .andExpect(jsonPath("$.error.fields[0].field").value("contentRevision"));
+  }
+
+  @Test
+  void reportsAChangedMaterialAsQuiz003Conflict() throws Exception {
+    String contentRevision = "0".repeat(64);
+    QuizGenerationCommand command =
+        new QuizGenerationCommand(
+            contentRevision,
+            new QuizGenerationConfig(
+                List.of(QuestionType.ESSAY), QuizDifficulty.NORMAL, 5, null));
+    when(service.accept(7L, "123", command))
+        .thenThrow(new BusinessException(QuizErrorCode.CONTENT_REVISION_CONFLICT));
+
+    mvc.perform(
+            post("/api/v1/learning-materials/123/quiz-sets")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"selectedTypes":["ESSAY"],"difficulty":"NORMAL","maxQuestionCount":5,
+                     "contentRevision":"%s"}
+                    """
+                        .formatted(contentRevision)))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.error.code").value("QUIZ_003"));
   }
 
   @Test

@@ -10,7 +10,10 @@ import type {
   ReviewSessionStatus,
 } from '@/pages/quiz/quiz.types'
 
-export type CreateQuizSetRequest = QuizRequestedConfig & { generationPrompt?: string }
+export type CreateQuizSetRequest = QuizRequestedConfig & {
+  generationPrompt?: string
+  contentRevision: string
+}
 export type CreateQuizSetResponse = {
   quizSetId: string
   materialId: string
