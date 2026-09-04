@@ -5,13 +5,17 @@ import test from 'node:test'
 const source = readFileSync(new URL('./QuizFlowPage.tsx', import.meta.url), 'utf8')
 const styles = readFileSync(new URL('./quiz.css', import.meta.url), 'utf8')
 
-test('전송 확인 dialog는 모바일 gutter를 두고 30일 안내를 짧게 보여준다', () => {
+test('전송 확인 dialog는 모바일 gutter를 두고 보관 기간과 예외를 함께 안내한다', () => {
   assert.match(source, /ContentDialog\.Positioner className="quiz-generation-dialog-positioner"/)
   assert.match(
     source,
     /className="quiz-generation-disclosure-description"[\s\S]*?\{'\uD559\uC2B5\uC790\uB8CC \uBCF8\uBB38 \uC804\uCCB4, \uBB38\uC81C \uC720\uD615·\uB09C\uC774\uB3C4·\uBB38\uC81C \uC218,\\n\uC785\uB825\uD55C \uCD94\uAC00 \uC694\uCCAD'\}/,
   )
-  assert.match(source, /악용 방지 정책에 따라 최대 30일 보관될 수 있어요\./)
+  assert.match(source, /입력·출력은 통상 최대 30일 보관돼요\./)
+  assert.match(source, /법적 의무나 서비스·제3자 보호를 위해 더 오래 보관될 수 있어요\./)
+  assert.doesNotMatch(source, /악용 방지 정책에 따라 최대 30일 보관될 수 있어요\./)
+  assert.doesNotMatch(source, /className="quiz-generation-retention-notice"/)
+  assert.doesNotMatch(styles, /\.quiz-generation-retention-notice/)
   assert.match(styles, /\.quiz-generation-dialog-positioner\s*\{[^}]*padding-inline:/s)
   assert.match(styles, /\.quiz-generation-disclosure-description\s*\{[^}]*white-space:\s*pre-line/s)
 })

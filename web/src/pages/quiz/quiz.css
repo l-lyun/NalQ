@@ -192,10 +192,6 @@
   word-break: keep-all;
 }
 
-.quiz-generation-retention-notice {
-  word-break: keep-all;
-}
-
 .quiz-question-heading:focus:not(:focus-visible) {
   outline: none;
 }

@@ -1014,8 +1014,8 @@ function GenerationDisclosureDialog({
                 <PageBanner.Root tone="informative" variant="weak">
                   <PageBanner.Content>
                     <PageBanner.Body>
-                      <PageBanner.Description className="quiz-generation-retention-notice">
-                        악용 방지 정책에 따라 최대 30일 보관될 수 있어요.
+                      <PageBanner.Description>
+                        입력·출력은 통상 최대 30일 보관돼요. 법적 의무나 서비스·제3자 보호를 위해 더 오래 보관될 수 있어요.
                       </PageBanner.Description>
                     </PageBanner.Body>
                   </PageBanner.Content>
