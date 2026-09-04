@@ -22,7 +22,7 @@ scope: web
 - 본 퀴즈 화면 상태는 `Zustand` store로 관리한다.
 - 한 화면 한 문항, 이전·다음, 제출 경고와 자기평가 단계 전환은 `useFunnel` 기반 단계 모델로 구성한다.
 - 본 퀴즈와 복습의 현재 문항·미제출 답안은 열린 화면의 Zustand 메모리에만 둔다. 새로고침·화면 이탈·브라우저 종료 뒤에는 복원하지 않고 첫 문항부터 다시 푼다.
-- `localStorage`에는 생성 요청 조건만 `userId + quizSetId` 범위로 보존할 수 있다. 값은 `selectedTypes`, `difficulty`, `maxQuestionCount`이며 답안·현재 문항·attempt ID·제출 payload를 섞지 않는다.
+- `localStorage`에는 생성 요청 조건을 `userId + quizSetId` 범위로, OpenAI 전송 확인을 `userId + materialId` 범위로 보존할 수 있다. 요청 조건은 `selectedTypes`, `difficulty`, `maxQuestionCount`만, 전송 확인은 본문의 SHA-256 지문과 확인 시각만 담고 학습자료 본문·답안·현재 문항·attempt ID·제출 payload를 섞지 않는다.
 - 생성 조건 로컬 값은 생성 중 화면에서 요청 조건을 다시 표시하고 `READY` 화면에서 실제 생성 수·유형과 함께 보여주기 위한 보조 정보다. 값이 없거나 손상돼도 활성 생성 조회와 상태 전이는 서버 응답만으로 계속한다.
 - 최종 제출 직렬화는 [API 계약의 응답 모양](../../../docs/contracts/contract-api-quiz-learning.md#최종-제출)을 따른다. 각 항목에는 `questionId`와 유형별 답안 필드만 보내고 `type`은 보내지 않는다. 빈칸은 작성된 값만 `blankAnswers: [{ blankId, answer }]`로 만들며 누락 빈칸을 빈 문자열로 채우지 않는다.
 - 사용자가 제출을 확정하면 HTTP 요청 전에 `crypto.randomUUID()`로 UUID v4 `attemptId` 하나를 만들고, 현재 화면이 살아 있는 동안 해당 ID와 제출 payload를 메모리에 유지한다. `randomUUID`를 제공하지 않는 지원 WebView에서는 `crypto.getRandomValues` 기반 UUID v4 helper까지만 호환 fallback으로 허용하며 `Math.random`은 사용하지 않는다.
@@ -64,12 +64,13 @@ scope: web
 - 틀린 문제 다시 풀기는 본 퀴즈의 `QuizFlowPage`와 문항 입력·이동·전체 제출·서술형 자기평가·결과 표현을 그대로 재사용한다. 풀이 화면의 사용자 노출 차이는 상단 헤더에서 학습자료 제목 뒤에 ` · 복습`을 덧붙이는 것뿐이며, 복습용 풀이 화면이나 문항별 즉시 채점 UI를 따로 만들지 않는다.
 - 일반 `pnpm dev`와 production build는 실제 퀴즈 API를 사용한다. fixture는 `pnpm dev:mock`에서만 선택하며, 개발 서버에서만 `/quiz-preview`와 `/quiz-result-preview`를 열어 전체 흐름과 결과 수정을 검토한다. 프로덕션 라우트에는 등록하지 않는다.
 - 생성 조건은 5·10·15·20문제와 선택적 추가 요청을 지원한다. 추가 요청은 Unicode code point 300자로 제한하고 앞뒤 공백을 정리해 생성 POST에만 포함하며, 응답·local requested-config·로그에는 보존하지 않는다.
-- 실제 생성 요청 전에는 OpenAI로 전송하는 정보, 전송하지 않는 계정·풀이 정보와 최대 30일 보관 가능성을 `ContentDialog`에서 확인한다. 취소는 조건을 유지하고 요청하지 않으며 확인 행동 중 중복 요청을 막는다.
+- 실제 생성 요청 전에는 OpenAI로 전송하는 정보, 전송하지 않는 계정·풀이 정보와 최대 30일 보관 가능성을 `ContentDialog`에서 확인한다. 현재 본문 SHA-256 지문이 기기 로컬 확인 지문과 같으면 다시 묻지 않고, 본문이 바뀌면 다시 확인하며 제목만 바뀐 경우는 기존 확인을 유지한다. 취소는 조건을 유지하고 요청하지 않으며 확인 행동 중 중복 요청을 막는다.
 - 좁은 문제 진행 막대는 현재 위치를 읽는 `progressbar`로만 제공하고 직접 조작하지 않는다. 문항 이동은 `BottomSheet` 안의 44px 이상 번호 버튼으로 분리해 키보드·터치 목표를 보장한다.
 - 단답형·빈칸 채우기 판정 수정은 마지막 저장 확인 판정과 요약을 화면의 기준으로 둔다. 저장 중에는 기존 결과를 유지하고, 성공 응답 뒤에만 현재 판정·점수·복습 수를 한 번에 교체하며 실패하면 이전 상태와 재시도 행동을 유지한다.
 - 결과 조회 adapter는 `response=null`이면 `답하지 않음`으로 표시하고 판정 수정 행동을 만들지 않는다. 답을 작성한 `SHORT_ANSWER` 또는 `FILL_IN_THE_BLANK`만 수정 가능하며 현재 판정과 관계없이 `채점 수정` 행동을 제공한다. 빈칸 채우기는 `response.blankAnswers`에 하나 이상의 답변이 있으면 일부 빈칸만 작성했더라도 수정할 수 있고, 완전 미응답이면 수정할 수 없다. 화면에서 사용하지 않는 `automaticOutcome`, `gradingSource`, `correctedAt`, `reviewRequired`, 별도 `unanswered` 필드를 요구하지 않는다.
 - 최종 제출 표현 경계는 제출 성공 응답의 `status`를 그대로 사용한다. `COMPLETED`는 결과로, `SELF_ASSESSMENT_REQUIRED`는 `pendingEssayQuestionIds` 순서의 자기평가로 이동하며, 제출 실패는 미응답 확인 시트로 되돌리지 않고 답안을 보존한 별도 재시도 상태로 이동한다.
 - 퀴즈 생성 POST에는 `Idempotency-Key`를 보내지 않는다. 접수 응답을 확인하지 못한 재시도에서는 자료의 활성 생성을 먼저 조회하고, `GENERATING` QuizSet이 없을 때만 같은 조건으로 새 생성 POST를 보낸다.
+- provider 생성이 `GENERATION_FAILED`로 끝나면 서버·로컬에 보존하지 않는 `generationPrompt`를 뺀 채 `같은 조건`으로 재요청하지 않고 조건 화면으로 돌아간다. 유형·난이도·최대 문제 수는 요청 표시용 로컬 값으로 복원하되, 사용자가 추가 요청을 다시 확인·입력한 뒤 새 요청을 보낸다.
 - 서술형 자기평가는 결과 조회 모양의 내 답·모범 답안·핵심 포인트·해설·학습자료 본문을 읽고 문항별 `정답(CORRECT)`·`보완 필요(PARTIAL)`·`오답(INCORRECT)`을 저장한다. 저장 응답의 `status`와 `remainingSelfAssessmentCount`를 확인한 뒤에만 다음 문항 또는 완료 결과로 이동한다.
 - 표현 callback은 실제 API adapter가 연결될 때 서버 성공 응답을 잃지 않도록 최종 제출 결과, 서술형 저장 결과와 판정 수정 결과를 필수 반환한다. 단답형·빈칸 채우기 판정 수정 adapter는 공통 `PUT /api/v1/quiz-attempts/{attemptId}/grading-overrides/{questionId}`에 `{ outcome }`만 보내며, 기존 `short-answer-gradings` 경로는 서버의 기존 소비자 호환 별칭이므로 신규 웹 요청에는 사용하지 않는다. 한 화면에서 요청을 직렬화하고 저장 중 추가 수정 행동을 막는다. 성공하면 서버가 반환한 전체 최신 결과로 현재 결과 상태를 교체하며 로컬 delta로 문항 판정이나 요약을 추정하지 않고, 실패하면 기존 판정과 요약을 유지한 채 재시도 행동을 제공한다. 공개 revision이나 충돌 해결 UI는 두지 않고 마지막으로 서버에 커밋된 판정을 현재 값으로 사용한다.
 

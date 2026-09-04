@@ -164,6 +164,28 @@
   resize: vertical;
 }
 
+.quiz-generation-prompt-description-line {
+  display: block;
+}
+
+.quiz-generation-prompt-count {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.quiz-generation-dialog-positioner {
+  box-sizing: border-box;
+  padding-inline: var(--seed-dimension-spacing-x-global-gutter);
+}
+
+.quiz-generation-dialog {
+  min-width: 0;
+}
+
+.quiz-generation-retention-notice {
+  word-break: keep-all;
+}
+
 .quiz-question-heading:focus:not(:focus-visible) {
   outline: none;
 }

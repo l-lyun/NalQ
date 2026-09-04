@@ -25,7 +25,7 @@ scope: web
 2. 문서가 visible이고 online이며 pending이 있으면 QuizSet 상태를 `pollAfterSeconds`로 확인한다.
 3. terminal을 확인하면 pending을 제거하고 알림·내 퀴즈 query를 무효화한다.
 4. 첫 페이지의 unread 항목 중 이 기기에서 claim하지 않은 ID만 Snackbar 후보로 사용한다.
-5. 생성 route에서는 Snackbar를 생략하고, 한 건은 결과별 Snackbar, 여러 건은 합산 Snackbar를 표시한다.
+5. 실제 `GENERATION` scene이 mount된 동안은 Snackbar claim 자체를 미루고, scene을 벗어난 뒤 한 건은 결과별 Snackbar, 여러 건은 합산 Snackbar를 표시한다. 같은 URL에서도 조건·준비·풀이 scene은 억제하지 않는다.
 6. background와 offline에서는 polling을 중단하고 visible·online 복귀 시 TanStack Query의 focus/reconnect 재조회를 사용한다.
 
 ## 화면 연결

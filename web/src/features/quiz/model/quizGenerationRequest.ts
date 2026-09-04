@@ -1,5 +1,5 @@
 import type { CreateQuizSetRequest } from '@/features/quiz/api/quiz.types'
-import type { QuizConditions } from '@/pages/quiz/quiz.types'
+import type { QuizConditions, QuizGenerationFailure } from '@/pages/quiz/quiz.types'
 
 export const GENERATION_PROMPT_MAX_CODE_POINTS = 300
 
@@ -20,6 +20,12 @@ export function isQuizGenerationActiveConflict(error: unknown) {
     && error !== null
     && 'code' in error
     && error.code === 'QUIZ_001'
+}
+
+export function getQuizGenerationRecoveryMode(failure: QuizGenerationFailure) {
+  if (failure.kind === 'STATUS_UNAVAILABLE') return 'REFRESH_STATUS' as const
+  if (failure.kind === 'REQUEST_FAILED' && failure.retryable) return 'RETRY_REQUEST' as const
+  return 'RETURN_TO_CONDITIONS' as const
 }
 
 export function toCreateQuizSetRequest(conditions: QuizConditions): CreateQuizSetRequest {

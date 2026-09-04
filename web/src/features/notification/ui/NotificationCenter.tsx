@@ -12,7 +12,7 @@ import {
   Snackbar,
   useSnackbarAdapter,
 } from '@seed-design/react'
-import { type ReactNode, useEffect, useState } from 'react'
+import { type ReactNode, useEffect, useState, useSyncExternalStore } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 import { useCurrentUser } from '@/features/auth/model/auth.queries'
@@ -37,6 +37,10 @@ import { getQuizSet } from '@/features/quiz/api/quiz.api'
 import type { QuizSetState } from '@/features/quiz/api/quiz.types'
 import { quizManagementKeys } from '@/features/quiz/model/quizManagementQueries'
 import { quizQueryKeys } from '@/features/quiz/model/quizQueries'
+import {
+  getQuizGenerationScenePresence,
+  subscribeQuizGenerationScenePresence,
+} from '@/features/quiz/model/quizGenerationScenePresence'
 
 export function NotificationCenterProvider({ children }: { children: ReactNode }) {
   return (
@@ -86,6 +90,11 @@ function NotificationCenterRuntime() {
   const queryClient = useQueryClient()
   const snackbar = useSnackbarAdapter()
   const currentUser = useCurrentUser()
+  const generationSceneActive = useSyncExternalStore(
+    subscribeQuizGenerationScenePresence,
+    getQuizGenerationScenePresence,
+    () => false,
+  )
   const userId = currentUser.data?.id
   const [foreground, setForeground] = useState(() => document.visibilityState === 'visible' && navigator.onLine)
   const [pending, setPending] = useState(() => userId ? loadPendingGenerations(userId) : [])
@@ -144,12 +153,11 @@ function NotificationCenterRuntime() {
   }, [pending, pendingQueries, queryClient, userId])
 
   useEffect(() => {
-    if (!userId || !foreground || !notifications.data) return
+    if (!userId || !foreground || !notifications.data || generationSceneActive) return
     const unseen = notifications.data.items.filter((item) => item.readAt === null)
     void claimSnackbarNotifications(userId, unseen.map((item) => item.notificationId)).then((claimedIds) => {
       if (claimedIds.length === 0) return
       const claimed = unseen.filter((item) => claimedIds.includes(item.notificationId))
-      if (isGenerationRoute(location.pathname)) return
 
       if (claimed.length > 1) {
         snackbar.create({
@@ -184,7 +192,7 @@ function NotificationCenterRuntime() {
         ),
       })
     })
-  }, [foreground, location.pathname, navigate, notifications.data, snackbar, userId])
+  }, [foreground, generationSceneActive, location.pathname, navigate, notifications.data, snackbar, userId])
 
   return null
 }
@@ -216,8 +224,4 @@ function AppSnackbar({ notification, message, actionLabel, onAction }: {
       <Snackbar.HiddenCloseButton aria-label="알림 닫기" />
     </Snackbar.Root>
   )
-}
-
-function isGenerationRoute(pathname: string) {
-  return pathname.startsWith('/quiz-sets/') || /^\/learning\/[^/]+\/quiz\/?$/.test(pathname)
 }

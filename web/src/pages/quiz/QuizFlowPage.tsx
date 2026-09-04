@@ -21,15 +21,17 @@ import {
   TextField,
   VStack,
 } from '@seed-design/react'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 
 import { createSubmissionPayload, isQuestionAnswered } from '@/features/quiz/model/quizAdapter'
 import {
   countGenerationPromptCodePoints,
   GENERATION_PROMPT_MAX_CODE_POINTS,
+  getQuizGenerationRecoveryMode,
   isQuizGenerationActiveConflict,
   sliceGenerationPrompt,
 } from '@/features/quiz/model/quizGenerationRequest'
+import { registerQuizGenerationScene } from '@/features/quiz/model/quizGenerationScenePresence'
 import { createUuidV4 } from '@/features/quiz/model/randomUuid'
 
 import {
@@ -192,7 +194,7 @@ function generationErrorCopy(error: QuizGenerationFailure) {
       return {
         title: '문제 만들기를 완료하지 못했어요',
         description: error.message ?? '불완전한 문제 세트는 저장하지 않았어요.',
-        action: error.retryable ? '같은 조건으로 다시 시도' : '조건 다시 보기',
+        action: '조건 다시 보기',
       }
   }
 }
@@ -209,6 +211,7 @@ export function QuizFlowPage({
     maxQuestionCount: 10,
   },
   initialAnswers = {},
+  generationDisclosureConfirmed = false,
   generationState,
   initialResourceId,
   initialPendingEssayQuestionIds = [],
@@ -218,6 +221,7 @@ export function QuizFlowPage({
   const [conditions, setConditions] = useState(initialConditions)
   const [conditionsError, setConditionsError] = useState<string>()
   const [generationDisclosureOpen, setGenerationDisclosureOpen] = useState(false)
+  const [disclosureConfirmed, setDisclosureConfirmed] = useState(generationDisclosureConfirmed)
   const [generationStarting, setGenerationStarting] = useState(false)
   const [generation, setGeneration] = useState(
     generationState ?? ({ status: 'GENERATING' } as const),
@@ -261,6 +265,15 @@ export function QuizFlowPage({
   const essayItem = resultState.items.find(
     (item) => item.questionId === pendingEssayQuestionIds[0] && item.type === 'ESSAY',
   )
+
+  useEffect(() => {
+    if (generationDisclosureConfirmed) setDisclosureConfirmed(true)
+  }, [generationDisclosureConfirmed])
+
+  useLayoutEffect(() => {
+    if (scene !== 'GENERATION') return
+    return registerQuizGenerationScene()
+  }, [scene])
 
   useEffect(() => {
     setResultState(result)
@@ -309,15 +322,19 @@ export function QuizFlowPage({
     callbacks?.onConditionsChange?.(next)
   }
 
-  const startGeneration = async () => {
+  const startGeneration = () => {
     if (conditions.selectedTypes.length === 0) {
       setConditionsError('문제 유형을 하나 이상 선택해 주세요.')
+      return
+    }
+    if (disclosureConfirmed) {
+      void requestGeneration()
       return
     }
     setGenerationDisclosureOpen(true)
   }
 
-  const confirmGeneration = async () => {
+  const requestGeneration = async () => {
     if (generationStarting) return
     setGenerationStarting(true)
     setGeneration({ status: 'GENERATING' })
@@ -341,6 +358,13 @@ export function QuizFlowPage({
     }
   }
 
+  const confirmGeneration = async () => {
+    if (generationStarting) return
+    setDisclosureConfirmed(true)
+    await callbacks?.onConfirmGenerationDisclosure?.()
+    await requestGeneration()
+  }
+
   const showReady = (ready: QuizGenerationReady) => {
     setGeneration({ status: 'READY', ready })
     setScene('READY')
@@ -348,14 +372,15 @@ export function QuizFlowPage({
   }
 
   const retryGeneration = async (failure: QuizGenerationFailure) => {
-    if (failure.kind === 'SOURCE_INSUFFICIENT' || !failure.retryable) {
+    const recoveryMode = getQuizGenerationRecoveryMode(failure)
+    if (recoveryMode === 'RETURN_TO_CONDITIONS') {
       setScene('CONDITIONS')
       return
     }
     setGeneration({ status: 'GENERATING' })
     try {
       const ready =
-        failure.kind === 'STATUS_UNAVAILABLE'
+        recoveryMode === 'REFRESH_STATUS'
           ? await callbacks?.onRefreshGenerationStatus?.()
           : await callbacks?.onRetryGeneration?.(failure)
       if (ready) showReady(ready)
@@ -368,7 +393,7 @@ export function QuizFlowPage({
       setGeneration({
         status: 'ERROR',
         error:
-          failure.kind === 'STATUS_UNAVAILABLE'
+          recoveryMode === 'REFRESH_STATUS'
             ? failure
             : { kind: 'REQUEST_FAILED', retryable: true },
       })
@@ -918,9 +943,11 @@ function ConditionsScreen({
           </TextField.Root>
           <Field.Footer>
             <Field.Description id="quiz-generation-prompt-description">
-              출제 초점과 스타일만 반영해요. 문제 유형·수·학습자료 근거는 바꿀 수 없어요.
+              <span className="quiz-generation-prompt-description-line">문제 출제 초점과 스타일을 반영해요.</span>
+              <span className="quiz-generation-prompt-description-line">문제 유형·수·학습자료 근거는 바꿀 수 없어요.</span>
             </Field.Description>
             <Field.CharacterCount
+              className="quiz-generation-prompt-count"
               current={countGenerationPromptCodePoints(conditions.generationPrompt ?? '')}
               max={GENERATION_PROMPT_MAX_CODE_POINTS}
             />
@@ -955,8 +982,8 @@ function GenerationDisclosureDialog({
     >
       <Portal>
         <ContentDialog.Backdrop />
-        <ContentDialog.Positioner>
-          <ContentDialog.Content width="full" maxWidth="440px">
+        <ContentDialog.Positioner className="quiz-generation-dialog-positioner">
+          <ContentDialog.Content className="quiz-generation-dialog" width="full" maxWidth="440px">
             <ContentDialog.Header>
               <ContentDialog.Title>학습자료를 OpenAI로 전송할까요?</ContentDialog.Title>
               <ContentDialog.Description>
@@ -980,8 +1007,8 @@ function GenerationDisclosureDialog({
                 <PageBanner.Root tone="informative" variant="weak">
                   <PageBanner.Content>
                     <PageBanner.Body>
-                      <PageBanner.Description>
-                        기본 악용 방지 모니터링 과정에서 입력과 출력이 최대 30일 보관될 수 있어요.
+                      <PageBanner.Description className="quiz-generation-retention-notice">
+                        악용 방지 정책에 따라 최대 30일 보관될 수 있어요.
                       </PageBanner.Description>
                     </PageBanner.Body>
                   </PageBanner.Content>

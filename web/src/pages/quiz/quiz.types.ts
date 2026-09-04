@@ -105,6 +105,7 @@ export type QuizEssayAssessmentResult = {
 
 export type QuizPresentationCallbacks = {
   onConditionsChange?: (conditions: QuizConditions) => void
+  onConfirmGenerationDisclosure?: () => void | Promise<void>
   onGenerate?: (conditions: QuizConditions) => void | Promise<QuizGenerationReady | void>
   onGenerationActive?: () => void
   onRetryGeneration?: (failure: QuizGenerationFailure) => void | Promise<QuizGenerationReady | void>
@@ -145,6 +146,7 @@ export type QuizFlowPageProps = {
   flowKind?: QuizFlowKind
   initialScene?: QuizFlowScene
   initialConditions?: QuizConditions
+  generationDisclosureConfirmed?: boolean
   initialAnswers?: QuizAnswers
   generationState?: QuizGenerationState
   initialResourceId?: string
