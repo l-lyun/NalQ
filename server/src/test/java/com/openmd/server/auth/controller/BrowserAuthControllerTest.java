@@ -68,8 +68,8 @@ class BrowserAuthControllerTest {
 					  "password":"password1",
 					  "nickname":"공부왕7",
 					  "agreements":[
-					    {"termsId":"SERVICE_TERMS","version":"TEMP-2026-08-20"},
-					    {"termsId":"PRIVACY_COLLECTION","version":"TEMP-2026-08-20"}
+					    {"termsId":"SERVICE_TERMS","version":"2026-09-04"},
+					    {"termsId":"PRIVACY_COLLECTION","version":"2026-09-04"}
 					  ]
 					}
 					"""))
@@ -210,8 +210,8 @@ class BrowserAuthControllerTest {
 			  "password":"password1",
 			  "nickname":"공부왕7",
 			  "agreements":[
-			    {"termsId":"SERVICE_TERMS","version":"TEMP-2026-08-20"},
-			    {"termsId":"PRIVACY_COLLECTION","version":"TEMP-2026-08-20"}
+			    {"termsId":"SERVICE_TERMS","version":"2026-09-04"},
+			    {"termsId":"PRIVACY_COLLECTION","version":"2026-09-04"}
 			  ]
 			}
 			""";

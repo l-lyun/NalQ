@@ -605,7 +605,7 @@ export function SignUpProfileStep(props: SignUpProfileStepProps) {
               </Checkbox.Group>
 
               <Text textStyle="t3Regular" color="fg.neutralSubtle">
-                현재 전문은 화면 검수를 위한 임시 문안이며 운영 출시 전 교체됩니다.
+                동의한 약관 버전과 동의 시각은 계정에 기록됩니다.
               </Text>
             </VStack>
           </Box>
@@ -653,7 +653,7 @@ function TermsOverlay({
           <ContentDialog.Header>
             <ContentDialog.Title>{term?.title ?? '약관 전문'}</ContentDialog.Title>
             <ContentDialog.Description>
-              임시 문안 · 버전 {term?.version ?? '-'}
+              시행일 {term?.effectiveAt ?? '-'} · 버전 {term?.version ?? '-'}
             </ContentDialog.Description>
             <ContentDialog.CloseButton aria-label="약관 전문 닫기">
               <svg className="sign-up-close-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -673,7 +673,7 @@ function TermsOverlay({
                   as="p"
                   key={`${term.id}-${index}`}
                   textStyle="t5Regular"
-                  color={index === 0 ? 'fg.warning' : 'fg.neutral'}
+                  color="fg.neutral"
                 >
                   {paragraph}
                 </Text>

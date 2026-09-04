@@ -1,17 +1,17 @@
 import { IconArrowLeftLine } from '@karrotmarket/react-monochrome-icon'
-import { ActionButton, Box, Divider, Flex, Icon, PageBanner, Text, VStack } from '@seed-design/react'
+import { ActionButton, Box, Divider, Flex, Icon, Text, VStack } from '@seed-design/react'
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 
 import seedLicense from './licenses/seed-license.txt?raw'
 import seedNotice from './licenses/seed-notice.txt?raw'
 import thirdPartyNoticesUrl from './licenses/third-party-notices.txt?url'
-import { privacyPolicyDraft, serviceTermsDraft, type LegalDocument } from './legalContent'
+import { privacyPolicy, serviceTerms, type LegalDocument } from './legalContent'
 import { PublicServiceFooter } from './PublicServiceFooter'
 import { getPublicBackLabel, readPublicReturnPath } from './publicServiceNavigation'
 import './public-service.css'
 
-const SUPPORT_EMAIL = 'kimdohyun032@gmail.com'
+const SUPPORT_EMAIL = 'nalq.service@gmail.com'
 
 function PublicPage({ title, children }: { title: string; children: React.ReactNode }) {
   const navigate = useNavigate()
@@ -50,19 +50,9 @@ function LegalDocumentPage({ document }: { document: LegalDocument }) {
   return (
     <PublicPage title={document.title}>
       <Text as="p" textStyle="t6Regular" color="fg.neutralMuted">{document.summary}</Text>
-      <PageBanner.Root tone="warning" variant="weak">
-        <PageBanner.Content>
-          <PageBanner.Body>
-            <PageBanner.Title>출시 전 검토 문서</PageBanner.Title>
-            <PageBanner.Description>
-              시행일과 운영 버전이 아직 확정되지 않았습니다. 현재 내용은 법률·운영 검토용이며 운영 중인 약관이나 방침이 아닙니다.
-            </PageBanner.Description>
-          </PageBanner.Body>
-        </PageBanner.Content>
-      </PageBanner.Root>
       <VStack className="public-service-document-meta" bg="bg.neutralWeak" borderRadius="r2" py="x3" px="x4" gap="x1">
-        <Text textStyle="t4Medium" color="fg.neutral">최근 검토 {document.reviewedAt}</Text>
-        <Text textStyle="t3Regular" color="fg.neutralMuted">시행일 미정 · 운영 버전 미정</Text>
+        <Text textStyle="t4Medium" color="fg.neutral">시행일 {document.effectiveAt}</Text>
+        <Text textStyle="t3Regular" color="fg.neutralMuted">버전 {document.version}</Text>
       </VStack>
       {document.sections.length >= 6 ? (
         <Box as="nav" className="public-service-toc" aria-label={`${document.title} 목차`}>
@@ -93,11 +83,11 @@ function LegalDocumentPage({ document }: { document: LegalDocument }) {
 }
 
 export function TermsPage() {
-  return <LegalDocumentPage document={serviceTermsDraft} />
+  return <LegalDocumentPage document={serviceTerms} />
 }
 
 export function PrivacyPage() {
-  return <LegalDocumentPage document={privacyPolicyDraft} />
+  return <LegalDocumentPage document={privacyPolicy} />
 }
 
 export function SupportPage() {

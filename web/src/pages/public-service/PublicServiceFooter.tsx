@@ -12,9 +12,6 @@ const footerLinks = [
 
 export function PublicServiceFooter({ preserveContext = false }: { preserveContext?: boolean }) {
   const { pathname } = useLocation()
-  const visibleLinks = import.meta.env.DEV
-    ? footerLinks
-    : footerLinks.filter((item) => item.to !== '/terms' && item.to !== '/privacy')
 
   return (
     <Box as="footer" className="public-service-footer" px="spacingX.globalGutter" py="x5">
@@ -22,7 +19,7 @@ export function PublicServiceFooter({ preserveContext = false }: { preserveConte
         <Flex className="public-service-footer__primary" width="full" gap="x3" align="center" justify="space-between" wrap>
           <Text textStyle="t5Bold" color="fg.neutral">NalQ</Text>
         <nav className="public-service-footer__links" aria-label="서비스 정보">
-          {visibleLinks.map((item) => pathname === item.to ? (
+          {footerLinks.map((item) => pathname === item.to ? (
             <span key={item.to} className="public-service-link" aria-current="page">
               {item.label}
             </span>
@@ -43,8 +40,8 @@ export function PublicServiceFooter({ preserveContext = false }: { preserveConte
         <Flex className="public-service-footer__meta" width="full" gap="x2" align="center" wrap>
           <Text textStyle="t3Regular" color="fg.neutralMuted">운영자 김도현</Text>
           <span className="public-service-footer__separator" aria-hidden>·</span>
-          <a className="public-service-link public-service-email" href="mailto:kimdohyun032@gmail.com">
-            kimdohyun032@gmail.com
+          <a className="public-service-link public-service-email" href="mailto:nalq.service@gmail.com">
+            nalq.service@gmail.com
           </a>
           <span className="public-service-footer__separator" aria-hidden>·</span>
           <Text textStyle="t3Regular" color="fg.neutralSubtle">© 2026 NalQ</Text>
