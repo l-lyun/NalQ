@@ -237,6 +237,7 @@ export function NotionImportPage() {
       const result = await importing.mutateAsync(pageId)
       if (!mounted.current) return
       navigate('/learning/materials/new', {
+        replace: true,
         state: {
           sourceType: result.sourceType,
           title: result.title,
@@ -320,6 +321,7 @@ export function NotionImportPage() {
             error={authorizing.isError ? presentationForError(authorizing.error) : undefined}
             onConnect={beginAuthorization}
             onDirect={() => navigate('/learning/materials/new', {
+              replace: true,
               state: {
                 sourceType: 'PASTE',
                 title: '',

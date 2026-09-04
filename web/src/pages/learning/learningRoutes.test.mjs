@@ -4,9 +4,12 @@ import test from 'node:test'
 import {
   getLearningRoutePanelClassName,
   readLearningCreateReturnState,
+  resolveLearningEditorBackNavigation,
+  resolveLearningMaterialEditBackNavigation,
   resolveLearningMaterialsReturnTo,
   resolveLearningQuizzesReturnTo,
   resolveLearningRoute,
+  shouldCommitLearningSearchInput,
 } from './learningRoutes.ts'
 
 test('학습 route를 실제 화면 뎁스로 구분한다', () => {
@@ -66,4 +69,35 @@ test('생성 화면 복귀 상태에서 안전한 경로와 유효한 스크롤 
     readLearningCreateReturnState({ returnTo: '//evil.example/learning/quizzes', returnScrollTop: -1 }),
     {},
   )
+})
+
+test('Notion 편집 확인의 뒤로가기는 선택 화면을 다시 쌓지 않고 원래 생성 진입점으로 수렴한다', () => {
+  assert.deepEqual(resolveLearningEditorBackNavigation('NOTION', undefined, {}), {
+    to: '/learning/new',
+    replace: true,
+  })
+  assert.deepEqual(
+    resolveLearningEditorBackNavigation('NOTION', '/learning/materials?page=2', {}),
+    { to: '/learning/materials?page=2', replace: true },
+  )
+})
+
+test('학습자료 편집의 뒤로가기는 목록을 현재 history entry에 교체해 왕복 루프를 만들지 않는다', () => {
+  assert.deepEqual(resolveLearningMaterialEditBackNavigation(undefined), {
+    to: '/learning/materials',
+    replace: true,
+  })
+  assert.deepEqual(
+    resolveLearningMaterialEditBackNavigation('/learning/materials?query=자료&page=2'),
+    {
+      to: '/learning/materials?query=%EC%9E%90%EB%A3%8C&page=2',
+      replace: true,
+    },
+  )
+})
+
+test('한글 IME 조합 중에는 검색 URL을 갱신하지 않고 조합 완료 뒤 한 번만 반영한다', () => {
+  assert.equal(shouldCommitLearningSearchInput(true, true), false)
+  assert.equal(shouldCommitLearningSearchInput(false, true), false)
+  assert.equal(shouldCommitLearningSearchInput(false, false), true)
 })

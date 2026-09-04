@@ -132,7 +132,7 @@
     function materialCard(item) {
       const open=openMaterials.has(item.id);
       return `<article class="card"><button class="disclosure" type="button" data-material="${item.id}" aria-expanded="${open}" aria-controls="panel-${item.id}"><span><span class="title">${escapeHtml(item.title)}</span><span class="meta">${escapeHtml(item.meta)}</span></span><span class="chevron" aria-hidden="true">⌄</span></button>
-        <div class="expanded ${open?'':'hidden'}" id="panel-${item.id}"><p class="preview">${escapeHtml(item.preview)}<br>${item.count}</p><div class="actions"><button class="secondary strong" type="button" data-message="${escapeHtml(item.title)}로 퀴즈 만들기를 시작해요.">퀴즈 만들기</button><button class="secondary" type="button" data-message="${escapeHtml(item.title)} 변경 화면으로 이동해요.">학습자료 변경</button></div></div></article>`;
+        <div class="expanded ${open?'':'hidden'}" id="panel-${item.id}"><p class="preview">${escapeHtml(item.preview)}<br>${item.count}</p><div class="actions"><button class="secondary strong" type="button" data-message="${escapeHtml(item.title)}로 퀴즈 만들기를 시작해요.">퀴즈 만들기</button><button class="secondary" type="button" data-message="${escapeHtml(item.title)} 수정 화면으로 이동해요.">학습자료 수정</button></div></div></article>`;
     }
     function renderMaterials() {
       bottomNav.classList.add('hidden');

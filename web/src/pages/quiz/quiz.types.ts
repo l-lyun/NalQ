@@ -1,12 +1,12 @@
 export type QuizQuestionType = 'MULTIPLE_CHOICE' | 'FILL_IN_THE_BLANK' | 'SHORT_ANSWER' | 'ESSAY'
 export type QuizDifficulty = 'EASY' | 'NORMAL' | 'HARD'
-export type QuizMaxQuestionCount = 5 | 10 | 15
+export type QuizMaxQuestionCount = 5 | 10 | 15 | 20
 export type QuizRequestedConfig = {
   selectedTypes: QuizQuestionType[]
   difficulty: QuizDifficulty
   maxQuestionCount: QuizMaxQuestionCount
 }
-export type QuizConditions = QuizRequestedConfig
+export type QuizConditions = QuizRequestedConfig & { generationPrompt?: string }
 
 type QuizQuestionBase = { questionId: string; number: number; topic: string; prompt: string }
 export type ObjectiveQuestion = QuizQuestionBase & {
@@ -105,7 +105,10 @@ export type QuizEssayAssessmentResult = {
 
 export type QuizPresentationCallbacks = {
   onConditionsChange?: (conditions: QuizConditions) => void
+  onConfirmGenerationDisclosure?: () => void | Promise<void>
+  onGenerationDisclosureExpired?: () => void | Promise<void>
   onGenerate?: (conditions: QuizConditions) => void | Promise<QuizGenerationReady | void>
+  onGenerationActive?: () => void
   onRetryGeneration?: (failure: QuizGenerationFailure) => void | Promise<QuizGenerationReady | void>
   onRefreshGenerationStatus?: () => void | Promise<QuizGenerationReady | void>
   onExitGeneration?: () => void
@@ -144,6 +147,7 @@ export type QuizFlowPageProps = {
   flowKind?: QuizFlowKind
   initialScene?: QuizFlowScene
   initialConditions?: QuizConditions
+  generationDisclosureConfirmed?: boolean
   initialAnswers?: QuizAnswers
   generationState?: QuizGenerationState
   initialResourceId?: string

@@ -24,3 +24,13 @@ export function resolvePendingSelfAssessmentForQuizEntry(
 ) {
   return restartMain ? null : pending
 }
+
+export function resolveQuizSetInitialScene(
+  status: 'GENERATING' | 'READY' | 'FAILED',
+  pending: { attemptId: string } | null,
+  restartMain: boolean,
+) {
+  if (pending) return 'SELF_ASSESSMENT' as const
+  if (status !== 'READY') return 'GENERATION' as const
+  return restartMain ? 'SOLVING' as const : 'READY' as const
+}

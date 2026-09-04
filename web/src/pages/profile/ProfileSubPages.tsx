@@ -2,6 +2,7 @@ import { IconArrowLeftLine } from '@karrotmarket/react-monochrome-icon'
 import {
   ActionButton,
   Box,
+  Divider,
   Field,
   Flex,
   Icon,
@@ -27,12 +28,14 @@ export function AccountSettingsPage({
   email,
   onBack,
   onRetry,
+  onOpenWithdrawal,
 }: {
   status: 'loading' | 'ready' | 'error'
   nickname?: string | null
   email?: string
   onBack: () => void
   onRetry: () => void
+  onOpenWithdrawal: () => void
 }) {
   const updateNickname = useUpdateCurrentUserNicknameMutation()
   const [draft, setDraft] = useState(nickname ?? '')
@@ -69,8 +72,9 @@ export function AccountSettingsPage({
           <ActionButton type="button" size="medium" variant="neutralWeak" onClick={onRetry}>다시 시도</ActionButton>
         </VStack>
       ) : (
-        <form onSubmit={handleSubmit} noValidate>
-          <VStack gap="x6">
+        <VStack gap="x8">
+          <form onSubmit={handleSubmit} noValidate>
+            <VStack gap="x6">
             <Field.Root>
               <Field.Label>이메일</Field.Label>
               <TextField.Root>
@@ -118,8 +122,19 @@ export function AccountSettingsPage({
             >
               변경사항 저장
             </ActionButton>
+            </VStack>
+          </form>
+          <Divider as="div" color="stroke.neutralSubtle" />
+          <VStack as="section" gap="x3" align="flex-start" aria-labelledby="account-withdrawal-title">
+            <Text as="h2" id="account-withdrawal-title" textStyle="t7Bold" color="fg.neutral">계정 삭제</Text>
+            <Text textStyle="t4Regular" color="fg.neutralMuted">
+              탈퇴하면 계정 사용이 즉시 중단되고 이전 학습 기록은 복구할 수 없어요.
+            </Text>
+            <ActionButton type="button" size="medium" variant="neutralWeak" onClick={onOpenWithdrawal}>
+              회원 탈퇴
+            </ActionButton>
           </VStack>
-        </form>
+        </VStack>
       )}
     </ProfileSubPage>
   )
@@ -292,6 +307,7 @@ function ProfileSubPage({
               <Icon svg={<IconArrowLeftLine />} size="x5" />
             </ActionButton>
             <Text as="h1" textStyle="t10Bold" color="fg.neutral">{title}</Text>
+            <div className="app-notification-slot" data-app-notification-slot />
           </Flex>
           {children}
         </VStack>

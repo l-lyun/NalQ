@@ -31,7 +31,7 @@ docker compose ps
 
 ## Server
 
-주요 의존성은 Spring Web MVC, Validation, Data JPA, Security, MySQL Driver, Data Redis, Lombok, JUnit입니다.
+주요 의존성은 Spring Web MVC, Validation, Data JPA, Security, Spring AI, MySQL Driver, Data Redis, Lombok, JUnit입니다.
 
 ```bash
 cd server
@@ -39,7 +39,24 @@ cd server
 ./gradlew bootRun
 ```
 
-기본 포트는 `8080`입니다. `server/.env.example`은 변수 목록 예시이며 Spring Boot가 파일을 자동으로 읽지는 않습니다. 필요하면 IDE run configuration에 넣거나 shell에 export한 뒤 실행합니다.
+기본 포트는 `8080`입니다. 필요한 변수 목록은 `server/.env.example`을 참고합니다.
+
+실제 퀴즈 생성을 로컬에서 확인할 때는 `OPENAI_API_KEY`와 `OPENMD_QUIZ_GENERATION_ENABLED=true`를 서버 프로세스 환경에 함께 넣습니다. 키는 저장소에 커밋하지 않습니다. 웹과 서버의 기본 허용 주소가 `http://localhost:5173`이므로 브라우저도 같은 주소로 접속합니다.
+
+Windows에서는 `server/.env`에 `OPENAI_API_KEY=...`를 포함한 로컬 설정을 넣고 아래 명령을 실행하면 됩니다. 값은 출력하지 않으며 `server/.env`는 Git에서 제외됩니다.
+
+IntelliJ에서는 `NalQ Server (local)` 실행 구성을 사용합니다. 이 구성은 키를 복사하지 않고 `server/.env`를 실행 시점에 읽습니다. 기본 `ServerApplication` 실행은 dotenv 파일을 자동으로 읽지 않습니다.
+
+```powershell
+# 터미널 1: 저장소 루트
+.\scripts\dev-server.ps1
+
+# 터미널 2
+cd web
+pnpm dev
+```
+
+브라우저는 반드시 `http://localhost:5173`으로 엽니다. `127.0.0.1`은 기본 CORS 허용 주소와 다릅니다.
 
 ```bash
 cp .env.example .env
@@ -57,11 +74,12 @@ React Router, TanStack Query, Axios와 SEED Design을 설치했습니다. 아직
 cd web
 pnpm install
 pnpm dev
+pnpm dev:mock
 pnpm typecheck
 pnpm build
 ```
 
-기본 개발 서버는 `http://localhost:5173`입니다. API 주소는 `web/.env.example`의 `VITE_API_BASE_URL`로 변경할 수 있습니다.
+`pnpm dev`는 실제 퀴즈 API를 사용하는 기본 개발 서버를 `http://localhost:5173`에 엽니다. 서버 없이 고정 화면만 확인할 때는 `pnpm dev:mock`을 사용합니다. API 주소는 `web/.env.example`의 `VITE_API_BASE_URL`로 변경할 수 있습니다.
 
 SEED는 `@seed-design/react`, `@seed-design/css`, `@seed-design/vite-plugin`으로 구성되어 있습니다. `src/main.tsx`에서 `base.css`를 불러오고 Vite plugin이 theme 및 component recipe CSS를 처리하므로 전역 Theme Provider는 필요하지 않습니다. 향후 SEED CLI component를 추가할 때는 다음처럼 실행합니다.
 

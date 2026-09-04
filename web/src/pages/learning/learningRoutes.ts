@@ -86,3 +86,28 @@ export function readLearningCreateReturnState(value: unknown) {
     ...(returnTo && returnScrollTop !== undefined ? { returnScrollTop } : {}),
   }
 }
+
+export function resolveLearningEditorBackNavigation(
+  _sourceType: 'NOTION' | 'PASTE',
+  returnTo: string | undefined,
+  _learningCreateReturnState: ReturnType<typeof readLearningCreateReturnState>,
+) {
+  return {
+    to: returnTo ?? '/learning/new',
+    replace: true as const,
+  }
+}
+
+export function resolveLearningMaterialEditBackNavigation(returnToValue: unknown) {
+  return {
+    to: resolveLearningMaterialsReturnTo(returnToValue) ?? '/learning/materials',
+    replace: true as const,
+  }
+}
+
+export function shouldCommitLearningSearchInput(
+  eventIsComposing: boolean,
+  compositionActive: boolean,
+) {
+  return !eventIsComposing && !compositionActive
+}

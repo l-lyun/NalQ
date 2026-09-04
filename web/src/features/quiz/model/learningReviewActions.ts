@@ -8,6 +8,15 @@ export type LearningReviewAction =
   | { kind: 'navigate'; label: string; path: string }
   | { kind: 'start-review'; label: string; sourceAttemptId: string }
 
+export function getReviewCandidatesEmptyMessage(
+  recent: Pick<LatestReview, 'reviewQuestionCount' | 'activeReviewSessionId'> | null | undefined,
+) {
+  if (!recent) return '복습할 퀴즈가 없어요.'
+  return recent.reviewQuestionCount > 0 || recent.activeReviewSessionId
+    ? '추가로 복습할 퀴즈가 없어요.'
+    : '최근 틀린 문제가 없어요! 훌륭합니다 🎉'
+}
+
 export function resolveRecentQuizAction(
   review: LatestReview,
   pending: PendingSelfAssessment | null,

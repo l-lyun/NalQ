@@ -3,7 +3,7 @@ import type { QuizRequestedConfig } from '@/pages/quiz/quiz.types'
 const PREFIX = 'openmd.quiz.requested-config.v1'
 const types = new Set(['MULTIPLE_CHOICE', 'FILL_IN_THE_BLANK', 'SHORT_ANSWER', 'ESSAY'])
 const difficulties = new Set(['EASY', 'NORMAL', 'HARD'])
-const counts = new Set([5, 10, 15])
+const counts = new Set([5, 10, 15, 20])
 
 function key(userId: number, quizSetId: string) {
   return `${PREFIX}:${userId}:${quizSetId}`
@@ -26,10 +26,15 @@ function isConfig(value: unknown): value is QuizRequestedConfig {
 export function saveRequestedConfig(
   userId: number,
   quizSetId: string,
-  requestedConfig: QuizRequestedConfig,
+  requestedConfig: QuizRequestedConfig & { generationPrompt?: string },
 ) {
   try {
-    localStorage.setItem(key(userId, quizSetId), JSON.stringify(requestedConfig))
+    const displayConfig: QuizRequestedConfig = {
+      selectedTypes: requestedConfig.selectedTypes,
+      difficulty: requestedConfig.difficulty,
+      maxQuestionCount: requestedConfig.maxQuestionCount,
+    }
+    localStorage.setItem(key(userId, quizSetId), JSON.stringify(displayConfig))
   } catch {
     // Local display metadata is optional and must not block generation.
   }

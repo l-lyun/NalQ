@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  getReviewCandidatesEmptyMessage,
   resolveRecentQuizAction,
   resolveReviewCandidateAction,
 } from './learningReviewActions.ts'
@@ -58,4 +59,16 @@ test('복습 후보도 미완료 자기평가와 활성 복습을 새 복습보�
     label: '틀린 문제 복습하기',
     sourceAttemptId: 'attempt-2',
   })
+})
+
+test('최근 퀴즈에 복습할 문제가 있으면 다른 후보가 없다는 문구로 구분한다', () => {
+  assert.equal(
+    getReviewCandidatesEmptyMessage({ reviewQuestionCount: 4, activeReviewSessionId: null }),
+    '추가로 복습할 퀴즈가 없어요.',
+  )
+  assert.equal(
+    getReviewCandidatesEmptyMessage({ reviewQuestionCount: 0, activeReviewSessionId: null }),
+    '최근 틀린 문제가 없어요! 훌륭합니다 🎉',
+  )
+  assert.equal(getReviewCandidatesEmptyMessage(undefined), '복습할 퀴즈가 없어요.')
 })

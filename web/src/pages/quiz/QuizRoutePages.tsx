@@ -1,4 +1,4 @@
-import { ActionButton, ProgressCircle, Text, VStack } from '@seed-design/react'
+import { ActionButton, ProgressCircle, Snackbar, Text, useSnackbarAdapter, VStack } from '@seed-design/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams, type NavigateFunction } from 'react-router-dom'
@@ -31,13 +31,25 @@ import {
   saveRequestedConfig,
 } from '@/features/quiz/model/quizRequestedConfigStorage'
 import { startReviewForCurrentRoute } from '@/features/quiz/model/reviewStartNavigation'
-import { resolvePendingSelfAssessmentForQuizEntry } from '@/features/quiz/model/quizManagementActions'
+import {
+  resolvePendingSelfAssessmentForQuizEntry,
+  resolveQuizSetInitialScene,
+} from '@/features/quiz/model/quizManagementActions'
 import { useCurrentUser } from '@/features/auth/model/auth.queries'
-import { learningMaterialKeys } from '@/features/learning-material/api/learningMaterial.api'
+import {
+  learningMaterialKeys,
+  learningMaterialQueryOptions,
+} from '@/features/learning-material/api/learningMaterial.api'
+import {
+  confirmQuizGenerationDisclosure,
+  getLearningMaterialContentRevision,
+  hasConfirmedQuizGenerationDisclosure,
+} from '@/features/quiz/model/quizGenerationDisclosureStorage'
 import {
   latestReviewQueryOptions,
   quizQueryKeys,
 } from '@/features/quiz/model/quizQueries'
+import { toCreateQuizSetRequest } from '@/features/quiz/model/quizGenerationRequest'
 
 import { QuizFlowPage } from './QuizFlowPage'
 import type {
@@ -80,6 +92,24 @@ function RouteLoading() {
       </ProgressCircle.Root>
     </VStack>
   )
+}
+
+function AnotherQuizGenerationSnackbar() {
+  return (
+    <Snackbar.Root>
+      <Snackbar.Content>
+        <Snackbar.Message className="app-snackbar-message">
+          다른 학습자료로 문제를 만들고 있어요. 완료 알림이 오면 다시 시도해 주세요.
+        </Snackbar.Message>
+      </Snackbar.Content>
+      <Snackbar.HiddenCloseButton aria-label="알림 닫기" />
+    </Snackbar.Root>
+  )
+}
+
+function useAnotherQuizGenerationSnackbar() {
+  const snackbar = useSnackbarAdapter()
+  return () => snackbar.create({ render: () => <AnotherQuizGenerationSnackbar /> })
 }
 
 function generationStateFrom(
@@ -145,6 +175,62 @@ function useRouteActiveRef() {
   return routeActiveRef
 }
 
+function generationDisclosureKey(
+  userId: number | undefined,
+  materialId: string | undefined,
+  materialUpdatedAt: string | undefined,
+) {
+  return ['private', 'quiz-generation-disclosure', userId, materialId, materialUpdatedAt] as const
+}
+
+function useQuizGenerationDisclosure(
+  materialId: string | undefined,
+  userId: number | undefined,
+  enabled: boolean,
+) {
+  const queryClient = useQueryClient()
+  const material = useQuery({
+    ...learningMaterialQueryOptions.detail(materialId ?? ''),
+    enabled: enabled && Boolean(materialId && userId),
+  })
+  const disclosure = useQuery({
+    queryKey: generationDisclosureKey(userId, materialId, material.data?.updatedAt),
+    queryFn: async () => {
+      if (!userId || !materialId || !material.data) throw new Error('Missing learning material')
+      const revision = await getLearningMaterialContentRevision(material.data.content)
+      return {
+        revision,
+        confirmed: hasConfirmedQuizGenerationDisclosure(userId, materialId, revision),
+      }
+    },
+    enabled: enabled && Boolean(userId && materialId && material.data),
+    staleTime: Number.POSITIVE_INFINITY,
+  })
+
+  return {
+    revision: disclosure.data?.revision,
+    confirmed: disclosure.data?.confirmed === true,
+    isPending: enabled && (material.isPending || disclosure.isPending),
+    isError: enabled && (material.isError || disclosure.isError),
+    retry: async () => {
+      if (material.isError) await material.refetch()
+      else await disclosure.refetch()
+    },
+    refresh: async () => {
+      const result = await material.refetch()
+      if (result.error) throw result.error
+    },
+    confirm: () => {
+      if (!userId || !materialId || !material.data || !disclosure.data) return
+      confirmQuizGenerationDisclosure(userId, materialId, disclosure.data.revision)
+      queryClient.setQueryData(
+        generationDisclosureKey(userId, materialId, material.data.updatedAt),
+        { ...disclosure.data, confirmed: true },
+      )
+    },
+  }
+}
+
 export function QuizMaterialRoutePage() {
   const { materialId } = useParams<{ materialId: string }>()
   const navigate = useNavigate()
@@ -152,6 +238,7 @@ export function QuizMaterialRoutePage() {
   const currentUser = useCurrentUser()
   const queryClient = useQueryClient()
   const routeActiveRef = useRouteActiveRef()
+  const showAnotherQuizGeneration = useAnotherQuizGenerationSnackbar()
   const materialTitle = (location.state as { materialTitle?: string } | null)?.materialTitle ?? '학습자료'
   const [quizSetId, setQuizSetId] = useState<string>()
   const lastConditionsRef = useRef<QuizConditions | undefined>(undefined)
@@ -162,6 +249,11 @@ export function QuizMaterialRoutePage() {
     enabled: Boolean(materialId),
     retry: shouldRetryQuery,
   })
+  const generationDisclosure = useQuizGenerationDisclosure(
+    materialId,
+    currentUser.data?.id,
+    Boolean(materialId && currentUser.data && !activeQuery.data),
+  )
 
   useEffect(() => {
     if (activeQuery.data?.quizSetId) {
@@ -196,7 +288,11 @@ export function QuizMaterialRoutePage() {
   const createMutation = useMutation({
     mutationFn: async (conditions: QuizConditions) => {
       lastConditionsRef.current = conditions
-      return createQuizSet(materialId!, conditions)
+      if (!generationDisclosure.revision) throw new Error('Missing learning material revision')
+      return createQuizSet(
+        materialId!,
+        toCreateQuizSetRequest(conditions, generationDisclosure.revision),
+      )
     },
     onSuccess: (created) => {
       if (currentUser.data) {
@@ -223,9 +319,16 @@ export function QuizMaterialRoutePage() {
   }, [materialId, queryClient, quizSetQuery.data])
 
   if (!materialId) return <RouteStatus message="학습자료를 확인하지 못했어요." />
-  if (activeQuery.isPending || currentUser.isPending) return <RouteLoading />
+  if (
+    activeQuery.isPending ||
+    currentUser.isPending ||
+    (!activeQuery.data && generationDisclosure.isPending)
+  ) return <RouteLoading />
   if (activeQuery.isError && !quizSetId) {
     return <RouteStatus message="문제 생성 상태를 불러오지 못했어요." retry={() => void activeQuery.refetch()} />
+  }
+  if (!activeQuery.data && generationDisclosure.isError) {
+    return <RouteStatus message="학습자료의 전송 확인 상태를 불러오지 못했어요." retry={() => void generationDisclosure.retry()} />
   }
 
   const requestedConfig = quizSetId && currentUser.data
@@ -248,9 +351,14 @@ export function QuizMaterialRoutePage() {
       questions={questions}
       result={emptyResult}
       initialScene={quizSetId ? 'GENERATION' : 'CONDITIONS'}
+      initialConditions={lastConditionsRef.current}
+      generationDisclosureConfirmed={generationDisclosure.confirmed}
       generationState={generationState}
       callbacks={{
+        onConfirmGenerationDisclosure: generationDisclosure.confirm,
+        onGenerationDisclosureExpired: generationDisclosure.refresh,
         onGenerate: async (conditions) => { await createMutation.mutateAsync(conditions) },
+        onGenerationActive: showAnotherQuizGeneration,
         onRetryGeneration: async (_failure: QuizGenerationFailure) => {
           const conditions = requestedConfig ?? lastConditionsRef.current
           if (!conditions) return
@@ -320,6 +428,7 @@ export function QuizSetRoutePage() {
   const currentUser = useCurrentUser()
   const queryClient = useQueryClient()
   const routeActiveRef = useRouteActiveRef()
+  const showAnotherQuizGeneration = useAnotherQuizGenerationSnackbar()
   const routeState = location.state as {
     materialTitle?: string
     restartMain?: boolean
@@ -355,7 +464,11 @@ export function QuizSetRoutePage() {
   const createMutation = useMutation({
     mutationFn: async ({ materialId, conditions }: { materialId: string; conditions: QuizConditions }) => {
       createConditionsRef.current = conditions
-      return createQuizSet(materialId, conditions)
+      if (!generationDisclosure.revision) throw new Error('Missing learning material revision')
+      return createQuizSet(
+        materialId,
+        toCreateQuizSetRequest(conditions, generationDisclosure.revision),
+      )
     },
     onSuccess: (created) => {
       if (currentUser.data) {
@@ -370,6 +483,11 @@ export function QuizSetRoutePage() {
       navigate(`/quiz-sets/${created.quizSetId}`, { replace: true, state: { materialTitle } })
     },
   })
+  const generationDisclosure = useQuizGenerationDisclosure(
+    stateQuery.data?.materialId,
+    currentUser.data?.id,
+    stateQuery.data?.status === 'FAILED',
+  )
 
   useEffect(() => {
     if (currentUser.data && stateQuery.data?.status === 'GENERATING') {
@@ -390,12 +508,14 @@ export function QuizSetRoutePage() {
     currentUser.isPending ||
     (stateQuery.data?.status === 'READY' && !restartMain && pendingQuery.isPending) ||
     (!restartMain && pendingQuery.data && pendingResultQuery.isPending)
+    || generationDisclosure.isPending
   ) return <RouteLoading />
   if (
     stateQuery.isError ||
     !stateQuery.data ||
     (!restartMain && pendingQuery.isError) ||
     (!restartMain && pendingResultQuery.isError)
+    || generationDisclosure.isError
   ) {
     return (
       <RouteStatus
@@ -404,6 +524,7 @@ export function QuizSetRoutePage() {
           if (stateQuery.isError) void stateQuery.refetch()
           if (!restartMain && pendingQuery.isError) void pendingQuery.refetch()
           if (!restartMain && pendingResultQuery.isError) void pendingResultQuery.refetch()
+          if (generationDisclosure.isError) void generationDisclosure.retry()
         }}
       />
     )
@@ -427,47 +548,41 @@ export function QuizSetRoutePage() {
       materialTitle={materialTitle}
       questions={questions}
       result={resumedResult}
-      initialScene={pending ? 'SELF_ASSESSMENT' : state.status === 'READY' ? 'READY' : 'GENERATION'}
+      initialScene={resolveQuizSetInitialScene(state.status, pending, restartMain)}
+      initialConditions={createConditionsRef.current ?? requestedConfig}
+      generationDisclosureConfirmed={generationDisclosure.confirmed}
       generationState={pending ? undefined : generationStateFrom(state, requestedConfig)}
       initialResourceId={pending?.attemptId}
       initialPendingEssayQuestionIds={pending?.pendingEssayQuestionIds}
       callbacks={{
+        onConfirmGenerationDisclosure: generationDisclosure.confirm,
+        onGenerationDisclosureExpired: generationDisclosure.refresh,
         onGenerate: async (conditions) => {
           await createMutation.mutateAsync({ materialId: state.materialId, conditions })
         },
+        onGenerationActive: showAnotherQuizGeneration,
         onRefreshGenerationStatus: async () => { await stateQuery.refetch() },
-        onRetryGeneration: async (failure) => {
-          if (failure.kind === 'REQUEST_FAILED' && createConditionsRef.current) {
-            const active = await getActiveQuizSet(state.materialId)
-            if (active) {
-              if (currentUser.data) {
-                saveRequestedConfig(
-                  currentUser.data.id,
-                  active.quizSetId,
-                  createConditionsRef.current,
-                )
-              }
-              navigate(`/quiz-sets/${active.quizSetId}`, {
-                replace: true,
-                state: { materialTitle },
-              })
-              return
+        onRetryGeneration: async () => {
+          if (!createConditionsRef.current) return
+          const active = await getActiveQuizSet(state.materialId)
+          if (active) {
+            if (currentUser.data) {
+              saveRequestedConfig(
+                currentUser.data.id,
+                active.quizSetId,
+                createConditionsRef.current,
+              )
             }
-            await createMutation.mutateAsync({
-              materialId: state.materialId,
-              conditions: createConditionsRef.current,
+            navigate(`/quiz-sets/${active.quizSetId}`, {
+              replace: true,
+              state: { materialTitle },
             })
             return
           }
-          if (failure.kind === 'GENERATION_FAILED' && requestedConfig) {
-            await createMutation.mutateAsync({ materialId: state.materialId, conditions: requestedConfig })
-            return
-          }
-          if (failure.kind === 'SOURCE_INSUFFICIENT' || !failure.retryable) {
-            navigate(`/learning/${state.materialId}/quiz`, { replace: true, state: { materialTitle } })
-            return
-          }
-          navigate(`/learning/${state.materialId}/quiz`, { replace: true, state: { materialTitle } })
+          await createMutation.mutateAsync({
+            materialId: state.materialId,
+            conditions: createConditionsRef.current,
+          })
         },
         onExitGeneration: () => navigate('/learning'),
         onExitQuiz: () => navigate('/learning'),

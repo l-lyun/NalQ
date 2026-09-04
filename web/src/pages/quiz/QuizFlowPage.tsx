@@ -8,6 +8,7 @@ import {
   BottomSheet,
   Box,
   Checkbox,
+  ContentDialog,
   Field,
   Flex,
   Grid,
@@ -20,9 +21,18 @@ import {
   TextField,
   VStack,
 } from '@seed-design/react'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 
 import { createSubmissionPayload, isQuestionAnswered } from '@/features/quiz/model/quizAdapter'
+import {
+  countGenerationPromptCodePoints,
+  GENERATION_PROMPT_MAX_CODE_POINTS,
+  getQuizGenerationRecoveryMode,
+  isQuizGenerationActiveConflict,
+  isQuizGenerationContentRevisionConflict,
+  sliceGenerationPrompt,
+} from '@/features/quiz/model/quizGenerationRequest'
+import { registerQuizGenerationScene } from '@/features/quiz/model/quizGenerationScenePresence'
 import { createUuidV4 } from '@/features/quiz/model/randomUuid'
 
 import {
@@ -185,7 +195,7 @@ function generationErrorCopy(error: QuizGenerationFailure) {
       return {
         title: '문제 만들기를 완료하지 못했어요',
         description: error.message ?? '불완전한 문제 세트는 저장하지 않았어요.',
-        action: error.retryable ? '같은 조건으로 다시 시도' : '조건 다시 보기',
+        action: '조건 다시 보기',
       }
   }
 }
@@ -202,6 +212,7 @@ export function QuizFlowPage({
     maxQuestionCount: 10,
   },
   initialAnswers = {},
+  generationDisclosureConfirmed = false,
   generationState,
   initialResourceId,
   initialPendingEssayQuestionIds = [],
@@ -210,6 +221,9 @@ export function QuizFlowPage({
   const [scene, setScene] = useState(initialScene)
   const [conditions, setConditions] = useState(initialConditions)
   const [conditionsError, setConditionsError] = useState<string>()
+  const [generationDisclosureOpen, setGenerationDisclosureOpen] = useState(false)
+  const [disclosureConfirmed, setDisclosureConfirmed] = useState(generationDisclosureConfirmed)
+  const [generationStarting, setGenerationStarting] = useState(false)
   const [generation, setGeneration] = useState(
     generationState ?? ({ status: 'GENERATING' } as const),
   )
@@ -252,6 +266,15 @@ export function QuizFlowPage({
   const essayItem = resultState.items.find(
     (item) => item.questionId === pendingEssayQuestionIds[0] && item.type === 'ESSAY',
   )
+
+  useEffect(() => {
+    if (generationDisclosureConfirmed) setDisclosureConfirmed(true)
+  }, [generationDisclosureConfirmed])
+
+  useLayoutEffect(() => {
+    if (scene !== 'GENERATION') return
+    return registerQuizGenerationScene()
+  }, [scene])
 
   useEffect(() => {
     setResultState(result)
@@ -300,22 +323,53 @@ export function QuizFlowPage({
     callbacks?.onConditionsChange?.(next)
   }
 
-  const startGeneration = async () => {
+  const startGeneration = () => {
     if (conditions.selectedTypes.length === 0) {
       setConditionsError('문제 유형을 하나 이상 선택해 주세요.')
       return
     }
+    if (disclosureConfirmed) {
+      void requestGeneration()
+      return
+    }
+    setGenerationDisclosureOpen(true)
+  }
+
+  const requestGeneration = async () => {
+    if (generationStarting) return
+    setGenerationStarting(true)
     setGeneration({ status: 'GENERATING' })
     setScene('GENERATION')
     try {
       const ready = await callbacks?.onGenerate?.(conditions)
       if (ready) showReady(ready)
-    } catch {
+    } catch (error) {
+      if (isQuizGenerationActiveConflict(error)) {
+        setScene('CONDITIONS')
+        callbacks?.onGenerationActive?.()
+        return
+      }
+      if (isQuizGenerationContentRevisionConflict(error)) {
+        setDisclosureConfirmed(false)
+        setScene('CONDITIONS')
+        await callbacks?.onGenerationDisclosureExpired?.()
+        return
+      }
       setGeneration({
         status: 'ERROR',
         error: { kind: 'REQUEST_FAILED', retryable: true },
       })
+    } finally {
+      setGenerationDisclosureOpen(false)
+      setGenerationStarting(false)
     }
+  }
+
+  const confirmGeneration = async () => {
+    if (generationStarting) return
+    setDisclosureConfirmed(true)
+    await callbacks?.onConfirmGenerationDisclosure?.()
+    await requestGeneration()
   }
 
   const showReady = (ready: QuizGenerationReady) => {
@@ -325,22 +379,28 @@ export function QuizFlowPage({
   }
 
   const retryGeneration = async (failure: QuizGenerationFailure) => {
-    if (failure.kind === 'SOURCE_INSUFFICIENT' || !failure.retryable) {
+    const recoveryMode = getQuizGenerationRecoveryMode(failure)
+    if (recoveryMode === 'RETURN_TO_CONDITIONS') {
       setScene('CONDITIONS')
       return
     }
     setGeneration({ status: 'GENERATING' })
     try {
       const ready =
-        failure.kind === 'STATUS_UNAVAILABLE'
+        recoveryMode === 'REFRESH_STATUS'
           ? await callbacks?.onRefreshGenerationStatus?.()
           : await callbacks?.onRetryGeneration?.(failure)
       if (ready) showReady(ready)
-    } catch {
+    } catch (error) {
+      if (isQuizGenerationActiveConflict(error)) {
+        setScene('CONDITIONS')
+        callbacks?.onGenerationActive?.()
+        return
+      }
       setGeneration({
         status: 'ERROR',
         error:
-          failure.kind === 'STATUS_UNAVAILABLE'
+          recoveryMode === 'REFRESH_STATUS'
             ? failure
             : { kind: 'REQUEST_FAILED', retryable: true },
       })
@@ -636,6 +696,15 @@ export function QuizFlowPage({
         ) : null}
       </Box>
 
+      <GenerationDisclosureDialog
+        open={generationDisclosureOpen}
+        loading={generationStarting}
+        onOpenChange={(open) => {
+          if (!generationStarting) setGenerationDisclosureOpen(open)
+        }}
+        onConfirm={() => void confirmGeneration()}
+      />
+
       <SheetFrame
         open={sheet === 'GENERATION_EXIT'}
         onOpenChange={(open) => setSheet(open ? 'GENERATION_EXIT' : null)}
@@ -852,7 +921,7 @@ function ConditionsScreen({
           legend="최대 문제 수"
           name="quiz-max-count"
           value={String(conditions.maxQuestionCount)}
-          options={([5, 10, 15] as QuizMaxQuestionCount[]).map((value) => ({
+          options={([5, 10, 15, 20] as QuizMaxQuestionCount[]).map((value) => ({
             value: String(value),
             label: `${value}개`,
           }))}
@@ -865,11 +934,123 @@ function ConditionsScreen({
           }
         />
 
+        <Field.Root>
+          <Field.Label>추가 요청 (선택)</Field.Label>
+          <TextField.Root>
+            <TextField.Textarea
+              className="quiz-generation-prompt"
+              value={conditions.generationPrompt ?? ''}
+              placeholder="예: 동시성 부분에 집중해서 실무 면접 스타일로 내줘"
+              aria-describedby="quiz-generation-prompt-description"
+              onChange={(event) => onChange({
+                ...conditions,
+                generationPrompt: sliceGenerationPrompt(event.currentTarget.value),
+              })}
+            />
+          </TextField.Root>
+          <Field.Footer>
+            <Field.Description
+              id="quiz-generation-prompt-description"
+              className="quiz-generation-prompt-description"
+            >
+              {'문제 출제 초점과 스타일을 반영해요.\n문제 유형·수·학습자료 근거는 바꿀 수 없어요.'}
+            </Field.Description>
+            <Field.CharacterCount
+              className="quiz-generation-prompt-count"
+              current={countGenerationPromptCodePoints(conditions.generationPrompt ?? '')}
+              max={GENERATION_PROMPT_MAX_CODE_POINTS}
+            />
+          </Field.Footer>
+        </Field.Root>
+
         <ActionButton size="large" variant="brandSolid" onClick={onGenerate}>
           문제 만들기
         </ActionButton>
       </VStack>
     </VStack>
+  )
+}
+
+function GenerationDisclosureDialog({
+  open,
+  loading,
+  onOpenChange,
+  onConfirm,
+}: {
+  open: boolean
+  loading: boolean
+  onOpenChange: (open: boolean) => void
+  onConfirm: () => void
+}) {
+  return (
+    <ContentDialog.Root
+      open={open}
+      onOpenChange={onOpenChange}
+      closeOnEscape={!loading}
+      closeOnInteractOutside={!loading}
+    >
+      <Portal>
+        <ContentDialog.Backdrop />
+        <ContentDialog.Positioner className="quiz-generation-dialog-positioner">
+          <ContentDialog.Content className="quiz-generation-dialog" width="full" maxWidth="440px">
+            <ContentDialog.Header>
+              <ContentDialog.Title>학습자료를 OpenAI로 전송할까요?</ContentDialog.Title>
+              <ContentDialog.Description>
+                문제를 만들기 전에 외부 전송 범위를 확인해 주세요.
+              </ContentDialog.Description>
+            </ContentDialog.Header>
+            <ContentDialog.Body>
+              <VStack gap="x4">
+                <VStack gap="x1">
+                  <Text as="h3" textStyle="t5Bold" color="fg.neutral">전송하는 정보</Text>
+                  <Text
+                    as="p"
+                    className="quiz-generation-disclosure-description"
+                    textStyle="t4Regular"
+                    color="fg.neutralMuted"
+                  >
+                    {'학습자료 본문 전체, 문제 유형·난이도·문제 수,\n입력한 추가 요청'}
+                  </Text>
+                </VStack>
+                <VStack gap="x1">
+                  <Text as="h3" textStyle="t5Bold" color="fg.neutral">전송하지 않는 정보</Text>
+                  <Text as="p" textStyle="t4Regular" color="fg.neutralMuted">
+                    이메일·닉네임·비밀번호·인증정보·풀이 답안
+                  </Text>
+                </VStack>
+                <PageBanner.Root tone="informative" variant="weak">
+                  <PageBanner.Content>
+                    <PageBanner.Body>
+                      <PageBanner.Description>
+                        입력·출력은 통상 최대 30일 보관돼요. 법적 의무나 서비스·제3자 보호를 위해 더 오래 보관될 수 있어요.
+                      </PageBanner.Description>
+                    </PageBanner.Body>
+                  </PageBanner.Content>
+                </PageBanner.Root>
+              </VStack>
+            </ContentDialog.Body>
+            <ContentDialog.Footer>
+              <ContentDialog.Action asChild>
+                <ActionButton type="button" size="large" variant="neutralWeak" disabled={loading}>
+                  취소
+                </ActionButton>
+              </ContentDialog.Action>
+              <ActionButton
+                autoFocus
+                type="button"
+                size="large"
+                variant="brandSolid"
+                loading={loading}
+                disabled={loading}
+                onClick={onConfirm}
+              >
+                {loading ? '요청 중' : '확인하고 문제 만들기'}
+              </ActionButton>
+            </ContentDialog.Footer>
+          </ContentDialog.Content>
+        </ContentDialog.Positioner>
+      </Portal>
+    </ContentDialog.Root>
   )
 }
 
@@ -1635,7 +1816,7 @@ function ResultScreen({
             <Text textStyle="t3Medium" color="fg.neutralMuted">
               {item.topic}
             </Text>
-            <Text as="h2" id="quiz-result-question" textStyle="t7Bold" color="fg.neutral">
+            <Text as="h2" id="quiz-result-question" textStyle="t6Bold" color="fg.neutral">
               {item.prompt}
             </Text>
           </VStack>

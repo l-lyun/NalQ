@@ -1,5 +1,6 @@
 import { QueryClientProvider } from '@tanstack/react-query'
-import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom'
+import type { ReactNode } from 'react'
+import { createBrowserRouter, Navigate, Outlet, RouterProvider } from 'react-router-dom'
 
 import { queryClient } from '@/app/providers/queryClient'
 import { AuthBootstrap } from '@/app/router/AuthBootstrap'
@@ -11,6 +12,7 @@ import {
 } from '@/app/router/AuthGate'
 import { AuthenticatedAppShell } from '@/app/shell/AuthenticatedAppShell'
 import { useAuthPhase } from '@/features/auth/model/useAuthPhase'
+import { NotificationCenterProvider } from '@/features/notification/ui/NotificationCenter'
 import {
   quizMockEnabled,
   quizRoutesEnabled,
@@ -67,29 +69,34 @@ import { VerifyEmailPage } from '@/pages/verify-email/VerifyEmailPage'
     children: [
       { path: '/onboarding', element: <AutomaticOnboardingRoute /> },
       {
-        element: <AuthenticatedAppShell />,
+        element: <AuthenticatedNotificationRoute />,
         children: [
-          { path: '/learning', element: null },
-          { path: '/learning/materials', element: null },
-          { path: '/learning/materials/new', element: null },
-          { path: '/learning/materials/:materialId', element: null },
-          { path: '/learning/import/notion', element: null },
-          { path: '/learning/quizzes', element: null },
-          { path: '/learning/new', element: null },
-          { path: '/notifications', element: null },
-          { path: '/profile', element: null },
-          { path: '/profile/guide', element: null },
-          { path: '/profile/account', element: null },
-          { path: '/profile/withdrawal', element: null },
+          {
+            element: <AuthenticatedAppShell />,
+            children: [
+              { path: '/learning', element: null },
+              { path: '/learning/materials', element: null },
+              { path: '/learning/materials/new', element: null },
+              { path: '/learning/materials/:materialId', element: null },
+              { path: '/learning/import/notion', element: null },
+              { path: '/learning/quizzes', element: null },
+              { path: '/learning/new', element: null },
+              { path: '/notifications', element: null },
+              { path: '/profile', element: null },
+              { path: '/profile/guide', element: null },
+              { path: '/profile/account', element: null },
+              { path: '/profile/withdrawal', element: null },
+            ],
+          },
+          ...(quizRoutesEnabled ? [
+            { path: '/learning/:materialId/quiz', element: quizMockEnabled ? <QuizMockMaterialRoutePage /> : <QuizMaterialRoutePage /> },
+            { path: '/quiz-sets/:quizSetId', element: quizMockEnabled ? <QuizMockSetRoutePage /> : <QuizSetRoutePage /> },
+            { path: '/quiz-attempts/:attemptId/result', element: quizMockEnabled ? <QuizMockAttemptResultRoutePage /> : <QuizAttemptResultRoutePage /> },
+            { path: '/review', element: quizMockEnabled ? <QuizMockReviewRoutePage /> : <ReviewEntryRoutePage /> },
+            { path: '/review-sessions/:reviewSessionId', element: quizMockEnabled ? <QuizMockReviewRoutePage /> : <ReviewSessionRoutePage /> },
+          ] : []),
         ],
       },
-      ...(quizRoutesEnabled ? [
-        { path: '/learning/:materialId/quiz', element: quizMockEnabled ? <QuizMockMaterialRoutePage /> : <QuizMaterialRoutePage /> },
-        { path: '/quiz-sets/:quizSetId', element: quizMockEnabled ? <QuizMockSetRoutePage /> : <QuizSetRoutePage /> },
-        { path: '/quiz-attempts/:attemptId/result', element: quizMockEnabled ? <QuizMockAttemptResultRoutePage /> : <QuizAttemptResultRoutePage /> },
-        { path: '/review', element: quizMockEnabled ? <QuizMockReviewRoutePage /> : <ReviewEntryRoutePage /> },
-        { path: '/review-sessions/:reviewSessionId', element: quizMockEnabled ? <QuizMockReviewRoutePage /> : <ReviewSessionRoutePage /> },
-      ] : []),
     ],
   },
   { path: '*', element: <Navigate to="/" replace /> },
@@ -102,7 +109,23 @@ function RootEntryRoute() {
   if (phase === 'bootstrap-error') return <AuthBootstrapError />
   if (phase === 'anonymous') return <PublicLandingPage />
 
-  return <AuthenticatedAppShell />
+  return (
+    <AuthenticatedNotificationBoundary>
+      <AuthenticatedAppShell />
+    </AuthenticatedNotificationBoundary>
+  )
+}
+
+function AuthenticatedNotificationRoute() {
+  return (
+    <AuthenticatedNotificationBoundary>
+      <Outlet />
+    </AuthenticatedNotificationBoundary>
+  )
+}
+
+function AuthenticatedNotificationBoundary({ children }: { children: ReactNode }) {
+  return <NotificationCenterProvider>{children}</NotificationCenterProvider>
 }
 
 export function App() {

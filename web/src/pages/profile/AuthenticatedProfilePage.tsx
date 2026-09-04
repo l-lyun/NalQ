@@ -39,6 +39,7 @@ export function AuthenticatedProfilePage() {
         email={currentUser.data?.email}
         onBack={back}
         onRetry={() => void currentUser.refetch()}
+        onOpenWithdrawal={() => navigate('/profile/withdrawal', { state: profileSubPageNavigationState })}
       />
     )
   }
@@ -67,12 +68,10 @@ export function AuthenticatedProfilePage() {
       onOpenAccount={() => navigate('/profile/account', { state: profileSubPageNavigationState })}
       onOpenGuide={() => navigate('/profile/guide', { state: profileSubPageNavigationState })}
       legalDocumentsAvailable={import.meta.env.DEV}
-      accountWithdrawalAvailable
       onOpenTerms={() => navigate('/terms', { state: { returnTo: '/profile' } })}
       onOpenPrivacy={() => navigate('/privacy', { state: { returnTo: '/profile' } })}
       onOpenInquiry={() => navigate('/support', { state: { returnTo: '/profile' } })}
       onOpenOpenSourceLicenses={() => navigate('/open-source-licenses', { state: { returnTo: '/profile' } })}
-      onOpenWithdrawal={() => navigate('/profile/withdrawal', { state: profileSubPageNavigationState })}
       onLogout={() => {
         if (!window.confirm('이 기기에서 로그아웃할까요?')) return
         logout.reset()

@@ -84,7 +84,7 @@ export function NotificationsPage() {
           <List.Root className="notifications-list" aria-label="알림 목록" width="full" itemBorderRadius="r2_5">
             {items.map((notification, index) => (
               <Fragment key={notification.notificationId}>
-                <List.Item alignItems="flex-start" className={notification.readAt ? undefined : 'notifications-item-unread'}>
+                <List.Item alignItems="flex-start">
                   <List.Prefix>
                     <span className="notifications-unread-marker" data-unread={notification.readAt ? undefined : ''} aria-hidden />
                   </List.Prefix>
@@ -92,8 +92,10 @@ export function NotificationsPage() {
                     <button className="notifications-item-button" type="button" onClick={() => selectNotification(notification)}>
                       <VStack minWidth="0px" flexGrow gap="x1" align="flex-start">
                         {!notification.readAt ? <span className="notifications-visually-hidden">읽지 않음</span> : null}
-                        <List.Title>{notificationMessage(notification)}</List.Title>
-                        <Text className="notifications-target-name" textStyle="t4Regular" color="fg.neutral">{notification.targetName}</Text>
+                        <List.Title className="notifications-message" data-unread={notification.readAt ? undefined : ''}>
+                          {notificationMessage(notification)}
+                        </List.Title>
+                        <Text className="notifications-target-name" textStyle="t4Regular" color="fg.neutralMuted">{notification.targetName}</Text>
                         <List.Detail>{formatNotificationTime(notification.createdAt)}</List.Detail>
                       </VStack>
                       <List.Suffix><Icon svg={<IconChevronRightLine />} size="x4_5" /></List.Suffix>

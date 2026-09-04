@@ -87,6 +87,8 @@ Semaphore는 이 서버가 받을 수 있는 총 작업 수를 제한한다. 사
 
 사용자당 중복 생성을 제어하기 위한 사용자 행 비관적 잠금이나 `users.generation_in_progress` boolean을 사용하지 않는다. `quiz_sets.status`에서 파생된 generated column과 UNIQUE 제약으로 DB가 동시 접수를 원자적으로 판정한다. 생성 접수 시 학습자료 행에 거는 짧은 잠금은 본문 편집과 스냅샷 확정을 조율하기 위한 별도 경계이며, LLM 호출 전에 종료한다.
 
+클라이언트는 사용자가 전송 범위를 확인한 본문의 UTF-8 SHA-256 lowercase hex를 `contentRevision`으로 보낸다. 접수 트랜잭션은 소유 학습자료 행을 `SELECT ... FOR UPDATE`로 읽은 뒤 현재 본문에서 같은 revision을 계산해 비교한다. 일치할 때만 QuizSet을 저장하고 AFTER_COMMIT 생성 이벤트를 발행한다. 불일치하면 `409 QUIZ_003`으로 롤백하며 QuizSet과 OpenAI 작업을 만들지 않는다. 이 비교와 본문 snapshot 확정이 같은 잠금 구간에 있으므로 다른 편집 transaction은 둘 사이에 끼어들 수 없다.
+
 ```sql
 active_generation_user_id BIGINT
     GENERATED ALWAYS AS (
@@ -735,3 +737,4 @@ native structured output이 요청 단계에서 구조를 제한하고 서버가
 | 2026-09-03 | `quiz-generation-v1` system prompt, 최초·보완 user payload, 언어 정책, 자료 부족 판정과 prompt injection 회귀 기준 확정 | 사용자·Codex |
 | 2026-09-03 | 중복 prompt 지시를 축약하고 `5·3·2`를 선호 배분으로 정의해 선택 유형 안의 부족분 재배분 허용 | 사용자·Codex |
 | 2026-09-03 | `QuizGenerationCandidate`를 flat record로 확정하고 비활성 필드 중립값, 서버 의미 검증과 번호·ID 서버 부여 원칙을 명시 | 사용자·Codex |
+| 2026-09-05 | 확인한 본문 `contentRevision`을 접수 트랜잭션에서 잠긴 최신 본문과 대조하고 불일치 시 `QUIZ_003`으로 생성 전 거절하도록 확정 | 사용자·Codex |

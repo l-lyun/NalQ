@@ -44,6 +44,7 @@ export function LearningScreenHeader({
       >
         {title}
       </Text>
+      <div className="app-notification-slot" data-app-notification-slot />
     </Flex>
   )
 }

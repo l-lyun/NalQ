@@ -3,9 +3,12 @@
 .env.*
 !.env.example
 !**/.env.example
+!web/.env.mock
 
 # Java and Gradle
 .gradle/
+.gradle-local/
+.worktrees/
 **/build/
 out/
 *.class
