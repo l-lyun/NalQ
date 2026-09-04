@@ -1,4 +1,4 @@
-import { Box, Text, VStack } from '@seed-design/react'
+import { Box, Flex, Text, VStack } from '@seed-design/react'
 import { Link, useLocation } from 'react-router-dom'
 
 import './public-service.css'
@@ -17,9 +17,10 @@ export function PublicServiceFooter({ preserveContext = false }: { preserveConte
     : footerLinks.filter((item) => item.to !== '/terms' && item.to !== '/privacy')
 
   return (
-    <Box as="footer" className="public-service-footer" px="spacingX.globalGutter" py="x6">
-      <VStack className="public-service-footer__content" gap="x2" align="flex-start">
-        <Text textStyle="t5Bold" color="fg.neutral">NalQ</Text>
+    <Box as="footer" className="public-service-footer" px="spacingX.globalGutter" py="x5">
+      <VStack className="public-service-footer__content" gap="x3" align="flex-start">
+        <Flex className="public-service-footer__primary" width="full" gap="x3" align="center" justify="space-between" wrap>
+          <Text textStyle="t5Bold" color="fg.neutral">NalQ</Text>
         <nav className="public-service-footer__links" aria-label="서비스 정보">
           {visibleLinks.map((item) => pathname === item.to ? (
             <span key={item.to} className="public-service-link" aria-current="page">
@@ -38,11 +39,16 @@ export function PublicServiceFooter({ preserveContext = false }: { preserveConte
             </Link>
           ))}
         </nav>
-        <Text textStyle="t3Regular" color="fg.neutralMuted">운영자 김도현</Text>
-        <a className="public-service-link public-service-email" href="mailto:kimdohyun032@gmail.com">
-          kimdohyun032@gmail.com
-        </a>
-        <Text textStyle="t3Regular" color="fg.neutralSubtle">© 2026 NalQ</Text>
+        </Flex>
+        <Flex className="public-service-footer__meta" width="full" gap="x2" align="center" wrap>
+          <Text textStyle="t3Regular" color="fg.neutralMuted">운영자 김도현</Text>
+          <span className="public-service-footer__separator" aria-hidden>·</span>
+          <a className="public-service-link public-service-email" href="mailto:kimdohyun032@gmail.com">
+            kimdohyun032@gmail.com
+          </a>
+          <span className="public-service-footer__separator" aria-hidden>·</span>
+          <Text textStyle="t3Regular" color="fg.neutralSubtle">© 2026 NalQ</Text>
+        </Flex>
       </VStack>
     </Box>
   )

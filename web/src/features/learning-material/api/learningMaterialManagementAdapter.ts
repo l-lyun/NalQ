@@ -3,6 +3,8 @@ import {
   getLearningMaterials,
   updateLearningMaterial,
 } from './learningMaterial.api'
+import { quizRuntimeMode } from '../../quiz/model/quizFeature'
+import type { QuizRuntimeMode } from '../../quiz/model/quizFeature'
 import type {
   GetLearningMaterialsParams,
   LearningMaterialDetail,
@@ -10,14 +12,10 @@ import type {
   UpdateLearningMaterialRequest,
 } from './learningMaterial.types'
 
-export type LearningMaterialManagementMode = 'api' | 'mock' | 'disabled'
+export type LearningMaterialManagementMode = QuizRuntimeMode
 
 export const learningMaterialManagementMode: LearningMaterialManagementMode =
-  import.meta.env.VITE_LEARNING_MANAGEMENT_API_ENABLED === 'true'
-    ? 'api'
-    : import.meta.env.DEV
-      ? 'mock'
-      : 'disabled'
+  quizRuntimeMode
 
 const mockMaterials: LearningMaterialDetail[] = [
   {

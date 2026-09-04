@@ -1,4 +1,4 @@
-import { ActionButton, ProgressCircle, Text, VStack } from '@seed-design/react'
+import { ActionButton, ProgressCircle, Snackbar, Text, useSnackbarAdapter, VStack } from '@seed-design/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams, type NavigateFunction } from 'react-router-dom'
@@ -31,7 +31,10 @@ import {
   saveRequestedConfig,
 } from '@/features/quiz/model/quizRequestedConfigStorage'
 import { startReviewForCurrentRoute } from '@/features/quiz/model/reviewStartNavigation'
-import { resolvePendingSelfAssessmentForQuizEntry } from '@/features/quiz/model/quizManagementActions'
+import {
+  resolvePendingSelfAssessmentForQuizEntry,
+  resolveQuizSetInitialScene,
+} from '@/features/quiz/model/quizManagementActions'
 import { useCurrentUser } from '@/features/auth/model/auth.queries'
 import { learningMaterialKeys } from '@/features/learning-material/api/learningMaterial.api'
 import {
@@ -80,6 +83,24 @@ function RouteLoading() {
       </ProgressCircle.Root>
     </VStack>
   )
+}
+
+function AnotherQuizGenerationSnackbar() {
+  return (
+    <Snackbar.Root>
+      <Snackbar.Content>
+        <Snackbar.Message className="app-snackbar-message">
+          다른 학습자료로 문제를 만들고 있어요. 완료 알림이 오면 다시 시도해 주세요.
+        </Snackbar.Message>
+      </Snackbar.Content>
+      <Snackbar.HiddenCloseButton aria-label="알림 닫기" />
+    </Snackbar.Root>
+  )
+}
+
+function useAnotherQuizGenerationSnackbar() {
+  const snackbar = useSnackbarAdapter()
+  return () => snackbar.create({ render: () => <AnotherQuizGenerationSnackbar /> })
 }
 
 function generationStateFrom(
@@ -152,6 +173,7 @@ export function QuizMaterialRoutePage() {
   const currentUser = useCurrentUser()
   const queryClient = useQueryClient()
   const routeActiveRef = useRouteActiveRef()
+  const showAnotherQuizGeneration = useAnotherQuizGenerationSnackbar()
   const materialTitle = (location.state as { materialTitle?: string } | null)?.materialTitle ?? '학습자료'
   const [quizSetId, setQuizSetId] = useState<string>()
   const lastConditionsRef = useRef<QuizConditions | undefined>(undefined)
@@ -251,6 +273,7 @@ export function QuizMaterialRoutePage() {
       generationState={generationState}
       callbacks={{
         onGenerate: async (conditions) => { await createMutation.mutateAsync(conditions) },
+        onGenerationActive: showAnotherQuizGeneration,
         onRetryGeneration: async (_failure: QuizGenerationFailure) => {
           const conditions = requestedConfig ?? lastConditionsRef.current
           if (!conditions) return
@@ -320,6 +343,7 @@ export function QuizSetRoutePage() {
   const currentUser = useCurrentUser()
   const queryClient = useQueryClient()
   const routeActiveRef = useRouteActiveRef()
+  const showAnotherQuizGeneration = useAnotherQuizGenerationSnackbar()
   const routeState = location.state as {
     materialTitle?: string
     restartMain?: boolean
@@ -427,7 +451,7 @@ export function QuizSetRoutePage() {
       materialTitle={materialTitle}
       questions={questions}
       result={resumedResult}
-      initialScene={pending ? 'SELF_ASSESSMENT' : state.status === 'READY' ? 'READY' : 'GENERATION'}
+      initialScene={resolveQuizSetInitialScene(state.status, pending, restartMain)}
       generationState={pending ? undefined : generationStateFrom(state, requestedConfig)}
       initialResourceId={pending?.attemptId}
       initialPendingEssayQuestionIds={pending?.pendingEssayQuestionIds}
@@ -435,6 +459,7 @@ export function QuizSetRoutePage() {
         onGenerate: async (conditions) => {
           await createMutation.mutateAsync({ materialId: state.materialId, conditions })
         },
+        onGenerationActive: showAnotherQuizGeneration,
         onRefreshGenerationStatus: async () => { await stateQuery.refetch() },
         onRetryGeneration: async (failure) => {
           if (failure.kind === 'REQUEST_FAILED' && createConditionsRef.current) {

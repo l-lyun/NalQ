@@ -16,6 +16,7 @@ scope: web
 - Notion에서 가져온 글을 확인·저장한 뒤 실제 서버 API로 퀴즈를 생성하고 풀 수 있다.
 - 학습자료 가져오기·편집·퀴즈 조건 화면의 좌상단 뒤로가기가 이미 지나온 두 화면을 반복해서 왕복시키지 않는다.
 - 사용자가 입력한 선택적 추가 요청이 `generationPrompt`로 생성 API에 한 번 전달된다.
+- 사용자는 최대 문제 수로 5·10·15·20을 선택할 수 있다.
 - 평상시 개발·빌드는 실제 API를 사용하고, fixture 화면은 명시적인 mock 실행 명령에서만 사용한다.
 - 종과 알림 목록은 기존 NalQ·SEED 정보 위계 및 목록 패턴과 일치한다.
 
@@ -98,14 +99,14 @@ scope: web
 
 ## 작업
 
-- [ ] T001 퀴즈 runtime mode와 `dev`·`dev:mock`·`build` 명령을 실제 API 기본으로 정리 — `web/package.json`, `web/.env.example`, `web/src/features/quiz/model/quizFeature.ts`
-- [ ] T002 Notion 복사 결과 저장 후 실제 퀴즈 생성 route와 history entry를 회귀 테스트로 고정 — `web/src/pages/learning/NotionImportPage.tsx`, `web/src/pages/learning/LearningMaterialCreatePage.tsx`, 관련 route 테스트
-- [ ] T003 사용자 추가 요청 타입·입력·검증·API payload를 연결 — `web/src/pages/quiz/`, `web/src/features/quiz/api/`
-- [ ] T004 종 glyph와 badge 조합을 작은 화면에서 조정 — `web/src/features/notification/ui/NotificationCenter.tsx`, 앱 셸 스타일
-- [ ] T005 알림 목록을 기존 SEED 목록 패턴과 정렬하고 로딩·빈 상태·오류 상태를 보존 — `web/src/pages/notifications/`
-- [ ] T006 관련 웹 회귀 테스트와 `pnpm verify` 실행
-- [ ] T007 실제 계정과 실제 Notion 페이지·OpenAI API로 전체 E2E 및 history·320px·키보드 확인
-- [ ] T008 구현 후 실제 결정과 명령을 관련 웹 TRD에 동기화
+- [x] T001 퀴즈 runtime mode와 `dev`·`dev:mock`·`build` 명령을 실제 API 기본으로 정리하고 학습자료·퀴즈·알림 adapter를 같은 mode로 통일 — `web/package.json`, `web/.env.example`, `web/src/features/quiz/model/quizFeature.ts`, `web/src/features/learning-material/api/learningMaterialManagementAdapter.ts`
+- [x] T002 Notion 복사 결과 저장 후 실제 퀴즈 생성 route와 history entry를 회귀 테스트로 고정 — `web/src/pages/learning/NotionImportPage.tsx`, `web/src/pages/learning/LearningMaterialCreatePage.tsx`, 관련 route 테스트
+- [x] T003 사용자 추가 요청·5·10·15·20 문제 수 타입·입력·검증·API payload를 연결 — `web/src/pages/quiz/`, `web/src/features/quiz/api/`
+- [x] T004 종 glyph와 badge 조합을 작은 화면에서 조정 — `web/src/features/notification/ui/NotificationCenter.tsx`, 앱 셸 스타일
+- [x] T005 알림 목록을 기존 SEED 목록 패턴과 정렬하고 로딩·빈 상태·오류 상태를 보존 — `web/src/pages/notifications/`
+- [ ] T006 관련 웹 회귀 테스트와 `pnpm verify` 실행 — 회귀 테스트 54개, typecheck, lint, build는 통과. `pnpm verify`는 기존 third-party notices 불일치에서 차단
+- [ ] T007 실제 계정과 실제 Notion 페이지·OpenAI API로 전체 E2E 및 history·320px·키보드 확인 — 실제 API 생성·알림 이동·풀이 진입과 320px는 통과, 실제 Notion OAuth와 키보드 수동 확인은 남음
+- [x] T008 구현 후 실제 결정과 명령을 관련 웹 TRD에 동기화
 
 ## 검증
 
@@ -120,8 +121,10 @@ scope: web
 | 날짜 | 상태 | 결과 또는 차단 사유 |
 | --- | --- | --- |
 | 2026-09-04 | 계획 | 실제 테스트와 코드 대조에서 P001~P004 확인, 구현 전 WIP 계획 작성 |
+| 2026-09-04 | 구현 중 | T001~T005·T008 구현. 웹 회귀 테스트 54개·typecheck·lint·build와 서버 fastTest 통과. 격리 DB의 실제 OpenAI API에서 4/5(80%)와 브라우저 5/5 READY를 확인하고 320px 풀이까지 진입 |
 
 ## 열린 질문과 차단 사항
 
-- 없음. mock은 삭제하지 않고 명시적 실행으로 격리하는 방향을 이 계획의 기본안으로 둔다.
+- `pnpm verify`의 라이선스 검사는 이번 변경과 무관한 기존 `THIRD_PARTY_NOTICES` 불일치로 차단된다.
+- mock은 삭제하지 않고 명시적 실행으로 격리한다.
 

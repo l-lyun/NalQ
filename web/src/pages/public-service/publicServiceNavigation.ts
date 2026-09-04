@@ -6,3 +6,9 @@ export function readPublicReturnPath(state: unknown) {
   }
   return candidate
 }
+
+export function getPublicBackLabel(returnTo: string) {
+  if (returnTo === '/profile') return '마이페이지로 돌아가기'
+  if (returnTo === '/login') return '로그인 화면으로 돌아가기'
+  return '이전 화면으로 돌아가기'
+}

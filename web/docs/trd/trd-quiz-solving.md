@@ -39,8 +39,8 @@ scope: web
 
 ## 실제 통합 라우트와 Query 경계
 
-- 퀴즈 생성·자기평가·복습 서버 API가 함께 배포되기 전에는 `VITE_QUIZ_API_ENABLED=false`를 기본값으로 사용한다. 이때 로컬 개발 서버는 인증된 학습 화면의 실제 버튼과 URL을 유지한 채 기존 fixture를 사용하는 명시적 `mock` 모드로 동작하며, 별도 preview URL 없이 조건 설정부터 생성·풀이·결과·복습까지 검토할 수 있다. `VITE_QUIZ_API_ENABLED=true`이면 같은 URL이 실제 API route page를 사용한다. 프로덕션은 API가 비활성일 때 fixture로 대체하지 않고 퀴즈 라우트와 최신 복습 Query를 등록·실행하지 않는다.
-- 퀴즈 route와 학습 메인의 퀴즈 관리·최근 퀴즈·복습 후보 adapter는 모두 같은 `VITE_QUIZ_API_ENABLED`에서 runtime mode를 파생한다. 별도 관리 API flag를 두어 route만 켜지고 학습 메인 Query는 꺼지는 분리 배포 상태를 만들지 않는다.
+- `VITE_QUIZ_RUNTIME_MODE`의 기본값은 개발·운영 모두 `api`다. 개발 중 `pnpm dev:mock`으로 명시한 경우에만 fixture를 사용하고, production build에서 `mock`이 지정돼도 실제 API로 수렴한다.
+- 퀴즈 route, 학습자료 관리, 퀴즈 관리·최근 퀴즈·복습 후보와 알림 adapter는 모두 `quizRuntimeMode`를 단일 원장으로 사용한다. 별도 관리 API flag 때문에 실제 자료와 fixture ID가 섞이는 분리 상태를 만들지 않는다.
 - 인증 라우트는 생성 조건 진입 `/learning/:materialId/quiz`, QuizSet 상태·풀이 `/quiz-sets/:quizSetId`, 본 퀴즈 결과 `/quiz-attempts/:attemptId/result`, 최신 복습 진입 `/review`, 복습 실행 `/review-sessions/:reviewSessionId`로 연결한다.
 - 학습 메인의 `전체 문제 다시 풀기`는 `/quiz-sets/:quizSetId`에 `restartMain` route state를 전달한다. 이 intent에서는 미완료 서술형 채점 재개 Query를 건너뛰고 `READY`부터 새 `MAIN` 회차를 시작하며, 일반 진입과 `채점이 남았어요` 행동은 기존처럼 pending 회차를 우선한다.
 - 내 퀴즈의 `퀴즈 풀기`도 `/quiz-sets/:quizSetId`에 `{ restartMain: true }` route state를 전달해 항상 새 `MAIN` 회차를 시작한다. 내 퀴즈 목록은 풀이·결과·복습 행동을 결정하지 않으므로 카드별 pending self-assessment Query와 페이지 단위 latest review Query를 실행하지 않는다. 해당 Query는 학습 메인과 일반 QuizSet route처럼 실제 소비 화면에만 남긴다.
@@ -62,7 +62,9 @@ scope: web
 - 객관식 `choices`는 가변 길이 3~5개다. 풀이·결과·복습 컴포넌트와 화면 답안 상태는 네 개 고정 인덱스를 가정하지 않고 서버 배열 순서를 그대로 렌더링하며 선택값은 배열 위치가 아니라 `choiceId`로 보존한다.
 - 프론트는 3개 보기에 빈 행을 추가하거나 5번째 보기를 잘라내지 않는다. 계약 범위를 벗어난 길이는 조용히 보정하지 않고 문제 데이터 오류 상태로 처리한다.
 - 틀린 문제 다시 풀기는 본 퀴즈의 `QuizFlowPage`와 문항 입력·이동·전체 제출·서술형 자기평가·결과 표현을 그대로 재사용한다. 풀이 화면의 사용자 노출 차이는 상단 헤더에서 학습자료 제목 뒤에 ` · 복습`을 덧붙이는 것뿐이며, 복습용 풀이 화면이나 문항별 즉시 채점 UI를 따로 만들지 않는다.
-- 개발 서버에서만 `/quiz-preview`와 `/quiz-result-preview`를 열어 전체 흐름과 결과 수정을 검토한다. 프로덕션 라우트에는 등록하지 않는다.
+- 일반 `pnpm dev`와 production build는 실제 퀴즈 API를 사용한다. fixture는 `pnpm dev:mock`에서만 선택하며, 개발 서버에서만 `/quiz-preview`와 `/quiz-result-preview`를 열어 전체 흐름과 결과 수정을 검토한다. 프로덕션 라우트에는 등록하지 않는다.
+- 생성 조건은 5·10·15·20문제와 선택적 추가 요청을 지원한다. 추가 요청은 Unicode code point 300자로 제한하고 앞뒤 공백을 정리해 생성 POST에만 포함하며, 응답·local requested-config·로그에는 보존하지 않는다.
+- 실제 생성 요청 전에는 OpenAI로 전송하는 정보, 전송하지 않는 계정·풀이 정보와 최대 30일 보관 가능성을 `ContentDialog`에서 확인한다. 취소는 조건을 유지하고 요청하지 않으며 확인 행동 중 중복 요청을 막는다.
 - 좁은 문제 진행 막대는 현재 위치를 읽는 `progressbar`로만 제공하고 직접 조작하지 않는다. 문항 이동은 `BottomSheet` 안의 44px 이상 번호 버튼으로 분리해 키보드·터치 목표를 보장한다.
 - 단답형·빈칸 채우기 판정 수정은 마지막 저장 확인 판정과 요약을 화면의 기준으로 둔다. 저장 중에는 기존 결과를 유지하고, 성공 응답 뒤에만 현재 판정·점수·복습 수를 한 번에 교체하며 실패하면 이전 상태와 재시도 행동을 유지한다.
 - 결과 조회 adapter는 `response=null`이면 `답하지 않음`으로 표시하고 판정 수정 행동을 만들지 않는다. 답을 작성한 `SHORT_ANSWER` 또는 `FILL_IN_THE_BLANK`만 수정 가능하며 현재 판정과 관계없이 `채점 수정` 행동을 제공한다. 빈칸 채우기는 `response.blankAnswers`에 하나 이상의 답변이 있으면 일부 빈칸만 작성했더라도 수정할 수 있고, 완전 미응답이면 수정할 수 없다. 화면에서 사용하지 않는 `automaticOutcome`, `gradingSource`, `correctedAt`, `reviewRequired`, 별도 `unanswered` 필드를 요구하지 않는다.

@@ -1,4 +1,4 @@
-import { Box, PageBanner, Text, VStack } from '@seed-design/react'
+import { Box, Flex, PageBanner, Text, VStack } from '@seed-design/react'
 
 import { HomeSectionDivider } from './components/HomePrimitives'
 import {
@@ -39,9 +39,12 @@ export function HomePage(props: HomePageProps) {
           gap="x3"
         >
           <VStack as="header" gap="x2">
-            <Text as="h1" textStyle="t12Bold" color="fg.neutral">
-              홈
-            </Text>
+            <Flex align="center" justify="space-between" gap="x3">
+              <Text as="h1" textStyle="t12Bold" color="fg.neutral">
+                홈
+              </Text>
+              <div className="app-notification-slot" data-app-notification-slot />
+            </Flex>
             <VStack gap="x1">
               <Text as="p" textStyle="t7Bold" color="fg.neutral">
                 <span aria-hidden>👋 </span>

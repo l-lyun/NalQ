@@ -50,7 +50,7 @@ export function AppBottomNavigation({
             <Box
               as="li"
               key={item.id}
-              flexGrow
+              className="app-navigation-item"
               borderRadius="r2"
               bg={current ? 'bg.neutralWeak' : undefined}
             >

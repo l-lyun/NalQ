@@ -70,7 +70,7 @@ export function NotificationBell() {
       aria-label={unreadCount > 0 ? `알림, 읽지 않은 알림 ${unreadCount}개` : '알림'}
       onClick={() => navigate('/notifications')}
     >
-      <Icon svg={<IconBellLine />} size="x5" />
+      <Icon svg={<IconBellLine />} size="x6" />
       {unreadCount > 0 ? (
         <NotificationBadgePositioner attach="icon" size="large" aria-hidden>
           <NotificationBadge size="large">{badgeLabel}</NotificationBadge>
@@ -210,7 +210,7 @@ function AppSnackbar({ notification, message, actionLabel, onAction }: {
     <Snackbar.Root variant={variant}>
       <Snackbar.Content>
         <Snackbar.PrefixIcon svg={icon} />
-        <Snackbar.Message>{message}</Snackbar.Message>
+        <Snackbar.Message className="app-snackbar-message">{message}</Snackbar.Message>
       </Snackbar.Content>
       {actionLabel && onAction ? <Snackbar.ActionButton onClick={onAction}>{actionLabel}</Snackbar.ActionButton> : null}
       <Snackbar.HiddenCloseButton aria-label="알림 닫기" />

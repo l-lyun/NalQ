@@ -26,14 +26,12 @@ export type ProfilePageProps = {
   logoutPending: boolean
   logoutError?: string
   legalDocumentsAvailable: boolean
-  accountWithdrawalAvailable: boolean
   onOpenAccount: () => void
   onOpenGuide: () => void
   onOpenTerms: () => void
   onOpenPrivacy: () => void
   onOpenInquiry: () => void
   onOpenOpenSourceLicenses: () => void
-  onOpenWithdrawal: () => void
   onLogout: () => void
   onRetry: () => void
 }
@@ -46,14 +44,12 @@ export function ProfilePage({
   logoutPending,
   logoutError,
   legalDocumentsAvailable,
-  accountWithdrawalAvailable,
   onOpenAccount,
   onOpenGuide,
   onOpenTerms,
   onOpenPrivacy,
   onOpenInquiry,
   onOpenOpenSourceLicenses,
-  onOpenWithdrawal,
   onLogout,
   onRetry,
 }: ProfilePageProps) {
@@ -63,7 +59,10 @@ export function ProfilePage({
     <VStack className="profile-shell" minHeight="100dvh" bg="bg.layerBasement">
       <Box as="main" className="profile-main" bg="bg.layerDefault" width="full" pt="safeArea">
         <VStack className="profile-content" px="spacingX.globalGutter" pt="x4" pb="spacingY.screenBottom" gap="x3">
-          <Text as="h1" textStyle="t12Bold" color="fg.neutral">마이페이지</Text>
+          <Flex as="header" align="center" justify="space-between" gap="x3">
+            <Text as="h1" textStyle="t12Bold" color="fg.neutral">마이페이지</Text>
+            <div className="app-notification-slot" data-app-notification-slot />
+          </Flex>
           {status === 'loading' ? <ProfileLoading /> : status === 'error' ? (
             <VStack minHeight="320px" align="center" justify="center" gap="x4">
               <Text role="alert" textStyle="t5Regular" color="fg.neutralMuted" align="center">계정 정보를 불러오지 못했어요.</Text>
@@ -94,26 +93,16 @@ export function ProfilePage({
 
               <Divider as="div" color="stroke.neutralSubtle" />
               <SettingsSection title="서비스 정보" titleId="mypage-service-title">
-                <SettingsRow label="NalQ 가이드" onClick={onOpenGuide} />
+                <SettingsRow label="NalQ 가이드" description="주요 기능과 학습 흐름 살펴보기" onClick={onOpenGuide} />
                 {legalDocumentsAvailable ? <SettingsRow label="서비스 이용약관" onClick={onOpenTerms} /> : null}
                 {legalDocumentsAvailable ? <SettingsRow label="개인정보처리방침" onClick={onOpenPrivacy} /> : null}
-                <SettingsRow label="문의하기" onClick={onOpenInquiry} />
+                <SettingsRow label="문의하기" description="서비스 문의와 권리 침해 신고" onClick={onOpenInquiry} />
                 <SettingsRow label="오픈소스 라이선스" onClick={onOpenOpenSourceLicenses} />
                 <Flex className="profile-version-row" align="center" justify="space-between" gap="x4">
                   <Text textStyle="t5Medium" color="fg.neutral">앱 버전</Text>
                   <Text textStyle="t4Regular" color="fg.neutralMuted">{appVersion}</Text>
                 </Flex>
               </SettingsSection>
-
-              {accountWithdrawalAvailable ? (
-                <>
-                  <Divider as="div" color="stroke.neutralSubtle" />
-                  <SettingsSection title="계정 종료" titleId="mypage-withdrawal-title">
-                    <SettingsRow label="회원 탈퇴" onClick={onOpenWithdrawal} />
-                  </SettingsSection>
-                  <Text textStyle="t4Regular" color="fg.neutralMuted">탈퇴하면 이전 학습 기록을 다시 이용할 수 없어요.</Text>
-                </>
-              ) : null}
             </>
           )}
         </VStack>
@@ -133,11 +122,13 @@ function SettingsSection({ title, titleId, children }: { title: string; titleId:
 
 function SettingsRow({
   label,
+  description,
   onClick,
   pending = false,
   trailing = true,
 }: {
   label: string
+  description?: string
   onClick: () => void
   pending?: boolean
   trailing?: boolean
@@ -146,8 +137,9 @@ function SettingsRow({
     <List.Item>
       <List.Content asChild>
         <button className="profile-list-button" type="button" disabled={pending} onClick={onClick}>
-          <VStack minWidth="0px" flexGrow align="flex-start">
+          <VStack minWidth="0px" flexGrow align="flex-start" gap="x1">
             <List.Title>{label}</List.Title>
+            {description ? <List.Detail>{description}</List.Detail> : null}
           </VStack>
           {pending ? (
             <Text textStyle="t3Regular" color="fg.neutralMuted">처리 중</Text>

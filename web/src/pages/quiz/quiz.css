@@ -159,6 +159,11 @@
   z-index: 1;
 }
 
+.quiz-generation-prompt {
+  min-height: var(--seed-dimension-x20);
+  resize: vertical;
+}
+
 .quiz-question-heading:focus:not(:focus-visible) {
   outline: none;
 }
@@ -224,6 +229,11 @@
 
 .quiz-result-answer-list dd {
   text-align: start;
+}
+
+.quiz-result-answer-list dt,
+.quiz-result-answer-list dd {
+  font-weight: var(--seed-font-weight-regular);
 }
 
 .quiz-progress-track {

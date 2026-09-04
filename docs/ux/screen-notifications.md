@@ -20,6 +20,7 @@ scope: ux
 ### 확정 사항
 
 - 일반 인증 화면의 Top Navigation 우측에 종을 두고 몰입형 퀴즈·결과·복습 화면에서는 숨긴다.
+- 종은 화면에 고정된 전역 overlay가 아니라 각 일반 화면의 문서 흐름 안에 있는 Top Navigation에 포함한다. 사용자가 본문을 스크롤해 header가 화면 밖으로 이동하면 종도 함께 사라진다.
 - 종은 `IconBellLine` 의미의 아이콘과 접근 가능한 이름 `알림`을 가진다.
 - 읽지 않은 수는 `NotificationBadge`와 `NotificationBadgePositioner`를 사용해 종에 연결한다. 0이면 숨기고 1~99는 숫자, 100 이상은 `99+`다.
 - 데스크톱·모바일 웹·WebView 모두 종 또는 `알림보기`를 선택하면 별도 알림 페이지로 이동한다. anchored layer와 Bottom Sheet는 사용하지 않는다.
@@ -164,5 +165,6 @@ Snackbar는 `notificationId` 기준으로 같은 사용자·기기에서 한 번
 
 | 날짜 | 변경 | 근거 | 작성자 |
 | --- | --- | --- | --- |
+| 2026-09-04 | 알림 종을 고정 overlay가 아닌 스크롤되는 화면 header 내부 utility로 명확화 | 사용자 UX 피드백 | NalQ UX/UI 설계 |
 | 2026-09-03 | 서버 알림함과 foreground 감시에 맞춘 종·목록·Snackbar 상태 정의 | 사용자 확정 | Codex |
 | 2026-09-03 | 생성 당시 이름 snapshot과 모든 플랫폼의 별도 알림 페이지 확정 | 사용자 확정 | Codex |

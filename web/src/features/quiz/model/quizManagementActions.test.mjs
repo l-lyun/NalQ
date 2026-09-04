@@ -4,6 +4,7 @@ import test from 'node:test'
 import {
   createNewMainQuizDestination,
   parseExpandedQuizIds,
+  resolveQuizSetInitialScene,
   resolvePendingSelfAssessmentForQuizEntry,
   toggleExpandedQuizId,
 } from './quizManagementActions.ts'
@@ -37,4 +38,14 @@ test('전체 문제 다시 풀기 진입은 미완료 자기평가 자동 재개
 
   assert.equal(resolvePendingSelfAssessmentForQuizEntry(pending, true), null)
   assert.equal(resolvePendingSelfAssessmentForQuizEntry(pending, false), pending)
+})
+
+test('기존 퀴즈를 새 MAIN 회차로 다시 풀 때는 준비 안내 없이 첫 문제로 바로 진입한다', () => {
+  assert.equal(resolveQuizSetInitialScene('READY', null, true), 'SOLVING')
+  assert.equal(resolveQuizSetInitialScene('READY', null, false), 'READY')
+  assert.equal(resolveQuizSetInitialScene('GENERATING', null, true), 'GENERATION')
+  assert.equal(
+    resolveQuizSetInitialScene('READY', { attemptId: 'attempt-1' }, true),
+    'SELF_ASSESSMENT',
+  )
 })

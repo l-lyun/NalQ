@@ -1,17 +1,14 @@
-export type QuizRuntimeMode = 'api' | 'mock' | 'disabled'
+import { resolveQuizRuntimeMode } from './quizRuntimeMode'
 
-export const quizApiEnabled = import.meta.env.VITE_QUIZ_API_ENABLED === 'true'
+export type { QuizRuntimeMode } from './quizRuntimeMode'
 
-/**
- * Local development keeps the complete learning journey reviewable even while
- * the quiz server APIs are disabled. Production never falls back to fixture
- * data: it either uses the explicitly enabled API or leaves quiz routes off.
- */
-export const quizRuntimeMode: QuizRuntimeMode = quizApiEnabled
-  ? 'api'
-  : import.meta.env.DEV
-    ? 'mock'
-    : 'disabled'
+/** Normal development and production use the server. Fixtures require `pnpm dev:mock`. */
+export const quizRuntimeMode = resolveQuizRuntimeMode(
+  import.meta.env.VITE_QUIZ_RUNTIME_MODE,
+  import.meta.env.DEV,
+)
+
+export const quizApiEnabled = quizRuntimeMode === 'api'
 
 export const quizMockEnabled = quizRuntimeMode === 'mock'
-export const quizRoutesEnabled = quizRuntimeMode !== 'disabled'
+export const quizRoutesEnabled = true

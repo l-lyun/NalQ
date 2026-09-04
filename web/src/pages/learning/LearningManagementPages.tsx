@@ -34,6 +34,7 @@ import {
   updateManagedLearningMaterial,
 } from '@/features/learning-material/api/learningMaterialManagementAdapter'
 import type { LearningMaterialSummary } from '@/features/learning-material/api/learningMaterial.types'
+import { getLearningMaterialManagementActions } from '@/features/learning-material/model/learningMaterialManagementActions'
 import { managedLearningMaterialQueryOptions } from '@/features/learning-material/model/learningMaterialManagementQueries'
 import {
   quizManagementMode,
@@ -58,6 +59,7 @@ import {
   toggleExpandedQuizId,
 } from '@/features/quiz/model/quizManagementActions'
 import {
+  getReviewCandidatesEmptyMessage,
   type LearningReviewAction,
   resolveRecentQuizAction,
   resolveReviewCandidateAction,
@@ -72,8 +74,10 @@ import {
   LearningTextarea,
 } from './components/LearningPrimitives'
 import {
+  resolveLearningMaterialEditBackNavigation,
   resolveLearningMaterialsReturnTo,
   resolveLearningQuizzesReturnTo,
+  shouldCommitLearningSearchInput,
 } from './learningRoutes'
 import { QuizManagementCard } from './components/QuizManagementCard'
 import { countUnicodeCodePoints } from './learning.text'
@@ -216,9 +220,12 @@ export function LearningManagementPage() {
           pb="spacingY.screenBottom"
           gap="x8"
         >
-          <Text as="h1" textStyle="t12Bold" color="fg.neutral">
-            학습
-          </Text>
+          <Flex as="header" align="center" justify="space-between" gap="x3">
+            <Text as="h1" textStyle="t12Bold" color="fg.neutral">
+              학습
+            </Text>
+            <div className="app-notification-slot" data-app-notification-slot />
+          </Flex>
 
           <VStack as="section" gap="x4" aria-labelledby="recent-quiz-heading">
             <Text as="h2" id="recent-quiz-heading" textStyle="t9Bold" color="fg.neutral">
@@ -274,7 +281,7 @@ export function LearningManagementPage() {
                 onRetry={() => void reviewCandidates.refetch()}
               />
             ) : reviewCandidates.data.items.length === 0 ? (
-              <EmptyState>복습할 퀴즈가 없어요. 지금까지의 학습이 잘 정리되어 있어요.</EmptyState>
+              <EmptyState>{getReviewCandidatesEmptyMessage(recentQuiz.data)}</EmptyState>
             ) : (
               <VStack as="ul" className="learning-review-list">
                 {reviewCandidates.data.items.map((candidate, index) => (
@@ -428,6 +435,8 @@ export function LearningMaterialsPage() {
   const back = usePageBack()
   const [searchParams, setSearchParams] = useSearchParams()
   const query = searchParams.get('query') ?? ''
+  const [searchDraft, setSearchDraft] = useState(query)
+  const searchCompositionRef = useRef(false)
   const requestedPage = Number(searchParams.get('page') ?? '1')
   const page = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1
   const expanded = useMemo(
@@ -464,6 +473,10 @@ export function LearningMaterialsPage() {
     updateParams({ expanded: [...next].join(',') || null })
   }
 
+  useEffect(() => {
+    if (!searchCompositionRef.current) setSearchDraft(query)
+  }, [query])
+
   const returnTo = resolveLearningMaterialsReturnTo(`${location.pathname}${location.search}`)
     ?? '/learning/materials'
   const restoreScrollTop = (() => {
@@ -495,10 +508,27 @@ export function LearningMaterialsPage() {
         <LearningField label="학습자료 제목 검색">
           <LearningTextInput
             type="search"
-            value={query}
+            value={searchDraft}
             placeholder="제목으로 검색"
             autoFocus
-            onChange={(event) => updateParams({ query: event.currentTarget.value, page: null })}
+            onCompositionStart={() => {
+              searchCompositionRef.current = true
+            }}
+            onCompositionEnd={(event) => {
+              searchCompositionRef.current = false
+              setSearchDraft(event.currentTarget.value)
+              updateParams({ query: event.currentTarget.value, page: null })
+            }}
+            onChange={(event) => {
+              const value = event.currentTarget.value
+              setSearchDraft(value)
+              if (shouldCommitLearningSearchInput(
+                Boolean((event.nativeEvent as InputEvent).isComposing),
+                searchCompositionRef.current,
+              )) {
+                updateParams({ query: value, page: null })
+              }
+            }}
           />
         </LearningField>
         {materials.isFetching && materials.data ? (
@@ -630,13 +660,10 @@ function MaterialDisclosureCard({
   onCreateQuiz: () => void
   onEdit: () => void
 }) {
-  const detailId = `material-${material.materialId}-detail`
-  const detail = useQuery({
-    ...managedLearningMaterialQueryOptions.detail(material.materialId),
-    enabled: expanded,
-    refetchOnWindowFocus: false,
-  })
   const locked = material.contentEditStatus === 'LOCKED_GENERATING'
+  const detailId = `material-${material.materialId}-detail`
+  const lockReasonId = `material-${material.materialId}-lock-reason`
+  const actions = getLearningMaterialManagementActions(material.contentEditStatus, disabled)
   return (
     <Box as="li" borderWidth={1} borderColor="stroke.neutralSubtle" borderRadius="r3">
       <button
@@ -653,12 +680,8 @@ function MaterialDisclosureCard({
           </Text>
           <Text textStyle="t4Regular" color="fg.neutralMuted">
             {material.sourceType === 'NOTION' ? 'Notion에서 가져옴' : '직접 입력'} · {formatDate(material.updatedAt)}
+            {locked ? ' · 문제 생성 중' : ''}
           </Text>
-          {locked ? (
-            <Text textStyle="t4Regular" color="fg.warning">
-              문제 생성 중
-            </Text>
-          ) : null}
         </VStack>
         <Box
           className={expanded ? 'learning-disclosure-icon learning-disclosure-icon-open' : 'learning-disclosure-icon'}
@@ -668,39 +691,26 @@ function MaterialDisclosureCard({
         </Box>
       </button>
       {expanded ? (
-        <VStack id={detailId} className="learning-disclosure-detail" gap="x4" p="x4" pt="x1">
-          {detail.isPending ? (
-            <LoadingRows label={`${material.title} 상세를 불러오는 중`} count={1} />
-          ) : detail.isError ? (
-            <InlineFailure message="학습자료 내용을 불러오지 못했어요." onRetry={() => void detail.refetch()} />
-          ) : (
-            <>
-              <Text className="learning-material-preview" as="p" textStyle="t5Regular" color="fg.neutralMuted">
-                {detail.data.content}
-              </Text>
-              <Text as="p" textStyle="t3Regular" color="fg.neutralMuted">
-                {detail.data.contentLength.toLocaleString('ko-KR')}자
-              </Text>
-            </>
-          )}
+        <VStack id={detailId} className="learning-disclosure-detail" gap="x2">
           <Flex className="learning-management-actions" gap="x2" width="full">
-            <ActionButton
-              type="button"
-              size="medium"
-              variant="neutralWeak"
-              disabled={locked}
-              aria-describedby={locked ? `${detailId}-lock-reason` : undefined}
-              onClick={onCreateQuiz}
-            >
-              퀴즈 만들기
-            </ActionButton>
-            <ActionButton type="button" size="medium" variant="neutralWeak" onClick={onEdit}>
-              학습자료 변경
-            </ActionButton>
+            {actions.map((action) => (
+              <ActionButton
+                key={action.id}
+                type="button"
+                size="medium"
+                variant="neutralWeak"
+                disabled={action.disabled}
+                aria-label={`${material.title} ${action.label}`}
+                aria-describedby={action.id === 'create-quiz' && locked ? lockReasonId : undefined}
+                onClick={action.id === 'create-quiz' ? onCreateQuiz : onEdit}
+              >
+                {action.label}
+              </ActionButton>
+            ))}
           </Flex>
           {locked ? (
-            <Text id={`${detailId}-lock-reason`} as="p" textStyle="t3Regular" color="fg.neutralMuted">
-              진행 중인 문제 생성이 끝나면 이 자료로 새 퀴즈를 만들 수 있어요.
+            <Text id={lockReasonId} as="p" textStyle="t3Regular" color="fg.neutralMuted">
+              이 학습자료로 문제를 만들고 있어요. 완료되면 다시 만들 수 있어요.
             </Text>
           ) : null}
         </VStack>
@@ -791,11 +801,12 @@ export function LearningMaterialEditPage({ materialId }: { materialId: string })
 
   const goBack = () => {
     if (dirty && !window.confirm('변경사항을 버리고 나갈까요?')) return
-    const returnTo = resolveLearningMaterialsReturnTo(
+    const navigation = resolveLearningMaterialEditBackNavigation(
       (location.state as { returnTo?: unknown } | null)?.returnTo,
     )
     const returnScrollTop = (location.state as { returnScrollTop?: unknown } | null)?.returnScrollTop
-    navigate(returnTo ?? '/learning/materials', {
+    navigate(navigation.to, {
+      replace: navigation.replace,
       state: typeof returnScrollTop === 'number' ? { restoreScrollTop: returnScrollTop } : undefined,
     })
   }
@@ -827,7 +838,7 @@ export function LearningMaterialEditPage({ materialId }: { materialId: string })
   return (
     <Box as="main" className="learning-management-page" bg="bg.layerDefault" minHeight="100dvh" pt="safeArea">
       <VStack className="learning-content" px="spacingX.globalGutter" pt="x4" pb="spacingY.screenBottom" gap="x5">
-        <LearningScreenHeader title="학습자료 변경" onBack={goBack} headingRef={headingRef} />
+        <LearningScreenHeader title="학습자료 수정" onBack={goBack} headingRef={headingRef} />
         {detail.isError ? (
           <InlineFailure message="학습자료를 불러오지 못했어요." onRetry={() => void detail.refetch()} />
         ) : detail.isPending || !draft ? (

@@ -109,6 +109,7 @@ export function OnboardingPage({ mode, onExit }: OnboardingPageProps) {
         <Text textStyle={mode === 'guide' ? 't10Bold' : 't8Bold'} color="fg.neutral">
           {mode === 'guide' ? 'NalQ 가이드' : 'NalQ'}
         </Text>
+        {mode === 'guide' ? <div className="app-notification-slot" data-app-notification-slot /> : null}
         <VisuallyHidden><h1>NalQ 시작 가이드</h1></VisuallyHidden>
       </Flex>
 

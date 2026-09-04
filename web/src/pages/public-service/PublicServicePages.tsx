@@ -1,5 +1,5 @@
 import { IconArrowLeftLine } from '@karrotmarket/react-monochrome-icon'
-import { ActionButton, Box, Divider, Flex, Icon, Text, VStack } from '@seed-design/react'
+import { ActionButton, Box, Divider, Flex, Icon, PageBanner, Text, VStack } from '@seed-design/react'
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 
@@ -8,7 +8,7 @@ import seedNotice from './licenses/seed-notice.txt?raw'
 import thirdPartyNoticesUrl from './licenses/third-party-notices.txt?url'
 import { privacyPolicyDraft, serviceTermsDraft, type LegalDocument } from './legalContent'
 import { PublicServiceFooter } from './PublicServiceFooter'
-import { readPublicReturnPath } from './publicServiceNavigation'
+import { getPublicBackLabel, readPublicReturnPath } from './publicServiceNavigation'
 import './public-service.css'
 
 const SUPPORT_EMAIL = 'kimdohyun032@gmail.com'
@@ -23,20 +23,20 @@ function PublicPage({ title, children }: { title: string; children: React.ReactN
         <VStack className="public-service-content" px="spacingX.globalGutter" pt="x4" pb="x10" gap="x6">
           <Flex as="header" align="center" gap="x2">
             <ActionButton
+              className="public-service-back-button"
               type="button"
               size="small"
               variant="ghost"
               layout="iconOnly"
-              aria-label="이전 화면으로 돌아가기"
+              aria-label={getPublicBackLabel(returnTo)}
               onClick={() => {
                 navigate(returnTo, { replace: true })
               }}
             >
               <Icon svg={<IconArrowLeftLine />} size="x5" />
             </ActionButton>
-            <Link className="public-service-brand-link" to="/login">NalQ</Link>
+            <Text as="h1" textStyle="t10Bold" color="fg.neutral">{title}</Text>
           </Flex>
-          <Text as="h1" textStyle="t12Bold" color="fg.neutral">{title}</Text>
           {children}
         </VStack>
       </Box>
@@ -49,18 +49,34 @@ function LegalDocumentPage({ document }: { document: LegalDocument }) {
   const location = useLocation()
   return (
     <PublicPage title={document.title}>
-      <Box role="status" bg="bg.warningWeak" borderRadius="r3" p="x4">
-        <VStack gap="x2">
-          <Text textStyle="t5Bold" color="fg.warning">출시 전 법률 검토가 필요한 문서예요</Text>
-          <Text textStyle="t4Regular" color="fg.neutralMuted">
-            확정 시행일과 운영 버전이 아직 승인되지 않았습니다. 현재 화면은 구현 검토용이며 운영 중인 약관·방침으로 표시하지 않습니다.
-          </Text>
-        </VStack>
-      </Box>
-      <Text textStyle="t4Medium" color="fg.neutralMuted">검토 문서 ID {document.reviewId}</Text>
-      <VStack as="article" gap="x8">
-        {document.sections.map((section) => (
-          <VStack as="section" key={section.heading} gap="x3">
+      <Text as="p" textStyle="t6Regular" color="fg.neutralMuted">{document.summary}</Text>
+      <PageBanner.Root tone="warning" variant="weak">
+        <PageBanner.Content>
+          <PageBanner.Body>
+            <PageBanner.Title>출시 전 검토 문서</PageBanner.Title>
+            <PageBanner.Description>
+              시행일과 운영 버전이 아직 확정되지 않았습니다. 현재 내용은 법률·운영 검토용이며 운영 중인 약관이나 방침이 아닙니다.
+            </PageBanner.Description>
+          </PageBanner.Body>
+        </PageBanner.Content>
+      </PageBanner.Root>
+      <VStack className="public-service-document-meta" bg="bg.neutralWeak" borderRadius="r2" py="x3" px="x4" gap="x1">
+        <Text textStyle="t4Medium" color="fg.neutral">최근 검토 {document.reviewedAt}</Text>
+        <Text textStyle="t3Regular" color="fg.neutralMuted">시행일 미정 · 운영 버전 미정</Text>
+      </VStack>
+      {document.sections.length >= 6 ? (
+        <Box as="nav" className="public-service-toc" aria-label={`${document.title} 목차`}>
+          <Text textStyle="t5Bold" color="fg.neutral">목차</Text>
+          <ol>
+            {document.sections.map((section, index) => (
+              <li key={section.heading}><a href={`#legal-section-${index + 1}`}>{section.heading}</a></li>
+            ))}
+          </ol>
+        </Box>
+      ) : null}
+      <VStack as="article" className="public-service-article" gap="x8">
+        {document.sections.map((section, index) => (
+          <VStack as="section" id={`legal-section-${index + 1}`} key={section.heading} gap="x3">
             <Text as="h2" textStyle="t7Bold" color="fg.neutral">{section.heading}</Text>
             {section.paragraphs.map((paragraph) => (
               <Text as="p" key={paragraph} textStyle="t5Regular" color="fg.neutral">{paragraph}</Text>
@@ -103,7 +119,7 @@ export function SupportPage() {
         <Text as="p" textStyle="t5Regular" color="fg.neutralMuted">운영자 김도현에게 이메일로 문의할 수 있어요.</Text>
         <a className="public-service-email-value" href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>
       </VStack>
-      <Flex gap="x3" wrap>
+      <Flex className="public-service-support-actions" gap="x3" wrap>
         <ActionButton asChild size="large" variant="brandSolid">
           <a href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('[NalQ 문의]')}`}>이메일로 문의하기</a>
         </ActionButton>
@@ -136,6 +152,9 @@ export function SupportPage() {
 export function OpenSourceLicensesPage() {
   return (
     <PublicPage title="오픈소스 라이선스">
+      <Text as="p" textStyle="t6Regular" color="fg.neutralMuted">
+        NalQ를 만드는 데 사용한 오픈소스 소프트웨어와 각 라이선스 고지를 확인할 수 있어요.
+      </Text>
       <VStack as="article" gap="x5">
         <VStack gap="x2">
           <Text as="h2" textStyle="t8Bold" color="fg.neutral">SEED Design</Text>

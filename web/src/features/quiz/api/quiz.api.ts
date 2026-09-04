@@ -24,6 +24,7 @@ import type {
   ReviewSubmissionResponse,
 } from './quiz.types'
 import type { QuizBinaryOutcome, QuizResultOutcome } from '@/pages/quiz/quiz.types'
+import { toCreateQuizSetRequest } from '@/features/quiz/model/quizGenerationRequest'
 
 async function getData<T>(url: string, signal?: AbortSignal) {
   const response = await protectedApi.get<ApiResponse<T>>(url, { signal })
@@ -36,7 +37,7 @@ export async function createQuizSet(
 ) {
   const response = await protectedApi.post<ApiResponse<CreateQuizSetResponse>>(
     `/api/v1/learning-materials/${materialId}/quiz-sets`,
-    payload,
+    toCreateQuizSetRequest(payload),
   )
   return unwrapApiResponse(response.data)
 }

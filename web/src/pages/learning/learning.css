@@ -129,7 +129,8 @@
 }
 
 .learning-disclosure-trigger {
-  padding: var(--seed-dimension-x4);
+  min-height: var(--seed-dimension-x12);
+  padding: var(--seed-dimension-x3) var(--seed-dimension-x4);
 }
 
 .learning-management-row:focus-visible,
@@ -180,6 +181,7 @@
 
 .learning-disclosure-detail {
   border-top: 1px solid var(--seed-color-stroke-neutral-subtle);
+  padding: var(--seed-dimension-x2) var(--seed-dimension-x4);
 }
 
 .learning-quiz-management-card:focus-visible {
@@ -194,8 +196,7 @@
 
 .learning-quiz-management-detail {
   position: relative;
-  min-height: 68px;
-  padding: var(--seed-dimension-x4);
+  min-height: var(--seed-dimension-x14);
   overflow: hidden;
 }
 
@@ -221,23 +222,16 @@
   margin-inline: var(--seed-dimension-spacing-x-global-gutter);
 }
 
-.learning-material-preview {
-  display: -webkit-box;
-  overflow: hidden;
-  white-space: pre-wrap;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-}
-
 .learning-management-actions {
   align-items: center;
   justify-content: flex-end;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .learning-management-actions > * {
   min-width: 0;
-  flex: 1 1 132px;
+  min-height: var(--seed-dimension-x12);
+  flex: 1 1 0;
 }
 
 .learning-long-title {
@@ -380,16 +374,6 @@
 @media (max-width: 359px) {
   .learning-textarea {
     min-height: 180px;
-  }
-
-  .learning-management-actions {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .learning-management-actions > * {
-    width: 100%;
-    flex-basis: auto;
   }
 
   .learning-review-row {

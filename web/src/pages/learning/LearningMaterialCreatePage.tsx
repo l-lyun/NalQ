@@ -33,6 +33,7 @@ import {
 } from './components/LearningPrimitives'
 import {
   readLearningCreateReturnState,
+  resolveLearningEditorBackNavigation,
   resolveLearningMaterialsReturnTo,
 } from './learningRoutes'
 import './learning.css'
@@ -110,12 +111,18 @@ export function LearningMaterialCreatePage() {
   })
 
   const requestBack = () => {
-    if (returnTo) {
-      navigate(returnTo, { state: { restoreScrollTop: returnScrollTop } })
-      return
-    }
-    navigate(sourceType === 'NOTION' ? '/learning/import/notion' : '/learning/new', {
-      state: Object.keys(learningCreateReturnState).length > 0 ? learningCreateReturnState : undefined,
+    const destination = resolveLearningEditorBackNavigation(
+      sourceType,
+      returnTo,
+      learningCreateReturnState,
+    )
+    navigate(destination.to, {
+      replace: destination.replace,
+      state: returnTo
+        ? { restoreScrollTop: returnScrollTop }
+        : Object.keys(learningCreateReturnState).length > 0
+          ? learningCreateReturnState
+          : undefined,
     })
   }
 

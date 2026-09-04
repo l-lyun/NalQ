@@ -8,6 +8,7 @@ import {
   BottomSheet,
   Box,
   Checkbox,
+  ContentDialog,
   Field,
   Flex,
   Grid,
@@ -23,6 +24,12 @@ import {
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { createSubmissionPayload, isQuestionAnswered } from '@/features/quiz/model/quizAdapter'
+import {
+  countGenerationPromptCodePoints,
+  GENERATION_PROMPT_MAX_CODE_POINTS,
+  isQuizGenerationActiveConflict,
+  sliceGenerationPrompt,
+} from '@/features/quiz/model/quizGenerationRequest'
 import { createUuidV4 } from '@/features/quiz/model/randomUuid'
 
 import {
@@ -210,6 +217,8 @@ export function QuizFlowPage({
   const [scene, setScene] = useState(initialScene)
   const [conditions, setConditions] = useState(initialConditions)
   const [conditionsError, setConditionsError] = useState<string>()
+  const [generationDisclosureOpen, setGenerationDisclosureOpen] = useState(false)
+  const [generationStarting, setGenerationStarting] = useState(false)
   const [generation, setGeneration] = useState(
     generationState ?? ({ status: 'GENERATING' } as const),
   )
@@ -305,16 +314,30 @@ export function QuizFlowPage({
       setConditionsError('문제 유형을 하나 이상 선택해 주세요.')
       return
     }
+    setGenerationDisclosureOpen(true)
+  }
+
+  const confirmGeneration = async () => {
+    if (generationStarting) return
+    setGenerationStarting(true)
     setGeneration({ status: 'GENERATING' })
     setScene('GENERATION')
     try {
       const ready = await callbacks?.onGenerate?.(conditions)
       if (ready) showReady(ready)
-    } catch {
+    } catch (error) {
+      if (isQuizGenerationActiveConflict(error)) {
+        setScene('CONDITIONS')
+        callbacks?.onGenerationActive?.()
+        return
+      }
       setGeneration({
         status: 'ERROR',
         error: { kind: 'REQUEST_FAILED', retryable: true },
       })
+    } finally {
+      setGenerationDisclosureOpen(false)
+      setGenerationStarting(false)
     }
   }
 
@@ -336,7 +359,12 @@ export function QuizFlowPage({
           ? await callbacks?.onRefreshGenerationStatus?.()
           : await callbacks?.onRetryGeneration?.(failure)
       if (ready) showReady(ready)
-    } catch {
+    } catch (error) {
+      if (isQuizGenerationActiveConflict(error)) {
+        setScene('CONDITIONS')
+        callbacks?.onGenerationActive?.()
+        return
+      }
       setGeneration({
         status: 'ERROR',
         error:
@@ -636,6 +664,15 @@ export function QuizFlowPage({
         ) : null}
       </Box>
 
+      <GenerationDisclosureDialog
+        open={generationDisclosureOpen}
+        loading={generationStarting}
+        onOpenChange={(open) => {
+          if (!generationStarting) setGenerationDisclosureOpen(open)
+        }}
+        onConfirm={() => void confirmGeneration()}
+      />
+
       <SheetFrame
         open={sheet === 'GENERATION_EXIT'}
         onOpenChange={(open) => setSheet(open ? 'GENERATION_EXIT' : null)}
@@ -852,7 +889,7 @@ function ConditionsScreen({
           legend="최대 문제 수"
           name="quiz-max-count"
           value={String(conditions.maxQuestionCount)}
-          options={([5, 10, 15] as QuizMaxQuestionCount[]).map((value) => ({
+          options={([5, 10, 15, 20] as QuizMaxQuestionCount[]).map((value) => ({
             value: String(value),
             label: `${value}개`,
           }))}
@@ -865,11 +902,114 @@ function ConditionsScreen({
           }
         />
 
+        <Field.Root>
+          <Field.Label>추가 요청 (선택)</Field.Label>
+          <TextField.Root>
+            <TextField.Textarea
+              className="quiz-generation-prompt"
+              value={conditions.generationPrompt ?? ''}
+              placeholder="예: 동시성 부분에 집중해서 실무 면접 스타일로 내줘"
+              aria-describedby="quiz-generation-prompt-description"
+              onChange={(event) => onChange({
+                ...conditions,
+                generationPrompt: sliceGenerationPrompt(event.currentTarget.value),
+              })}
+            />
+          </TextField.Root>
+          <Field.Footer>
+            <Field.Description id="quiz-generation-prompt-description">
+              출제 초점과 스타일만 반영해요. 문제 유형·수·학습자료 근거는 바꿀 수 없어요.
+            </Field.Description>
+            <Field.CharacterCount
+              current={countGenerationPromptCodePoints(conditions.generationPrompt ?? '')}
+              max={GENERATION_PROMPT_MAX_CODE_POINTS}
+            />
+          </Field.Footer>
+        </Field.Root>
+
         <ActionButton size="large" variant="brandSolid" onClick={onGenerate}>
           문제 만들기
         </ActionButton>
       </VStack>
     </VStack>
+  )
+}
+
+function GenerationDisclosureDialog({
+  open,
+  loading,
+  onOpenChange,
+  onConfirm,
+}: {
+  open: boolean
+  loading: boolean
+  onOpenChange: (open: boolean) => void
+  onConfirm: () => void
+}) {
+  return (
+    <ContentDialog.Root
+      open={open}
+      onOpenChange={onOpenChange}
+      closeOnEscape={!loading}
+      closeOnInteractOutside={!loading}
+    >
+      <Portal>
+        <ContentDialog.Backdrop />
+        <ContentDialog.Positioner>
+          <ContentDialog.Content width="full" maxWidth="440px">
+            <ContentDialog.Header>
+              <ContentDialog.Title>학습자료를 OpenAI로 전송할까요?</ContentDialog.Title>
+              <ContentDialog.Description>
+                문제를 만들기 전에 외부 전송 범위를 확인해 주세요.
+              </ContentDialog.Description>
+            </ContentDialog.Header>
+            <ContentDialog.Body>
+              <VStack gap="x4">
+                <VStack gap="x1">
+                  <Text as="h3" textStyle="t5Bold" color="fg.neutral">전송하는 정보</Text>
+                  <Text as="p" textStyle="t4Regular" color="fg.neutralMuted">
+                    학습자료 본문 전체, 문제 유형·난이도·문제 수, 입력한 추가 요청
+                  </Text>
+                </VStack>
+                <VStack gap="x1">
+                  <Text as="h3" textStyle="t5Bold" color="fg.neutral">전송하지 않는 정보</Text>
+                  <Text as="p" textStyle="t4Regular" color="fg.neutralMuted">
+                    이메일·닉네임·비밀번호·인증정보·풀이 답안
+                  </Text>
+                </VStack>
+                <PageBanner.Root tone="informative" variant="weak">
+                  <PageBanner.Content>
+                    <PageBanner.Body>
+                      <PageBanner.Description>
+                        기본 악용 방지 모니터링 과정에서 입력과 출력이 최대 30일 보관될 수 있어요.
+                      </PageBanner.Description>
+                    </PageBanner.Body>
+                  </PageBanner.Content>
+                </PageBanner.Root>
+              </VStack>
+            </ContentDialog.Body>
+            <ContentDialog.Footer>
+              <ContentDialog.Action asChild>
+                <ActionButton type="button" size="large" variant="neutralWeak" disabled={loading}>
+                  취소
+                </ActionButton>
+              </ContentDialog.Action>
+              <ActionButton
+                autoFocus
+                type="button"
+                size="large"
+                variant="brandSolid"
+                loading={loading}
+                disabled={loading}
+                onClick={onConfirm}
+              >
+                {loading ? '요청 중' : '확인하고 문제 만들기'}
+              </ActionButton>
+            </ContentDialog.Footer>
+          </ContentDialog.Content>
+        </ContentDialog.Positioner>
+      </Portal>
+    </ContentDialog.Root>
   )
 }
 
@@ -1635,7 +1775,7 @@ function ResultScreen({
             <Text textStyle="t3Medium" color="fg.neutralMuted">
               {item.topic}
             </Text>
-            <Text as="h2" id="quiz-result-question" textStyle="t7Bold" color="fg.neutral">
+            <Text as="h2" id="quiz-result-question" textStyle="t6Bold" color="fg.neutral">
               {item.prompt}
             </Text>
           </VStack>

@@ -7,11 +7,6 @@ CREATE TABLE notion_connections (
     access_token_nonce BINARY(12) NOT NULL,
     refresh_token_ciphertext TEXT NULL,
     refresh_token_nonce BINARY(12) NULL,
-    pending_revocation_workspace_id VARCHAR(36) NULL,
-    pending_revocation_token_ciphertext TEXT NULL,
-    pending_revocation_token_nonce BINARY(12) NULL,
-    pending_revocation_key_version VARCHAR(32) NULL,
-    pending_revocation_created_at TIMESTAMP(6) NULL,
     encryption_key_version VARCHAR(32) NOT NULL,
     status VARCHAR(24) NOT NULL,
     credential_revision BIGINT NOT NULL,
@@ -25,17 +20,5 @@ CREATE TABLE notion_connections (
     CONSTRAINT chk_notion_connections_refresh_pair CHECK (
         (refresh_token_ciphertext IS NULL AND refresh_token_nonce IS NULL)
         OR (refresh_token_ciphertext IS NOT NULL AND refresh_token_nonce IS NOT NULL)
-    ),
-    CONSTRAINT chk_notion_connections_pending_revocation CHECK (
-        (pending_revocation_workspace_id IS NULL
-            AND pending_revocation_token_ciphertext IS NULL
-            AND pending_revocation_token_nonce IS NULL
-            AND pending_revocation_key_version IS NULL
-            AND pending_revocation_created_at IS NULL)
-        OR (pending_revocation_workspace_id IS NOT NULL
-            AND pending_revocation_token_ciphertext IS NOT NULL
-            AND pending_revocation_token_nonce IS NOT NULL
-            AND pending_revocation_key_version IS NOT NULL
-            AND pending_revocation_created_at IS NOT NULL)
     )
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
