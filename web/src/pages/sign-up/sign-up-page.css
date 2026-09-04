@@ -101,6 +101,19 @@
   height: var(--seed-dimension-x6);
 }
 
+.sign-up-email-sending-positioner {
+  padding: var(--seed-dimension-x4);
+}
+
+.sign-up-email-sending-dialog {
+  width: min(100%, 400px);
+  word-break: keep-all;
+}
+
+.sign-up-email-sending-body {
+  min-height: 96px;
+}
+
 @media (min-width: 600px) {
   .sign-up-terms-positioner {
     padding: var(--seed-dimension-x6);
