@@ -29,4 +29,7 @@ done
 log "validating CloudFront Function JavaScript syntax"
 node --check "$PRODUCTION_ROOT/cloudfront/spa-rewrite.js"
 
+log "running production infrastructure safety regressions"
+"$SCRIPT_DIR/test-safety.sh"
+
 log "static infrastructure configuration validation passed"

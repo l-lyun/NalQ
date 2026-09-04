@@ -29,6 +29,7 @@ done
 load_env_file "$ENV_FILE"
 IMAGE="${IMAGE:-${SERVER_IMAGE:-}}"
 require_immutable_image "$IMAGE"
+require_restore_complete "$STATE_DIRECTORY"
 
 if [ "$APPLY" != true ]; then
 	log "DRY RUN: would deploy immutable server image $IMAGE"
@@ -53,7 +54,13 @@ else
 	log "WARNING: backup explicitly skipped after operator confirmed a verified empty first database"
 fi
 
-previous_image="$(compose ps --format json server 2>/dev/null | sed -n 's/.*"Image":"\([^"]*\)".*/\1/p' | head -1)"
+require_restore_complete "$STATE_DIRECTORY"
+running_container_id="$(compose ps --status running --quiet server 2>/dev/null | head -1)"
+previous_image=""
+if [ -n "$running_container_id" ]; then
+	previous_image="$(docker inspect --format '{{.Config.Image}}' "$running_container_id")"
+fi
+record_rollback_candidate "$previous_image" "$IMAGE" "$STATE_DIRECTORY"
 
 log "pulling and starting server image"
 compose pull server
@@ -66,12 +73,6 @@ case "$status" in
 	*) die "external API smoke failed with HTTP status ${status:-none}" ;;
 esac
 
-install -d -m 0700 "$STATE_DIRECTORY"
-if [ -n "$previous_image" ] && [ "$previous_image" != "$IMAGE" ]; then
-	printf '%s\n' "$previous_image" >"$STATE_DIRECTORY/previous-server-image"
-	chmod 0600 "$STATE_DIRECTORY/previous-server-image"
-fi
-printf '%s\n' "$IMAGE" >"$STATE_DIRECTORY/current-server-image"
-chmod 0600 "$STATE_DIRECTORY/current-server-image"
+atomic_write_file "$IMAGE" "$STATE_DIRECTORY/current-server-image"
 
 log "server deployment passed container and HTTPS smoke checks"

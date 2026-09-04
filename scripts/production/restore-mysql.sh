@@ -10,6 +10,7 @@ ENV_FILE="$DEFAULT_ENV_FILE"
 SOURCE_URI=""
 APPLY=false
 CONFIRMATION=""
+STATE_DIRECTORY="${NALQ_STATE_DIRECTORY:-/var/lib/nalq}"
 
 while [ "$#" -gt 0 ]; do
 	case "$1" in
@@ -39,9 +40,18 @@ require_command docker
 require_command aws
 require_command gzip
 
+running_server_id="$(compose ps --status running --quiet server 2>/dev/null | head -1)"
+[ -z "$running_server_id" ] || die "restore refused: stop the server container before restoring"
+
 table_count="$(compose exec -T mysql sh -c \
 	'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql --batch --skip-column-names --user=root --execute="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE();" "$MYSQL_DATABASE"')"
 [ "$table_count" = "0" ] || die "restore refused: target database is not empty"
+
+restore_marker="$STATE_DIRECTORY/restore-incomplete"
+atomic_write_file \
+	"source=$SOURCE_URI status=deletion-journal-reapply-required" \
+	"$restore_marker"
+log "restore-incomplete marker installed before data import: $restore_marker"
 
 temporary_directory="$(mktemp -d)"
 trap 'rm -rf "$temporary_directory"' EXIT
@@ -57,4 +67,7 @@ actual_hash="$(sha256_file "$dump_file" | awk '{print $1}')"
 log "restoring verified backup into empty database"
 gzip -dc "$dump_file" | compose exec -T mysql sh -c \
 	'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql --user=root "$MYSQL_DATABASE"'
-log "restore completed; run server startup and application smoke tests next"
+log "database import finished, but restore remains INCOMPLETE"
+log "a verified deletion/anonymization journal must be reapplied before removing $restore_marker"
+log "server deployment remains blocked; this script intentionally returns a failure status"
+exit 2

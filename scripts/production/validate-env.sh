@@ -24,8 +24,8 @@ case "$WEB_DOMAIN:$API_DOMAIN" in
 esac
 
 required_names=(
-	AWS_REGION WEB_DOMAIN API_DOMAIN WEB_ORIGIN VITE_API_BASE_URL
-	WEB_S3_BUCKET CLOUDFRONT_DISTRIBUTION_ID DB_BACKUP_S3_URI SERVER_IMAGE
+	AWS_REGION WEB_DOMAIN API_DOMAIN WEB_ORIGIN
+	DB_BACKUP_S3_URI SERVER_IMAGE SERVER_HOST_PORT
 	MYSQL_DATABASE MYSQL_USER MYSQL_PASSWORD MYSQL_ROOT_PASSWORD
 	OPENMD_CORS_ALLOWED_ORIGINS OPENMD_AUTH_BROWSER_ALLOWED_ORIGINS
 	OPENMD_AUTH_ACCESS_TOKEN_SECRET OPENMD_AUTH_EMAIL_CODE_HMAC_SECRET
@@ -42,8 +42,8 @@ for name in "${required_names[@]}"; do
 done
 
 [ "$AWS_REGION" = "ap-northeast-2" ] || die "AWS_REGION must be ap-northeast-2"
+[ "$SERVER_HOST_PORT" = "8080" ] || die "SERVER_HOST_PORT must be exactly 8080 for the fixed Nginx upstream"
 [ "$WEB_ORIGIN" = "https://$WEB_DOMAIN" ] || die "WEB_ORIGIN must equal https://WEB_DOMAIN"
-[ "$VITE_API_BASE_URL" = "https://$API_DOMAIN" ] || die "VITE_API_BASE_URL must equal https://API_DOMAIN"
 [ "$OPENMD_CORS_ALLOWED_ORIGINS" = "$WEB_ORIGIN" ] || die "CORS origin must equal WEB_ORIGIN"
 [ "$OPENMD_AUTH_BROWSER_ALLOWED_ORIGINS" = "$WEB_ORIGIN" ] || die "browser origin must equal WEB_ORIGIN"
 [[ "$DB_BACKUP_S3_URI" =~ ^s3://[^/]+/.+ ]] || die "DB_BACKUP_S3_URI must include bucket and prefix"
@@ -56,10 +56,32 @@ for name in OPENMD_AUTH_ACCESS_TOKEN_SECRET OPENMD_AUTH_EMAIL_CODE_HMAC_SECRET; 
 	[ "$decoded_bytes" -ge 32 ] || die "$name must decode to at least 32 bytes"
 done
 
+case "${OPENMD_NOTION_ENABLED:-false}" in
+	true|false) ;;
+	*) die "OPENMD_NOTION_ENABLED must be true or false" ;;
+esac
+
+require_https_uri() {
+	local name="$1"
+	local uri="$2"
+	[[ "$uri" =~ ^https://[^/?#[:space:]@]+(/[^[:space:]#]*)?$ ]] || die "$name must be an absolute https URI without credentials or fragments"
+}
+
 if [ "${OPENMD_NOTION_ENABLED:-false}" = "true" ]; then
-	for name in OPENMD_NOTION_CLIENT_ID OPENMD_NOTION_CLIENT_SECRET OPENMD_NOTION_CALLBACK_URI OPENMD_NOTION_TOKEN_KEYS OPENMD_NOTION_WRITE_KEY_VERSION; do
+	for name in OPENMD_NOTION_CLIENT_ID OPENMD_NOTION_CLIENT_SECRET OPENMD_NOTION_CALLBACK_URI OPENMD_NOTION_ALLOWED_RETURN_URIS OPENMD_NOTION_FAILURE_RETURN_URI OPENMD_NOTION_TOKEN_KEYS OPENMD_NOTION_WRITE_KEY_VERSION; do
 		[ -n "${!name:-}" ] || die "$name is required when Notion is enabled"
 	done
+	require_https_uri OPENMD_NOTION_CALLBACK_URI "$OPENMD_NOTION_CALLBACK_URI"
+	require_https_uri OPENMD_NOTION_FAILURE_RETURN_URI "$OPENMD_NOTION_FAILURE_RETURN_URI"
+	failure_uri_allowed=false
+	IFS=',' read -r -a notion_return_uris <<<"$OPENMD_NOTION_ALLOWED_RETURN_URIS"
+	for uri in "${notion_return_uris[@]}"; do
+		require_https_uri OPENMD_NOTION_ALLOWED_RETURN_URIS "$uri"
+		if [ "$uri" = "$OPENMD_NOTION_FAILURE_RETURN_URI" ]; then
+			failure_uri_allowed=true
+		fi
+	done
+	[ "$failure_uri_allowed" = true ] || die "OPENMD_NOTION_FAILURE_RETURN_URI must be an exact member of OPENMD_NOTION_ALLOWED_RETURN_URIS"
 fi
 
 if [ "${OPENMD_QUIZ_GENERATION_ENABLED:-false}" = "true" ]; then

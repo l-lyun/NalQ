@@ -60,7 +60,8 @@ Terraform을 사용하지 않는 첫 배포용 체크리스트다. 이 문서는
 - [ ] Elastic IP 하나를 ENI에 연결한다.
 - [ ] 전용 security group inbound는 인터넷 `80/tcp`, `443/tcp`만 허용한다.
 - [ ] `22`, `8080`, `3306`, `6379` inbound rule이 없음을 확인한다.
-- [ ] 첫 배포는 existing/default public subnet을 사용할 수 있다. NAT Gateway, ALB와 private subnet은 만들지 않는다.
+- [ ] 첫 배포는 existing/default VPC의 public subnet을 사용하며 새 VPC, Internet Gateway와 route table을 만들지 않는다. 해당 subnet에 인터넷 경로와 public IPv4 할당이 있는지 확인한다.
+- [ ] NAT Gateway, ALB, private subnet과 S3 VPC Endpoint는 만들지 않는다.
 - [ ] T3 CPU credit mode와 `CPUCreditBalance`, surplus charge 정책을 기록한다.
 
 ## 5. IAM과 운영 접근
@@ -75,7 +76,8 @@ Terraform을 사용하지 않는 첫 배포용 체크리스트다. 이 문서는
 
 - [ ] Docker Engine, Compose plugin, Nginx, Certbot Nginx plugin과 AWS CLI를 설치한다.
 - [ ] 1~2 GiB swap을 encrypted root EBS에 만들고 `vm.swappiness=10`으로 시작한다.
-- [ ] repository는 `/opt/nalq/repository`, env는 `/opt/nalq/production.env` mode `600`으로 둔다.
+- [ ] repository는 `/opt/nalq/repository`, 서버 env는 `/opt/nalq/production.env` mode `600`으로 둔다.
+- [ ] 웹 배포 env는 `/opt/nalq/web-deploy.env`로 분리하고 server/DB/auth 비밀이 없음을 검증한다. 웹 배포 principal에는 web bucket과 지정 distribution 외 권한을 주지 않는다.
 - [ ] [`nalq-nginx`](../../infra/production/logrotate/nalq-nginx)를 `/etc/logrotate.d/`에 설치한다.
 - [ ] backup service/timer를 `/etc/systemd/system/`에 설치하고 daemon-reload 후 timer를 활성화한다.
 - [ ] Docker daemon과 container의 동시 log 정책이 충돌하지 않는지 확인한다. Compose는 container당 10 MiB × 3 files로 제한한다.

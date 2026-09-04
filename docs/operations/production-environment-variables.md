@@ -6,7 +6,9 @@ scope: production-infrastructure
 
 # [Operations Contract] 운영 환경 변수 원장
 
-실제 값은 저장소에 기록하지 않는다. EC2에서는 `/opt/nalq/production.env`를 `root:root`, mode `600`으로 두고 Session Manager를 통해서만 갱신한다. 예시는 [`infra/production/.env.example`](../../infra/production/.env.example)이다.
+실제 값은 저장소에 기록하지 않는다. 서버 원장은 EC2의 `/opt/nalq/production.env`에 `root:root`, mode `600`으로 두고 Session Manager로만 갱신한다. 서버 예시는 [`infra/production/.env.example`](../../infra/production/.env.example)이다.
+
+웹 배포는 별도 principal과 [`infra/production/web.env.example`](../../infra/production/web.env.example)을 사용한다. 적용 파일의 기본 경로는 `/opt/nalq/web-deploy.env`지만 EC2에 둘 필요는 없으며, CI나 배포 workstation에서 소유자만 읽게 한다. 이 파일에는 공개 Vite 값과 web bucket/distribution 식별자만 두고 AWS credential이나 서버·DB·인증·메일·Notion 비밀을 넣지 않는다.
 
 ## 공개 배포 값
 
@@ -16,15 +18,25 @@ scope: production-infrastructure
 | `WEB_DOMAIN` | 예 | protocol 없는 `app.<domain>` |
 | `API_DOMAIN` | 예 | protocol 없는 `api.<domain>` |
 | `WEB_ORIGIN` | 예 | `https://`를 포함한 정확한 웹 origin |
-| `VITE_API_BASE_URL` | 예 | 웹 build에 포함되는 공개 API URL |
-| `WEB_S3_BUCKET` | 예 | private web origin bucket 이름 |
-| `CLOUDFRONT_DISTRIBUTION_ID` | 예 | web invalidation 대상 |
 | `DB_BACKUP_S3_URI` | 예 | 별도 private backup bucket과 prefix |
 | `BACKUP_RETENTION_DAYS` | 예 | bucket lifecycle과 맞출 보유일. 초기 제안 14일 |
 | `SERVER_IMAGE` | 예 | `repository@sha256:<64 hex>` 형태의 불변 image |
-| `SERVER_HOST_PORT` | 예 | Nginx가 접근할 loopback port. 기본 `8080` |
+| `SERVER_HOST_PORT` | 예 | Nginx가 접근할 loopback port. 이 최소 구성에서는 `8080` 고정이며 다른 값은 거부 |
 
 `VITE_*`와 `EXPO_PUBLIC_*` 값은 클라이언트 bundle에 포함되는 공개 설정이다. 비밀을 넣지 않는다. Expo production build의 `EXPO_PUBLIC_WEB_URL`은 별도 EAS 환경에서 `https://app.<domain>`으로 설정한다.
+
+## 웹 배포 전용 값
+
+| 이름 | 필수 | 설명 |
+| --- | --- | --- |
+| `AWS_REGION` | 예 | web S3 region, `ap-northeast-2` |
+| `WEB_DOMAIN` | 예 | `app.<domain>` |
+| `API_DOMAIN` | 예 | `api.<domain>` |
+| `VITE_API_BASE_URL` | 예 | bundle에 포함되는 공개 API URL, 정확히 `https://API_DOMAIN` |
+| `WEB_S3_BUCKET` | 예 | private web origin bucket 이름 |
+| `CLOUDFRONT_DISTRIBUTION_ID` | 예 | invalidation 대상 distribution |
+
+웹 build subprocess는 기존 shell environment를 상속하지 않고 현재 Node 실행 파일을 우선하는 `PATH`, 임시 디렉터리와 `VITE_API_BASE_URL`, 고정 runtime mode, release version만 전달받는다. 사용자 home, npm 설정이나 AWS credential은 build에 전달하지 않는다. S3/CloudFront 작업은 build가 끝난 뒤 웹 배포 principal로 실행한다.
 
 ## 데이터 저장소
 
@@ -64,7 +76,7 @@ Cookie의 Secure, SameSite, Path와 OpenAPI/Swagger 비활성화는 운영 Compo
 
 ## Notion
 
-`OPENMD_NOTION_ENABLED=false`이면 credential은 비워 둔다. 활성화 전에는 `OPENMD_NOTION_CLIENT_ID`, `OPENMD_NOTION_CLIENT_SECRET`, `OPENMD_NOTION_CALLBACK_URI`, `OPENMD_NOTION_ALLOWED_RETURN_URIS`, `OPENMD_NOTION_FAILURE_RETURN_URI`, `OPENMD_NOTION_TOKEN_KEYS`, `OPENMD_NOTION_WRITE_KEY_VERSION`을 현재 Notion 계약과 맞춰 별도 승인한다.
+`OPENMD_NOTION_ENABLED=false`이면 credential은 비워 둔다. 활성화 전에는 `OPENMD_NOTION_CLIENT_ID`, `OPENMD_NOTION_CLIENT_SECRET`, `OPENMD_NOTION_CALLBACK_URI`, `OPENMD_NOTION_ALLOWED_RETURN_URIS`, `OPENMD_NOTION_FAILURE_RETURN_URI`, `OPENMD_NOTION_TOKEN_KEYS`, `OPENMD_NOTION_WRITE_KEY_VERSION`을 현재 Notion 계약과 맞춰 별도 승인한다. callback, 허용 return URI와 failure return URI는 절대 `https` URI여야 하고 failure URI는 허용 목록의 정확한 원소여야 한다.
 
 ## OpenAI와 생성 worker
 
@@ -83,9 +95,9 @@ Cookie의 Secure, SameSite, Path와 OpenAPI/Swagger 비활성화는 운영 Compo
 
 1. Session Manager로 접속한다.
 2. 새 파일을 별도 경로에 mode `600`으로 작성한다. 값을 터미널 history나 로그에 출력하지 않는다.
-3. `scripts/production/validate-env.sh --env-file <새 파일>`을 통과한다.
+3. 서버 원장은 `scripts/production/validate-env.sh`, 웹 원장은 `scripts/production/validate-web-env.sh`로 각각 검증한다.
 4. 기존 파일을 권한이 제한된 backup으로 보관하고 원자적으로 교체한다.
 5. 영향받는 container만 재배포하고 HTTPS smoke를 수행한다.
 6. credential 변경이면 이전 credential을 provider에서 폐기한다.
 
-저장소의 `.env.example`은 이름과 형식의 계약일 뿐 secret 저장소가 아니다.
+저장소의 두 example 파일은 이름과 형식의 계약일 뿐 secret 저장소가 아니다. 웹 배포 principal에는 server env, backup bucket과 EC2 접근 권한을 주지 않고 web bucket object/release write와 지정 CloudFront invalidation만 허용한다.

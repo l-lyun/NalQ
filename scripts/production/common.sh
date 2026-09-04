@@ -7,6 +7,7 @@ REPOSITORY_ROOT="$(cd "$PRODUCTION_SCRIPT_DIR/../.." && pwd)"
 PRODUCTION_ROOT="$REPOSITORY_ROOT/infra/production"
 COMPOSE_FILE="$PRODUCTION_ROOT/compose.yml"
 DEFAULT_ENV_FILE="/opt/nalq/production.env"
+DEFAULT_WEB_ENV_FILE="/opt/nalq/web-deploy.env"
 
 die() {
 	printf 'ERROR: %s\n' "$*" >&2
@@ -34,6 +35,14 @@ load_env_file() {
 	set +a
 }
 
+load_env_file_unexported() {
+	local env_file="$1"
+	require_file "$env_file"
+	set +a
+	# shellcheck disable=SC1090
+	. "$env_file"
+}
+
 require_confirmation() {
 	local actual="$1"
 	local expected="$2"
@@ -43,6 +52,38 @@ require_confirmation() {
 require_immutable_image() {
 	local image="$1"
 	[[ "$image" =~ @sha256:[0-9a-f]{64}$ ]] || die "server image must be pinned by sha256 digest"
+}
+
+atomic_write_file() {
+	local content="$1"
+	local target="$2"
+	local target_directory temporary_file
+	target_directory="$(dirname "$target")"
+	install -d -m 0700 "$target_directory"
+	temporary_file="$(mktemp "$target_directory/.nalq-state.XXXXXX")"
+	if ! printf '%s\n' "$content" >"$temporary_file"; then
+		rm -f "$temporary_file"
+		die "failed to write temporary state file"
+	fi
+	chmod 0600 "$temporary_file"
+	mv -f "$temporary_file" "$target"
+}
+
+require_restore_complete() {
+	local state_directory="$1"
+	local marker="$state_directory/restore-incomplete"
+	[ ! -e "$marker" ] || die "restore is incomplete: deletion journal reapplication is required before server startup ($marker)"
+}
+
+record_rollback_candidate() {
+	local current_image="$1"
+	local target_image="$2"
+	local state_directory="$3"
+	[ -n "$current_image" ] || return 0
+	require_immutable_image "$current_image"
+	[ "$current_image" != "$target_image" ] || return 0
+	atomic_write_file "$current_image" "$state_directory/previous-server-image"
+	log "recorded current running image as rollback target before replacement"
 }
 
 compose() {

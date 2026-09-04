@@ -3,7 +3,8 @@
 This directory contains repository-only artifacts for the first manual AWS deployment.
 
 - `compose.yml`: Spring, MySQL and Redis runtime on one EC2 instance
-- `.env.example`: placeholder-only production configuration contract
+- `.env.example`: placeholder-only server runtime and backup contract
+- `web.env.example`: separate public web build and S3/CloudFront deployment contract
 - `nginx/`: Ubuntu host bootstrap and TLS virtual-host templates
 - `certbot/`: certificate renewal deploy hook
 - `cloudfront/`: SPA viewer-request rewrite

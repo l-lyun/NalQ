@@ -36,7 +36,7 @@ scope: repository
 ### 범위
 
 - 정적 웹 배포 자동화와 CloudFront, OAC, DNS, TLS의 AWS Console 수동 구성 체크리스트
-- EC2용 서버 image, 운영 Compose, Nginx·Certbot, VPC·EBS·IAM과 비밀 주입 계약
+- EC2용 서버 image, 운영 Compose, Nginx·Certbot, 기존/default VPC 사용 경계, EBS·IAM과 비밀 주입 계약
 - 운영 도메인 분리에 따른 Cookie, CORS, CSRF와 WebView 검증
 - MySQL 백업·복원, 로그·상태 확인과 애플리케이션 rollback 절차
 - CI에서 검증된 commit의 web artifact와 server image만 운영 후보로 만드는 경계
@@ -59,7 +59,7 @@ Web browser / Expo WebView
   └─ https://api.<service-domain>
        └─ EC2 Elastic IP :443
             └─ API security group :80/:443
-                 └─ VPC public subnet / single EC2
+                 └─ existing/default VPC public subnet / single EC2
                       ├─ Nginx TLS reverse proxy
                       │    └─ Spring Boot :8080
                       │         ├─ OpenAI API
@@ -103,17 +103,17 @@ AWS의 현재 권장 OAC 경계는 [S3 origin 접근 제한](https://docs.aws.am
 
 ## API와 데이터: 단일 EC2와 Nginx
 
-### 최소 VPC와 공개 경계
+### 최소 기존 network와 공개 경계
 
-- 서울 리전(`ap-northeast-2`)에 NalQ 전용 VPC 하나와 가용 영역 하나의 public subnet 하나를 둔다. CIDR은 충돌하지 않는 사설 대역을 선택하고, main route table을 암묵적으로 쓰지 않고 public route table을 subnet에 명시적으로 연결한다.
-- Internet Gateway 하나를 VPC에 연결하고 public route table의 `0.0.0.0/0`을 해당 gateway로 보낸다. 이 route와 public IPv4가 있는 subnet이라는 조건을 첫 배포 AWS Console 체크리스트에서 함께 확인한다.
+- 첫 배포는 서울 리전(`ap-northeast-2`)의 existing/default VPC와 한 가용 영역의 기존 public subnet을 사용한다. 새 VPC, Internet Gateway와 route table은 만들지 않는다.
+- 선택한 subnet에 Internet Gateway로 향하는 기존 인터넷 경로와 public IPv4 할당이 있는지 AWS Console 체크리스트에서 확인한다. 이 조건이 없으면 임의로 network를 변경하지 않고 승인을 다시 받는다.
 - EC2 network interface에 Elastic IP 하나를 연결하고 `api.<service-domain>` A record가 이 주소를 가리키게 한다. instance 교체 시 동일 주소를 새 instance로 재연결하는 것을 복구 절차에 포함한다.
 - API security group의 인터넷 inbound는 `80/tcp`, `443/tcp`만 허용한다. Nginx의 `80` server는 Certbot HTTP-01 challenge를 제공하고 나머지 요청을 `443` HTTPS로 영구 redirect한다.
 - 기본 관리 경로는 AWS Systems Manager Session Manager로 두고 `22/tcp`를 열지 않는다. 긴급 SSH가 별도로 승인된 경우에만 운영자 고정 IP `/32`를 한시적으로 허용하고 사용 후 제거한다.
 - MySQL `3306`, Redis `6379`와 Spring Boot `8080`은 security group과 host port에 공개하지 않는다. Nginx만 Compose 내부 network의 Spring Boot `8080`으로 reverse proxy하며 인터넷 클라이언트는 `8080`에 직접 접근할 수 없다.
 - instance는 OpenAI, SMTP, image registry, 패키지 저장소와 SSM에 필요한 outbound만 사용한다. security group은 domain 기반 제한을 제공하지 않으므로 실제 port와 외부 endpoint 목록을 운영 환경 변수 계약과 함께 관리한다.
 - 첫 구성에는 private subnet과 NAT Gateway를 만들지 않는다. 외부 API 호출이 필요한 단일 EC2를 public subnet에 두되 inbound를 security group으로 제한하며, ALB·private app subnet 전환은 고가용성·확장 요구가 생길 때 별도 승인한다.
-- 서울 리전 S3 Gateway VPC Endpoint를 public route table에 연결하고 backup bucket prefix로 endpoint policy를 제한하는 방식을 권장한다. 초기 구현에서 제외하면 backup 전송이 Internet Gateway 경로를 사용한다는 점을 명시한다.
+- S3 VPC Endpoint도 첫 최소 구성에는 추가하지 않는다. backup 전송은 기존 Internet Gateway 경로와 TLS를 사용한다.
 
 AWS의 public subnet 경계는 [Internet Gateway](https://docs.aws.amazon.com/vpc/latest/userguide/VPC_Internet_Gateway.html)와 [subnet route table](https://docs.aws.amazon.com/vpc/latest/userguide/subnet-route-tables.html)을 구현 시 다시 확인한다.
 
@@ -226,11 +226,11 @@ Session Manager의 instance profile 기준은 [Session Manager 권한](https://d
 - [ ] T001 Route 53 Domains에서 새 등록 가능 도메인을 구매하고 `app`/`api` host의 환경별 origin 표를 작성한다.
 - [x] T002 private web bucket, OAC, CloudFront, DNS와 certificate의 AWS Console 수동 생성·검증 체크리스트를 작성한다. Terraform은 이번 첫 배포에서 제외한다.
 - [x] T003 web build/upload, cache metadata, SPA rewrite와 이전 release rollback 자동화를 작성한다.
-- [x] T004 VPC, public subnet, Internet Gateway, route table, security group, Elastic IP, `t3.small`, 암호화 `gp3` 20 GiB root EBS와 SSM/IAM의 AWS Console 수동 체크리스트를 작성한다.
+- [x] T004 existing/default VPC public subnet 검증, 전용 security group, Elastic IP, `t3.small`, 암호화 `gp3` 20 GiB root EBS와 SSM/IAM의 AWS Console 수동 체크리스트를 작성한다. 새 VPC, Internet Gateway와 route table은 만들지 않는다.
 - [x] T005 non-root server image, EC2 운영 Compose, Nginx·Certbot 자동 갱신과 내부 network/health/resource limit을 작성한다.
 - [x] T006 운영 secret·환경 변수 계약과 최소 권한 IAM을 문서화하되 실제 값을 저장소에 넣지 않는다.
 - [ ] T007 분리 origin에 맞는 Cookie/CORS/CSRF 구성과 계약 테스트를 갱신한다.
-- [x] T008 database-backup 전용 bucket, 암호화 dump, lifecycle, 삭제 journal과 restore runbook을 작성한다.
+- [ ] T008 database-backup 전용 bucket, 암호화 dump와 lifecycle은 설계했다. 삭제·비식별화 journal 재적용은 미구현이므로 restore marker가 서버 재개를 차단하며, journal과 검증 절차는 별도 승인이 필요하다.
 - [x] T009 로그 redaction·rotation, uptime, resource와 backup failure 관측 기준을 작성한다.
 - [ ] T010 2 GiB memory budget, container limit, JVM/MySQL/Redis tuning, swap와 `t3.medium` 상향 경보를 부하 검증한다.
 - [ ] T011 production-like HTTPS 브라우저와 iOS·Android WebView smoke test를 수행한다.
@@ -254,7 +254,7 @@ Session Manager의 instance profile 기준은 [Session Manager 권한](https://d
 | --- | --- | --- |
 | 2026-09-03 | 계획 | private S3 + CloudFront 웹, 단일 EC2 API·데이터와 same-site 별도 host를 사용자 결정으로 기록. 외부 리소스는 변경하지 않음. |
 | 2026-09-03 | 계획 | 실전 최소 사양을 `t3.small`, 암호화 `gp3` 20 GiB 단일 root volume과 daily S3 MySQL 논리 backup으로 확정. |
-| 2026-09-04 | 구현 | Terraform 없이 server image, 운영 Compose, host Nginx·Certbot, web/server 배포·rollback, MySQL backup·restore와 AWS Console 수동 체크리스트를 저장소에 추가. 실제 AWS·DNS·secret 적용은 하지 않음. |
+| 2026-09-04 | 구현 | Terraform 없이 server image, 운영 Compose, host Nginx·Certbot, web/server 배포·rollback, MySQL backup/import와 AWS Console 수동 체크리스트를 저장소에 추가. 삭제 journal 재적용이 없어 production restore는 미완료·서버 재개 차단 상태이며 실제 AWS·DNS·secret 적용은 하지 않음. |
 
 ## 열린 질문과 외부 적용 전 필요한 결정
 

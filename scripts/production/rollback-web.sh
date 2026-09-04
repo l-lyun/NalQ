@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=common.sh
 . "$SCRIPT_DIR/common.sh"
 
-ENV_FILE="$DEFAULT_ENV_FILE"
+ENV_FILE="$DEFAULT_WEB_ENV_FILE"
 RELEASE=""
 APPLY=false
 CONFIRMATION=""
@@ -22,7 +22,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 [[ "$RELEASE" =~ ^[0-9a-f]{40}$ ]] || die "--release must be a full Git commit SHA"
-load_env_file "$ENV_FILE"
+load_env_file_unexported "$ENV_FILE"
 
 if [ "$APPLY" != true ]; then
 	log "DRY RUN: would restore web release $RELEASE from the private S3 release prefix"
@@ -31,20 +31,24 @@ if [ "$APPLY" != true ]; then
 fi
 
 require_confirmation "$CONFIRMATION" ROLLBACK_WEB
-"$SCRIPT_DIR/validate-env.sh" --env-file "$ENV_FILE"
+"$SCRIPT_DIR/validate-web-env.sh" --env-file "$ENV_FILE"
 require_command aws
 
+web_aws() {
+	AWS_REGION="$AWS_REGION" aws "$@"
+}
+
 release_uri="s3://$WEB_S3_BUCKET/releases/$RELEASE"
-aws s3 ls "$release_uri/index.html" >/dev/null
-aws s3 cp "$release_uri/assets/" "s3://$WEB_S3_BUCKET/assets/" \
+web_aws s3 ls "$release_uri/index.html" >/dev/null
+web_aws s3 cp "$release_uri/assets/" "s3://$WEB_S3_BUCKET/assets/" \
 	--recursive --only-show-errors --cache-control 'public,max-age=31536000,immutable' --metadata-directive REPLACE
-aws s3 cp "$release_uri/" "s3://$WEB_S3_BUCKET/" \
+web_aws s3 cp "$release_uri/" "s3://$WEB_S3_BUCKET/" \
 	--recursive --exclude 'assets/*' --exclude 'index.html' --only-show-errors --cache-control 'public,max-age=300' --metadata-directive REPLACE
-aws s3 cp "$release_uri/index.html" "s3://$WEB_S3_BUCKET/index.html" \
+web_aws s3 cp "$release_uri/index.html" "s3://$WEB_S3_BUCKET/index.html" \
 	--only-show-errors --cache-control 'no-cache,no-store,must-revalidate' --content-type 'text/html; charset=utf-8' --metadata-directive REPLACE
-printf '%s\n' "$RELEASE" | aws s3 cp - "s3://$WEB_S3_BUCKET/releases/current" \
+printf '%s\n' "$RELEASE" | web_aws s3 cp - "s3://$WEB_S3_BUCKET/releases/current" \
 	--only-show-errors --cache-control 'no-cache'
-aws cloudfront create-invalidation \
+web_aws cloudfront create-invalidation \
 	--distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
 	--paths '/index.html' >/dev/null
 

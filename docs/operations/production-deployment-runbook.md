@@ -25,7 +25,8 @@ Terraform은 첫 수동 배포에서 제외한다. 대신 [AWS Console 체크리
 
 - Route 53에서 새로 구매할 등록 가능 domain과 `app`, `api` hostname
 - AWS account, 운영 principal, 서울 AZ
-- web bucket, backup bucket과 distribution ID
+- web 배포 principal이 사용할 web bucket과 distribution ID
+- 서버/복구 principal이 사용할 backup bucket
 - ECR 또는 GHCR repository와 검증된 server image digest
 - SMTP, OpenAI, 선택 시 Notion credential
 - backup 14일 제안, 목표 RPO 최대 24시간과 수동 RTO 승인
@@ -110,7 +111,7 @@ sudo ./scripts/production/deploy-server.sh \
   --skip-backup --confirm-empty-db FIRST_EMPTY_DATABASE
 ```
 
-스크립트는 environment 계약을 검증하고, MySQL·Redis를 기다린 뒤 기존 DB가 있으면 backup하고, digest image를 pull·교체한 다음 HTTPS를 확인한다. Flyway는 기존 시작 동작을 유지하고 JPA `validate`를 바꾸지 않는다.
+스크립트는 environment 계약과 restore 미완료 marker 부재를 검증하고, MySQL·Redis를 기다린 뒤 기존 DB가 있으면 backup한다. 실행 중인 현재 image가 새 image와 다르면 그 digest를 교체 전에 원자적으로 rollback 대상으로 기록한다. 따라서 새 image pull·기동이나 HTTPS smoke가 실패해도 직전 image가 남는다. 첫 배포에는 이전 image 파일을 만들지 않고 동일 image 재배포는 기존 rollback 대상을 덮어쓰지 않는다. Flyway는 기존 시작 동작을 유지하고 JPA `validate`를 바꾸지 않는다.
 
 ## 서버 rollback
 
@@ -126,13 +127,13 @@ sudo ./scripts/production/rollback-server.sh \
 
 ## 웹 배포와 rollback
 
-웹 배포는 clean Git commit에서만 실행한다. artifact를 `releases/<commit>/`에 보존하고 root asset을 올린 뒤 `index.html`을 마지막에 전환한다.
+웹 배포는 clean Git commit과 서버 원장과 분리된 `/opt/nalq/web-deploy.env`에서만 실행한다. artifact를 `releases/<commit>/`에 보존하고 root asset을 올린 뒤 `index.html`을 마지막에 전환한다. 웹 배포 principal에는 web bucket write와 지정 CloudFront invalidation만 허용하며 서버 원장, backup bucket과 EC2 권한을 주지 않는다. build subprocess에는 공개 `VITE_API_BASE_URL`, 고정 runtime mode와 release version만 전달한다.
 
 ```bash
-./scripts/production/deploy-web.sh --env-file /opt/nalq/production.env
+./scripts/production/deploy-web.sh --env-file /opt/nalq/web-deploy.env
 
 ./scripts/production/deploy-web.sh \
-  --env-file /opt/nalq/production.env \
+  --env-file /opt/nalq/web-deploy.env \
   --apply --confirm DEPLOY_WEB
 ```
 
@@ -140,11 +141,11 @@ rollback 대상은 보존된 전체 commit SHA다.
 
 ```bash
 ./scripts/production/rollback-web.sh \
-  --env-file /opt/nalq/production.env \
+  --env-file /opt/nalq/web-deploy.env \
   --release <40-character-commit-sha>
 
 ./scripts/production/rollback-web.sh \
-  --env-file /opt/nalq/production.env \
+  --env-file /opt/nalq/web-deploy.env \
   --release <40-character-commit-sha> \
   --apply --confirm ROLLBACK_WEB
 ```
@@ -162,7 +163,7 @@ sudo ./scripts/production/backup-mysql.sh --env-file /opt/nalq/production.env --
 
 backup은 single-transaction dump를 gzip으로 압축하고 checksum과 함께 SSE-S3 object로 올린 뒤 local 임시본을 삭제한다. systemd timer는 매일 03:20 KST에 실행한다.
 
-restore는 설정한 backup prefix의 `.sql.gz`만 허용하며 비어 있지 않은 DB를 거부한다.
+restore는 설정한 backup prefix의 `.sql.gz`만 허용하고 실행 중인 server나 비어 있지 않은 DB를 거부한다. import 전에 `/var/lib/nalq/restore-incomplete` marker를 원자적으로 만들며, import가 끝나도 성공으로 종료하지 않는다.
 
 ```bash
 sudo ./scripts/production/restore-mysql.sh \
@@ -175,7 +176,9 @@ sudo ./scripts/production/restore-mysql.sh \
   --apply --confirm RESTORE_EMPTY_DATABASE
 ```
 
-복원 훈련은 새 MySQL volume에서 수행하고 server 시작, Flyway 적용, JPA validation, 보호 데이터 접근 차단과 주요 smoke를 확인한다.
+현재 저장소에는 백업 시점 이후 탈퇴·삭제·비식별화 journal을 검증하고 재적용하는 절차가 없다. 따라서 복원은 **데이터 import 완료, 운영 restore 미완료** 상태로 남고 `deploy-server.sh`는 marker가 있는 동안 서버 기동을 거부한다. marker를 수동 삭제해 성공으로 간주하지 않는다. 별도 승인된 journal 구현과 재적용 검증, 보호 데이터 접근 차단 확인이 준비된 뒤에만 그 절차가 marker를 해제하도록 후속 구현해야 한다. 그 전까지 production restore와 서버 재개는 `BLOCKED`다.
+
+복원 훈련도 새 MySQL volume에서 import와 checksum까지만 확인할 수 있으며, 삭제 journal 재적용이 없으면 server 시작·Flyway/JPA/주요 smoke를 완료로 보고하지 않는다.
 
 ## 검증과 운영 기준
 
@@ -183,6 +186,7 @@ sudo ./scripts/production/restore-mysql.sh \
 
 ```bash
 ./scripts/production/validate-config.sh
+./scripts/production/test-safety.sh
 docker build -t nalq-server:local server
 SERVER_IMAGE=nalq-server:local docker compose \
   --env-file infra/production/.env.example \
