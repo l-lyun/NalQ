@@ -1,0 +1,13 @@
+/var/log/nginx/nalq-api-access.log /var/log/nginx/nalq-api-error.log {
+    daily
+    rotate 14
+    size 10M
+    missingok
+    notifempty
+    compress
+    delaycompress
+    sharedscripts
+    postrotate
+        [ ! -f /run/nginx.pid ] || kill -USR1 "$(cat /run/nginx.pid)"
+    endscript
+}
