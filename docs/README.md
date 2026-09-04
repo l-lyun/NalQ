@@ -100,7 +100,7 @@ TRD는 각 애플리케이션의 `docs/trd/trd-*.md`에 두며, 파일명과 제
 | --- | --- | --- | --- |
 | 첫 운영 배포: private S3·CloudFront 웹과 단일 EC2 API·데이터 | [첫 운영 배포 인프라 실행 계획](plans/plan-production-deployment-infrastructure.md) | Execution Plan | 토폴로지 확정, 구현 전 |
 | 웹·서버 정적 검증 하네스와 단계별 강화 | [정적 검증 하네스 실행 계획](plans/plan-static-verification-harness.md) | Execution Plan | 1단계 구현, 2·3단계 제안 |
-| 로그인 사용자 배포 전 브라우저 E2E 점검 | [배포 전 E2E 실행 계획](plans/plan-pre-deployment-e2e.md) | Execution Plan | 초안, 실행 전 |
+| 로그인 사용자 배포 전 브라우저 E2E 점검 | [배포 전 E2E 실행 계획](plans/plan-pre-deployment-e2e.md) | Execution Plan | 1차 실행, 후속 확인 필요 |
 | 학습 메인 복습 목록과 route 뎁스 정상화 | [학습 메인 복습·라우팅 실행 계획](plans/plan-learning-main-review-routing.md) | Execution Plan | T001~T003 완료, 웹 후속 대기 |
 | 실제 퀴즈 생성 흐름과 알림 UI 후속 수정 | [실제 퀴즈·내비게이션·알림 실행 계획](plans/plan-real-quiz-navigation-notifications-followup.md) | Execution Plan | 초안, 구현 전 |
 
