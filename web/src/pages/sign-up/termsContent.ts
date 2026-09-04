@@ -27,7 +27,7 @@ export const signUpTerms: Record<SignUpTermId, SignUpTerm> = {
   service: {
     id: 'service',
     title: serviceTerms.title,
-    shortLabel: '서비스 이용약관에 동의해요.',
+    shortLabel: '만 14세 이상이며 서비스 이용약관에 동의해요.',
     version: LEGAL_VERSION,
     effectiveAt: LEGAL_EFFECTIVE_AT,
     paragraphs: documentParagraphs(serviceTerms),
