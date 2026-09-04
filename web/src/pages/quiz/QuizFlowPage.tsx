@@ -942,9 +942,11 @@ function ConditionsScreen({
             />
           </TextField.Root>
           <Field.Footer>
-            <Field.Description id="quiz-generation-prompt-description">
-              <span className="quiz-generation-prompt-description-line">문제 출제 초점과 스타일을 반영해요.</span>
-              <span className="quiz-generation-prompt-description-line">문제 유형·수·학습자료 근거는 바꿀 수 없어요.</span>
+            <Field.Description
+              id="quiz-generation-prompt-description"
+              className="quiz-generation-prompt-description"
+            >
+              {'문제 출제 초점과 스타일을 반영해요.\n문제 유형·수·학습자료 근거는 바꿀 수 없어요.'}
             </Field.Description>
             <Field.CharacterCount
               className="quiz-generation-prompt-count"
@@ -994,8 +996,13 @@ function GenerationDisclosureDialog({
               <VStack gap="x4">
                 <VStack gap="x1">
                   <Text as="h3" textStyle="t5Bold" color="fg.neutral">전송하는 정보</Text>
-                  <Text as="p" textStyle="t4Regular" color="fg.neutralMuted">
-                    학습자료 본문 전체, 문제 유형·난이도·문제 수, 입력한 추가 요청
+                  <Text
+                    as="p"
+                    className="quiz-generation-disclosure-description"
+                    textStyle="t4Regular"
+                    color="fg.neutralMuted"
+                  >
+                    {'학습자료 본문 전체, 문제 유형·난이도·문제 수,\n입력한 추가 요청'}
                   </Text>
                 </VStack>
                 <VStack gap="x1">

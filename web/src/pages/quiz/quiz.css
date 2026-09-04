@@ -164,13 +164,18 @@
   resize: vertical;
 }
 
-.quiz-generation-prompt-description-line {
-  display: block;
+.quiz-generation-prompt-description {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: pre-line;
+  word-break: keep-all;
 }
 
 .quiz-generation-prompt-count {
   white-space: nowrap;
-  flex-shrink: 0;
+  flex: 0 0 var(--seed-dimension-x12);
+  inline-size: var(--seed-dimension-x12);
+  text-align: end;
 }
 
 .quiz-generation-dialog-positioner {
@@ -180,6 +185,11 @@
 
 .quiz-generation-dialog {
   min-width: 0;
+}
+
+.quiz-generation-disclosure-description {
+  white-space: pre-line;
+  word-break: keep-all;
 }
 
 .quiz-generation-retention-notice {
