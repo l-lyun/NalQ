@@ -75,7 +75,13 @@ Set-ProcessDefault 'OPENMD_AUTH_BROWSER_COOKIE_NAME' 'openmd_refresh'
 Set-ProcessDefault 'OPENMD_AUTH_BROWSER_COOKIE_SECURE' 'false'
 Set-ProcessDefault 'OPENMD_AUTH_ACCESS_TOKEN_SECRET' (New-LocalSecret)
 Set-ProcessDefault 'OPENMD_AUTH_EMAIL_CODE_HMAC_SECRET' (New-LocalSecret)
-Set-ProcessDefault 'OPENMD_MAIL_FROM' 'no-reply@localhost'
+$mailUsername = [Environment]::GetEnvironmentVariable('SPRING_MAIL_USERNAME', 'Process')
+if ($mailUsername) {
+    Set-ProcessDefault 'OPENMD_MAIL_FROM' $mailUsername
+}
+else {
+    Set-ProcessDefault 'OPENMD_MAIL_FROM' 'no-reply@localhost'
+}
 Set-ProcessDefault 'SPRING_MAIL_HOST' 'localhost'
 
 Write-Host "Loaded local environment variable names: $($loadedNames -join ', ')"
