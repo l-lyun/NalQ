@@ -60,7 +60,7 @@ import { VerifyEmailPage } from '@/pages/verify-email/VerifyEmailPage'
     element: <PublicOnlyGate />,
     children: [
       { path: '/login', element: <LoginPage /> },
-      ...(import.meta.env.DEV ? [{ path: '/sign-up', element: <SignUpPage /> }] : []),
+      { path: '/sign-up', element: <SignUpPage /> },
       { path: '/verify-email', element: <VerifyEmailPage /> },
     ],
   },

@@ -60,11 +60,9 @@ export function LoginPage() {
           : '로그인하고 학습자료와 문제 풀이를 이어가세요.'
       }
       footer={
-        import.meta.env.DEV ? (
-          <AuthTextLink to="/sign-up" state={{ from: state?.from }}>
-            계정이 없나요? 회원가입
-          </AuthTextLink>
-        ) : undefined
+        <AuthTextLink to="/sign-up" state={{ from: state?.from }}>
+          계정이 없나요? 회원가입
+        </AuthTextLink>
       }
     >
       <AuthForm
