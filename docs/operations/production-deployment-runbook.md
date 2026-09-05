@@ -9,7 +9,7 @@ scope: production-infrastructure
 ## 구성과 의도
 
 ```text
-https://app.<domain> -> CloudFront -> OAC -> private web S3
+https://<domain> -> CloudFront -> OAC -> private web S3
 https://api.<domain> -> Elastic IP -> host Nginx TLS -> 127.0.0.1:8080 -> Spring container
 Spring container -> internal Docker network -> MySQL / Redis
 host backup timer -> MySQL logical dump -> private backup S3
@@ -23,7 +23,7 @@ Terraform은 첫 수동 배포에서 제외한다. 대신 [AWS Console 체크리
 
 ## 외부 적용 전 입력
 
-- Route 53에서 새로 구매할 `SERVICE_DOMAIN`과 정확히 `app.SERVICE_DOMAIN`, `api.SERVICE_DOMAIN`인 hostname
+- Route 53에서 구매한 `SERVICE_DOMAIN`, 웹용 루트 hostname과 정확히 `api.SERVICE_DOMAIN`인 API hostname
 - AWS account, 운영 principal, 서울 AZ
 - web 배포 principal이 사용할 web bucket과 distribution ID
 - 서버/복구 principal이 사용할 backup bucket

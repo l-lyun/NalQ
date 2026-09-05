@@ -48,7 +48,10 @@ case "$SERVICE_DOMAIN:$WEB_DOMAIN:$API_DOMAIN" in
 	*example.com*) die "example.com placeholders are forbidden in an applied web environment" ;;
 esac
 [ "$AWS_REGION" = "ap-northeast-2" ] || die "AWS_REGION must be ap-northeast-2"
-[ "$WEB_DOMAIN" = "app.$SERVICE_DOMAIN" ] || die "WEB_DOMAIN must equal app.SERVICE_DOMAIN"
+case "$WEB_DOMAIN" in
+	"$SERVICE_DOMAIN"|"app.$SERVICE_DOMAIN") ;;
+	*) die "WEB_DOMAIN must equal SERVICE_DOMAIN or app.SERVICE_DOMAIN" ;;
+esac
 [ "$API_DOMAIN" = "api.$SERVICE_DOMAIN" ] || die "API_DOMAIN must equal api.SERVICE_DOMAIN"
 [ "$VITE_API_BASE_URL" = "https://$API_DOMAIN" ] || die "VITE_API_BASE_URL must equal https://API_DOMAIN"
 

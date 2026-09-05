@@ -43,7 +43,10 @@ for name in "${required_names[@]}"; do
 done
 
 [ "$AWS_REGION" = "ap-northeast-2" ] || die "AWS_REGION must be ap-northeast-2"
-[ "$WEB_DOMAIN" = "app.$SERVICE_DOMAIN" ] || die "WEB_DOMAIN must equal app.SERVICE_DOMAIN"
+case "$WEB_DOMAIN" in
+	"$SERVICE_DOMAIN"|"app.$SERVICE_DOMAIN") ;;
+	*) die "WEB_DOMAIN must equal SERVICE_DOMAIN or app.SERVICE_DOMAIN" ;;
+esac
 [ "$API_DOMAIN" = "api.$SERVICE_DOMAIN" ] || die "API_DOMAIN must equal api.SERVICE_DOMAIN"
 [ "$SERVER_HOST_PORT" = "8080" ] || die "SERVER_HOST_PORT must be exactly 8080 for the fixed Nginx upstream"
 [ "$WEB_ORIGIN" = "https://$WEB_DOMAIN" ] || die "WEB_ORIGIN must equal https://WEB_DOMAIN"

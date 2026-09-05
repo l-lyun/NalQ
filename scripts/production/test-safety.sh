@@ -33,9 +33,9 @@ write_valid_server_env() {
 	printf '%s\n' \
 		'AWS_REGION=ap-northeast-2' \
 		'SERVICE_DOMAIN=nalq.test' \
-		'WEB_DOMAIN=app.nalq.test' \
+		'WEB_DOMAIN=nalq.test' \
 		'API_DOMAIN=api.nalq.test' \
-		'WEB_ORIGIN=https://app.nalq.test' \
+		'WEB_ORIGIN=https://nalq.test' \
 		'DB_BACKUP_S3_URI=s3://nalq-test-backup/mysql' \
 		'SERVER_IMAGE=registry.invalid/openmd/server@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' \
 		'SERVER_HOST_PORT=8080' \
@@ -43,8 +43,8 @@ write_valid_server_env() {
 		'MYSQL_USER=openmd' \
 		'MYSQL_PASSWORD=test-only' \
 		'MYSQL_ROOT_PASSWORD=test-only-root' \
-		'OPENMD_CORS_ALLOWED_ORIGINS=https://app.nalq.test' \
-		'OPENMD_AUTH_BROWSER_ALLOWED_ORIGINS=https://app.nalq.test' \
+		'OPENMD_CORS_ALLOWED_ORIGINS=https://nalq.test' \
+		'OPENMD_AUTH_BROWSER_ALLOWED_ORIGINS=https://nalq.test' \
 		'OPENMD_AUTH_ACCESS_TOKEN_SECRET=QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE=' \
 		'OPENMD_AUTH_EMAIL_CODE_HMAC_SECRET=QkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkI=' \
 		'OPENMD_MAIL_FROM=no-reply@nalq.test' \
@@ -62,7 +62,7 @@ write_valid_web_env() {
 	printf '%s\n' \
 		'AWS_REGION=ap-northeast-2' \
 		'SERVICE_DOMAIN=nalq.test' \
-		'WEB_DOMAIN=app.nalq.test' \
+		'WEB_DOMAIN=nalq.test' \
 		'API_DOMAIN=api.nalq.test' \
 		'VITE_API_BASE_URL=https://api.nalq.test' \
 		'WEB_S3_BUCKET=nalq-test-web' \
@@ -158,8 +158,15 @@ write_valid_web_env "$web_env"
 web_cross_site_env="$temporary_directory/web-cross-site.env"
 cp "$web_env" "$web_cross_site_env"
 printf '%s\n' 'WEB_DOMAIN=app.other.test' >>"$web_cross_site_env"
-expect_failure_containing 'WEB_DOMAIN must equal app.SERVICE_DOMAIN' \
+expect_failure_containing 'WEB_DOMAIN must equal SERVICE_DOMAIN or app.SERVICE_DOMAIN' \
 	"$SCRIPT_DIR/validate-web-env.sh" --env-file "$web_cross_site_env"
+
+web_subdomain_env="$temporary_directory/web-subdomain.env"
+cp "$web_env" "$web_subdomain_env"
+printf '%s\n' \
+	'WEB_DOMAIN=app.nalq.test' \
+	'VITE_API_BASE_URL=https://api.nalq.test' >>"$web_subdomain_env"
+"$SCRIPT_DIR/validate-web-env.sh" --env-file "$web_subdomain_env" >/dev/null
 
 web_secret_env="$temporary_directory/web-secret.env"
 cp "$web_env" "$web_secret_env"

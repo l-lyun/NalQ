@@ -16,7 +16,7 @@ scope: production-infrastructure
 | --- | --- | --- |
 | `AWS_REGION` | 예 | API·S3·backup 리전. 첫 배포는 `ap-northeast-2` |
 | `SERVICE_DOMAIN` | 예 | 새로 구매한 등록 가능 기준 도메인. scheme과 host prefix 없음 |
-| `WEB_DOMAIN` | 예 | 정확히 `app.SERVICE_DOMAIN` |
+| `WEB_DOMAIN` | 예 | NalQ 운영값은 루트 `SERVICE_DOMAIN`; `app.SERVICE_DOMAIN`도 지원 |
 | `API_DOMAIN` | 예 | 정확히 `api.SERVICE_DOMAIN` |
 | `WEB_ORIGIN` | 예 | `https://`를 포함한 정확한 웹 origin |
 | `DB_BACKUP_S3_URI` | 예 | 별도 private backup bucket과 prefix |
@@ -24,7 +24,7 @@ scope: production-infrastructure
 | `SERVER_IMAGE` | 예 | `repository@sha256:<64 hex>` 형태의 불변 image |
 | `SERVER_HOST_PORT` | 예 | Nginx가 접근할 loopback port. 이 최소 구성에서는 `8080` 고정이며 다른 값은 거부 |
 
-`VITE_*`와 `EXPO_PUBLIC_*` 값은 클라이언트 bundle에 포함되는 공개 설정이다. 비밀을 넣지 않는다. Expo production build의 `EXPO_PUBLIC_WEB_URL`은 별도 EAS 환경에서 `https://app.<domain>`으로 설정한다.
+`VITE_*`와 `EXPO_PUBLIC_*` 값은 클라이언트 bundle에 포함되는 공개 설정이다. 비밀을 넣지 않는다. NalQ Expo production build의 `EXPO_PUBLIC_WEB_URL`은 별도 EAS 환경에서 `https://nalq.app`으로 설정한다.
 
 ## 웹 배포 전용 값
 
@@ -32,7 +32,7 @@ scope: production-infrastructure
 | --- | --- | --- |
 | `AWS_REGION` | 예 | web S3 region, `ap-northeast-2` |
 | `SERVICE_DOMAIN` | 예 | 서버 원장과 동일한 등록 가능 기준 도메인 |
-| `WEB_DOMAIN` | 예 | 정확히 `app.SERVICE_DOMAIN` |
+| `WEB_DOMAIN` | 예 | NalQ 운영값은 루트 `SERVICE_DOMAIN`; `app.SERVICE_DOMAIN`도 지원 |
 | `API_DOMAIN` | 예 | 정확히 `api.SERVICE_DOMAIN` |
 | `VITE_API_BASE_URL` | 예 | bundle에 포함되는 공개 API URL, 정확히 `https://API_DOMAIN` |
 | `WEB_S3_BUCKET` | 예 | private web origin bucket 이름 |
