@@ -53,7 +53,7 @@ write_valid_server_env() {
 		'SPRING_MAIL_PASSWORD=test-only' \
 		'OPENMD_NOTION_ENABLED=false' \
 		'OPENMD_QUIZ_GENERATION_ENABLED=false' \
-		'SPRING_AI_OPENAI_BASE_URL=https://api.openai.com' \
+		'SPRING_AI_OPENAI_BASE_URL=https://api.openai.com/v1' \
 		'OPENAI_API_KEY=no-key-configured' >"$target"
 }
 
@@ -89,7 +89,7 @@ expect_failure_containing 'SERVER_HOST_PORT must be exactly 8080' \
 regional_openai_env="$temporary_directory/regional-openai.env"
 cp "$server_env" "$regional_openai_env"
 printf '%s\n' 'SPRING_AI_OPENAI_BASE_URL=https://us.api.openai.com' >>"$regional_openai_env"
-expect_failure_containing 'SPRING_AI_OPENAI_BASE_URL must be https://api.openai.com' \
+expect_failure_containing 'SPRING_AI_OPENAI_BASE_URL must be https://api.openai.com/v1' \
 	"$SCRIPT_DIR/validate-env.sh" --env-file "$regional_openai_env"
 
 notion_missing_env="$temporary_directory/notion-missing.env"
