@@ -2,7 +2,7 @@
 document_type: trd
 status: implemented
 scope: web
-last_updated: 2026-09-05
+last_updated: 2026-09-06
 ---
 
 # [TRD] 웹 앱 셸과 최상위 탭 상태 보존
@@ -16,7 +16,9 @@ last_updated: 2026-09-05
 - 최상위 브라우저 라우터는 `createBrowserRouter`와 `RouterProvider`로 구성한다. 저장 전 편집 화면은 Data Router의 blocker를 사용해 헤더 back뿐 아니라 브라우저·WebView history 이동도 같은 이탈 확인으로 모은다.
 - `/learning/quizzes`에서 시작한 생성 흐름의 검색·페이지·펼침·스크롤 복귀 상태는 노션 가져오기와 직접 입력 하위 route에도 전달한다. 노션 OAuth로 문서 밖을 왕복할 때는 검증된 내부 복귀 상태만 `sessionStorage`에 임시 보관하고 callback 처리와 함께 소비한다.
 - 인증된 `/`, `/learning`, `/profile`은 하나의 `AuthenticatedAppShell` 부모 route를 공유한다. `/profile/*` 하위 route는 마이페이지 안의 계정·서비스 정보 화면이며 공통 하단 탭을 숨긴다.
-- 처음 방문한 탭 화면만 지연 마운트하고, 이후에는 `inert`와 `aria-hidden`으로 비활성화한 채 마운트를 유지한다. 따라서 탭별 스크롤·React 로컬 상태·Query observer가 탭 이동 때문에 초기화되지 않는다.
+- 처음 방문한 탭 화면만 지연 마운트하고, 이후에는 `inert`와 `aria-hidden`으로 비활성화한 채 마운트를 유지한다. 따라서 React 로컬 상태와 Query observer가 탭 이동 때문에 초기화되지 않는다.
+- 최상위 `/`, `/learning`, `/profile`은 모바일 브라우저 chrome이 스크롤에 따라 접힐 수 있도록 내부 `main`이 아니라 브라우저 문서를 세로 스크롤한다. 공통 하단 탭은 뷰포트 아래에 고정하고 콘텐츠 끝에 그 높이와 safe area만큼 여백을 확보한다.
+- 문서 스크롤 위치는 최상위 탭별로 메모리에 저장하고 탭 선택과 브라우저·시스템 back에서 복원한다. 공통 탭을 숨기는 학습·프로필 하위 route는 기존 bounded app-shell 내부 스크롤을 유지한다.
 - 탭 클릭과 브라우저·시스템 back의 `POP` 모두 활성 panel만 즉시 표시하며 수평 이동이나 opacity animation class를 만들지 않는다. `prefers-reduced-motion`에도 별도 대체 애니메이션을 추가하지 않는다.
 - 학습 메인 `/learning`도 공통 탭 panel 안에서 별도 `learning-route-enter` 모션을 재생하지 않는다. 학습 하위 route만 독립적인 화면 흐름에 필요한 내부 진입 class를 유지할 수 있다.
 - 같은 목적지의 중복 선택은 무시한다. 전환 중 다른 탭 선택은 앞선 중간 목적지를 history에서 replace해 최신 목적지만 남긴다.
@@ -37,6 +39,7 @@ last_updated: 2026-09-05
 - `web/`의 `pnpm verify`가 통과한다.
 - 320 CSS px에서 가로 overflow가 없고 공통 탭의 현재 상태가 텍스트와 `aria-current`로 전달된다.
 - 홈 스크롤과 학습 검색 상태가 홈·학습·마이페이지 왕복 후 유지된다.
+- 최상위 탭의 실제 스크롤 소유자는 `document.scrollingElement`이고, 긴 화면에서 공통 하단 탭이 콘텐츠를 가리지 않는다.
 - 탭 클릭과 `POP`은 활성 panel만 즉시 표시하고 animation class를 만들지 않는다.
 - 학습 메인 탭 진입에는 앱 셸·학습 내부 route 모션이 없고, 학습 하위 route의 독립적인 화면 흐름은 유지된다.
 - 탭 왕복 뒤 이미 방문한 panel과 component instance가 유지되고 탭 이동 때문에 같은 Query를 새로 만들지 않는다.

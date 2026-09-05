@@ -4,6 +4,20 @@
 .app-tab-panel--active { visibility: visible; opacity: 1; pointer-events: auto; }
 .app-tab-panel > .home-shell, .app-tab-panel > .learning-shell, .app-tab-panel > .profile-shell { height: 100%; min-height: 0; }
 
+/* Top-level tabs let the browser own vertical scrolling so mobile browser chrome
+ * can collapse. Internal routes keep the bounded app-shell scroller above. */
+.app-shell--document-scroll { height: auto; min-height: 100dvh; overflow: visible; }
+.app-shell--document-scroll .app-tab-viewport { overflow: visible; }
+.app-shell--document-scroll .app-tab-panel--active { position: relative; inset: auto; }
+.app-shell--document-scroll .app-tab-panel--active > .home-shell,
+.app-shell--document-scroll .app-tab-panel--active > .learning-shell,
+.app-shell--document-scroll .app-tab-panel--active > .profile-shell { height: auto; min-height: 100%; overflow: visible; }
+.app-shell--document-scroll .home-main,
+.app-shell--document-scroll .learning-main,
+.app-shell--document-scroll .profile-main { overflow-y: visible; overscroll-behavior-y: auto; }
+.app-shell--document-scroll .app-bottom-navigation-boundary { position: fixed; right: 0; bottom: 0; left: 0; z-index: 2; }
+.app-shell--document-scroll .app-tab-panel--active { padding-bottom: calc(var(--seed-dimension-x16) + var(--seed-safe-area-bottom)); }
+
 /* Learning keeps ownership of immersive internal screens. Only its legacy top-level
  * navigation is suppressed while the page is hosted by the shared shell. */
 .app-tab-panel .learning-bottom-navigation { display: none; }
