@@ -84,6 +84,7 @@ Cookie의 Secure, SameSite, Path와 OpenAPI/Swagger 비활성화는 운영 Compo
 
 | 이름 | 비밀 | 초기값 |
 | --- | --- | --- |
+| `SPRING_AI_OPENAI_BASE_URL` | 아니요 | 개인정보처리방침과 맞춘 미국 처리 endpoint `https://us.api.openai.com` 고정 |
 | `OPENAI_API_KEY` | 예 | 비활성 상태는 `no-key-configured` |
 | `OPENMD_QUIZ_GENERATION_ENABLED` | 아니요 | key 승인 전 `false` |
 | `OPENMD_QUIZ_GENERATION_MODEL` | 아니요 | 실제 계정 접근 가능 model 확인 |
@@ -92,6 +93,8 @@ Cookie의 Secure, SameSite, Path와 OpenAPI/Swagger 비활성화는 운영 Compo
 | `OPENMD_QUIZ_GENERATION_NETWORK_RETRY` | 아니요 | `1` |
 | `OPENMD_QUIZ_GENERATION_WORKER_COUNT` | 아니요 | t3.small에서는 `1`부터 시작 |
 | `OPENMD_QUIZ_GENERATION_QUEUE_CAPACITY` | 아니요 | t3.small에서는 `4`부터 시작 |
+
+운영 배포 검증은 `SPRING_AI_OPENAI_BASE_URL`이 정확히 `https://us.api.openai.com`인지 확인하며 다른 값은 거부한다. Compose는 이 값을 Spring Boot의 `spring.ai.openai.base-url` 속성으로 전달한다. 실제 퀴즈 생성을 활성화하기 전에는 운영 project의 데이터 처리 지역 설정과 이 endpoint를 사용한 API 호출 성공을 별도로 확인한다.
 
 ## 변경 절차
 

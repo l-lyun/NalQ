@@ -53,6 +53,7 @@ write_valid_server_env() {
 		'SPRING_MAIL_PASSWORD=test-only' \
 		'OPENMD_NOTION_ENABLED=false' \
 		'OPENMD_QUIZ_GENERATION_ENABLED=false' \
+		'SPRING_AI_OPENAI_BASE_URL=https://us.api.openai.com' \
 		'OPENAI_API_KEY=no-key-configured' >"$target"
 }
 
@@ -84,6 +85,12 @@ cp "$server_env" "$bad_port_env"
 printf '%s\n' 'SERVER_HOST_PORT=18080' >>"$bad_port_env"
 expect_failure_containing 'SERVER_HOST_PORT must be exactly 8080' \
 	"$SCRIPT_DIR/validate-env.sh" --env-file "$bad_port_env"
+
+global_openai_env="$temporary_directory/global-openai.env"
+cp "$server_env" "$global_openai_env"
+printf '%s\n' 'SPRING_AI_OPENAI_BASE_URL=https://api.openai.com' >>"$global_openai_env"
+expect_failure_containing 'SPRING_AI_OPENAI_BASE_URL must be https://us.api.openai.com' \
+	"$SCRIPT_DIR/validate-env.sh" --env-file "$global_openai_env"
 
 notion_missing_env="$temporary_directory/notion-missing.env"
 cp "$server_env" "$notion_missing_env"
@@ -225,6 +232,8 @@ pull_line="$(grep -nF 'compose pull server' "$SCRIPT_DIR/deploy-server.sh" | cut
 
 grep -Fq 'server deployment remains blocked' "$SCRIPT_DIR/restore-mysql.sh"
 grep -Fq 'exit 2' "$SCRIPT_DIR/restore-mysql.sh"
+grep -Fq 'SPRING_AI_OPENAI_BASE_URL: "${SPRING_AI_OPENAI_BASE_URL:?set SPRING_AI_OPENAI_BASE_URL}"' \
+	"$REPOSITORY_ROOT/infra/production/compose.yml"
 grep -Fq 'proxy_pass http://127.0.0.1:8080;' "$REPOSITORY_ROOT/infra/production/nginx/nalq-api.conf.template"
 grep -Fq 'existing/default VPC' "$REPOSITORY_ROOT/docs/plans/plan-production-deployment-infrastructure.md"
 if grep -Fq 'NalQ 전용 VPC 하나' "$REPOSITORY_ROOT/docs/plans/plan-production-deployment-infrastructure.md"; then

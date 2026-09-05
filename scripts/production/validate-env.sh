@@ -31,7 +31,7 @@ required_names=(
 	OPENMD_CORS_ALLOWED_ORIGINS OPENMD_AUTH_BROWSER_ALLOWED_ORIGINS
 	OPENMD_AUTH_ACCESS_TOKEN_SECRET OPENMD_AUTH_EMAIL_CODE_HMAC_SECRET
 	OPENMD_MAIL_FROM SPRING_MAIL_HOST SPRING_MAIL_USERNAME SPRING_MAIL_PASSWORD
-	OPENAI_API_KEY
+	SPRING_AI_OPENAI_BASE_URL OPENAI_API_KEY
 )
 
 for name in "${required_names[@]}"; do
@@ -50,6 +50,7 @@ done
 [ "$OPENMD_CORS_ALLOWED_ORIGINS" = "$WEB_ORIGIN" ] || die "CORS origin must equal WEB_ORIGIN"
 [ "$OPENMD_AUTH_BROWSER_ALLOWED_ORIGINS" = "$WEB_ORIGIN" ] || die "browser origin must equal WEB_ORIGIN"
 [[ "$DB_BACKUP_S3_URI" =~ ^s3://[^/]+/.+ ]] || die "DB_BACKUP_S3_URI must include bucket and prefix"
+[ "$SPRING_AI_OPENAI_BASE_URL" = "https://us.api.openai.com" ] || die "SPRING_AI_OPENAI_BASE_URL must be https://us.api.openai.com"
 require_immutable_image "$SERVER_IMAGE"
 
 require_command openssl
