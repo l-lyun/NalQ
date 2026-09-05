@@ -238,9 +238,9 @@ class TwoStepSignUpServiceTest {
 		ArgumentCaptor<User> saved = ArgumentCaptor.forClass(User.class);
 		verify(users).saveAndFlush(saved.capture());
 		assertEquals("Study7", saved.getValue().getNickname());
-		assertEquals("TEMP-2026-08-20", saved.getValue().getServiceTermsVersion());
+		assertEquals("2026-09-04", saved.getValue().getServiceTermsVersion());
 		assertEquals(NOW, saved.getValue().getServiceTermsAgreedAt());
-		assertEquals("TEMP-2026-08-20", saved.getValue().getPrivacyTermsVersion());
+		assertEquals("2026-09-04", saved.getValue().getPrivacyTermsVersion());
 		assertEquals(NOW, saved.getValue().getPrivacyTermsAgreedAt());
 		InOrder order = inOrder(transactions, credentials, refreshTokens, accessTokens);
 		order.verify(transactions).execute(any());
@@ -358,7 +358,7 @@ class TwoStepSignUpServiceTest {
 			"learner@example.com", "learner@example.com", NOW
 		)));
 		SignUpCommand missingPrivacy = new SignUpCommand(token, "password1", "Study7", List.of(
-			new TermsAgreement("SERVICE_TERMS", "TEMP-2026-08-20")
+			new TermsAgreement("SERVICE_TERMS", "2026-09-04")
 		));
 
 		BusinessException exception = assertThrows(BusinessException.class,
@@ -377,13 +377,13 @@ class TwoStepSignUpServiceTest {
 			"learner@example.com", "learner@example.com", NOW
 		)));
 		SignUpCommand duplicated = new SignUpCommand(token, "password1", "Study7", List.of(
-			new TermsAgreement("SERVICE_TERMS", "TEMP-2026-08-20"),
-			new TermsAgreement("SERVICE_TERMS", "TEMP-2026-08-20"),
-			new TermsAgreement("PRIVACY_COLLECTION", "TEMP-2026-08-20")
+			new TermsAgreement("SERVICE_TERMS", "2026-09-04"),
+			new TermsAgreement("SERVICE_TERMS", "2026-09-04"),
+			new TermsAgreement("PRIVACY_COLLECTION", "2026-09-04")
 		));
 		SignUpCommand unsupportedVersion = new SignUpCommand(token, "password1", "Study7", List.of(
 			new TermsAgreement("SERVICE_TERMS", "OLD"),
-			new TermsAgreement("PRIVACY_COLLECTION", "TEMP-2026-08-20")
+			new TermsAgreement("PRIVACY_COLLECTION", "2026-09-04")
 		));
 
 		BusinessException duplicateError = assertThrows(BusinessException.class,
@@ -454,8 +454,8 @@ class TwoStepSignUpServiceTest {
 
 	private SignUpCommand command(String token, String nickname) {
 		return new SignUpCommand(token, "password1", nickname, List.of(
-			new TermsAgreement("SERVICE_TERMS", "TEMP-2026-08-20"),
-			new TermsAgreement("PRIVACY_COLLECTION", "TEMP-2026-08-20")
+			new TermsAgreement("SERVICE_TERMS", "2026-09-04"),
+			new TermsAgreement("PRIVACY_COLLECTION", "2026-09-04")
 		));
 	}
 

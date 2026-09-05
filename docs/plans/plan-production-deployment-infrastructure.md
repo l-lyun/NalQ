@@ -45,7 +45,7 @@ scope: repository
 
 - 이 계획 작성만으로 AWS 계정, VPC, subnet, security group, EC2, EBS, Elastic IP, IAM, bucket, distribution, DNS, certificate나 비밀을 실제 생성·변경하지 않는다.
 - NAT Gateway, ALB, RDS, ElastiCache, 고가용성 DB, 다중 instance와 무중단 재해 복구는 첫 MVP 범위가 아니다.
-- OpenAI와 SMTP 제공자 선택 및 개인정보처리방침의 법률 적정성은 별도 운영·법률 결정이다.
+- OpenAI 처리 지역과 개인정보처리방침의 법률 적정성은 별도 운영·법률 결정이다. 첫 배포의 가입 인증 메일 제공자는 Google Gmail SMTP로 확정한다.
 - 회원 탈퇴, 비밀번호 재설정과 OpenAI 문제 생성의 애플리케이션 구현을 이 인프라 계획이 대신하지 않는다.
 
 ## 확정 토폴로지
@@ -261,6 +261,6 @@ Session Manager의 instance profile 기준은 [Session Manager 권한](https://d
 - AWS 계정·서울 리전, DNS zone과 비용 알림을 소유할 운영 계정
 - 사용할 가용 영역과 `DeleteOnTermination=false` 권장안의 최종 승인
 - 초기 백업 보유기간 14일 제안, 목표 RPO/RTO와 허용 가능한 복구 중단 시간
-- 운영 SMTP 제공자, OpenAI 실제 모델과 개인정보처리방침에 표시할 처리 국가·재위탁 세부
+- OpenAI 실제 모델과 개인정보처리방침에 표시할 처리 국가·재위탁 세부
 - CloudFront access log 사용 여부와 운영 로그의 정확한 보유기간
 - 외부 apply, DNS 변경, 운영 secret 주입, production build와 실제 배포에 대한 명시적 승인
