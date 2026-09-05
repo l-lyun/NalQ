@@ -53,7 +53,7 @@ esac
 [ "$OPENMD_CORS_ALLOWED_ORIGINS" = "$WEB_ORIGIN" ] || die "CORS origin must equal WEB_ORIGIN"
 [ "$OPENMD_AUTH_BROWSER_ALLOWED_ORIGINS" = "$WEB_ORIGIN" ] || die "browser origin must equal WEB_ORIGIN"
 [[ "$DB_BACKUP_S3_URI" =~ ^s3://[^/]+/.+ ]] || die "DB_BACKUP_S3_URI must include bucket and prefix"
-[ "$SPRING_AI_OPENAI_BASE_URL" = "https://us.api.openai.com" ] || die "SPRING_AI_OPENAI_BASE_URL must be https://us.api.openai.com"
+[ "$SPRING_AI_OPENAI_BASE_URL" = "https://api.openai.com" ] || die "SPRING_AI_OPENAI_BASE_URL must be https://api.openai.com"
 require_immutable_image "$SERVER_IMAGE"
 
 require_command openssl
