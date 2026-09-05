@@ -50,7 +50,6 @@ env -i \
 	VITE_API_BASE_URL="$VITE_API_BASE_URL" \
 	VITE_HOME_VISITS_API_ENABLED=true \
 	VITE_QUIZ_RUNTIME_MODE=api \
-	VITE_APP_VERSION="$release" \
 	"$pnpm_command" -C "$REPOSITORY_ROOT/web" verify
 
 release_uri="s3://$WEB_S3_BUCKET/releases/$release"

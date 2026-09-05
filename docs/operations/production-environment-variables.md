@@ -38,7 +38,7 @@ scope: production-infrastructure
 | `WEB_S3_BUCKET` | 예 | private web origin bucket 이름 |
 | `CLOUDFRONT_DISTRIBUTION_ID` | 예 | invalidation 대상 distribution |
 
-웹 build subprocess는 기존 shell environment를 상속하지 않고 현재 Node 실행 파일을 우선하는 `PATH`, 임시 디렉터리와 `VITE_API_BASE_URL`, 고정 runtime mode, release version만 전달받는다. 이미 구현·승인된 홈 방문 기록 API는 별도 운영 knob를 추가하지 않고 `VITE_HOME_VISITS_API_ENABLED=true`로 고정한다. 사용자 home, npm 설정이나 AWS credential은 build에 전달하지 않는다. S3/CloudFront 작업은 build가 끝난 뒤 웹 배포 principal로 실행한다.
+웹 build subprocess는 기존 shell environment를 상속하지 않고 현재 Node 실행 파일을 우선하는 `PATH`, 임시 디렉터리와 `VITE_API_BASE_URL`, 고정 runtime mode만 전달받는다. 이미 구현·승인된 홈 방문 기록 API는 별도 운영 knob를 추가하지 않고 `VITE_HOME_VISITS_API_ENABLED=true`로 고정한다. 사용자에게 표시하는 앱 버전은 웹 소스에서 관리하며 배포 commit SHA를 주입하지 않는다. 사용자 home, npm 설정이나 AWS credential은 build에 전달하지 않는다. S3/CloudFront 작업은 build가 끝난 뒤 웹 배포 principal로 실행한다.
 
 ## 데이터 저장소
 

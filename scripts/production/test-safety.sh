@@ -181,6 +181,10 @@ if grep -Eq '/validate-env\.sh|load_env_file ' "$SCRIPT_DIR/deploy-web.sh"; then
 fi
 grep -Fq 'env -i' "$SCRIPT_DIR/deploy-web.sh"
 grep -Fq 'VITE_HOME_VISITS_API_ENABLED=true' "$SCRIPT_DIR/deploy-web.sh"
+if grep -Fq 'VITE_APP_VERSION' "$SCRIPT_DIR/deploy-web.sh"; then
+	printf 'deploy-web must not replace the product app version with a release identifier\n' >&2
+	exit 1
+fi
 
 restore_state="$temporary_directory/restore-state"
 mkdir -p "$restore_state"
