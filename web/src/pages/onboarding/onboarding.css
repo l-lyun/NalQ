@@ -1,0 +1,109 @@
+.onboarding-page {
+  min-width: 320px;
+  overflow: hidden;
+}
+
+.onboarding-header {
+  min-height: calc(64px + var(--seed-safe-area-top));
+  padding-bottom: var(--seed-dimension-x3);
+}
+
+.onboarding-content {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  padding-top: var(--seed-dimension-x4);
+  padding-bottom: calc(168px + var(--seed-safe-area-bottom));
+}
+
+.onboarding-carousel {
+  width: 100%;
+  max-width: 520px;
+  min-height: 100%;
+  margin-inline: auto;
+  outline: none;
+  touch-action: pan-y;
+}
+
+.onboarding-carousel:focus-visible {
+  outline: var(--seed-dimension-x0_5) solid var(--seed-color-stroke-focus-ring);
+  outline-offset: var(--seed-dimension-x1);
+  border-radius: var(--seed-radius-r4);
+}
+
+.onboarding-slide {
+  animation: onboarding-slide-in 180ms ease-out;
+}
+
+.onboarding-capture-slot {
+  display: flex;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  align-items: center;
+  justify-content: center;
+  padding: var(--seed-dimension-x6);
+}
+
+.onboarding-capture-caption {
+  font-weight: 400;
+}
+
+.onboarding-footer {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1;
+  width: 100%;
+  max-width: 640px;
+  margin-inline: auto;
+  padding-top: var(--seed-dimension-x3);
+  padding-bottom: calc(var(--seed-dimension-x4) + var(--seed-safe-area-bottom));
+  border-top: 1px solid var(--seed-color-stroke-neutral-subtle);
+}
+
+.onboarding-footer-side {
+  display: flex;
+  width: 72px;
+  min-height: 44px;
+  align-items: center;
+}
+
+.onboarding-footer-side--end {
+  justify-content: flex-end;
+}
+
+.onboarding-indicator-dot {
+  display: block;
+  width: var(--seed-dimension-x2);
+  height: var(--seed-dimension-x2);
+  border-radius: var(--seed-radius-full);
+  background: var(--seed-color-bg-neutral-weak);
+  transition: width 180ms ease-out, background-color 180ms ease-out;
+}
+
+.onboarding-indicator-dot[data-current] {
+  width: var(--seed-dimension-x6);
+  background: var(--seed-color-bg-brand-solid);
+}
+
+.onboarding-exit {
+  width: 100%;
+}
+
+@keyframes onboarding-slide-in {
+  from { opacity: 0; transform: translateX(12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .onboarding-slide { animation: none; }
+  .onboarding-indicator-dot { transition: none; }
+}
+
+@media (max-height: 640px) {
+  .onboarding-capture-slot {
+    max-height: 220px;
+  }
+}

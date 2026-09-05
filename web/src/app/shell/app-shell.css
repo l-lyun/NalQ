@@ -1,0 +1,20 @@
+.app-shell { position: relative; height: 100dvh; min-height: 0; overflow: hidden; }
+.app-tab-viewport { position: relative; flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
+.app-tab-panel { position: absolute; inset: 0; min-width: 0; min-height: 0; visibility: hidden; opacity: 0; pointer-events: none; }
+.app-tab-panel--active { visibility: visible; opacity: 1; pointer-events: auto; }
+.app-tab-panel > .home-shell, .app-tab-panel > .learning-shell, .app-tab-panel > .profile-shell { height: 100%; min-height: 0; }
+
+/* Learning keeps ownership of immersive internal screens. Only its legacy top-level
+ * navigation is suppressed while the page is hosted by the shared shell. */
+.app-tab-panel .learning-bottom-navigation { display: none; }
+
+.app-bottom-navigation { box-sizing: border-box; flex-shrink: 0; z-index: 2; }
+.app-bottom-navigation-boundary { flex-shrink: 0; }
+.app-notification-slot { display: flex; flex: 0 0 var(--seed-dimension-x12); align-items: center; justify-content: flex-end; min-height: var(--seed-dimension-x12); margin-inline-start: auto; }
+.app-notification-button { position: relative; min-width: var(--seed-dimension-x12); min-height: var(--seed-dimension-x12); }
+.app-navigation-list { max-width: 640px; margin: 0 auto; padding: 0; list-style: none; }
+.app-navigation-item { flex: 1 1 0; min-width: 0; }
+.app-navigation-button { appearance: none; box-sizing: border-box; min-height: 56px; width: 100%; padding: var(--seed-dimension-x1) var(--seed-dimension-x2); border: 0; background: transparent; font: inherit; cursor: pointer; }
+.app-snackbar-message { flex: 1; min-width: 0; text-align: left; }
+.app-navigation-button:active { background: var(--seed-color-bg-layer-default-pressed); }
+.app-navigation-button:focus-visible { outline: var(--seed-dimension-x0_5) solid var(--seed-color-stroke-focus-ring); outline-offset: var(--seed-dimension-x0_5); border-radius: var(--seed-radius-r2); }

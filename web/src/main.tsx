@@ -1,6 +1,8 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import '@seed-design/css/base.css'
+import 'pretendard/dist/web/variable/pretendardvariable.css'
+import '@/app/global.css'
 
 import { App } from '@/app/App'
 

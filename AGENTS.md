@@ -12,6 +12,69 @@ Keep changes scoped to the relevant application. Do not modify the other applica
 
 After changes, run the relevant build, test, or type-check command for that application.
 
+## Working Model
+
+This repository uses project-scoped specialist agents defined in `.codex/agents/`.
+Treat them as focused roles for a small, reviewable unit of work, not as an automatic delivery pipeline.
+
+- Start with one specialist that best matches the user's request.
+- Use a second specialist only when the user explicitly asks for delegation or when a small, independent review materially improves confidence.
+- Never chain planning, design, publishing, implementation, testing, and review automatically.
+- Finish the requested stage, present its artifact or changes, and let the user choose the next stage.
+- The primary agent owns task routing, scope control, integration, and the final answer.
+- A specialist must not delegate to another specialist unless the user explicitly asks for that delegation.
+
+## Specialist Routing
+
+Choose the specialist from the requested outcome, not merely from words appearing in the prompt.
+
+| Requested outcome | Specialist | Typical output |
+| --- | --- | --- |
+| Clarify product behavior, requirements, priorities, or acceptance criteria | `product_planner` | Feature, flow, decision, or product document |
+| Define screen structure, interaction, UX states, or a design artifact | `seed_ui_designer` | Screen specification, wireframe, prototype, or design artifact |
+| Turn an approved UI specification into SEED-based presentation code | `seed_publisher` | Visual components and responsive layout without business integration |
+| Connect approved web UI to routing, state, forms, and APIs | `frontend_engineer` | Working `web/` behavior and relevant tests |
+| Implement server behavior from an approved feature specification | `backend_engineer` | Test-first `server/` implementation |
+| Independently design or strengthen server tests | `backend_test_engineer` | Unit, integration, contract, or regression tests under `server/src/test/` |
+| Implement Expo/React Native application behavior | `app_engineer` | Working `app/` behavior and relevant tests or type checks |
+| Plan or implement repository infrastructure explicitly requested by the user | `infra_engineer` | Reviewed infrastructure artifacts; no unapproved external changes |
+| Check an artifact or implementation against approved requirements | `acceptance_reviewer` | Read-only Korean findings and acceptance result |
+
+If the requested outcome spans multiple stages, complete only the stage the user asked for. For example, “화면 설계해줘” stops after a reviewable design artifact; it does not imply publishing or feature implementation.
+
+## Document Source of Truth
+
+- Start documentation work from `docs/README.md`; it routes agents to the smallest relevant set of documents.
+- For work that designs, implements, or reviews user-visible UI, read the root `DESIGN.md` as the source of truth for global visual atmosphere, information hierarchy, layout, and responsive principles.
+- Keep requirement and implementation documents separated by responsibility:
+  - Product foundation `docs/product.md`: product purpose, principles, global navigation, and shared terminology
+  - PRD `docs/prd/`: user problem, product behavior and policy, scope, and observable acceptance criteria
+  - Flow `docs/ux/flow-*.md`: cross-screen order, branches, interruption, and recovery
+  - UX screen specification `docs/ux/screen-*.md`: information structure, content and action hierarchy, entry and exit, and user-visible states
+  - Contract `docs/contracts/`: inputs, outputs, errors, permissions, idempotency, and data meaning shared across `web`, `app`, and `server`
+  - TRD `<application>/docs/trd/trd-*.md`: application-local architecture, state model, component mapping, integration decisions, and technical verification criteria
+- These document types are not a mandatory checklist. Follow `docs/guide.md`: start a user feature with one focused PRD, add at most the companion document justified by real UX, flow, or technical complexity, and separate a Contract only for a shared application boundary. Add further documents only when their distinct responsibility is actually needed.
+- PRD, flow, screen specification, contract, and TRD are separate authority axes. A TRD may explain how an approved requirement is implemented, but it must not redefine product policy, user-visible behavior, or a cross-application contract.
+- Treat current SEED Docs and Rootage as the source of truth for exact components, props, and tokens; `DESIGN.md` and a TRD must not override or freeze outdated SEED APIs.
+- If `DESIGN.md`, an approved specification, and current SEED documentation conflict, do not silently choose one. Report the conflict and its impact before changing the agreed behavior or visual direction.
+- Product and UX decisions belong in `docs/`, not in chat history alone.
+- Distinguish confirmed requirements, assumptions, and open questions. Never silently promote an assumption to a decision.
+- Update the relevant source document when an implementation request changes an approved contract or behavior.
+- When a non-obvious, reusable application-internal implementation decision changes, the responsible implementation agent updates or creates that application's TRD with the code. A missing TRD does not block a simple implementation that follows established conventions. When an approved change affects product behavior, UX, or an application boundary, update the corresponding PRD/flow, screen specification, or contract as part of the scoped work.
+- If the request does not authorize the upstream requirement or contract change, implementation agents must report the conflict, user impact, required decision, and owning document instead of silently changing code or documentation.
+- Prefer a focused feature, screen, flow, contract, or decision document over a single growing PRD.
+
+## Backend Test-First Policy
+
+All backend feature implementation is test-first even when the user does not mention tests:
+
+1. Read the relevant feature specification and existing server conventions.
+2. Add or update the smallest meaningful test and confirm the intended failure.
+3. Implement the minimum production change that satisfies the behavior.
+4. Run the focused test, then the relevant broader server test suite.
+
+Do not skip the failure check unless the environment makes it impossible; report that limitation explicitly. The detailed server and test rules are in `server/AGENTS.md` and `server/src/test/AGENTS.md`.
+
 ## Context Efficiency
 
 - 작업 시작 시 전체 코드베이스나 파일 전문을 선제적으로 읽지 않는다.
@@ -19,6 +82,13 @@ After changes, run the relevant build, test, or type-check command for that appl
 - 필요한 파일의 관련 구간만 읽고, 판단에 근거가 부족할 때만 주변 코드나 연결된 파일로 범위를 확장한다.
 - 이미 확인한 내용은 불필요하게 다시 읽지 않는다.
 - 코드 리뷰는 변경 diff부터 확인하고, 변경의 영향을 판단하는 데 필요한 코드만 추가로 읽는다.
+
+## Repository Verification Harness
+
+- 로컬과 에이전트는 CI와 같은 저장소 명령을 사용한다. 기본 검증은 루트에서 `./scripts/verify.sh fast`, Testcontainers까지 포함한 전체 검증은 `./scripts/verify.sh all`이다.
+- 애플리케이션 하나만 변경한 경우 각 하위 `AGENTS.md`의 범위별 명령을 우선 실행한다. 배포 전 변경이나 검증 하네스 자체를 수정한 경우에는 `./scripts/verify.sh all`을 실행한다.
+- 실행 결과는 `PASS`, `BLOCKED`, `PRE-EXISTING FAILURE` 중 하나로 분류하고, 실행하지 않은 검사를 통과한 것으로 보고하지 않는다.
+- 상세 명령, CI 구조와 단계별 강화 계획은 [정적 검증 하네스 실행 계획](docs/plans/plan-static-verification-harness.md)을 따른다.
 
 ## Code Review Rules
 

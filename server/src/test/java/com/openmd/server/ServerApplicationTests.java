@@ -4,6 +4,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest(properties = {
+	"openmd.auth.enabled=false",
+	"openmd.learning-material.enabled=false",
+	"openmd.quiz.enabled=false",
+	"openmd.home-visit.enabled=false",
 	"spring.data.jpa.auditing.enabled=false",
 	"spring.autoconfigure.exclude="
 		+ "org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration,"

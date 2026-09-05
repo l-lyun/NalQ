@@ -1,0 +1,138 @@
+package com.openmd.server.quiz.service;
+
+import com.openmd.server.global.error.BusinessException;
+import com.openmd.server.global.error.CommonErrorCode;
+import com.openmd.server.quiz.domain.type.GradingOutcome;
+import com.openmd.server.quiz.domain.type.QuestionType;
+import com.openmd.server.quiz.domain.type.QuizAttemptStatus;
+import com.openmd.server.quiz.domain.type.QuizAttemptType;
+import com.openmd.server.quiz.dto.response.GradingCount;
+import com.openmd.server.quiz.dto.response.PendingSelfAssessment;
+import com.openmd.server.quiz.dto.response.QuizAttemptResult;
+import com.openmd.server.quiz.dto.response.ReviewAttemptResult;
+import com.openmd.server.quiz.dto.response.ReviewAttemptSummary;
+import com.openmd.server.quiz.error.QuizErrorCode;
+import com.openmd.server.quiz.repository.QuizAttemptQuestionRepository;
+import com.openmd.server.quiz.repository.QuizAttemptRepository;
+import com.openmd.server.quiz.repository.QuizQuestionRepository;
+import com.openmd.server.quiz.repository.QuizSetRepository;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@ConditionalOnProperty(name = "openmd.quiz.enabled", havingValue = "true", matchIfMissing = true)
+public class QuizAttemptResultService {
+
+  private final QuizAttemptRepository attempts;
+  private final QuizAttemptResultProjector projector;
+  private final QuizReviewAvailabilityResolver reviewAvailability;
+  private final QuizAttemptQuestionRepository attemptQuestions;
+  private final QuizQuestionRepository questions;
+  private final QuizSetRepository sets;
+
+  public QuizAttemptResultService(
+      QuizAttemptRepository attempts,
+      QuizAttemptResultProjector projector,
+      QuizReviewAvailabilityResolver reviewAvailability,
+      QuizAttemptQuestionRepository attemptQuestions,
+      QuizQuestionRepository questions,
+      QuizSetRepository sets) {
+    this.attempts = attempts;
+    this.projector = projector;
+    this.reviewAvailability = reviewAvailability;
+    this.attemptQuestions = attemptQuestions;
+    this.questions = questions;
+    this.sets = sets;
+  }
+
+  @Transactional(readOnly = true)
+  public QuizAttemptResult result(long userId, String attemptPublicId) {
+    var attempt =
+        attempts
+            .findByPublicIdAndUserId(attemptPublicId, userId)
+            .filter(value -> value.getType() == QuizAttemptType.MAIN)
+            .orElseThrow(() -> new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND));
+    return reviewAvailability.enrich(userId, attempt, projector.project(attempt));
+  }
+
+  @Transactional(readOnly = true)
+  public ReviewAttemptResult reviewResult(long userId, String reviewId) {
+    var review =
+        attempts
+            .findByPublicIdAndUserId(reviewId, userId)
+            .filter(a -> a.getType() == com.openmd.server.quiz.domain.type.QuizAttemptType.REVIEW)
+            .orElseThrow(() -> new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND));
+    if (review.getStatus() == QuizAttemptStatus.IN_PROGRESS) {
+      throw new BusinessException(QuizErrorCode.ATTEMPT_CONFLICT);
+    }
+    var source =
+        attempts
+            .findById(review.getSourceAttemptId())
+            .orElseThrow(() -> new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND));
+    var projected = projector.project(review);
+    int automaticallyGraded =
+        (int)
+            projected.questionResults().stream()
+                .filter(result -> result.type() != QuestionType.ESSAY)
+                .count();
+    int automaticallyCorrect =
+        (int)
+            projected.questionResults().stream()
+                .filter(result -> result.type() != QuestionType.ESSAY)
+                .filter(result -> result.outcome() == GradingOutcome.CORRECT)
+                .count();
+    int resolved =
+        (int)
+            projected.questionResults().stream()
+                .filter(result -> result.outcome() == GradingOutcome.CORRECT)
+                .count();
+    int unresolved =
+        (int)
+            projected.questionResults().stream()
+                .filter(result -> result.outcome() != null)
+                .filter(result -> result.outcome() != GradingOutcome.CORRECT)
+                .count();
+    var sourceResult = projector.project(source);
+    boolean reviewAvailable =
+        reviewAvailability.isAvailable(
+            userId, source, sourceResult.summary().reviewQuestionCount());
+    ReviewAttemptSummary summary =
+        new ReviewAttemptSummary(
+            new GradingCount(automaticallyCorrect, automaticallyGraded),
+            projected.summary().essaySelfAssessment(),
+            resolved,
+            unresolved);
+    return new ReviewAttemptResult(
+        review.getPublicId(),
+        source.getPublicId(),
+        review.getStatus().name(),
+        reviewAvailable,
+        summary,
+        projected.questionResults());
+  }
+
+  @Transactional(readOnly = true)
+  public PendingSelfAssessment pending(long userId, String quizSetId) {
+    var set =
+        sets.findByPublicIdAndUserId(quizSetId, userId)
+            .orElseThrow(() -> new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND));
+    var attempt =
+        attempts
+            .findFirstByQuizSetIdAndUserIdAndTypeAndStatus(
+                set.getId(),
+                userId,
+                QuizAttemptType.MAIN,
+                QuizAttemptStatus.SELF_ASSESSMENT_REQUIRED)
+            .filter(value -> value.getType() == QuizAttemptType.MAIN)
+            .orElse(null);
+    if (attempt == null) return null;
+    var ids =
+        attemptQuestions.findAllByAttemptIdOrderBySequenceNumber(attempt.getId()).stream()
+            .filter(q -> q.getFinalGradingResult() == null)
+            .map(q -> questions.findById(q.getQuestionId()).orElseThrow().getPublicId())
+            .toList();
+    return new PendingSelfAssessment(
+        attempt.getPublicId(), set.getPublicId(), attempt.getStatus(), ids);
+  }
+}

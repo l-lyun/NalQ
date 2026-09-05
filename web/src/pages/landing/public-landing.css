@@ -1,0 +1,34 @@
+.public-landing {
+  min-width: 320px;
+  overflow-x: hidden;
+}
+
+.public-landing-header {
+  min-height: calc(64px + var(--seed-safe-area-top));
+  padding-bottom: var(--seed-dimension-x3);
+}
+
+.public-landing-main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  padding-top: var(--seed-dimension-x6);
+  padding-bottom: calc(var(--seed-dimension-x8) + var(--seed-safe-area-bottom));
+}
+
+.public-landing-hero {
+  width: 100%;
+  max-width: 560px;
+  margin-inline: auto;
+}
+
+.public-landing-primary,
+.public-landing-login {
+  width: 100%;
+}
+
+@media (max-height: 600px) {
+  .public-landing-main {
+    align-items: flex-start;
+  }
+}

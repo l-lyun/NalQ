@@ -1,4 +1,4 @@
-# 📚 OpenMD
+# 📚 NalQ
 
 > **읽은 글이, 풀어본 지식이 되도록.**
 
@@ -46,10 +46,10 @@
 
 ## 🗂️ 저장소 구조
 
-OpenMD는 서버, 웹, 모바일 앱을 한 저장소에서 관리하는 monorepo입니다.
+NalQ는 서버, 웹, 모바일 앱을 한 저장소에서 관리하는 monorepo입니다.
 
 ```text
-openmd/
+NalQ/
 ├── server/  # Java 21, Spring Boot 4, Gradle
 ├── web/     # React, TypeScript, Vite, pnpm, SEED Design
 └── app/     # Expo, React Native, TypeScript, pnpm
@@ -65,7 +65,7 @@ Mobile App ── WebView ─┘
 
 - `web/`은 인증, 홈, 학습자료, 퀴즈, 마이페이지의 사용자 화면과 상태를 담습니다.
 - `server/`는 인증, 학습자료, Notion 가져오기, 퀴즈 생성·채점·복습 API와 데이터를 다룹니다.
-- `app/`은 OpenMD 웹 서비스를 표시하고 네이티브 탐색·오류 상태를 처리하는 WebView 앱 셸입니다.
+- `app/`은 NalQ 웹 서비스를 표시하고 네이티브 탐색·오류 상태를 처리하는 WebView 앱 셸입니다.
 
 <br>
 
@@ -150,10 +150,10 @@ WebView가 열 웹 URL은 `app/.env.example`의 `EXPO_PUBLIC_WEB_URL`로 설정�
 
 | 관심사 | 원장 | 상태 |
 | --- | --- | --- |
-| 제품 목적·범위·원칙·용어 | [OpenMD 제품 기반](./docs/product.md) | 초안 |
+| 제품 목적·범위·원칙·용어 | [NalQ 제품 기반](./docs/product.md) | 초안 |
 | 학습자료 가져오기 | [학습자료 만들기 PRD](./docs/prd/prd-content-import.md) | 검토 중 |
 | 퀴즈 생성·풀이·결과·복습 | [퀴즈 PRD](./docs/prd/prd-quiz-learning.md) | 검토 중 |
-| 전체 문서와 영역별 구현 상태 | [OpenMD 문서 지도](./docs/README.md) | 계속 갱신 |
+| 전체 문서와 영역별 구현 상태 | [NalQ 문서 지도](./docs/README.md) | 계속 갱신 |
 
 <br>
 
@@ -194,7 +194,7 @@ SEED Design에서 버튼을 구현할 때 사용할 React component와 주요 pr
 Figma official Remote MCP endpoint가 등록되어 있습니다. 사용자가 직접 OAuth를 완료해야 합니다.
 
 ```bash
-cd /path/to/openmd
+cd /path/to/NalQ
 codex mcp login figma
 ```
 

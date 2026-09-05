@@ -1,24 +1,30 @@
 {
   "name": "web",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "packageManager": "pnpm@11.18.0",
   "engines": {
     "node": "^20.19.0 || >=22.12.0"
   },
   "scripts": {
+    "licenses:generate": "node scripts/generate-third-party-notices.mjs",
+    "licenses:check": "node scripts/generate-third-party-notices.mjs --check",
     "dev": "vite",
+    "dev:mock": "vite --mode mock",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b --pretty false",
     "lint": "oxlint",
+    "verify": "pnpm licenses:check && pnpm typecheck && pnpm lint && pnpm build",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@karrotmarket/react-monochrome-icon": "1.25.0",
     "@seed-design/css": "2.5.0",
     "@seed-design/react": "2.3.0",
     "@tanstack/react-query": "^5.101.4",
     "axios": "^1.19.0",
+    "pretendard": "1.3.9",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router-dom": "^7.18.2"

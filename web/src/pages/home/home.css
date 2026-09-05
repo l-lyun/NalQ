@@ -1,0 +1,80 @@
+.home-shell {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.home-main {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto;
+}
+
+.home-content {
+  box-sizing: border-box;
+  margin-inline: auto;
+  overflow-wrap: anywhere;
+}
+
+.home-list-button {
+  appearance: none;
+  align-items: flex-start;
+  flex-direction: row;
+  min-width: 0;
+  width: 100%;
+  cursor: pointer;
+}
+
+.home-navigation-button:active {
+  background: var(--seed-color-bg-layer-default-pressed);
+}
+
+.home-list-button:disabled {
+  cursor: not-allowed;
+}
+
+.home-list,
+.home-metrics,
+.home-metric-value,
+.home-navigation-list {
+  margin: 0;
+}
+
+.home-list,
+.home-navigation-list {
+  padding: 0;
+  list-style: none;
+}
+
+.home-metrics {
+  min-width: 0;
+}
+
+.home-bottom-navigation {
+  box-sizing: border-box;
+  flex-shrink: 0;
+  z-index: 1;
+}
+
+.home-navigation-list {
+  padding: 0;
+}
+
+.home-navigation-button {
+  appearance: none;
+  box-sizing: border-box;
+  min-height: 56px;
+  width: 100%;
+  padding: var(--seed-dimension-x1) var(--seed-dimension-x2);
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.home-navigation-button:focus-visible {
+  outline: var(--seed-dimension-x0_5) solid var(--seed-color-stroke-focus-ring);
+  outline-offset: var(--seed-dimension-x0_5);
+  border-radius: var(--seed-radius-r2);
+}

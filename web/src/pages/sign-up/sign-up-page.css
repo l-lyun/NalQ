@@ -1,0 +1,135 @@
+.sign-up-page {
+  width: 100%;
+  max-width: 480px;
+  margin-inline: auto;
+  overflow-wrap: anywhere;
+}
+
+.sign-up-back-button {
+  align-self: flex-start;
+}
+
+.sign-up-progress {
+  width: 100%;
+  height: var(--seed-dimension-x1);
+  overflow: hidden;
+  border-radius: var(--seed-radius-full);
+  background: var(--seed-color-bg-neutral-weak);
+}
+
+.sign-up-progress__value {
+  display: block;
+  width: 50%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--seed-color-bg-brand-solid);
+  transition: width 180ms ease-out;
+}
+
+.sign-up-progress__value[data-step='2'] {
+  width: 100%;
+}
+
+.sign-up-checkmark-icon {
+  color: var(--seed-color-palette-static-white);
+}
+
+.sign-up-form {
+  margin: 0;
+}
+
+.sign-up-field-action > :first-child {
+  min-width: 0;
+}
+
+.sign-up-text-field {
+  min-width: 0;
+  flex: 1;
+}
+
+.sign-up-field-action > button {
+  flex-shrink: 0;
+}
+
+.sign-up-agreement-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--seed-dimension-x4);
+}
+
+.sign-up-agreement-all {
+  padding: var(--seed-dimension-x4);
+  border-radius: var(--seed-radius-r3);
+  background: var(--seed-color-bg-neutral-weak);
+}
+
+.sign-up-agreement-row {
+  min-width: 0;
+}
+
+.sign-up-agreement-row > label {
+  min-width: 0;
+}
+
+.sign-up-agreement-row > button {
+  flex-shrink: 0;
+}
+
+.sign-up-terms-positioner {
+  padding: 0;
+}
+
+.sign-up-terms-dialog {
+  width: 100%;
+  height: 100dvh;
+  max-width: none;
+  max-height: 100dvh;
+  border-radius: 0;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.sign-up-terms-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  overflow-wrap: anywhere;
+}
+
+.sign-up-close-icon {
+  width: var(--seed-dimension-x6);
+  height: var(--seed-dimension-x6);
+}
+
+.sign-up-email-sending-positioner {
+  padding: var(--seed-dimension-x4);
+}
+
+.sign-up-email-sending-dialog {
+  width: min(100%, 400px);
+  word-break: keep-all;
+}
+
+.sign-up-email-sending-body {
+  min-height: 96px;
+}
+
+@media (min-width: 600px) {
+  .sign-up-terms-positioner {
+    padding: var(--seed-dimension-x6);
+  }
+
+  .sign-up-terms-dialog {
+    width: min(100%, 640px);
+    height: min(80dvh, 720px);
+    max-width: 640px;
+    max-height: 80dvh;
+    border-radius: var(--seed-radius-r4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sign-up-progress__value {
+    transition: none;
+  }
+}

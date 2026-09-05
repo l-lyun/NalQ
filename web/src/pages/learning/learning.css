@@ -1,0 +1,397 @@
+.learning-shell {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.learning-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+
+.learning-route-panel {
+  min-height: 100%;
+}
+
+.learning-route-panel--enter {
+  animation: learning-route-enter 180ms ease-out;
+}
+
+.learning-content {
+  width: 100%;
+  max-width: 640px;
+  min-width: 0;
+  margin-inline: auto;
+  overflow-wrap: anywhere;
+}
+
+.learning-list,
+.learning-navigation-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.learning-list-button {
+  appearance: none;
+  align-items: flex-start;
+  flex-direction: row;
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.learning-list-button:active:not(:disabled),
+.learning-navigation-button:active {
+  background: var(--seed-color-bg-layer-default-pressed);
+}
+
+.learning-list-button:disabled {
+  cursor: not-allowed;
+}
+
+.learning-list-button:focus-visible,
+.learning-navigation-button:focus-visible,
+.learning-focus-heading:focus-visible {
+  outline: var(--seed-dimension-x0_5) solid var(--seed-color-stroke-focus-ring);
+  outline-offset: var(--seed-dimension-x0_5);
+  border-radius: var(--seed-radius-r2);
+}
+
+.learning-focus-heading:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.learning-back-button {
+  flex-shrink: 0;
+}
+
+.learning-form {
+  margin: 0;
+}
+
+.learning-pagination {
+  display: grid;
+  grid-template-columns: minmax(44px, 1fr) auto minmax(44px, 1fr);
+  align-items: center;
+  gap: var(--seed-dimension-x3);
+  width: 100%;
+}
+
+.learning-pagination > :last-child {
+  justify-self: end;
+}
+
+.learning-material-body {
+  white-space: pre-wrap;
+}
+
+.learning-management-page {
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  overflow-wrap: anywhere;
+}
+
+.learning-management-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.learning-management-row,
+.learning-disclosure-trigger {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--seed-dimension-x3);
+  width: 100%;
+  min-width: 0;
+  min-height: 56px;
+  padding: var(--seed-dimension-x3) 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.learning-disclosure-trigger {
+  min-height: var(--seed-dimension-x12);
+  padding: var(--seed-dimension-x3) var(--seed-dimension-x4);
+}
+
+.learning-management-row:focus-visible,
+.learning-disclosure-trigger:focus-visible,
+.learning-quiz-card:focus-visible {
+  outline: var(--seed-dimension-x0_5) solid var(--seed-color-stroke-focus-ring);
+  outline-offset: var(--seed-dimension-x0_5);
+  border-radius: var(--seed-radius-r2);
+}
+
+.learning-management-row:active,
+.learning-disclosure-trigger:active:not(:disabled) {
+  background: var(--seed-color-bg-layer-default-pressed);
+}
+
+.learning-review-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.learning-review-row {
+  min-width: 0;
+  min-height: 72px;
+  padding-block: var(--seed-dimension-x3);
+}
+
+.learning-review-row > :first-child {
+  flex: 1 1 auto;
+}
+
+.learning-review-row > :last-child {
+  flex: 0 1 auto;
+}
+
+.learning-disclosure-trigger:disabled {
+  cursor: wait;
+}
+
+.learning-disclosure-icon {
+  flex-shrink: 0;
+  transition: transform 160ms ease-out;
+}
+
+.learning-disclosure-icon-open {
+  transform: rotate(90deg);
+}
+
+.learning-disclosure-detail {
+  border-top: 1px solid var(--seed-color-stroke-neutral-subtle);
+  padding: var(--seed-dimension-x2) var(--seed-dimension-x4);
+}
+
+.learning-quiz-management-card:focus-visible {
+  outline: var(--seed-dimension-x0_5) solid var(--seed-color-stroke-focus-ring);
+  outline-offset: var(--seed-dimension-x0_5);
+  border-radius: var(--seed-radius-r2);
+}
+
+.learning-quiz-management-card:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.learning-quiz-management-detail {
+  position: relative;
+  min-height: var(--seed-dimension-x14);
+  overflow: hidden;
+}
+
+.learning-quiz-status-overlay {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  background: var(--seed-color-bg-neutral-weak-alpha);
+  pointer-events: none;
+}
+
+.learning-quiz-failure-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--seed-dimension-x6);
+  height: var(--seed-dimension-x6);
+  border: 2px solid var(--seed-color-stroke-critical-solid);
+  border-radius: 50%;
+}
+
+.learning-quiz-rename-dialog {
+  margin-inline: var(--seed-dimension-spacing-x-global-gutter);
+}
+
+.learning-management-actions {
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+}
+
+.learning-management-actions > * {
+  min-width: 0;
+  min-height: var(--seed-dimension-x12);
+  flex: 1 1 0;
+}
+
+.learning-long-title {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.learning-quiz-card:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.learning-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.learning-textarea {
+  min-height: 220px;
+}
+
+.learning-textarea[readonly] {
+  cursor: default;
+}
+
+.learning-notice {
+  overflow-wrap: anywhere;
+}
+
+.learning-full-width-action,
+.learning-create-actions,
+.learning-create-actions > * {
+  width: 100%;
+}
+
+.learning-confirm-dialog {
+  margin-inline: var(--seed-dimension-spacing-x-global-gutter);
+}
+
+.notion-import-content {
+  min-height: 100%;
+}
+
+.notion-workspace-row {
+  min-height: 56px;
+  padding-block: var(--seed-dimension-x2);
+}
+
+.notion-page-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--seed-dimension-x1);
+  width: 100%;
+}
+
+.notion-page-row {
+  display: flex;
+  align-items: center;
+  gap: var(--seed-dimension-x3);
+  min-width: 0;
+  min-height: 64px;
+  padding: var(--seed-dimension-x3);
+  border-radius: var(--seed-radius-r3);
+  cursor: pointer;
+}
+
+.notion-page-row:hover,
+.notion-page-row[data-hover] {
+  background: var(--seed-color-bg-neutral-weak);
+}
+
+.notion-page-row:focus-within {
+  outline: var(--seed-dimension-x0_5) solid var(--seed-color-stroke-focus-ring);
+  outline-offset: var(--seed-dimension-x0_5);
+}
+
+.notion-page-copy {
+  flex: 1 1 auto;
+}
+
+.notion-page-title {
+  display: -webkit-box;
+  max-width: 100%;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.notion-import-action {
+  width: 100%;
+  padding-bottom: max(var(--seed-dimension-x2), env(safe-area-inset-bottom));
+}
+
+.notion-link-steps {
+  margin: 0;
+  padding-inline-start: var(--seed-dimension-x5);
+  color: var(--seed-color-fg-neutral-muted);
+}
+
+.notion-link-steps > li + li {
+  margin-top: var(--seed-dimension-x2);
+}
+
+.learning-bottom-navigation {
+  box-sizing: border-box;
+  flex-shrink: 0;
+  z-index: 1;
+}
+
+.learning-navigation-button {
+  appearance: none;
+  box-sizing: border-box;
+  min-height: 56px;
+  width: 100%;
+  padding: var(--seed-dimension-x1) var(--seed-dimension-x2);
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+@keyframes learning-route-enter {
+  from {
+    opacity: 0;
+    transform: translateX(var(--seed-dimension-x4));
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (max-width: 359px) {
+  .learning-textarea {
+    min-height: 180px;
+  }
+
+  .learning-review-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .learning-review-row > :last-child {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .learning-route-panel {
+    animation: none;
+  }
+
+  .learning-disclosure-icon {
+    transition: none;
+  }
+}

@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1500" viewBox="0 0 1800 1500" role="img" aria-labelledby="title description">
+  <title id="title">NalQ Quiz and Review ERD</title>
+  <desc id="description">Quiz sets and questions, four type-specific answer stores, unified main and review attempts, and submitted answers</desc>
+  <defs>
+    <style>
+      .canvas{fill:#f8fafc}.title{fill:#0f172a;font:700 32px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.subtitle{fill:#64748b;font:400 16px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.table{fill:#fff;stroke:#cbd5e1;stroke-width:2}.definition{fill:#2563eb}.type{fill:#7c3aed}.attempt{fill:#059669}.header{fill:#fff;font:700 16px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.field{fill:#334155;font:400 13px ui-monospace,SFMono-Regular,Menlo,monospace}.key{fill:#2563eb;font:700 12px ui-monospace,SFMono-Regular,Menlo,monospace}.divider{stroke:#e2e8f0}.relation{fill:none;stroke:#94a3b8;stroke-width:2}.label{fill:#475569;font:700 12px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.note{fill:#475569;font:400 14px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.note-title{fill:#0f172a;font:700 15px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    </style>
+    <marker id="many" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth"><path d="M1 1L10 6 1 11M1 6H10" fill="none" stroke="#94a3b8" stroke-width="1.5"/></marker>
+  </defs>
+  <rect class="canvas" width="1800" height="1500"/>
+  <text class="title" x="40" y="50">NalQ Quiz &amp; Review ERD</text>
+  <text class="subtitle" x="40" y="80">type-specific answer stores · unified MAIN/REVIEW attempts · requestedConfig is not persisted</text>
+
+  <!-- relations -->
+  <path class="relation" marker-end="url(#many)" d="M380 225H430"/>
+  <path class="relation" marker-end="url(#many)" d="M610 380V455H210V500"/>
+  <path class="relation" marker-end="url(#many)" d="M610 380V500"/>
+  <path class="relation" marker-end="url(#many)" d="M610 380V455H990V500"/>
+  <path class="relation" marker-end="url(#many)" d="M610 380V455H1380V500"/>
+  <path class="relation" marker-end="url(#many)" d="M1380 730V780"/>
+  <path class="relation" marker-end="url(#many)" d="M380 265H810"/>
+  <path class="relation" marker-end="url(#many)" d="M1170 250H1220"/>
+  <path class="relation" marker-end="url(#many)" d="M790 300H1180V330H1220"/>
+  <path class="relation" marker-end="url(#many)" d="M1430 450V1030"/>
+  <path class="relation" marker-end="url(#many)" d="M380 615H1120V1120H1220"/>
+  <path class="relation" marker-end="url(#many)" d="M1380 1010V1030"/>
+  <path class="relation" marker-end="url(#many)" d="M1170 175H1195V115H990V120"/>
+  <text class="label" x="1110" y="108">REVIEW → MAIN</text>
+  <path class="relation" marker-end="url(#many)" d="M1580 350H1610V300H1580"/>
+  <text class="label" x="1618" y="330">REVIEW item → MAIN item</text>
+
+  <!-- quiz sets -->
+  <g transform="translate(40 120)">
+    <rect class="table" width="340" height="220" rx="10"/><path class="definition" d="M10 0H330a10 10 0 0110 10v34H0V10A10 10 0 0110 0Z"/>
+    <text class="header" x="18" y="28">QUIZ_SETS</text>
+    <text class="key" x="18" y="70">PK</text><text class="field" x="52" y="70">id BIGINT</text>
+    <text class="key" x="18" y="94">UK</text><text class="field" x="52" y="94">public_id VARCHAR(36)</text><line class="divider" x1="18" y1="108" x2="322" y2="108"/>
+    <text class="key" x="18" y="132">FK</text><text class="field" x="52" y="132">user_id BIGINT</text>
+    <text class="key" x="18" y="156">FK</text><text class="field" x="52" y="156">learning_material_id BIGINT</text>
+    <text class="field" x="18" y="180">status GENERATING | READY | FAILED</text>
+    <text class="field" x="18" y="204">failure_code VARCHAR(32) NULL</text>
+  </g>
+
+  <!-- questions -->
+  <g transform="translate(430 120)">
+    <rect class="table" width="360" height="260" rx="10"/><path class="definition" d="M10 0H350a10 10 0 0110 10v34H0V10A10 10 0 0110 0Z"/>
+    <text class="header" x="18" y="28">QUIZ_QUESTIONS</text>
+    <text class="key" x="18" y="70">PK</text><text class="field" x="52" y="70">id BIGINT</text>
+    <text class="key" x="18" y="94">UK</text><text class="field" x="52" y="94">public_id VARCHAR(36)</text>
+    <text class="key" x="18" y="118">FK</text><text class="field" x="52" y="118">quiz_set_id BIGINT</text><line class="divider" x1="18" y1="132" x2="342" y2="132"/>
+    <text class="field" x="18" y="156">question_number INT</text><text class="field" x="18" y="180">question_type VARCHAR(32)</text>
+    <text class="field" x="18" y="204">topic VARCHAR(255)</text><text class="field" x="18" y="228">prompt / explanation / source_excerpt</text>
+  </g>
+
+  <!-- attempts -->
+  <g transform="translate(810 120)">
+    <rect class="table" width="360" height="280" rx="10"/><path class="attempt" d="M10 0H350a10 10 0 0110 10v34H0V10A10 10 0 0110 0Z"/>
+    <text class="header" x="18" y="28">QUIZ_ATTEMPTS</text>
+    <text class="key" x="18" y="70">PK</text><text class="field" x="52" y="70">id BIGINT</text><text class="key" x="18" y="94">UK</text><text class="field" x="52" y="94">public_id VARCHAR(36)</text>
+    <text class="key" x="18" y="118">FK</text><text class="field" x="52" y="118">quiz_set_id / user_id</text><text class="key" x="18" y="142">FK</text><text class="field" x="52" y="142">source_attempt_id NULL</text>
+    <line class="divider" x1="18" y1="156" x2="342" y2="156"/><text class="field" x="18" y="180">attempt_type MAIN | REVIEW</text>
+    <text class="field" x="18" y="204">status IN_PROGRESS | SELF_...</text><text class="field" x="18" y="228">submitted_at TIMESTAMP NULL</text><text class="field" x="18" y="252">completed_at TIMESTAMP NULL</text>
+  </g>
+
+  <g transform="translate(1220 120)">
+    <rect class="table" width="360" height="330" rx="10"/><path class="attempt" d="M10 0H350a10 10 0 0110 10v34H0V10A10 10 0 0110 0Z"/>
+    <text class="header" x="18" y="28">QUIZ_ATTEMPT_QUESTIONS</text>
+    <text class="key" x="18" y="70">PK</text><text class="field" x="52" y="70">id BIGINT</text><text class="key" x="18" y="94">FK</text><text class="field" x="52" y="94">attempt_id BIGINT</text>
+    <text class="key" x="18" y="118">FK</text><text class="field" x="52" y="118">question_id BIGINT</text><text class="key" x="18" y="142">FK</text><text class="field" x="52" y="142">source_attempt_question_id NULL</text>
+    <line class="divider" x1="18" y1="156" x2="342" y2="156"/><text class="field" x="18" y="180">sequence_number INT</text>
+    <text class="field" x="18" y="204">automatic_grading_result NULL</text><text class="field" x="18" y="228">final_grading_result NULL</text>
+    <text class="field" x="18" y="252">grading_method NULL</text><text class="field" x="18" y="276">review_resolved_at NULL</text>
+  </g>
+
+  <!-- type-specific stores -->
+  <g transform="translate(40 500)"><rect class="table" width="340" height="230" rx="10"/><path class="type" d="M10 0H330a10 10 0 0110 10v34H0V10A10 10 0 0110 0Z"/><text class="header" x="18" y="28">QUIZ_QUESTION_CHOICES</text>
+    <text class="key" x="18" y="70">PK</text><text class="field" x="52" y="70">id BIGINT</text><text class="key" x="18" y="94">UK</text><text class="field" x="52" y="94">public_id VARCHAR(36)</text><text class="key" x="18" y="118">FK</text><text class="field" x="52" y="118">question_id BIGINT</text><line class="divider" x1="18" y1="132" x2="322" y2="132"/><text class="field" x="18" y="156">choice_value TEXT</text><text class="field" x="18" y="180">is_correct BOOLEAN</text><text class="field" x="18" y="208">3–5 rows · exactly one correct</text></g>
+
+  <g transform="translate(420 500)"><rect class="table" width="340" height="210" rx="10"/><path class="type" d="M10 0H330a10 10 0 0110 10v34H0V10A10 10 0 0110 0Z"/><text class="header" x="18" y="28">QUIZ_SHORT_ANSWER_ANSWERS</text>
+    <text class="key" x="18" y="70">PK</text><text class="field" x="52" y="70">id BIGINT</text><text class="key" x="18" y="94">FK</text><text class="field" x="52" y="94">question_id BIGINT</text><line class="divider" x1="18" y1="108" x2="322" y2="108"/><text class="field" x="18" y="132">answer_value TEXT</text><text class="field" x="18" y="156">normalized_value VARCHAR(1000)</text><text class="field" x="18" y="184">all rows are accepted answers</text></g>
+
+  <g transform="translate(800 500)"><rect class="table" width="340" height="190" rx="10"/><path class="type" d="M10 0H330a10 10 0 0110 10v34H0V10A10 10 0 0110 0Z"/><text class="header" x="18" y="28">QUIZ_ESSAY_ANSWER_GUIDES</text>
+    <text class="key" x="18" y="70">PK/FK</text><text class="field" x="72" y="70">question_id BIGINT</text><line class="divider" x1="18" y1="84" x2="322" y2="84"/><text class="field" x="18" y="108">model_answer TEXT</text><text class="field" x="18" y="132">key_points JSON</text><text class="field" x="18" y="164">one guide per ESSAY</text></g>
+
+  <g transform="translate(1180 500)"><rect class="table" width="400" height="230" rx="10"/><path class="type" d="M10 0H390a10 10 0 0110 10v34H0V10A10 10 0 0110 0Z"/><text class="header" x="18" y="28">QUIZ_FILL_IN_THE_BLANKS</text>
+    <text class="key" x="18" y="70">PK</text><text class="field" x="52" y="70">id BIGINT</text><text class="key" x="18" y="94">UK</text><text class="field" x="52" y="94">public_id VARCHAR(36)</text><text class="key" x="18" y="118">FK</text><text class="field" x="52" y="118">question_id BIGINT</text><line class="divider" x1="18" y1="132" x2="382" y2="132"/><text class="field" x="18" y="156">blank_number INT</text><text class="field" x="18" y="184">UK(question_id, blank_number)</text><text class="field" x="18" y="208">1–2 continuous prompt markers</text></g>
+
+  <g transform="translate(1180 780)"><rect class="table" width="400" height="230" rx="10"/><path class="type" d="M10 0H390a10 10 0 0110 10v34H0V10A10 10 0 0110 0Z"/><text class="header" x="18" y="28">QUIZ_FILL_IN_THE_BLANK_ANSWERS</text>
+    <text class="key" x="18" y="70">PK</text><text class="field" x="52" y="70">id BIGINT</text><text class="key" x="18" y="94">FK</text><text class="field" x="52" y="94">blank_id BIGINT</text><line class="divider" x1="18" y1="108" x2="382" y2="108"/><text class="field" x="18" y="132">answer_value TEXT</text><text class="field" x="18" y="156">normalized_value VARCHAR(1000)</text><text class="field" x="18" y="184">one or more accepted answers per blank</text></g>
+
+  <g transform="translate(1220 1030)"><rect class="table" width="360" height="250" rx="10"/><path class="attempt" d="M10 0H350a10 10 0 0110 10v34H0V10A10 10 0 0110 0Z"/><text class="header" x="18" y="28">QUIZ_SUBMITTED_ANSWERS</text>
+    <text class="key" x="18" y="70">PK</text><text class="field" x="52" y="70">id BIGINT</text><text class="key" x="18" y="94">FK</text><text class="field" x="52" y="94">attempt_question_id BIGINT</text><text class="key" x="18" y="118">FK</text><text class="field" x="52" y="118">selected_choice_id NULL</text><text class="key" x="18" y="142">FK</text><text class="field" x="52" y="142">blank_id NULL</text><line class="divider" x1="18" y1="156" x2="342" y2="156"/><text class="field" x="18" y="180">answer_value TEXT NULL</text><text class="field" x="18" y="204">shape CHECK by answer type</text><text class="field" x="18" y="228">UK(attempt_question_id, blank_id)</text></g>
+
+  <g transform="translate(40 820)"><text class="note-title" x="0" y="0">핵심 규칙</text>
+    <circle cx="8" cy="34" r="5" fill="#7c3aed"/><text class="note" x="24" y="39">공통 answer 테이블과 answer_role 없음</text>
+    <circle cx="8" cy="68" r="5" fill="#7c3aed"/><text class="note" x="24" y="73">객관식 보기·단답형·서술형·빈칸 정답 원장 분리</text>
+    <circle cx="8" cy="102" r="5" fill="#059669"/><text class="note" x="24" y="107">MAIN과 REVIEW가 동일한 attempt 구조 사용</text>
+    <circle cx="8" cy="136" r="5" fill="#059669"/><text class="note" x="24" y="141">복습 성공은 원본 MAIN의 review_resolved_at만 갱신</text>
+    <circle cx="8" cy="170" r="5" fill="#2563eb"/><text class="note" x="24" y="175">requestedConfig·점수 캐시·공개 revision 미저장</text>
+    <circle cx="8" cy="204" r="5" fill="#475569"/><text class="note" x="24" y="209">교차 문제 소속과 유형별 행 수는 서비스가 검증</text>
+  </g>
+  <text class="subtitle" x="40" y="1450">Source: server/src/main/resources/db/migration/V5__create_quiz_grading.sql · 2026-08-25</text>
+</svg>
