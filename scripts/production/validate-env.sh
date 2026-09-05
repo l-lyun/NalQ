@@ -17,14 +17,15 @@ done
 
 load_env_file "$ENV_FILE"
 
+[[ "${SERVICE_DOMAIN:-}" =~ ^[a-z0-9.-]+$ ]] || die "SERVICE_DOMAIN must be a hostname"
 [[ "${WEB_DOMAIN:-}" =~ ^[a-z0-9.-]+$ ]] || die "WEB_DOMAIN must be a hostname"
 [[ "${API_DOMAIN:-}" =~ ^[a-z0-9.-]+$ ]] || die "API_DOMAIN must be a hostname"
-case "$WEB_DOMAIN:$API_DOMAIN" in
+case "$SERVICE_DOMAIN:$WEB_DOMAIN:$API_DOMAIN" in
 	*example.com*) die "example.com placeholders are forbidden in an applied production environment" ;;
 esac
 
 required_names=(
-	AWS_REGION WEB_DOMAIN API_DOMAIN WEB_ORIGIN
+	AWS_REGION SERVICE_DOMAIN WEB_DOMAIN API_DOMAIN WEB_ORIGIN
 	DB_BACKUP_S3_URI SERVER_IMAGE SERVER_HOST_PORT
 	MYSQL_DATABASE MYSQL_USER MYSQL_PASSWORD MYSQL_ROOT_PASSWORD
 	OPENMD_CORS_ALLOWED_ORIGINS OPENMD_AUTH_BROWSER_ALLOWED_ORIGINS
@@ -42,6 +43,8 @@ for name in "${required_names[@]}"; do
 done
 
 [ "$AWS_REGION" = "ap-northeast-2" ] || die "AWS_REGION must be ap-northeast-2"
+[ "$WEB_DOMAIN" = "app.$SERVICE_DOMAIN" ] || die "WEB_DOMAIN must equal app.SERVICE_DOMAIN"
+[ "$API_DOMAIN" = "api.$SERVICE_DOMAIN" ] || die "API_DOMAIN must equal api.SERVICE_DOMAIN"
 [ "$SERVER_HOST_PORT" = "8080" ] || die "SERVER_HOST_PORT must be exactly 8080 for the fixed Nginx upstream"
 [ "$WEB_ORIGIN" = "https://$WEB_DOMAIN" ] || die "WEB_ORIGIN must equal https://WEB_DOMAIN"
 [ "$OPENMD_CORS_ALLOWED_ORIGINS" = "$WEB_ORIGIN" ] || die "CORS origin must equal WEB_ORIGIN"
@@ -67,6 +70,34 @@ require_https_uri() {
 	[[ "$uri" =~ ^https://[^/?#[:space:]@]+(/[^[:space:]#]*)?$ ]] || die "$name must be an absolute https URI without credentials or fragments"
 }
 
+validate_notion_token_keys() {
+	local configured_keys="$1"
+	local write_version="$2"
+	local configured version encoded_key decoded_bytes seen_versions write_version_found
+	[[ "$write_version" =~ ^[A-Za-z0-9._-]+$ ]] || die "OPENMD_NOTION_WRITE_KEY_VERSION has an invalid format"
+	seen_versions=','
+	write_version_found=false
+	IFS=',' read -r -a notion_token_keys <<<"$configured_keys"
+	for configured in "${notion_token_keys[@]}"; do
+		configured="${configured#"${configured%%[![:space:]]*}"}"
+		configured="${configured%"${configured##*[![:space:]]}"}"
+		[[ "$configured" =~ ^([A-Za-z0-9._-]+):([A-Za-z0-9+/]{43}=?)$ ]] \
+			|| die "each OPENMD_NOTION_TOKEN_KEYS entry must be version:base64"
+		version="${BASH_REMATCH[1]}"
+		encoded_key="${BASH_REMATCH[2]}"
+		case "$seen_versions" in
+			*",$version,"*) die "OPENMD_NOTION_TOKEN_KEYS contains a duplicate version: $version" ;;
+		esac
+		seen_versions="${seen_versions}${version},"
+		decoded_bytes="$(printf '%s' "$encoded_key" | openssl base64 -d -A 2>/dev/null | wc -c | tr -d ' ')"
+		[ "$decoded_bytes" = "32" ] || die "each Notion token key must decode to exactly 32 bytes"
+		if [ "$version" = "$write_version" ]; then
+			write_version_found=true
+		fi
+	done
+	[ "$write_version_found" = true ] || die "OPENMD_NOTION_WRITE_KEY_VERSION must exist in OPENMD_NOTION_TOKEN_KEYS"
+}
+
 if [ "${OPENMD_NOTION_ENABLED:-false}" = "true" ]; then
 	for name in OPENMD_NOTION_CLIENT_ID OPENMD_NOTION_CLIENT_SECRET OPENMD_NOTION_CALLBACK_URI OPENMD_NOTION_ALLOWED_RETURN_URIS OPENMD_NOTION_FAILURE_RETURN_URI OPENMD_NOTION_TOKEN_KEYS OPENMD_NOTION_WRITE_KEY_VERSION; do
 		[ -n "${!name:-}" ] || die "$name is required when Notion is enabled"
@@ -82,6 +113,7 @@ if [ "${OPENMD_NOTION_ENABLED:-false}" = "true" ]; then
 		fi
 	done
 	[ "$failure_uri_allowed" = true ] || die "OPENMD_NOTION_FAILURE_RETURN_URI must be an exact member of OPENMD_NOTION_ALLOWED_RETURN_URIS"
+	validate_notion_token_keys "$OPENMD_NOTION_TOKEN_KEYS" "$OPENMD_NOTION_WRITE_KEY_VERSION"
 fi
 
 if [ "${OPENMD_QUIZ_GENERATION_ENABLED:-false}" = "true" ]; then

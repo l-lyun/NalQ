@@ -16,7 +16,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 require_file "$ENV_FILE"
-allowed_names=(AWS_REGION WEB_DOMAIN API_DOMAIN VITE_API_BASE_URL WEB_S3_BUCKET CLOUDFRONT_DISTRIBUTION_ID)
+allowed_names=(AWS_REGION SERVICE_DOMAIN WEB_DOMAIN API_DOMAIN VITE_API_BASE_URL WEB_S3_BUCKET CLOUDFRONT_DISTRIBUTION_ID)
 while IFS= read -r line || [ -n "$line" ]; do
 	trimmed="${line#"${line%%[![:space:]]*}"}"
 	case "$trimmed" in
@@ -41,12 +41,15 @@ for name in "${allowed_names[@]}"; do
 	esac
 done
 
+[[ "$SERVICE_DOMAIN" =~ ^[a-z0-9.-]+$ ]] || die "SERVICE_DOMAIN must be a hostname"
 [[ "$WEB_DOMAIN" =~ ^[a-z0-9.-]+$ ]] || die "WEB_DOMAIN must be a hostname"
 [[ "$API_DOMAIN" =~ ^[a-z0-9.-]+$ ]] || die "API_DOMAIN must be a hostname"
-case "$WEB_DOMAIN:$API_DOMAIN" in
+case "$SERVICE_DOMAIN:$WEB_DOMAIN:$API_DOMAIN" in
 	*example.com*) die "example.com placeholders are forbidden in an applied web environment" ;;
 esac
 [ "$AWS_REGION" = "ap-northeast-2" ] || die "AWS_REGION must be ap-northeast-2"
+[ "$WEB_DOMAIN" = "app.$SERVICE_DOMAIN" ] || die "WEB_DOMAIN must equal app.SERVICE_DOMAIN"
+[ "$API_DOMAIN" = "api.$SERVICE_DOMAIN" ] || die "API_DOMAIN must equal api.SERVICE_DOMAIN"
 [ "$VITE_API_BASE_URL" = "https://$API_DOMAIN" ] || die "VITE_API_BASE_URL must equal https://API_DOMAIN"
 
 log "web deployment environment contract is valid (public build values only)"

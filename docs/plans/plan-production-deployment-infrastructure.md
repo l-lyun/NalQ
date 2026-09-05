@@ -76,7 +76,7 @@ EC2 backup job
 
 - 기준 웹 host는 `app`을 권장한다. `www`를 선택하면 그것을 유일한 기준 origin으로 정하고 다른 host는 redirect만 제공한다.
 - CloudFront가 API를 경로 기반으로 proxy하지 않는다. 웹과 API는 배포·장애·cache 경계를 분리한 두 host로 운영한다.
-- 두 host는 반드시 `https://app.example.com`과 `https://api.example.com`처럼 scheme과 등록 가능 도메인이 같아야 한다. 서로 다른 최상위 site를 쓰는 토폴로지는 이번 승인에 포함되지 않는다.
+- `SERVICE_DOMAIN`을 등록 가능 기준 도메인으로 두고 두 host는 정확히 `https://app.SERVICE_DOMAIN`과 `https://api.SERVICE_DOMAIN`으로 구성한다. PSL 추론 없이 두 validator가 이 관계를 직접 확인하며, 서로 다른 최상위 site를 쓰는 토폴로지는 이번 승인에 포함되지 않는다.
 - CloudFront/S3가 살아 있어도 EC2가 중단되면 보호 기능은 사용할 수 없다. 웹은 API 장애를 로그인 해제나 빈 성공 상태로 오인하지 않고 복구 가능한 오류로 표시한다.
 
 ## 정적 웹: private S3와 CloudFront

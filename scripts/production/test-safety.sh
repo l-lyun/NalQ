@@ -32,6 +32,7 @@ write_valid_server_env() {
 	local target="$1"
 	printf '%s\n' \
 		'AWS_REGION=ap-northeast-2' \
+		'SERVICE_DOMAIN=nalq.test' \
 		'WEB_DOMAIN=app.nalq.test' \
 		'API_DOMAIN=api.nalq.test' \
 		'WEB_ORIGIN=https://app.nalq.test' \
@@ -59,6 +60,7 @@ write_valid_web_env() {
 	local target="$1"
 	printf '%s\n' \
 		'AWS_REGION=ap-northeast-2' \
+		'SERVICE_DOMAIN=nalq.test' \
 		'WEB_DOMAIN=app.nalq.test' \
 		'API_DOMAIN=api.nalq.test' \
 		'VITE_API_BASE_URL=https://api.nalq.test' \
@@ -70,6 +72,12 @@ server_env="$temporary_directory/server.env"
 write_valid_server_env "$server_env"
 "$SCRIPT_DIR/validate-env.sh" --env-file "$server_env" >/dev/null
 "$SCRIPT_DIR/deploy-server.sh" --env-file "$server_env" >/dev/null
+
+server_cross_site_env="$temporary_directory/server-cross-site.env"
+cp "$server_env" "$server_cross_site_env"
+printf '%s\n' 'API_DOMAIN=api.other.test' >>"$server_cross_site_env"
+expect_failure_containing 'API_DOMAIN must equal api.SERVICE_DOMAIN' \
+	"$SCRIPT_DIR/validate-env.sh" --env-file "$server_cross_site_env"
 
 bad_port_env="$temporary_directory/bad-port.env"
 cp "$server_env" "$bad_port_env"
@@ -84,8 +92,8 @@ printf '%s\n' \
 	'OPENMD_NOTION_CLIENT_ID=test-client' \
 	'OPENMD_NOTION_CLIENT_SECRET=test-secret' \
 	'OPENMD_NOTION_CALLBACK_URI=https://api.nalq.test/api/v1/integrations/notion/callback' \
-	'OPENMD_NOTION_TOKEN_KEYS=test-key' \
-	'OPENMD_NOTION_WRITE_KEY_VERSION=1' >>"$notion_missing_env"
+	'OPENMD_NOTION_TOKEN_KEYS=v1:QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE=' \
+	'OPENMD_NOTION_WRITE_KEY_VERSION=v1' >>"$notion_missing_env"
 expect_failure_containing 'OPENMD_NOTION_ALLOWED_RETURN_URIS is required' \
 	"$SCRIPT_DIR/validate-env.sh" --env-file "$notion_missing_env"
 
@@ -95,6 +103,30 @@ printf '%s\n' \
 	'OPENMD_NOTION_ALLOWED_RETURN_URIS=https://app.nalq.test/learning/import/notion,https://app.nalq.test/notion/failure' \
 	'OPENMD_NOTION_FAILURE_RETURN_URI=https://app.nalq.test/notion/failure' >>"$notion_valid_env"
 "$SCRIPT_DIR/validate-env.sh" --env-file "$notion_valid_env" >/dev/null
+
+notion_short_key_env="$temporary_directory/notion-short-key.env"
+cp "$notion_valid_env" "$notion_short_key_env"
+printf '%s\n' 'OPENMD_NOTION_TOKEN_KEYS=v1:QUFB' >>"$notion_short_key_env"
+expect_failure_containing 'must be version:base64' \
+	"$SCRIPT_DIR/validate-env.sh" --env-file "$notion_short_key_env"
+
+notion_duplicate_key_env="$temporary_directory/notion-duplicate-key.env"
+cp "$notion_valid_env" "$notion_duplicate_key_env"
+printf '%s\n' 'OPENMD_NOTION_TOKEN_KEYS=v1:QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE=,v1:QkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkI=' >>"$notion_duplicate_key_env"
+expect_failure_containing 'contains a duplicate version' \
+	"$SCRIPT_DIR/validate-env.sh" --env-file "$notion_duplicate_key_env"
+
+notion_missing_write_version_env="$temporary_directory/notion-missing-write-version.env"
+cp "$notion_valid_env" "$notion_missing_write_version_env"
+printf '%s\n' 'OPENMD_NOTION_WRITE_KEY_VERSION=v2' >>"$notion_missing_write_version_env"
+expect_failure_containing 'must exist in OPENMD_NOTION_TOKEN_KEYS' \
+	"$SCRIPT_DIR/validate-env.sh" --env-file "$notion_missing_write_version_env"
+
+notion_invalid_write_version_env="$temporary_directory/notion-invalid-write-version.env"
+cp "$notion_valid_env" "$notion_invalid_write_version_env"
+printf '%s\n' 'OPENMD_NOTION_WRITE_KEY_VERSION=v1:invalid' >>"$notion_invalid_write_version_env"
+expect_failure_containing 'has an invalid format' \
+	"$SCRIPT_DIR/validate-env.sh" --env-file "$notion_invalid_write_version_env"
 
 notion_bad_allowlist_env="$temporary_directory/notion-bad-allowlist.env"
 cp "$notion_valid_env" "$notion_bad_allowlist_env"
@@ -116,6 +148,12 @@ write_valid_web_env "$web_env"
 "$SCRIPT_DIR/deploy-web.sh" --env-file "$web_env" >/dev/null
 "$SCRIPT_DIR/rollback-web.sh" --env-file "$web_env" --release 0123456789abcdef0123456789abcdef01234567 >/dev/null
 
+web_cross_site_env="$temporary_directory/web-cross-site.env"
+cp "$web_env" "$web_cross_site_env"
+printf '%s\n' 'WEB_DOMAIN=app.other.test' >>"$web_cross_site_env"
+expect_failure_containing 'WEB_DOMAIN must equal app.SERVICE_DOMAIN' \
+	"$SCRIPT_DIR/validate-web-env.sh" --env-file "$web_cross_site_env"
+
 web_secret_env="$temporary_directory/web-secret.env"
 cp "$web_env" "$web_secret_env"
 printf '%s\n' 'MYSQL_PASSWORD=must-not-reach-web-build' >>"$web_secret_env"
@@ -128,6 +166,7 @@ if grep -Eq '/validate-env\.sh|load_env_file ' "$SCRIPT_DIR/deploy-web.sh"; then
 	exit 1
 fi
 grep -Fq 'env -i' "$SCRIPT_DIR/deploy-web.sh"
+grep -Fq 'VITE_HOME_VISITS_API_ENABLED=true' "$SCRIPT_DIR/deploy-web.sh"
 
 restore_state="$temporary_directory/restore-state"
 mkdir -p "$restore_state"

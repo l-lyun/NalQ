@@ -15,8 +15,9 @@ scope: production-infrastructure
 | 이름 | 필수 | 예시 의미 |
 | --- | --- | --- |
 | `AWS_REGION` | 예 | API·S3·backup 리전. 첫 배포는 `ap-northeast-2` |
-| `WEB_DOMAIN` | 예 | protocol 없는 `app.<domain>` |
-| `API_DOMAIN` | 예 | protocol 없는 `api.<domain>` |
+| `SERVICE_DOMAIN` | 예 | 새로 구매한 등록 가능 기준 도메인. scheme과 host prefix 없음 |
+| `WEB_DOMAIN` | 예 | 정확히 `app.SERVICE_DOMAIN` |
+| `API_DOMAIN` | 예 | 정확히 `api.SERVICE_DOMAIN` |
 | `WEB_ORIGIN` | 예 | `https://`를 포함한 정확한 웹 origin |
 | `DB_BACKUP_S3_URI` | 예 | 별도 private backup bucket과 prefix |
 | `BACKUP_RETENTION_DAYS` | 예 | bucket lifecycle과 맞출 보유일. 초기 제안 14일 |
@@ -30,13 +31,14 @@ scope: production-infrastructure
 | 이름 | 필수 | 설명 |
 | --- | --- | --- |
 | `AWS_REGION` | 예 | web S3 region, `ap-northeast-2` |
-| `WEB_DOMAIN` | 예 | `app.<domain>` |
-| `API_DOMAIN` | 예 | `api.<domain>` |
+| `SERVICE_DOMAIN` | 예 | 서버 원장과 동일한 등록 가능 기준 도메인 |
+| `WEB_DOMAIN` | 예 | 정확히 `app.SERVICE_DOMAIN` |
+| `API_DOMAIN` | 예 | 정확히 `api.SERVICE_DOMAIN` |
 | `VITE_API_BASE_URL` | 예 | bundle에 포함되는 공개 API URL, 정확히 `https://API_DOMAIN` |
 | `WEB_S3_BUCKET` | 예 | private web origin bucket 이름 |
 | `CLOUDFRONT_DISTRIBUTION_ID` | 예 | invalidation 대상 distribution |
 
-웹 build subprocess는 기존 shell environment를 상속하지 않고 현재 Node 실행 파일을 우선하는 `PATH`, 임시 디렉터리와 `VITE_API_BASE_URL`, 고정 runtime mode, release version만 전달받는다. 사용자 home, npm 설정이나 AWS credential은 build에 전달하지 않는다. S3/CloudFront 작업은 build가 끝난 뒤 웹 배포 principal로 실행한다.
+웹 build subprocess는 기존 shell environment를 상속하지 않고 현재 Node 실행 파일을 우선하는 `PATH`, 임시 디렉터리와 `VITE_API_BASE_URL`, 고정 runtime mode, release version만 전달받는다. 이미 구현·승인된 홈 방문 기록 API는 별도 운영 knob를 추가하지 않고 `VITE_HOME_VISITS_API_ENABLED=true`로 고정한다. 사용자 home, npm 설정이나 AWS credential은 build에 전달하지 않는다. S3/CloudFront 작업은 build가 끝난 뒤 웹 배포 principal로 실행한다.
 
 ## 데이터 저장소
 
@@ -76,7 +78,7 @@ Cookie의 Secure, SameSite, Path와 OpenAPI/Swagger 비활성화는 운영 Compo
 
 ## Notion
 
-`OPENMD_NOTION_ENABLED=false`이면 credential은 비워 둔다. 활성화 전에는 `OPENMD_NOTION_CLIENT_ID`, `OPENMD_NOTION_CLIENT_SECRET`, `OPENMD_NOTION_CALLBACK_URI`, `OPENMD_NOTION_ALLOWED_RETURN_URIS`, `OPENMD_NOTION_FAILURE_RETURN_URI`, `OPENMD_NOTION_TOKEN_KEYS`, `OPENMD_NOTION_WRITE_KEY_VERSION`을 현재 Notion 계약과 맞춰 별도 승인한다. callback, 허용 return URI와 failure return URI는 절대 `https` URI여야 하고 failure URI는 허용 목록의 정확한 원소여야 한다.
+`OPENMD_NOTION_ENABLED=false`이면 credential은 비워 둔다. 활성화 전에는 `OPENMD_NOTION_CLIENT_ID`, `OPENMD_NOTION_CLIENT_SECRET`, `OPENMD_NOTION_CALLBACK_URI`, `OPENMD_NOTION_ALLOWED_RETURN_URIS`, `OPENMD_NOTION_FAILURE_RETURN_URI`, `OPENMD_NOTION_TOKEN_KEYS`, `OPENMD_NOTION_WRITE_KEY_VERSION`을 현재 Notion 계약과 맞춰 별도 승인한다. callback, 허용 return URI와 failure return URI는 절대 `https` URI여야 하고 failure URI는 허용 목록의 정확한 원소여야 한다. token key 목록의 각 항목은 중복 없는 `version:<32-byte Base64>` 형식이며 write version은 `[A-Za-z0-9._-]+` 형식으로 목록에 반드시 존재해야 한다.
 
 ## OpenAI와 생성 worker
 
