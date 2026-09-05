@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -93,6 +94,46 @@ class TwoStepSignUpServiceTest {
 			eq(emailKey), eq(digests.create(emailKey, "A7K9M2")), eq(NOW), any(), any(), eq(true)
 		);
 		verify(emails).sendVerificationCode("Learner@Example.COM", "A7K9M2");
+		verify(verifications, never()).cancelIssue(any(), any());
+	}
+
+	@Test
+	void mailDeliveryFailureCancelsOnlyTheIssuedDigestAndKeepsAuth008() {
+		when(users.findByNormalizedEmail("learner@example.com")).thenReturn(Optional.empty());
+		when(codes.generate()).thenReturn("A7K9M2");
+		String emailKey = digests.emailKey("learner@example.com");
+		String digest = digests.create(emailKey, "A7K9M2");
+		when(verifications.issue(eq(emailKey), eq(digest), eq(NOW), any(), any(), eq(true)))
+			.thenReturn(EmailVerificationStore.IssueResult.success());
+		doThrow(new BusinessException(AuthErrorCode.EMAIL_DELIVERY_FAILED))
+			.when(emails).sendVerificationCode("learner@example.com", "A7K9M2");
+
+		BusinessException exception = assertThrows(BusinessException.class,
+			() -> service.requestEmailVerification("learner@example.com"));
+
+		assertEquals(AuthErrorCode.EMAIL_DELIVERY_FAILED, exception.getErrorCode());
+		verify(verifications).cancelIssue(emailKey, digest);
+	}
+
+	@Test
+	void cancellationFailureDoesNotHideTheOriginalMailDeliveryFailure() {
+		when(users.findByNormalizedEmail("learner@example.com")).thenReturn(Optional.empty());
+		when(codes.generate()).thenReturn("A7K9M2");
+		String emailKey = digests.emailKey("learner@example.com");
+		String digest = digests.create(emailKey, "A7K9M2");
+		when(verifications.issue(eq(emailKey), eq(digest), eq(NOW), any(), any(), eq(true)))
+			.thenReturn(EmailVerificationStore.IssueResult.success());
+		BusinessException deliveryFailure = new BusinessException(AuthErrorCode.EMAIL_DELIVERY_FAILED);
+		doThrow(deliveryFailure).when(emails).sendVerificationCode("learner@example.com", "A7K9M2");
+		IllegalStateException cancellationFailure = new IllegalStateException("redis unavailable");
+		doThrow(cancellationFailure).when(verifications).cancelIssue(emailKey, digest);
+
+		BusinessException exception = assertThrows(BusinessException.class,
+			() -> service.requestEmailVerification("learner@example.com"));
+
+		assertEquals(AuthErrorCode.EMAIL_DELIVERY_FAILED, exception.getErrorCode());
+		assertEquals(1, exception.getSuppressed().length);
+		assertEquals(cancellationFailure, exception.getSuppressed()[0]);
 	}
 
 	@Test

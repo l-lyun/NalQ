@@ -354,7 +354,7 @@ export function SignUpPage() {
       ? '한글, 영문, 숫자만 사용해 공백 없이 2~10자로 입력해 주세요.'
       : fieldError(checkNickname.error ?? completeSignUp.error, 'nickname')
   const firstRequestError =
-    !verificationRequested && requestVerification.error
+    !requestPending && !verificationRequested && requestVerification.error
       ? getApiErrorMessage(
           requestVerification.error,
           '인증 메일을 보내지 못했어요. 다시 시도해 주세요.',

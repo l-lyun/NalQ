@@ -7,6 +7,7 @@ import {
   Field,
   Flex,
   Icon,
+  ProgressCircle,
   Text,
   TextField,
   VStack,
@@ -275,8 +276,9 @@ export function SignUpAccountStep(props: SignUpAccountStepProps) {
   }
 
   return (
-    <form className="sign-up-form" onSubmit={handleSubmit} noValidate>
-      <VStack gap="x5">
+    <>
+      <form className="sign-up-form" onSubmit={handleSubmit} noValidate>
+        <VStack gap="x5">
         <SignUpField label="이메일" required {...props.emailMessage}>
           <Flex className="sign-up-field-action" gap="x2" align="center">
             <TextField.Root className="sign-up-text-field" invalid={Boolean(props.emailMessage?.error)}>
@@ -408,8 +410,42 @@ export function SignUpAccountStep(props: SignUpAccountStepProps) {
         >
           다음
         </ActionButton>
-      </VStack>
-    </form>
+        </VStack>
+      </form>
+
+      <EmailSendingOverlay open={props.emailVerificationStatus === 'sending'} />
+    </>
+  )
+}
+
+function EmailSendingOverlay({ open }: { open: boolean }) {
+  return (
+    <ContentDialog.Root
+      open={open}
+      closeOnEscape={false}
+      closeOnInteractOutside={false}
+      onOpenChange={() => undefined}
+    >
+      <ContentDialog.Backdrop />
+      <ContentDialog.Positioner className="sign-up-email-sending-positioner">
+        <ContentDialog.Content className="sign-up-email-sending-dialog">
+          <ContentDialog.Header>
+            <ContentDialog.Title>인증 메일을 보내고 있어요</ContentDialog.Title>
+            <ContentDialog.Description>
+              안전하게 인증 코드를 보내는 중이에요. 잠시만 기다려 주세요.
+            </ContentDialog.Description>
+          </ContentDialog.Header>
+          <ContentDialog.Body>
+            <Flex className="sign-up-email-sending-body" justify="center" align="center">
+              <ProgressCircle.Root aria-label="인증 메일 발송 중" tone="brand" size="40">
+                <ProgressCircle.Track />
+                <ProgressCircle.Range />
+              </ProgressCircle.Root>
+            </Flex>
+          </ContentDialog.Body>
+        </ContentDialog.Content>
+      </ContentDialog.Positioner>
+    </ContentDialog.Root>
   )
 }
 
