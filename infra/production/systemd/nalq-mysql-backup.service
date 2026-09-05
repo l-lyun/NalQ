@@ -1,0 +1,15 @@
+[Unit]
+Description=NalQ encrypted-volume MySQL logical backup to private S3
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/opt/nalq/repository
+ExecStart=/opt/nalq/repository/scripts/production/backup-mysql.sh --apply --env-file /opt/nalq/production.env
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+PrivateTmp=true
+NoNewPrivileges=true

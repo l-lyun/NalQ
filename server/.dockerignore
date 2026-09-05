@@ -1,0 +1,9 @@
+.gradle
+build
+.env
+.env.*
+.idea
+.run
+docs
+src/test
+*.iml

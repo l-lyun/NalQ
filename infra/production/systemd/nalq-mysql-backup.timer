@@ -1,0 +1,11 @@
+[Unit]
+Description=Run NalQ MySQL backup daily
+
+[Timer]
+OnCalendar=*-*-* 03:20:00 Asia/Seoul
+RandomizedDelaySec=15m
+Persistent=true
+Unit=nalq-mysql-backup.service
+
+[Install]
+WantedBy=timers.target

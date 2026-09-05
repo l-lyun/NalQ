@@ -1,0 +1,133 @@
+name: nalq-production
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: "${MYSQL_DATABASE:?set MYSQL_DATABASE}"
+      MYSQL_USER: "${MYSQL_USER:?set MYSQL_USER}"
+      MYSQL_PASSWORD: "${MYSQL_PASSWORD:?set MYSQL_PASSWORD}"
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD}"
+      TZ: Asia/Seoul
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./mysql/openmd.cnf:/etc/mysql/conf.d/openmd.cnf:ro
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$${MYSQL_ROOT_PASSWORD}\" mysqladmin ping --host=127.0.0.1 --user=root --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+    stop_grace_period: 1m
+    mem_limit: 640m
+    pids_limit: 256
+    logging: *default-logging
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    volumes:
+      - redis-data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    stop_grace_period: 30s
+    mem_limit: 192m
+    pids_limit: 128
+    logging: *default-logging
+
+  server:
+    image: "${SERVER_IMAGE:?set SERVER_IMAGE to an immutable digest}"
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    ports:
+      - "127.0.0.1:${SERVER_HOST_PORT:-8080}:8080"
+    environment:
+      SERVER_PORT: "8080"
+      JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m -XX:+ExitOnOutOfMemoryError -Djava.io.tmpdir=/tmp"
+      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/${MYSQL_DATABASE}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8"
+      SPRING_DATASOURCE_USERNAME: "${MYSQL_USER}"
+      SPRING_DATASOURCE_PASSWORD: "${MYSQL_PASSWORD}"
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: "8"
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+      SERVER_TOMCAT_THREADS_MAX: "32"
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+      OPENMD_CORS_ALLOWED_ORIGINS: "${OPENMD_CORS_ALLOWED_ORIGINS:?set OPENMD_CORS_ALLOWED_ORIGINS}"
+      OPENMD_AUTH_BROWSER_ALLOWED_ORIGINS: "${OPENMD_AUTH_BROWSER_ALLOWED_ORIGINS:?set OPENMD_AUTH_BROWSER_ALLOWED_ORIGINS}"
+      OPENMD_AUTH_BROWSER_COOKIE_NAME: "${OPENMD_AUTH_BROWSER_COOKIE_NAME:-__Host-openmd_refresh}"
+      OPENMD_AUTH_BROWSER_COOKIE_SECURE: "true"
+      OPENMD_AUTH_BROWSER_COOKIE_SAME_SITE: Lax
+      OPENMD_AUTH_BROWSER_COOKIE_PATH: /
+      OPENMD_OPENAPI_ENABLED: "false"
+      OPENMD_SWAGGER_UI_ENABLED: "false"
+      OPENMD_AUTH_ACCESS_TOKEN_SECRET: "${OPENMD_AUTH_ACCESS_TOKEN_SECRET:?set OPENMD_AUTH_ACCESS_TOKEN_SECRET}"
+      OPENMD_AUTH_EMAIL_CODE_HMAC_SECRET: "${OPENMD_AUTH_EMAIL_CODE_HMAC_SECRET:?set OPENMD_AUTH_EMAIL_CODE_HMAC_SECRET}"
+      OPENMD_AUTH_REFRESH_TOKEN_LIFETIME: "${OPENMD_AUTH_REFRESH_TOKEN_LIFETIME:-30d}"
+      OPENMD_MAIL_FROM: "${OPENMD_MAIL_FROM:?set OPENMD_MAIL_FROM}"
+      SPRING_MAIL_HOST: "${SPRING_MAIL_HOST:?set SPRING_MAIL_HOST}"
+      SPRING_MAIL_PORT: "${SPRING_MAIL_PORT:-587}"
+      SPRING_MAIL_USERNAME: "${SPRING_MAIL_USERNAME:?set SPRING_MAIL_USERNAME}"
+      SPRING_MAIL_PASSWORD: "${SPRING_MAIL_PASSWORD:?set SPRING_MAIL_PASSWORD}"
+      SPRING_MAIL_SMTP_AUTH: "${SPRING_MAIL_SMTP_AUTH:-true}"
+      SPRING_MAIL_STARTTLS_ENABLE: "${SPRING_MAIL_STARTTLS_ENABLE:-true}"
+      OPENMD_NOTION_ENABLED: "${OPENMD_NOTION_ENABLED:-false}"
+      OPENMD_NOTION_CLIENT_ID: "${OPENMD_NOTION_CLIENT_ID:-}"
+      OPENMD_NOTION_CLIENT_SECRET: "${OPENMD_NOTION_CLIENT_SECRET:-}"
+      OPENMD_NOTION_CALLBACK_URI: "${OPENMD_NOTION_CALLBACK_URI:-}"
+      OPENMD_NOTION_ALLOWED_RETURN_URIS: "${OPENMD_NOTION_ALLOWED_RETURN_URIS:-}"
+      OPENMD_NOTION_FAILURE_RETURN_URI: "${OPENMD_NOTION_FAILURE_RETURN_URI:-}"
+      OPENMD_NOTION_TOKEN_KEYS: "${OPENMD_NOTION_TOKEN_KEYS:-}"
+      OPENMD_NOTION_WRITE_KEY_VERSION: "${OPENMD_NOTION_WRITE_KEY_VERSION:-}"
+      SPRING_AI_OPENAI_BASE_URL: "${SPRING_AI_OPENAI_BASE_URL:?set SPRING_AI_OPENAI_BASE_URL}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:?set OPENAI_API_KEY}"
+      OPENMD_QUIZ_GENERATION_ENABLED: "${OPENMD_QUIZ_GENERATION_ENABLED:-false}"
+      OPENMD_QUIZ_GENERATION_MODEL: "${OPENMD_QUIZ_GENERATION_MODEL:-gpt-5.6-luna}"
+      OPENMD_QUIZ_GENERATION_REASONING_EFFORT: "${OPENMD_QUIZ_GENERATION_REASONING_EFFORT:-low}"
+      OPENMD_QUIZ_GENERATION_TIMEOUT: "${OPENMD_QUIZ_GENERATION_TIMEOUT:-60s}"
+      OPENMD_QUIZ_GENERATION_NETWORK_RETRY: "${OPENMD_QUIZ_GENERATION_NETWORK_RETRY:-1}"
+      OPENMD_QUIZ_GENERATION_WORKER_COUNT: "${OPENMD_QUIZ_GENERATION_WORKER_COUNT:-1}"
+      OPENMD_QUIZ_GENERATION_QUEUE_CAPACITY: "${OPENMD_QUIZ_GENERATION_QUEUE_CAPACITY:-4}"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - backend
+      - egress
+    mem_limit: 640m
+    pids_limit: 256
+    logging: *default-logging
+
+networks:
+  backend:
+    internal: true
+  egress: {}
+
+volumes:
+  mysql-data:
+  redis-data:
