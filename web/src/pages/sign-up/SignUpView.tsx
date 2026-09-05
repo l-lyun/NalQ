@@ -7,6 +7,7 @@ import {
   Field,
   Flex,
   Icon,
+  ProgressCircle,
   Text,
   TextField,
   VStack,
@@ -275,8 +276,9 @@ export function SignUpAccountStep(props: SignUpAccountStepProps) {
   }
 
   return (
-    <form className="sign-up-form" onSubmit={handleSubmit} noValidate>
-      <VStack gap="x5">
+    <>
+      <form className="sign-up-form" onSubmit={handleSubmit} noValidate>
+        <VStack gap="x5">
         <SignUpField label="이메일" required {...props.emailMessage}>
           <Flex className="sign-up-field-action" gap="x2" align="center">
             <TextField.Root className="sign-up-text-field" invalid={Boolean(props.emailMessage?.error)}>
@@ -408,8 +410,42 @@ export function SignUpAccountStep(props: SignUpAccountStepProps) {
         >
           다음
         </ActionButton>
-      </VStack>
-    </form>
+        </VStack>
+      </form>
+
+      <EmailSendingOverlay open={props.emailVerificationStatus === 'sending'} />
+    </>
+  )
+}
+
+function EmailSendingOverlay({ open }: { open: boolean }) {
+  return (
+    <ContentDialog.Root
+      open={open}
+      closeOnEscape={false}
+      closeOnInteractOutside={false}
+      onOpenChange={() => undefined}
+    >
+      <ContentDialog.Backdrop />
+      <ContentDialog.Positioner className="sign-up-email-sending-positioner">
+        <ContentDialog.Content className="sign-up-email-sending-dialog">
+          <ContentDialog.Header>
+            <ContentDialog.Title>인증 메일을 보내고 있어요</ContentDialog.Title>
+            <ContentDialog.Description>
+              안전하게 인증 코드를 보내는 중이에요. 잠시만 기다려 주세요.
+            </ContentDialog.Description>
+          </ContentDialog.Header>
+          <ContentDialog.Body>
+            <Flex className="sign-up-email-sending-body" justify="center" align="center">
+              <ProgressCircle.Root aria-label="인증 메일 발송 중" tone="brand" size="40">
+                <ProgressCircle.Track />
+                <ProgressCircle.Range />
+              </ProgressCircle.Root>
+            </Flex>
+          </ContentDialog.Body>
+        </ContentDialog.Content>
+      </ContentDialog.Positioner>
+    </ContentDialog.Root>
   )
 }
 
@@ -605,7 +641,7 @@ export function SignUpProfileStep(props: SignUpProfileStepProps) {
               </Checkbox.Group>
 
               <Text textStyle="t3Regular" color="fg.neutralSubtle">
-                현재 전문은 화면 검수를 위한 임시 문안이며 운영 출시 전 교체됩니다.
+                동의한 약관 버전과 동의 시각은 계정에 기록됩니다.
               </Text>
             </VStack>
           </Box>
@@ -653,7 +689,7 @@ function TermsOverlay({
           <ContentDialog.Header>
             <ContentDialog.Title>{term?.title ?? '약관 전문'}</ContentDialog.Title>
             <ContentDialog.Description>
-              임시 문안 · 버전 {term?.version ?? '-'}
+              시행일 {term?.effectiveAt ?? '-'} · 버전 {term?.version ?? '-'}
             </ContentDialog.Description>
             <ContentDialog.CloseButton aria-label="약관 전문 닫기">
               <svg className="sign-up-close-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -673,7 +709,7 @@ function TermsOverlay({
                   as="p"
                   key={`${term.id}-${index}`}
                   textStyle="t5Regular"
-                  color={index === 0 ? 'fg.warning' : 'fg.neutral'}
+                  color="fg.neutral"
                 >
                   {paragraph}
                 </Text>

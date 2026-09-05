@@ -31,6 +31,13 @@ TwoStepSignUpService
 - 가입 자격 값은 표시 이메일, 정규화 이메일과 인증 시각이며 TTL은 15분이다.
 - `RedisSignUpCredentialStore`는 `HSET`과 `PEXPIRE`를 단일 Lua 실행으로 묶어 TTL 없는 가입 자격이 남지 않게 한다.
 
+## 인증 메일 발송
+
+- 가입 인증 메일은 요청 스레드에서 `JavaMailSender`로 동기 발송한다. 별도 비동기 큐나 자동 SMTP 재시도는 사용하지 않으며, API는 SMTP 발송이 성공한 뒤 `202 Accepted`를 반환한다.
+- UTF-8 `multipart/alternative` MIME 메시지에 동일한 인증 코드와 안내를 담은 `text/plain` 대체 본문과 인라인 CSS 기반 `text/html` 본문을 함께 보낸다. HTML은 NalQ 텍스트 워드마크만 사용하고 원격 이미지, 추적 URL, 스크립트와 첨부를 포함하지 않는다.
+- Gmail SMTP 기본값은 587 포트와 필수 STARTTLS이며 서버 인증서를 확인한다. 연결 5초, 읽기·쓰기 각 10초의 유한 timeout을 적용하고 환경변수로 조정할 수 있다.
+- MIME 구성 또는 SMTP 발송이 실패하면 `AUTH_008`을 반환한다. `TwoStepSignUpService`는 실패한 발급의 digest가 아직 현재 값일 때만 `cancelIssue`로 Redis 코드와 재발송 제한을 제거한다. 취소 실패는 원래 `AUTH_008`을 가리지 않으며 남은 상태는 10분 TTL로 정리된다.
+
 ## 최종 가입 순서
 
 최종 가입은 다음 순서를 유지한다.

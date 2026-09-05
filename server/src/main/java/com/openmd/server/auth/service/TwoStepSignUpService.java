@@ -39,7 +39,7 @@ public final class TwoStepSignUpService {
 	private static final Duration RESEND_COOLDOWN = Duration.ofSeconds(60);
 	private static final Duration SIGN_UP_TOKEN_TTL = Duration.ofMinutes(15);
 	private static final String CODE_REGEX = "[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}";
-	private static final String TERMS_VERSION = "TEMP-2026-08-20";
+	private static final String TERMS_VERSION = "2026-09-04";
 	private static final Map<String, String> REQUIRED_AGREEMENTS = Map.of(
 		"SERVICE_TERMS", TERMS_VERSION,
 		"PRIVACY_COLLECTION", TERMS_VERSION

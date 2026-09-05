@@ -1,0 +1,54 @@
+# Render __API_DOMAIN__ before installing this file. The log format intentionally
+# omits query strings, Cookie, Authorization and request bodies.
+log_format nalq_redacted '$remote_addr - $remote_user [$time_local] '
+                         '"$request_method $uri $server_protocol" $status $body_bytes_sent '
+                         '"$http_referer" "$http_user_agent" request_time=$request_time';
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name __API_DOMAIN__;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+        default_type text/plain;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+
+    access_log /var/log/nginx/nalq-api-access.log nalq_redacted;
+    error_log /var/log/nginx/nalq-api-error.log warn;
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name __API_DOMAIN__;
+
+    ssl_certificate /etc/letsencrypt/live/__API_DOMAIN__/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/__API_DOMAIN__/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:NALQ_TLS:10m;
+    ssl_session_timeout 1d;
+
+    client_max_body_size 1m;
+    proxy_connect_timeout 5s;
+    proxy_send_timeout 75s;
+    proxy_read_timeout 75s;
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header Connection "";
+    }
+
+    access_log /var/log/nginx/nalq-api-access.log nalq_redacted;
+    error_log /var/log/nginx/nalq-api-error.log warn;
+}

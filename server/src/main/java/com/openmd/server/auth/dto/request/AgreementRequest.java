@@ -6,6 +6,6 @@ import jakarta.validation.constraints.Size;
 
 public record AgreementRequest(
 	@NotBlank @Size(max = 64) @Schema(example = "SERVICE_TERMS") String termsId,
-	@NotBlank @Size(max = 64) @Schema(example = "TEMP-2026-08-20") String version
+	@NotBlank @Size(max = 64) @Schema(example = "2026-09-04") String version
 ) {
 }

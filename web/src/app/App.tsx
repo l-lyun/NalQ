@@ -46,14 +46,14 @@ import { VerifyEmailPage } from '@/pages/verify-email/VerifyEmailPage'
     ...(import.meta.env.DEV ? [
       { path: '/landing-preview', element: <PublicLandingPage /> },
       { path: '/onboarding-preview', element: <OnboardingPage mode="guide" onExit={() => undefined} /> },
-      { path: '/terms', element: <TermsPage /> },
-      { path: '/privacy', element: <PrivacyPage /> },
     ] : []),
   { path: '/', element: <RootEntryRoute /> },
+  { path: '/terms', element: <TermsPage /> },
+  { path: '/privacy', element: <PrivacyPage /> },
   { path: '/support', element: <SupportPage /> },
   { path: '/open-source-licenses', element: <OpenSourceLicensesPage /> },
-  { path: '/profile/terms', element: <Navigate to={import.meta.env.DEV ? '/terms' : '/support'} replace /> },
-  { path: '/profile/privacy', element: <Navigate to={import.meta.env.DEV ? '/privacy' : '/support'} replace /> },
+  { path: '/profile/terms', element: <Navigate to="/terms" replace /> },
+  { path: '/profile/privacy', element: <Navigate to="/privacy" replace /> },
   { path: '/profile/inquiry', element: <Navigate to="/support" replace /> },
   { path: '/profile/marketing', element: <Navigate to="/" replace /> },
   {

@@ -1,3 +1,11 @@
+import {
+  LEGAL_EFFECTIVE_AT,
+  LEGAL_VERSION,
+  privacyPolicy,
+  serviceTerms,
+  type LegalDocument,
+} from '../public-service/legalContent'
+
 export type SignUpTermId = 'service' | 'privacy'
 
 export type SignUpTerm = {
@@ -5,44 +13,31 @@ export type SignUpTerm = {
   title: string
   shortLabel: string
   version: string
+  effectiveAt: string
   paragraphs: readonly string[]
 }
-const temporaryNotice =
-  '아래 내용은 회원가입 화면의 동작과 긴 문서 표시를 검수하기 위한 임시 문안입니다. 실제 운영 약관이 아니며, 서비스 공개 전 법률 검토를 거친 약관으로 교체해야 합니다.'
+
+function documentParagraphs(document: LegalDocument) {
+  return document.sections.map(
+    (section) => `${section.heading} ${section.paragraphs.join(' ')}`,
+  )
+}
 
 export const signUpTerms: Record<SignUpTermId, SignUpTerm> = {
   service: {
     id: 'service',
-    title: '서비스 이용약관',
-    shortLabel: '서비스 이용약관에 동의해요.',
-    version: 'TEMP-2026-08-20',
-    paragraphs: [
-      temporaryNotice,
-      '제1조 (목적) 이 임시 문안은 NalQ가 제공하는 학습자료 정리, 문제 생성, 문제 풀이와 복습 기능을 이용할 때 화면에서 약관을 읽고 동의하는 흐름을 확인하기 위해 작성되었습니다.',
-      '제2조 (계정) 사용자는 본인이 이용할 수 있는 이메일 주소와 안전한 비밀번호를 사용해야 합니다. 다른 사람의 정보를 도용하거나 서비스 운영을 방해하는 방식으로 계정을 사용해서는 안 됩니다.',
-      '제3조 (학습 콘텐츠) 사용자가 입력하거나 연결한 학습자료에 관한 권리와 책임은 해당 사용자에게 있습니다. 공개하거나 사용할 권한이 없는 자료, 타인의 개인정보 또는 불법적인 내용을 입력해서는 안 됩니다.',
-      '제4조 (AI 생성 결과) 문제와 해설 등 자동으로 생성된 결과에는 오류나 누락이 있을 수 있습니다. 중요한 학습 내용은 원문과 함께 확인해야 하며, 서비스는 생성 결과가 항상 정확하거나 특정 학습 성과를 보장한다고 약속하지 않습니다.',
-      '제5조 (서비스 이용 제한) 시스템의 안정성을 해치는 자동화 요청, 부정 이용, 권한 우회가 확인되면 서비스 이용이 일시적으로 제한될 수 있습니다. 구체적인 제한과 복구 정책은 운영 약관에서 별도로 안내합니다.',
-      '제6조 (서비스 변경) 기능의 품질 개선과 안전한 운영을 위해 일부 기능이나 제공 방식이 변경될 수 있습니다. 사용자에게 중요한 영향을 주는 변경은 운영 정책에 따라 알기 쉬운 방법으로 안내합니다.',
-      '제7조 (책임과 문의) 서비스 이용 중 문제가 발생하면 정해진 고객지원 경로로 문의할 수 있습니다. 책임의 범위, 분쟁 해결 절차와 관할에 관한 내용은 실제 운영 약관에서 확정합니다.',
-      '부칙 이 문안의 버전은 TEMP-2026-08-20이며 화면 개발과 품질 검수 목적으로만 사용합니다.',
-    ],
+    title: serviceTerms.title,
+    shortLabel: '만 14세 이상이며 서비스 이용약관에 동의해요.',
+    version: LEGAL_VERSION,
+    effectiveAt: LEGAL_EFFECTIVE_AT,
+    paragraphs: documentParagraphs(serviceTerms),
   },
   privacy: {
     id: 'privacy',
     title: '개인정보 수집·이용 동의',
     shortLabel: '개인정보 수집·이용에 동의해요.',
-    version: 'TEMP-2026-08-20',
-    paragraphs: [
-      temporaryNotice,
-      '1. 수집 항목(임시) 회원가입 과정에서 이메일 주소, 비밀번호의 안전한 변환값, 닉네임, 약관 동의 기록과 서비스 이용에 필요한 기술 정보를 처리하는 화면을 가정합니다. 비밀번호 원문은 저장 대상으로 안내하지 않습니다.',
-      '2. 수집 목적(임시) 본인 확인, 계정 생성과 로그인 유지, 사용자 식별, 학습 기능 제공, 부정 이용 방지와 서비스 오류 대응을 목적으로 정보를 처리하는 상황을 검수합니다.',
-      '3. 보유 기간(임시) 실제 보유 기간은 관련 법률, 탈퇴와 데이터 삭제 정책, 운영상 필요한 기간을 검토한 뒤 확정해야 합니다. 이 임시 문안만으로 보유 기간이나 파기 절차가 확정되지 않습니다.',
-      '4. 동의 거부 사용자는 개인정보 수집·이용에 동의하지 않을 수 있습니다. 다만 계정 생성에 꼭 필요한 항목에 동의하지 않으면 회원가입과 개인화된 학습 기능을 이용할 수 없는 화면 흐름을 가정합니다.',
-      '5. 처리 위탁과 국외 이전 실제 서비스에서 외부 메일 발송, 인프라 또는 AI 제공자를 이용하는 경우 처리 항목, 수탁자, 목적과 보유 기간을 별도로 검토하고 운영 문서에 정확히 반영해야 합니다.',
-      '6. 이용자의 권리 개인정보 열람, 정정, 삭제, 처리 정지와 동의 철회 방법은 실제 계정 관리 및 고객지원 정책과 함께 확정해 안내해야 합니다.',
-      '7. 안전성 확보 비밀번호와 인증정보를 보호하고 접근 권한을 통제하는 등 합리적인 안전조치를 적용하는 상황을 전제로 하지만, 구체적인 보호조치는 실제 시스템과 정책을 기준으로 검토해야 합니다.',
-      '부칙 이 문안의 버전은 TEMP-2026-08-20이며 화면 개발과 품질 검수 목적으로만 사용합니다.',
-    ],
+    version: LEGAL_VERSION,
+    effectiveAt: LEGAL_EFFECTIVE_AT,
+    paragraphs: documentParagraphs(privacyPolicy),
   },
 }

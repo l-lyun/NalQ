@@ -1,0 +1,22 @@
+# Render __API_DOMAIN__ before installing this file.
+log_format nalq_redacted '$remote_addr - $remote_user [$time_local] '
+                         '"$request_method $uri $server_protocol" $status $body_bytes_sent '
+                         '"$http_referer" "$http_user_agent" request_time=$request_time';
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name __API_DOMAIN__;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+        default_type text/plain;
+    }
+
+    location / {
+        return 503;
+    }
+
+    access_log /var/log/nginx/nalq-api-access.log nalq_redacted;
+    error_log /var/log/nginx/nalq-api-error.log warn;
+}

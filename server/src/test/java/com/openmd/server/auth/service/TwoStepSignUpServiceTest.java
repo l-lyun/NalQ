@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -93,6 +94,46 @@ class TwoStepSignUpServiceTest {
 			eq(emailKey), eq(digests.create(emailKey, "A7K9M2")), eq(NOW), any(), any(), eq(true)
 		);
 		verify(emails).sendVerificationCode("Learner@Example.COM", "A7K9M2");
+		verify(verifications, never()).cancelIssue(any(), any());
+	}
+
+	@Test
+	void mailDeliveryFailureCancelsOnlyTheIssuedDigestAndKeepsAuth008() {
+		when(users.findByNormalizedEmail("learner@example.com")).thenReturn(Optional.empty());
+		when(codes.generate()).thenReturn("A7K9M2");
+		String emailKey = digests.emailKey("learner@example.com");
+		String digest = digests.create(emailKey, "A7K9M2");
+		when(verifications.issue(eq(emailKey), eq(digest), eq(NOW), any(), any(), eq(true)))
+			.thenReturn(EmailVerificationStore.IssueResult.success());
+		doThrow(new BusinessException(AuthErrorCode.EMAIL_DELIVERY_FAILED))
+			.when(emails).sendVerificationCode("learner@example.com", "A7K9M2");
+
+		BusinessException exception = assertThrows(BusinessException.class,
+			() -> service.requestEmailVerification("learner@example.com"));
+
+		assertEquals(AuthErrorCode.EMAIL_DELIVERY_FAILED, exception.getErrorCode());
+		verify(verifications).cancelIssue(emailKey, digest);
+	}
+
+	@Test
+	void cancellationFailureDoesNotHideTheOriginalMailDeliveryFailure() {
+		when(users.findByNormalizedEmail("learner@example.com")).thenReturn(Optional.empty());
+		when(codes.generate()).thenReturn("A7K9M2");
+		String emailKey = digests.emailKey("learner@example.com");
+		String digest = digests.create(emailKey, "A7K9M2");
+		when(verifications.issue(eq(emailKey), eq(digest), eq(NOW), any(), any(), eq(true)))
+			.thenReturn(EmailVerificationStore.IssueResult.success());
+		BusinessException deliveryFailure = new BusinessException(AuthErrorCode.EMAIL_DELIVERY_FAILED);
+		doThrow(deliveryFailure).when(emails).sendVerificationCode("learner@example.com", "A7K9M2");
+		IllegalStateException cancellationFailure = new IllegalStateException("redis unavailable");
+		doThrow(cancellationFailure).when(verifications).cancelIssue(emailKey, digest);
+
+		BusinessException exception = assertThrows(BusinessException.class,
+			() -> service.requestEmailVerification("learner@example.com"));
+
+		assertEquals(AuthErrorCode.EMAIL_DELIVERY_FAILED, exception.getErrorCode());
+		assertEquals(1, exception.getSuppressed().length);
+		assertEquals(cancellationFailure, exception.getSuppressed()[0]);
 	}
 
 	@Test
@@ -197,9 +238,9 @@ class TwoStepSignUpServiceTest {
 		ArgumentCaptor<User> saved = ArgumentCaptor.forClass(User.class);
 		verify(users).saveAndFlush(saved.capture());
 		assertEquals("Study7", saved.getValue().getNickname());
-		assertEquals("TEMP-2026-08-20", saved.getValue().getServiceTermsVersion());
+		assertEquals("2026-09-04", saved.getValue().getServiceTermsVersion());
 		assertEquals(NOW, saved.getValue().getServiceTermsAgreedAt());
-		assertEquals("TEMP-2026-08-20", saved.getValue().getPrivacyTermsVersion());
+		assertEquals("2026-09-04", saved.getValue().getPrivacyTermsVersion());
 		assertEquals(NOW, saved.getValue().getPrivacyTermsAgreedAt());
 		InOrder order = inOrder(transactions, credentials, refreshTokens, accessTokens);
 		order.verify(transactions).execute(any());
@@ -317,7 +358,7 @@ class TwoStepSignUpServiceTest {
 			"learner@example.com", "learner@example.com", NOW
 		)));
 		SignUpCommand missingPrivacy = new SignUpCommand(token, "password1", "Study7", List.of(
-			new TermsAgreement("SERVICE_TERMS", "TEMP-2026-08-20")
+			new TermsAgreement("SERVICE_TERMS", "2026-09-04")
 		));
 
 		BusinessException exception = assertThrows(BusinessException.class,
@@ -336,13 +377,13 @@ class TwoStepSignUpServiceTest {
 			"learner@example.com", "learner@example.com", NOW
 		)));
 		SignUpCommand duplicated = new SignUpCommand(token, "password1", "Study7", List.of(
-			new TermsAgreement("SERVICE_TERMS", "TEMP-2026-08-20"),
-			new TermsAgreement("SERVICE_TERMS", "TEMP-2026-08-20"),
-			new TermsAgreement("PRIVACY_COLLECTION", "TEMP-2026-08-20")
+			new TermsAgreement("SERVICE_TERMS", "2026-09-04"),
+			new TermsAgreement("SERVICE_TERMS", "2026-09-04"),
+			new TermsAgreement("PRIVACY_COLLECTION", "2026-09-04")
 		));
 		SignUpCommand unsupportedVersion = new SignUpCommand(token, "password1", "Study7", List.of(
 			new TermsAgreement("SERVICE_TERMS", "OLD"),
-			new TermsAgreement("PRIVACY_COLLECTION", "TEMP-2026-08-20")
+			new TermsAgreement("PRIVACY_COLLECTION", "2026-09-04")
 		));
 
 		BusinessException duplicateError = assertThrows(BusinessException.class,
@@ -413,8 +454,8 @@ class TwoStepSignUpServiceTest {
 
 	private SignUpCommand command(String token, String nickname) {
 		return new SignUpCommand(token, "password1", nickname, List.of(
-			new TermsAgreement("SERVICE_TERMS", "TEMP-2026-08-20"),
-			new TermsAgreement("PRIVACY_COLLECTION", "TEMP-2026-08-20")
+			new TermsAgreement("SERVICE_TERMS", "2026-09-04"),
+			new TermsAgreement("PRIVACY_COLLECTION", "2026-09-04")
 		));
 	}
 

@@ -179,14 +179,14 @@ scope: shared
   "password": "<redacted>",
   "nickname": "공부왕7",
   "agreements": [
-    { "termsId": "SERVICE_TERMS", "version": "TEMP-2026-08-20" },
-    { "termsId": "PRIVACY_COLLECTION", "version": "TEMP-2026-08-20" }
+    { "termsId": "SERVICE_TERMS", "version": "2026-09-04" },
+    { "termsId": "PRIVACY_COLLECTION", "version": "2026-09-04" }
   ]
 }
 ```
 
 - `password`: 이메일 가입에만 필수이며 8~64자, 영문자·숫자 각각 1자 이상, 공백 불가, 특수문자 선택이다. 비밀번호 확인 값은 전송하지 않는다.
-- `agreements`는 단순 boolean이 아니라 사용자가 동의한 약관 식별자와 버전의 목록이다. 예시의 `TEMP-2026-08-20`은 현재 프론트엔드 임시 전문용 값이며 법률 검토가 끝난 운영 약관 버전으로 간주하지 않는다.
+- `agreements`는 단순 boolean이 아니라 사용자가 동의한 약관 식별자와 버전의 목록이다. 첫 공개 베타 운영 약관과 개인정보 수집·이용 동의 버전은 `2026-09-04`다.
 - 서버는 가입 계속 자격, 닉네임 형식·전역 중복과 필수 약관의 식별자·버전을 최종 요청에서 다시 검증한다.
 - 서버가 허용한 서비스 이용약관과 개인정보 수집·이용 동의의 버전과 서버 시각의 동의 시각은 별도 이력 테이블 없이 새 사용자 행에 각각 저장한다.
 - 성공 시 `ACTIVE` 사용자 행을 처음 생성한다. 네이티브 endpoint는 로그인과 같은 세션 body를, 브라우저 endpoint는 Access Token body와 HttpOnly Refresh Token Cookie를 발급한다.
