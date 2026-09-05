@@ -79,10 +79,23 @@ record_rollback_candidate() {
 	local current_image="$1"
 	local target_image="$2"
 	local state_directory="$3"
+	local verified_marker verified_image marker_line_count
 	[ -n "$current_image" ] || return 0
 	require_immutable_image "$current_image"
-	[ "$current_image" != "$target_image" ] || return 0
-	atomic_write_file "$current_image" "$state_directory/previous-server-image"
+	verified_marker="$state_directory/current-server-image"
+	[ -f "$verified_marker" ] || die "running server has no last-verified image marker: $verified_marker"
+	marker_line_count="$(wc -l <"$verified_marker" | tr -d ' ')"
+	[ "$marker_line_count" = "1" ] || die "last-verified image marker is malformed: $verified_marker"
+	verified_image="$(head -1 "$verified_marker")"
+	if ! [[ "$verified_image" =~ @sha256:[0-9a-f]{64}$ ]]; then
+		die "last-verified image marker is malformed: $verified_marker"
+	fi
+	if [ "$current_image" != "$verified_image" ]; then
+		log "running image is not the last smoke-verified image; preserving the existing rollback target"
+		return 0
+	fi
+	[ "$verified_image" != "$target_image" ] || return 0
+	atomic_write_file "$verified_image" "$state_directory/previous-server-image"
 	log "recorded current running image as rollback target before replacement"
 }
 

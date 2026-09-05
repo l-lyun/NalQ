@@ -111,7 +111,7 @@ sudo ./scripts/production/deploy-server.sh \
   --skip-backup --confirm-empty-db FIRST_EMPTY_DATABASE
 ```
 
-스크립트는 environment 계약과 restore 미완료 marker 부재를 검증하고, MySQL·Redis를 기다린 뒤 기존 DB가 있으면 backup한다. 실행 중인 현재 image가 새 image와 다르면 그 digest를 교체 전에 원자적으로 rollback 대상으로 기록한다. 따라서 새 image pull·기동이나 HTTPS smoke가 실패해도 직전 image가 남는다. 첫 배포에는 이전 image 파일을 만들지 않고 동일 image 재배포는 기존 rollback 대상을 덮어쓰지 않는다. Flyway는 기존 시작 동작을 유지하고 JPA `validate`를 바꾸지 않는다.
+스크립트는 environment 계약과 restore 미완료 marker 부재를 검증하고, MySQL·Redis를 기다린 뒤 기존 DB가 있으면 backup한다. `current-server-image`는 마지막 외부 HTTPS smoke에 성공한 image marker다. 실행 중 image가 이 marker와 일치하고 새 image와 다를 때만 검증된 image를 교체 전에 `previous-server-image`에 원자 기록한다. 실패한 image가 계속 실행되는 상태에서 다음 배포를 재시도하면 기존 rollback 후보를 보존한다. 실행 container가 있는데 성공 marker가 없거나 손상됐으면 자동 승격하지 않고 배포를 중단한다. 첫 배포에는 이전 image 파일을 만들지 않고 동일 image 재배포는 기존 rollback 대상을 덮어쓰지 않는다. Flyway는 기존 시작 동작을 유지하고 JPA `validate`를 바꾸지 않는다.
 
 ## 서버 rollback
 

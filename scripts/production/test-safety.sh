@@ -137,16 +137,47 @@ expect_failure_containing 'restore is incomplete' \
 
 first_image='registry.invalid/openmd/server@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 second_image='registry.invalid/openmd/server@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+third_image='registry.invalid/openmd/server@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc'
+fourth_image='registry.invalid/openmd/server@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd'
 rollback_state="$temporary_directory/rollback-state"
+mkdir -p "$rollback_state"
+
+# First deploy has no running image and therefore needs no verified marker.
 record_rollback_candidate "" "$second_image" "$rollback_state"
 [ ! -e "$rollback_state/previous-server-image" ]
-atomic_write_file "$first_image" "$rollback_state/previous-server-image"
-record_rollback_candidate "$second_image" "$second_image" "$rollback_state"
-[ "$(head -1 "$rollback_state/previous-server-image")" = "$first_image" ]
+
+# A running container without a trustworthy success marker must stop safely.
+expect_failure_containing 'no last-verified image marker' \
+	record_rollback_candidate "$first_image" "$second_image" "$rollback_state"
+printf '%s\n%s\n' "$first_image" "$second_image" >"$rollback_state/current-server-image"
+expect_failure_containing 'last-verified image marker is malformed' \
+	record_rollback_candidate "$first_image" "$second_image" "$rollback_state"
+printf '%s\n' 'not-an-image-digest' >"$rollback_state/current-server-image"
+expect_failure_containing 'last-verified image marker is malformed' \
+	record_rollback_candidate "$first_image" "$second_image" "$rollback_state"
+
+# A was smoke-verified; a normal A -> B deployment records A.
+atomic_write_file "$first_image" "$rollback_state/current-server-image"
 record_rollback_candidate "$first_image" "$second_image" "$rollback_state" >/dev/null
 [ "$(head -1 "$rollback_state/previous-server-image")" = "$first_image" ]
 
-record_line="$(grep -nF 'record_rollback_candidate "$previous_image"' "$SCRIPT_DIR/deploy-server.sh" | cut -d: -f1)"
+# B failed smoke, so B -> C retry must preserve A instead of promoting B.
+record_rollback_candidate "$second_image" "$third_image" "$rollback_state" >/dev/null
+[ "$(head -1 "$rollback_state/previous-server-image")" = "$first_image" ]
+
+# C succeeding changes only the verified marker; A remains its rollback target.
+atomic_write_file "$third_image" "$rollback_state/current-server-image"
+[ "$(head -1 "$rollback_state/previous-server-image")" = "$first_image" ]
+
+# Redeploying the same verified image leaves the prior rollback target intact.
+record_rollback_candidate "$third_image" "$third_image" "$rollback_state" >/dev/null
+[ "$(head -1 "$rollback_state/previous-server-image")" = "$first_image" ]
+
+# A later normal C -> D deployment records verified C.
+record_rollback_candidate "$third_image" "$fourth_image" "$rollback_state" >/dev/null
+[ "$(head -1 "$rollback_state/previous-server-image")" = "$third_image" ]
+
+record_line="$(grep -nF 'record_rollback_candidate "$running_image"' "$SCRIPT_DIR/deploy-server.sh" | cut -d: -f1)"
 pull_line="$(grep -nF 'compose pull server' "$SCRIPT_DIR/deploy-server.sh" | cut -d: -f1)"
 [ -n "$record_line" ] && [ -n "$pull_line" ] && [ "$record_line" -lt "$pull_line" ] || {
 	printf 'rollback image must be atomically recorded before replacement\n' >&2

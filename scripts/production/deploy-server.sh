@@ -56,11 +56,11 @@ fi
 
 require_restore_complete "$STATE_DIRECTORY"
 running_container_id="$(compose ps --status running --quiet server 2>/dev/null | head -1)"
-previous_image=""
+running_image=""
 if [ -n "$running_container_id" ]; then
-	previous_image="$(docker inspect --format '{{.Config.Image}}' "$running_container_id")"
+	running_image="$(docker inspect --format '{{.Config.Image}}' "$running_container_id")"
 fi
-record_rollback_candidate "$previous_image" "$IMAGE" "$STATE_DIRECTORY"
+record_rollback_candidate "$running_image" "$IMAGE" "$STATE_DIRECTORY"
 
 log "pulling and starting server image"
 compose pull server
