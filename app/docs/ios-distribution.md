@@ -14,6 +14,7 @@
 | EAS project | `@hhhyyuns-team/nalq` | Expo 팀 프로젝트 연결 완료 |
 | App Store Connect Apple ID | `6807688566` | `NalQ` 앱 레코드 생성 및 EAS 제출 설정 연결 완료 |
 | iPad 지원 | 활성화 | 기존 설정 유지, iPad 실기기 검증과 스크린샷 필요 |
+| 스플래시 | 흰 배경·`contain`·200pt | `expo-splash-screen`이 `assets/splash-icon.png` 사용 |
 | 수출 규정 | 비면제 암호화 미사용 | 현재 앱이 OS의 표준 HTTPS/WebView만 사용하는 범위 기준 |
 
 `bundleIdentifier`는 App Store에 등록한 뒤 기존 앱에서 바꿀 수 없는 앱 정체성이다. `com.nalq.app`은 Apple Developer의 개인 팀에 등록되어 있다.
@@ -47,8 +48,9 @@ pnpm dlx eas-cli@latest submit --platform ios --profile production
 
 ## 저장소 밖에서 아직 필요한 출시 자료
 
-- 현재 `assets/icon.png`와 splash 자산은 Expo 기본 자산이므로 최종 NalQ 브랜드 자산으로 교체해야 한다. iOS 아이콘은 1024×1024 PNG, 불투명 배경으로 준비한다.
-- `supportsTablet=true`를 유지하면 iPad 화면 동작 검증과 App Store용 iPad 스크린샷이 필요하다. iPhone 전용 출시가 제품 결정이면 첫 제출 전에 `false`로 변경한다.
+- 현재 `assets/icon.png`는 Expo 기본 자산이므로 최종 NalQ 브랜드 자산으로 교체해야 한다. iOS 아이콘은 1024×1024 PNG, 불투명 배경으로 준비한다.
+- 스플래시는 `assets/splash-icon.png`를 흰 배경 중앙에 표시하도록 연결되어 있다. 현재 파일도 Expo 기본 이미지이므로 최종 NalQ 이미지로 같은 경로에 교체한 뒤 iPhone과 iPad의 cold launch에서 여백과 크기를 확인한다.
+- iPad 지원은 `supportsTablet=true`로 유지한다. 별도 태블릿 UI 대신 웹의 모바일 단일 열과 주요 학습 화면의 최대 640px 본문 폭을 재사용한다. iPad 화면 동작 검증과 App Store용 iPad 스크린샷은 필요하다.
 - 운영 WebView URL과 API/Cookie 구성이 HTTPS에서 실제로 동작하는지 iPhone과 iPad에서 확인한다.
 - App Store 설명, 키워드, 카테고리, 지원 URL, 개인정보처리방침 URL, 심사용 로그인 계정과 리뷰 메모를 App Store Connect에 입력한다.
 - 앱에서 계정을 만들 수 있으므로 승인된 개인정보처리방침과 앱 내부 회원 탈퇴 흐름이 사용자에게 제공되어야 한다. 현재 제품 문서상 두 항목은 아직 운영 확정 전이므로 심사 제출 전 별도 완료가 필요하다.
