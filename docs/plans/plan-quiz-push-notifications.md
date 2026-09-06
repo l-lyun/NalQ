@@ -195,3 +195,23 @@ Expo data는 `payloadVersion`, `notificationId`, `bindingId`로 구성하고 표
 3. **foreground 억제와 회귀 확인**: 앱 초기화부터 알림 표시를 억제하고 앱·웹 자동 검증을 실행한다. 무음·무진동 및 실제 단말 수신은 실기기로 별도 확인한다.
 
 푸시 탭 이동·cold start 복원은 별도 후속 단위로 남긴다. 의존성 설치·신규 브리지·실기기 빌드 준비가 남아 있으므로, 남은 약 50분 안에 등록/해제 전체와 실기기 검증까지 완료한다고 확약하지 않는다. 다음 작업에서는 먼저 의존성 기준선을 복구하고 검증 가능한 첫 구현 단위를 완료하는 것을 목표로 한다.
+
+## 11. 브리지·보안 저장 기반 구현 (2026-09-07)
+
+[준비 점검 PR #62](https://github.com/l-lyun/NalQ/pull/62)의 `cb2a4fd`에서 `codex/push-bridge-foundation`을 분기했다. 이번 단위는 다음 기반만 구현하며 서버 코드와 발송 flag는 변경하지 않는다.
+
+- 앱: 문서 로드별 session, WEB_READY/HELLO, 빈 capability, 보안 저장소 기반 installation ID/key 초기화와 직렬 저장 repository. 손상 상태·저장 실패를 성공으로 처리하거나 기존 key를 자동 덮어쓰지 않는다.
+- 웹: 정상 최상위 문서에서만 handshake를 시도하고 3회 제한 재시도, replyTo·schema·크기 검증과 cleanup을 연결한다. 실제 앱 serializer와 웹 parser를 한 테스트에서 연결했다.
+- 공통 계약: 초기 null session, HELLO.replyTo, 고정 이벤트의 JSON 문자열과 빈 capability의 의미를 구체화했다.
+- 의존성: SDK 호환 Crypto·SecureStore 및 config plugin, 생성된 third-party notices를 반영했다. 앞선 의존성 설치 BLOCKED는 해소했다.
+
+### 검증 결과와 남은 경계
+
+- **PASS**: 앱 `pnpm typecheck && pnpm test`, 웹 `pnpm verify`(타입·테스트·라이선스·린트·빌드).
+- **PASS**: `./scripts/verify.sh all`. 서버 fast/integration은 서버 변경이 없어 기존 결과를 재사용한 `UP-TO-DATE`이며, 이번에 401개 테스트를 새로 실행했다고 보고하지 않는다.
+- **PASS**: `git diff --check`.
+- **미검증**: 실제 iOS/Android SecureStore·WebView 동작과 네이티브 빌드. Node 저장소/DOM 대역 검증은 실기기 검증이 아니다.
+
+현재 WebView SDK의 onMessage에는 최상위 프레임 여부가 없어 origin 검사와 정상 웹 발신 guard만으로 악성 iframe의 출처를 증명하지 못한다. 플랫폼별 한계는 [앱 TRD](../../app/docs/trd/trd-push-bridge-foundation.md)에 기록했다. **native-level 최상위 문서 출처 보강 또는 동등한 격리를 완료하기 전에는 push-v1을 활성화하지 않는다.** 이번에는 자격/사용자 정보를 브리지로 보내지 않는다.
+
+실제 authEpoch·refresh fence, 등록/해제 HTTP, OS 권한·토큰, pending 재전송/ACK, foreground 표시 억제와 푸시 선택은 아직 미구현이다. 다음 단위는 최상위 문서 출처 보호를 먼저 보강한 후 인증·등록/해제의 안전 경계를 연결한다.

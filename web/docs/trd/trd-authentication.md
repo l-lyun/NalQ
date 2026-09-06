@@ -383,3 +383,11 @@ web/src/
 - 승인된 CSRF 방어 없이 cookie 기반 refresh/logout이 성공하지 않는다.
 - 브라우저 저장소와 콘솔·오류 추적 payload에 토큰 원문이 남지 않는다.
 - Web Locks 지원 환경에서 여러 탭의 refresh 요청이 직렬화된다.
+
+## 18. 네이티브 브리지 기반 — 기능 활성화 전
+
+`AuthBootstrap`은 인증 bootstrap과 독립인 effect에서 `shared/native/nativeBridge.ts`의 transport handshake를 시작하고 해제한다. 일반 브라우저·하위 frame에는 통로를 열지 않는다. 리스너 설치 후 WEB_READY를 보내며, 같은 논리 messageId로 최대 3회만 시도한다. HELLO의 버전·스키마·8KiB UTF-8 크기·요청 상관관계를 검사하고 cleanup/응답/전송 실패/timeout에서 리스너와 타이머를 제거한다. StrictMode effect 재실행은 새로운 handshake 요청으로 시작한다.
+
+메시지 원장은 [푸시 브리지 계약](../../../docs/contracts/contract-api-push-notifications.md#6-브리지-envelope와-연결)이다. 현재 구현은 HELLO까지만 확인하며, 새 앱이 push-v1을 광고하더라도 아직 AUTH_STATE·등록·해제·선택 메시지를 보내거나 처리하지 않는다. 웹 저장소에 설치 자격을 보관하지 않고 기존 인증·refresh 동작도 바꾸지 않는다.
+
+다음 등록 단위에서는 실제 인증 epoch 소스, 계정 전환 및 refresh 전후 fence, 로그아웃 전 내구 해제 ACK를 함께 구현해야 한다. 현재 handshake의 epoch=0은 그 인증 경계를 구현했다는 뜻이 아니다. 순수 transport 회귀는 `pnpm test`로 실행하며 `pnpm verify`에도 포함한다. DOM 대역 테스트는 실제 WebView 최상위 문서 주입과 iOS/Android 검증을 대체하지 않는다.
