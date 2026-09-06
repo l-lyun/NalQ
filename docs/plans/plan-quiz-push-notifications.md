@@ -105,7 +105,7 @@ Expo data는 `payloadVersion`, `notificationId`, `bindingId`로 구성하고 표
 
 ## 7. 기존 문서와 변경 경계
 
-서버 파일 배치, 기존 코드 연결 지점, 트랜잭션·잠금·기술 기본값 및 테스트 파일은 [서버 푸시 TRD](../../server/docs/trd/trd-quiz-push-notifications.md)에 구체화한다. 아직 파일 구현은 하지 않았다.
+서버 파일 배치, 기존 코드 연결 지점, 트랜잭션·잠금·기술 기본값 및 테스트 파일은 [서버 푸시 TRD](../../server/docs/trd/trd-quiz-push-notifications.md)에 구체화한다. 서버 구현·실행 검증 현황은 아래 9절에 기록한다.
 
 앱 셸 TRD의 '브리지·푸시 비범위'는 현재 버전 설명이다. 이 설계 채택 시 해당 절을 확장하고 허용 메시지를 공유 Contract에 연결한다. 기존 알림 API는 유지하면서 단일 조회와 기기 API를 추가한다. PRD의 중복 표시 방지 목표를 OS exactly-once로 확대하지 않는다.
 
@@ -118,4 +118,21 @@ Expo data는 `payloadVersion`, `notificationId`, `bindingId`로 구성하고 표
 - 웹·앱 테스트: 웹 단독 미등록, 로그인 성공 후 권한 요청, 새 설치·토큰 갱신, cold/warm 진입, 다른 계정 404, 삭제 대상, durable read 재시도·계정 분리, 구버전 handshake 무응답.
 - 실기기: 두 기기 중 하나 foreground/다른 하나 background, 종료 앱에서 알림 선택, 제목 표시, OS 권한 변경, 로그아웃 직전 발송, 네트워크 단절 후 재접속.
 - 배포 순서 제안: additive 서버 기능(발송 off) → 구앱 호환 웹 → 푸시 앱 빌드 → 실제 생성 E2E → 신규 알림부터 발송 활성화. rollback은 발송 중단 후 기존 알림함 유지.
-- 이번 검증: 문서 diff·참조만 확인한다. 단말 도달·권한 팝업·foreground 무음 동작은 아직 미검증이다.
+- 설계 단계에서는 문서 diff·참조를 확인했다. 이후 서버 실행 검증은 9절에 구분한다. 단말 도달·권한 팝업·foreground 무음 동작은 아직 미검증이다.
+
+## 9. 서버 구현 진행 기록 (2026-09-06)
+
+- 사용자 승인 범위: 서버만 구현하며 기기 관리 → Outbox·단일 조회 → 발송 Worker·정리 순서로 커밋을 분리한다. 웹·앱과 운영 발송 활성화는 제외한다.
+- 변경 전 기준선: `cd server && ./gradlew fastTest --no-daemon` PASS (267 tests). Java 21 및 Docker 28.5.1 확인.
+- 단일 알림 GET: 구현 전 MVC 테스트가 HTTP 404로 실패한 것을 확인한 후 라우트·서비스 구현. `./gradlew fastTest --tests '*NotificationControllerTest' --tests '*NotificationServiceTest' --no-daemon` PASS. 이후 응답 필드 검증 보강은 최종 회귀에서 재실행한다.
+- 기기 관리·Expo 경계: 테스트 먼저 추가하고 미구현 타입에 대한 `compileTestJava` 실패 확인. 이는 동작 assertion 실패와 구분한다. 실제 MySQL/Redis 경합과 HTTP timeout 검증 결과는 실행 후 기록한다.
+- 실제 Expo/APNs/FCM 호출과 단말 수신은 검증 대상에 포함하지 않는다. 가짜 제공자 테스트를 실제 발송 성공으로 보고하지 않는다.
+- Outbox 연결 전 기존 결과 저장 테스트의 `saveAndFlush` 기대가 실제 `WantedButNotInvoked`로 실패함을 확인했다. 이후 다섯 terminal 경로를 공통 저장 helper로 연결했다.
+- `./gradlew fastTest --tests '*push.*' --tests '*Notification*' --no-daemon` PASS (중간 검증; 최종 전체 회귀는 별도).
+- `./gradlew integrationTest --tests '*PushOutboxIntegrationTest' --no-daemon` PASS (6 tests, MySQL 8.4): SQL CHECK로 outbox insert 실패 강제 후 QuizSet/notification/delivery 전체 rollback, 다기기·다섯 terminal 경로, 소급 제외, MANDATORY 경계, 단일 조회 소유권·90일을 확인했다.
+- 전체 fast 회귀에서 DB auto-configuration을 제외한 기존 `ServerApplicationTests` 부팅 실패를 확인했다. 발송 비활성 Outbox의 저장소 주입을 지연해 기존 비활성 부팅 경계를 유지하고, `./gradlew fastTest --tests '*ServerApplicationTests' --tests '*PushOutboxServiceTest' --no-daemon` PASS를 확인했다. 활성 상태에서 저장소가 없으면 성공으로 숨기지 않는다.
+- 기기 통합 검증 중 bulk delete의 persistence-context clear 때문에 같은 트랜잭션의 회원 탈퇴 상태가 저장되지 않는 실패를 확인하고 수정했다. 실제 logout/session 해제·탈퇴 정리를 포함한 MySQL/Redis 6개 검사가 통과했다.
+- `lockedRegistrationRefreshesAnAlreadyManagedDeviceAfterConcurrentRevoke`: MySQL REPEATABLE READ와 JPA 1차 캐시를 먼저 만든 후 별도 트랜잭션에서 revoke를 커밋한다. 이전 revision 등록을 허용하는 RED를 확인했다. `refresh(..., PESSIMISTIC_WRITE)`만으로도 회귀가 남아 실제 SQL을 확인했으며, 이미 잠긴 엔티티의 refresh가 non-locking SELECT를 내는 것을 확인했다. 최초 조회한 기기 엔티티만 detach한 뒤 정렬된 locking query가 최신 행을 새로 적재하도록 수정했다. 전체 persistence context를 clear하지 않아 회원 등 다른 managed 객체는 보존한다.
+- 전체 통합에서 기존 Notion의 고정 Clock과 충돌하는 부팅 실패를 확인했다. 새 전역 Clock 빈 대신 기존 Clock 또는 UTC fallback을 주입하며, `NotionInfrastructureIntegrationTest` 4개 PASS를 확인했다.
+- 첫 커밋 `7cdf8c6`: staged 파일만 임시 체크아웃으로 분리해 `fastTest` 296개, `PushDeviceInfrastructureIntegrationTest` 7개 PASS. 늦은 해제 이후 이전 revision 등록 차단을 실제 MySQL에서 확인했다.
+- 두 번째 커밋 대상도 staged 파일만 분리해 `fastTest` 304개, `PushOutboxIntegrationTest` 6개 PASS. 이후 worker가 추가되기 전 독립적으로 부팅·원자성·소유권을 검증했다.

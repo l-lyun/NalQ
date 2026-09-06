@@ -1,0 +1,6 @@
+package com.openmd.server.push.domain;
+
+public enum PushDeliveryState {
+  PENDING, SENDING, RETRY_WAIT, TICKET_ACCEPTED, RECEIPT_CHECKING,
+  PROVIDER_ACCEPTED, FAILED, CANCELLED, EXPIRED, UNKNOWN
+}

@@ -13,6 +13,9 @@ import com.openmd.server.global.error.BusinessException;
 import com.openmd.server.global.error.CommonErrorCode;
 import com.openmd.server.global.error.GlobalExceptionHandler;
 import com.openmd.server.notification.dto.response.NotificationPage;
+import com.openmd.server.notification.dto.response.NotificationItem;
+import com.openmd.server.notification.domain.NotificationType;
+import com.openmd.server.notification.domain.NotificationActionType;
 import com.openmd.server.notification.dto.response.NotificationReadAllResult;
 import com.openmd.server.notification.dto.response.NotificationReadResult;
 import com.openmd.server.notification.service.NotificationService;
@@ -39,6 +42,30 @@ class NotificationControllerTest {
         .setControllerAdvice(new GlobalExceptionHandler())
         .setCustomArgumentResolvers(principal())
         .build();
+  }
+
+  @Test
+  void exposesAnAuthenticatedSingleNotificationLookupRoute() throws Exception {
+    when(service.get(7L, NOTIFICATION_ID)).thenReturn(new NotificationItem(
+        NOTIFICATION_ID, 1, NotificationType.QUIZ_GENERATION_READY, "quiz-1", "20",
+        "퀴즈 제목", null, NotificationActionType.FOCUS_QUIZ_IN_LIST, false,
+        null, Instant.parse("2026-09-06T00:00:00Z")));
+    mvc.perform(get("/api/v1/notifications/" + NOTIFICATION_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.notificationId").value(NOTIFICATION_ID))
+        .andExpect(jsonPath("$.data.targetName").value("퀴즈 제목"))
+        .andExpect(jsonPath("$.data.targetAvailable").value(false))
+        .andExpect(jsonPath("$.data.actionType").value("FOCUS_QUIZ_IN_LIST"));
+    verify(service).get(7L, NOTIFICATION_ID);
+  }
+
+  @Test
+  void hidesUnavailableOrForeignSingleNotifications() throws Exception {
+    when(service.get(7L, NOTIFICATION_ID))
+        .thenThrow(new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND));
+    mvc.perform(get("/api/v1/notifications/" + NOTIFICATION_ID))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.error.code").value("COMMON_003"));
   }
 
   @Test

@@ -8,7 +8,7 @@ scope: server
 
 ## 1. 범위와 상태
 
-- 2026-09-06 현재 checkout을 확인한 **구현 전 파일 설계안**이다. Java·SQL·설정·테스트 파일은 아직 추가하지 않았다.
+- 2026-09-06 현재 기기 등록·조회·해제, 설치 자격과 멱등 operation, Redis 제한, logout·탈퇴 연계(V12)가 구현됐다. delivery outbox(V13)는 구현·통합 검증됐으며 worker·receipt·retention은 아직 구현 전이다.
 - 제품 정책은 [PRD](../../../docs/prd/prd-quiz-push-notifications.md), 공개 API·브리지는 [공유 계약](../../../docs/contracts/contract-api-push-notifications.md), 통합 순서는 [실행 계획](../../../docs/plans/plan-quiz-push-notifications.md)이 소유한다.
 - [패키지 규칙](trd-package-structure.md)을 따라 새 `com.openmd.server.push` 기능 도메인을 둔다. 기존 notification은 알림함, push는 기기와 외부 전달을 소유한다. 범용 메시징 프레임워크나 별도 서비스는 만들지 않는다.
 - 출시 자격·개인정보 고지는 이번 서버 파일 설계에서 해결됐다고 간주하지 않는다.
@@ -105,7 +105,9 @@ Spring proxy를 거치는 별도 빈으로 나눠 self-invocation에 새 트랜�
 - unique 충돌은 `PushDeviceTransaction` 프록시 밖의 `PushDeviceService`에서 분류한다. rollback-only가 된 트랜잭션 안에서 catch 후 계속 쓰지 않는다. 재조회로 동일 operation/같은 사용자 이관/타사용자 충돌을 구분하며 모든 unique 오류를 token conflict로 뭉개지 않는다.
 - 토큰 이관에서 여러 설치 행을 잠그면 ID 정렬 순서로 잠근다. 멱등 결과가 있더라도 현재 인증·설치 자격 검증을 생략하지 않는다.
 - 해제/갱신 트랜잭션은 delivery 전체를 잠가 일괄 수정하지 않는다. 연결 변경 후 worker가 snapshot mismatch를 취소하도록 해서 기기→delivery와 delivery→기기 잠금 역전을 피한다. 원자적 탈퇴 정리 경로는 같은 잠금 순서·deadlock 재시도 테스트를 포함한다.
-- 명시적 logout은 Redis revoke와 MySQL 해제가 한 TX가 아니다. 검증한 session 정보로만 정리하고 부분 실패를 진단하며 native pending revoke가 보완한다. 기존의 잘못된/만료된 refresh logout 멱등 동작은 유지한다. 성공 응답이 즉시 모든 OS 알림 회수를 뜻하지 않는다.
+- 명시적 logout은 Redis revoke와 MySQL 해제가 한 TX가 아니다. refresh token을 먼저 검증해 얻은 session 정보로만 MySQL 연결을 정리하고, Redis revoke 뒤 MySQL 정리가 실패하면 제한 재시도와 진단을 남기며 native pending revoke가 보완한다. 기존의 잘못된/만료된 refresh logout 멱등 동작은 유지한다. 성공 응답이 즉시 모든 OS 알림 회수를 뜻하지 않는다.
+- 등록은 현재 사용자 행을 먼저 잠그고 ACTIVE·이메일 검증 상태를 트랜잭션 안에서 다시 확인한다. 이후 관련 설치 ID를 정렬해 잠그며, 탈퇴와 등록이 경합해 탈퇴 사용자에게 새 활성 토큰이 남지 않게 한다.
+- 토큰 소유 설치를 찾는 일반 조회의 JPA 엔티티는 잠금 쿼리 전에 개별 detach한다. 잠금 쿼리 자체가 최신 행을 다시 적재하게 하여 REPEATABLE READ와 1차 캐시의 과거 revision을 사용하지 않는다. 전체 context clear는 같은 TX의 회원 변경을 누락시킬 수 있어 사용하지 않는다. 잠금 후 refresh만 호출하는 대안은 실제 Hibernate SQL이 non-locking SELECT여서 회귀 테스트를 통과하지 못했다.
 
 ## 5. 테이블과 인덱스 설계안
 
@@ -140,11 +142,11 @@ Spring proxy를 거치는 별도 빈으로 나눠 self-invocation에 새 트랜�
 프로덕션 구현 시 작은 실패 테스트를 먼저 확인한다. 아래 테스트도 아직 미작성이다.
 
 1. `push/service/PushDeviceServiceTest`, `push/controller/PushDeviceControllerTest`: 소유권·revision·멱등·권한·계정 충돌·24시간 요청 만료.
-2. `push/repository/PushDeviceConcurrencyTest` (integration): 동일 설치 등록, 동일 토큰 이관, 7/30일 정리 후 과거 PUT 재생, 늦은 revoke와 계정 전환.
+2. `push/repository/PushDeviceInfrastructureIntegrationTest` (integration): V12 스키마와 비밀 미저장, 동일 설치 동시 등록, 동일 사용자 토큰 이관·타사용자 충돌, 실제 Redis 제한, logout·탈퇴 정리. 7/30일 정리 후 과거 PUT 재생과 늦은 revoke·계정 전환은 retention 단계에서 추가한다.
 3. 기존 `quiz/service/QuizGenerationNotificationTest` 확장 + `push/service/PushOutboxIntegrationTest`: 다섯 terminal 경로, 두 기기, 0기기, enqueue 실패 전체 rollback, 중복 완료, 발송 off/소급 제외.
 4. `push/repository/PushDeliveryClaimStoreTest` (integration): 두 worker의 비중복 claim, lease 복구, 이전 attempt UPDATE 0행, 인덱스/Flyway 검증.
 5. `push/service/PushDeliveryWorkerTest`, `push/integration/expo/ExpoPushGatewayTest`: HTTP 때 TX 미활성, 오류/timeout, 응답 불일치, send/receipt 분리, 1시간 경계, tokenVersion.
 6. 기존 `AuthServiceTest`, `AccountWithdrawalServiceTest`, `SecurityConfigurationTest`, `NotificationControllerTest`/`NotificationServiceTest`: logout 부분 실패, 탈퇴 rollback, 제한 revoke 경로, 단일 조회 소유권/90일.
 7. `push/service/PushRetentionServiceTest` (integration): 삭제 기준/순서, 비활성 토큰 즉시 제거, 활성 기기 유지, 탈퇴 기록 삭제.
 
-집중 테스트 → `server/gradlew fastTest` → Docker 환경의 `server/gradlew integrationTest` 순으로 검증한다. 테스트용 제공자 성공은 실제 푸시 도달 증거가 아니다.
+집중 테스트 → `server/gradlew fastTest` → Docker 환경의 `server/gradlew integrationTest` 순으로 검증한다. 2026-09-06 단계 1 구현은 프로덕션 클래스가 없어서 발생한 compile 실패, V12 전의 Hibernate schema 실패, 보안/CORS 기대 실패를 각각 확인한 뒤 좁은 테스트를 통과시켰다. 최종 전체 검증 결과는 실행 계획에 기록한다. 테스트용 제공자 성공은 실제 푸시 도달 증거가 아니다.

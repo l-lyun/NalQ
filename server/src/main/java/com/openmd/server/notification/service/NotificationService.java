@@ -84,6 +84,12 @@ public class NotificationService {
         items, notifications.countUnread(userId, retainedSince), nextCursor, hasNext);
   }
 
+  @Transactional(readOnly = true)
+  public NotificationItem get(long userId, String notificationId) {
+    QuizGenerationNotification notification = owned(notificationId, userId, retainedSince());
+    return item(notification, availability(userId, List.of(notification)));
+  }
+
   @Transactional
   public NotificationReadResult read(long userId, String notificationId) {
     Instant retainedSince = retainedSince();
