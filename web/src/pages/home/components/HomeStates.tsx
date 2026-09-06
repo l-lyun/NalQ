@@ -39,7 +39,7 @@ export function FullError({ onRetry }: { onRetry: () => void }) {
       aria-labelledby="home-error-title"
     >
       <VStack gap="spacingY.betweenText" align="center">
-        <Text as="h2" id="home-error-title" textStyle="t7Bold" color="fg.neutral" align="center">
+        <Text as="h2" id="home-error-title" textStyle="t10Bold" color="fg.neutral" align="center">
           홈 정보를 불러오지 못했어요
         </Text>
         <Text as="p" textStyle="t5Regular" color="fg.neutralMuted" align="center">

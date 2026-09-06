@@ -1172,7 +1172,7 @@ function GenerationError({
     <VStack className="quiz-status-content" align="center" gap="x6" aria-live="polite">
       <Icon svg={<IconExclamationmarkCircleFill />} size="x10" color="fg.critical" />
       <VStack gap="x2" align="center">
-        <Text as="h2" className="quiz-center-copy" textStyle="t7Bold" color="fg.neutral">
+        <Text as="h2" className="quiz-center-copy" textStyle="t10Bold" color="fg.neutral">
           {copy.title}
         </Text>
         <Text as="p" className="quiz-center-copy" textStyle="t5Regular" color="fg.neutralMuted">
@@ -1609,7 +1609,7 @@ function SubmissionErrorScreen({
       <VStack className="quiz-status-content" align="center" gap="x6" aria-live="polite">
         <Icon svg={<IconExclamationmarkCircleFill />} size="x10" color="fg.critical" />
         <VStack gap="x2" align="center">
-          <Text as="h2" className="quiz-center-copy" textStyle="t7Bold" color="fg.neutral">
+          <Text as="h2" className="quiz-center-copy" textStyle="t10Bold" color="fg.neutral">
             답안을 제출하지 못했어요
           </Text>
           <Text as="p" className="quiz-center-copy" textStyle="t5Regular" color="fg.neutralMuted">
