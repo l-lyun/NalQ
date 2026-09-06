@@ -41,6 +41,7 @@ scope: repository
 
 | 관심사 | 원장 | 유형 | 상태 |
 | --- | --- | --- | --- |
+| 전역 글자·컴포넌트 밀도 | [UI 밀도 조정](ux/screen-ui-density.md) | Screen Spec | 확정·구현 반영 |
 | 이메일 기반 자체 인증 | [인증 흐름](ux/flow-authentication.md) | Flow | 초안 |
 | 학습자료 만들기 | [학습자료 만들기 흐름](ux/flow-content-import.md) | Flow | 검토 중 |
 | Notion 학습자료 가져오기 | [Notion 가져오기 화면](ux/screen-notion-import.md) | Screen Spec | 검토 중 |

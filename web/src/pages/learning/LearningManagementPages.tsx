@@ -144,7 +144,7 @@ function EmptyState({ children, action }: { children: string; action?: React.Rea
 function SectionHeading({ id, title, action }: { id: string; title: string; action?: React.ReactNode }) {
   return (
     <Flex align="center" justify="space-between" gap="x3">
-      <Text as="h2" id={id} textStyle="t9Bold" color="fg.neutral">
+      <Text as="h2" id={id} textStyle="t7Bold" color="fg.neutral">
         {title}
       </Text>
       {action}
@@ -156,7 +156,7 @@ function PreviewRow({ title, detail, onClick }: { title: string; detail?: string
   return (
     <button className="learning-management-row" type="button" onClick={onClick}>
       <VStack minWidth="0px" gap="x1" align="flex-start">
-        <Text className="learning-long-title" textStyle="t6Medium" color="fg.neutral">
+        <Text className="learning-long-title" textStyle="t5Medium" color="fg.neutral">
           {title}
         </Text>
         {detail ? (
@@ -218,17 +218,17 @@ export function LearningManagementPage() {
           px="spacingX.globalGutter"
           pt="x6"
           pb="spacingY.screenBottom"
-          gap="x8"
+          gap="x6"
         >
           <Flex as="header" align="center" justify="space-between" gap="x3">
-            <Text as="h1" textStyle="t12Bold" color="fg.neutral">
+            <Text as="h1" textStyle="t9Bold" color="fg.neutral">
               학습
             </Text>
             <div className="app-notification-slot" data-app-notification-slot />
           </Flex>
 
           <VStack as="section" gap="x4" aria-labelledby="recent-quiz-heading">
-            <Text as="h2" id="recent-quiz-heading" textStyle="t9Bold" color="fg.neutral">
+            <Text as="h2" id="recent-quiz-heading" textStyle="t7Bold" color="fg.neutral">
               최근 퀴즈
             </Text>
             {!quizManagementAvailable ? (
@@ -343,7 +343,7 @@ function RecentQuizPanel({
   return (
     <VStack bg="bg.brandWeak" borderRadius="r3" p="x4" gap="x4" align="flex-start">
       <VStack gap="x1" align="flex-start">
-        <Text className="learning-long-title" textStyle="t7Bold" color="fg.neutral">
+        <Text className="learning-long-title" textStyle="t5Bold" color="fg.neutral">
           {review.quizTitle}
         </Text>
         <Text textStyle="t4Regular" color="fg.neutralMuted">
@@ -408,7 +408,7 @@ function ReviewCandidateRow({
   return (
     <Flex className="learning-review-row" align="center" justify="space-between" gap="x3">
       <VStack minWidth="0px" gap="x1" align="flex-start">
-        <Text className="learning-long-title" textStyle="t6Medium" color="fg.neutral">
+        <Text className="learning-long-title" textStyle="t5Medium" color="fg.neutral">
           {candidate.quizTitle}
         </Text>
         <Text textStyle="t3Regular" color="fg.neutralMuted">
@@ -675,7 +675,7 @@ function MaterialDisclosureCard({
         onClick={onToggle}
       >
         <VStack minWidth="0px" gap="x1" align="flex-start">
-          <Text className="learning-long-title" textStyle="t7Bold" color="fg.neutral">
+          <Text className="learning-long-title" textStyle="t5Bold" color="fg.neutral">
             {material.title}
           </Text>
           <Text textStyle="t4Regular" color="fg.neutralMuted">

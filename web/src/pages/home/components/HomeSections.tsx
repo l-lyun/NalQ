@@ -77,7 +77,7 @@ export function StudyMethodsSection({
       <Text
         as={compact ? 'h3' : 'h2'}
         id={compact ? undefined : 'home-new-study-title'}
-        textStyle={compact ? 't8Bold' : 't10Bold'}
+        textStyle={compact ? 't6Bold' : 't7Bold'}
         color="fg.neutral"
       >
         {compact ? '가져올 방법을 선택하세요' : '새 학습'}
@@ -92,9 +92,9 @@ export function NextActionSection({ nextAction }: Pick<HomePageProps, 'nextActio
 
   return (
     <VStack as="section" gap="x4" aria-labelledby="home-next-action-title">
-      <VStack bg="bg.brandWeak" borderRadius="r3" p="x5" gap="x4">
+      <VStack bg="bg.brandWeak" borderRadius="r3" p="x4" gap="x4">
         <VStack gap="spacingY.betweenText">
-          <Text as="h2" id="home-next-action-title" textStyle="t8Bold" color="fg.neutral">
+          <Text as="h2" id="home-next-action-title" textStyle="t6Bold" color="fg.neutral">
             {nextAction.title}
           </Text>
           <Text as="p" textStyle="t5Regular" color="fg.neutralMuted">
@@ -128,12 +128,12 @@ export function RecommendationFallbackSection({
 }) {
   return (
     <VStack as="section" gap="x4" aria-labelledby="home-recommendation-fallback-title">
-      <VStack bg="bg.neutralWeak" borderRadius="r3" p="x5" gap="x4">
+      <VStack bg="bg.neutralWeak" borderRadius="r3" p="x4" gap="x4">
         <VStack gap="spacingY.betweenText">
           <Text
             as="h2"
             id="home-recommendation-fallback-title"
-            textStyle="t8Bold"
+            textStyle="t6Bold"
             color="fg.neutral"
           >
             새 학습을 시작해보세요
@@ -155,9 +155,9 @@ export function RecommendationFallbackSection({
 export function FirstVisitSection({ studyMethods }: Pick<HomePageProps, 'studyMethods'>) {
   return (
     <VStack as="section" gap="x4" aria-labelledby="home-first-title">
-      <VStack bg="bg.neutralWeak" borderRadius="r3" p="x5" gap="x5">
+      <VStack bg="bg.neutralWeak" borderRadius="r3" p="x4" gap="x4">
         <VStack gap="spacingY.betweenText">
-          <Text as="h2" id="home-first-title" textStyle="t8Bold" color="fg.neutral">
+          <Text as="h2" id="home-first-title" textStyle="t6Bold" color="fg.neutral">
             학습할 글을 가져와 시작해보세요
           </Text>
           <Text as="p" textStyle="t5Regular" color="fg.neutralMuted">

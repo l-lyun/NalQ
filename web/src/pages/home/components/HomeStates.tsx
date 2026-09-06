@@ -7,7 +7,7 @@ import { StudyMethodsSection } from './HomeSections'
 export function HomeLoading({ studyMethods }: Pick<HomePageProps, 'studyMethods'>) {
   return (
     <VStack gap="x5" aria-busy="true" aria-label="홈 정보를 불러오는 중">
-      <VStack bg="bg.neutralWeak" borderRadius="r3" p="x5" gap="x3">
+      <VStack bg="bg.neutralWeak" borderRadius="r3" p="x4" gap="x3">
         <Skeleton tone="neutral" radius="8" width="80%" height="x6" />
         <Skeleton tone="neutral" radius="8" width="full" height="x4" />
         <Skeleton tone="neutral" radius="16" width="full" height="x12" />
@@ -39,7 +39,7 @@ export function FullError({ onRetry }: { onRetry: () => void }) {
       aria-labelledby="home-error-title"
     >
       <VStack gap="spacingY.betweenText" align="center">
-        <Text as="h2" id="home-error-title" textStyle="t10Bold" color="fg.neutral" align="center">
+        <Text as="h2" id="home-error-title" textStyle="t7Bold" color="fg.neutral" align="center">
           홈 정보를 불러오지 못했어요
         </Text>
         <Text as="p" textStyle="t5Regular" color="fg.neutralMuted" align="center">

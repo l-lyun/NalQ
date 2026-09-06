@@ -118,7 +118,7 @@
   gap: var(--seed-dimension-x3);
   width: 100%;
   min-width: 0;
-  min-height: 56px;
+  min-height: var(--seed-dimension-x12);
   padding: var(--seed-dimension-x3) 0;
   border: 0;
   background: transparent;
@@ -154,7 +154,7 @@
 
 .learning-review-row {
   min-width: 0;
-  min-height: 72px;
+  min-height: var(--seed-dimension-x14);
   padding-block: var(--seed-dimension-x3);
 }
 
@@ -282,7 +282,7 @@
 }
 
 .notion-workspace-row {
-  min-height: 56px;
+  min-height: var(--seed-dimension-x12);
   padding-block: var(--seed-dimension-x2);
 }
 
@@ -298,8 +298,8 @@
   align-items: center;
   gap: var(--seed-dimension-x3);
   min-width: 0;
-  min-height: 64px;
-  padding: var(--seed-dimension-x3);
+  min-height: var(--seed-dimension-x14);
+  padding: var(--seed-dimension-x2) var(--seed-dimension-x3);
   border-radius: var(--seed-radius-r3);
   cursor: pointer;
 }

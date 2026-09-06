@@ -40,13 +40,13 @@ export function HomePage(props: HomePageProps) {
         >
           <VStack as="header" gap="x2">
             <Flex align="center" justify="space-between" gap="x3">
-              <Text as="h1" textStyle="t12Bold" color="fg.neutral">
+              <Text as="h1" textStyle="t9Bold" color="fg.neutral">
                 홈
               </Text>
               <div className="app-notification-slot" data-app-notification-slot />
             </Flex>
             <VStack gap="x1">
-              <Text as="p" textStyle="t7Bold" color="fg.neutral">
+              <Text as="p" textStyle="t5Bold" color="fg.neutral">
                 <span aria-hidden>👋 </span>
                 {greeting.nickname ? `${greeting.nickname}님, ` : ''}오늘도 반가워요
               </Text>
