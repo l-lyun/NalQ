@@ -13,7 +13,9 @@
 .onboarding-content {
   min-height: 0;
   flex: 1;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
   padding-top: var(--seed-dimension-x4);
   padding-bottom: calc(168px + var(--seed-safe-area-bottom));
 }

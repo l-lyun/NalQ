@@ -68,11 +68,11 @@ export function OnboardingPage({ mode, onExit }: OnboardingPageProps) {
   const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key === 'ArrowLeft' && previousAvailable) {
       event.preventDefault()
-      move(-1)
+      move(-1, 'keyboard')
     }
     if (event.key === 'ArrowRight' && nextAvailable) {
       event.preventDefault()
-      move(1)
+      move(1, 'keyboard')
     }
   }
 

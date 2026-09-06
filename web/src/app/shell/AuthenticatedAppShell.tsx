@@ -44,21 +44,17 @@ function AuthenticatedAppShellContent() {
   const isNotificationsPage = location.pathname === '/notifications'
   const documentScrollEnabled = !isNotificationsPage && isTopLevelTabPath(location.pathname)
 
-  useEffect(() => {
-    const rememberScrollPosition = () => {
-      if (!documentScrollEnabledRef.current) return
-      tabScrollPositionsRef.current[activeTabRef.current] = window.scrollY
-    }
+  const rememberActiveTabScrollPosition = () => {
+    if (!documentScrollEnabledRef.current) return
+    tabScrollPositionsRef.current[activeTabRef.current] = window.scrollY
+  }
 
-    window.addEventListener('scroll', rememberScrollPosition, { passive: true })
-    return () => window.removeEventListener('scroll', rememberScrollPosition)
+  useEffect(() => {
+    window.addEventListener('scroll', rememberActiveTabScrollPosition, { passive: true })
+    return () => window.removeEventListener('scroll', rememberActiveTabScrollPosition)
   }, [])
 
   useLayoutEffect(() => {
-    if (documentScrollEnabledRef.current && documentScrollEnabled) {
-      tabScrollPositionsRef.current[activeTabRef.current] = window.scrollY
-    }
-
     activeTabRef.current = activeTab
     documentScrollEnabledRef.current = documentScrollEnabled
     const nextScrollTop = documentScrollEnabled ? tabScrollPositionsRef.current[activeTab] : 0
@@ -85,6 +81,7 @@ function AuthenticatedAppShellContent() {
     if (tab === activeTab && isTopLevelTabPath(location.pathname)) return
     if (pendingTabRef.current === tab) return
     const replace = pendingTabRef.current !== null
+    rememberActiveTabScrollPosition()
     pendingTabRef.current = tab
     setVisitedTabs((current) => current[tab] ? current : { ...current, [tab]: true })
     navigate(appTabPaths[tab], { replace })
