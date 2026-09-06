@@ -43,14 +43,17 @@ for name in "${required_names[@]}"; do
 done
 
 [ "$AWS_REGION" = "ap-northeast-2" ] || die "AWS_REGION must be ap-northeast-2"
-[ "$WEB_DOMAIN" = "app.$SERVICE_DOMAIN" ] || die "WEB_DOMAIN must equal app.SERVICE_DOMAIN"
+case "$WEB_DOMAIN" in
+	"$SERVICE_DOMAIN"|"app.$SERVICE_DOMAIN") ;;
+	*) die "WEB_DOMAIN must equal SERVICE_DOMAIN or app.SERVICE_DOMAIN" ;;
+esac
 [ "$API_DOMAIN" = "api.$SERVICE_DOMAIN" ] || die "API_DOMAIN must equal api.SERVICE_DOMAIN"
 [ "$SERVER_HOST_PORT" = "8080" ] || die "SERVER_HOST_PORT must be exactly 8080 for the fixed Nginx upstream"
 [ "$WEB_ORIGIN" = "https://$WEB_DOMAIN" ] || die "WEB_ORIGIN must equal https://WEB_DOMAIN"
 [ "$OPENMD_CORS_ALLOWED_ORIGINS" = "$WEB_ORIGIN" ] || die "CORS origin must equal WEB_ORIGIN"
 [ "$OPENMD_AUTH_BROWSER_ALLOWED_ORIGINS" = "$WEB_ORIGIN" ] || die "browser origin must equal WEB_ORIGIN"
 [[ "$DB_BACKUP_S3_URI" =~ ^s3://[^/]+/.+ ]] || die "DB_BACKUP_S3_URI must include bucket and prefix"
-[ "$SPRING_AI_OPENAI_BASE_URL" = "https://us.api.openai.com" ] || die "SPRING_AI_OPENAI_BASE_URL must be https://us.api.openai.com"
+[ "$SPRING_AI_OPENAI_BASE_URL" = "https://api.openai.com/v1" ] || die "SPRING_AI_OPENAI_BASE_URL must be https://api.openai.com/v1"
 require_immutable_image "$SERVER_IMAGE"
 
 require_command openssl

@@ -338,7 +338,7 @@ Set-Cookie: __Host-openmd_refresh=<redacted>; Path=/; HttpOnly; Secure; SameSite
 | `Path` | 운영 `__Host-` 사용 시 `/` | Cookie는 더 넓게 전송되지만 서버는 웹 세션 endpoint에서만 읽는다. 좁은 Path가 더 중요하면 `__Secure-` 이름으로 바꾸는 선택을 별도 검토한다. |
 | `Max-Age` | Redis 세션의 남은 절대 수명 | 회전할 때 최초 세션의 절대 만료를 연장하지 않는다. 서버 시각을 기준으로 계산한다. |
 
-- 첫 운영 배포는 `https://app.<service-domain>`(또는 기준 `www`)의 CloudFront 웹과 `https://api.<service-domain>`의 단일 EC2/Nginx API를 사용한다. Nginx는 HTTPS를 종료하고 비공개 Spring Boot `8080`으로 reverse proxy한다. 두 host는 cross-origin이지만 HTTPS와 등록 가능 도메인이 같은 same-site topology다.
+- 첫 운영 배포는 `https://<service-domain>`의 CloudFront 웹과 `https://api.<service-domain>`의 단일 EC2/Nginx API를 사용한다. Nginx는 HTTPS를 종료하고 비공개 Spring Boot `8080`으로 reverse proxy한다. 두 host는 cross-origin이지만 HTTPS와 등록 가능 도메인이 같은 same-site topology다.
 - 이 topology에서는 `SameSite=Lax`, `Secure`, `HttpOnly`, `Path=/`, `Domain` 생략을 사용한다. host-only Refresh Cookie는 API host에만 저장·전송하며 web host와 공유하지 않는다.
 - 브라우저와 WebView의 웹 코드는 API 요청에 credentials를 포함하고, 서버는 기준 web origin 하나만 정확히 허용한다. 서로 다른 site로 분리하는 변경은 `SameSite=None; Secure`, WebView third-party Cookie와 CSRF 설계를 다시 승인하기 전에는 허용하지 않는다.
 - 상세 배포·검증 절차는 [첫 운영 배포 인프라 실행 계획](../plans/plan-production-deployment-infrastructure.md)을 따른다.

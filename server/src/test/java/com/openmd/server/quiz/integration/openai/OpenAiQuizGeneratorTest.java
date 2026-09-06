@@ -102,6 +102,18 @@ class OpenAiQuizGeneratorTest {
     assertFalse(schema.contains("publicId"));
   }
 
+  @Test
+  void reportsExceptionTypesWithoutIncludingMessages() {
+    RuntimeException failure =
+        new RuntimeException("sensitive outer message", new IllegalArgumentException("secret"));
+
+    String types = generator.exceptionTypes(failure);
+
+    assertEquals("RuntimeException>IllegalArgumentException", types);
+    assertFalse(types.contains("sensitive"));
+    assertFalse(types.contains("secret"));
+  }
+
   private OpenAiQuizGenerator generator() {
     ChatClient.Builder builder = mock(ChatClient.Builder.class);
     when(builder.build()).thenReturn(mock(ChatClient.class));

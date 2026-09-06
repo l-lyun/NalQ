@@ -33,9 +33,9 @@ write_valid_server_env() {
 	printf '%s\n' \
 		'AWS_REGION=ap-northeast-2' \
 		'SERVICE_DOMAIN=nalq.test' \
-		'WEB_DOMAIN=app.nalq.test' \
+		'WEB_DOMAIN=nalq.test' \
 		'API_DOMAIN=api.nalq.test' \
-		'WEB_ORIGIN=https://app.nalq.test' \
+		'WEB_ORIGIN=https://nalq.test' \
 		'DB_BACKUP_S3_URI=s3://nalq-test-backup/mysql' \
 		'SERVER_IMAGE=registry.invalid/openmd/server@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' \
 		'SERVER_HOST_PORT=8080' \
@@ -43,8 +43,8 @@ write_valid_server_env() {
 		'MYSQL_USER=openmd' \
 		'MYSQL_PASSWORD=test-only' \
 		'MYSQL_ROOT_PASSWORD=test-only-root' \
-		'OPENMD_CORS_ALLOWED_ORIGINS=https://app.nalq.test' \
-		'OPENMD_AUTH_BROWSER_ALLOWED_ORIGINS=https://app.nalq.test' \
+		'OPENMD_CORS_ALLOWED_ORIGINS=https://nalq.test' \
+		'OPENMD_AUTH_BROWSER_ALLOWED_ORIGINS=https://nalq.test' \
 		'OPENMD_AUTH_ACCESS_TOKEN_SECRET=QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE=' \
 		'OPENMD_AUTH_EMAIL_CODE_HMAC_SECRET=QkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkI=' \
 		'OPENMD_MAIL_FROM=no-reply@nalq.test' \
@@ -53,7 +53,7 @@ write_valid_server_env() {
 		'SPRING_MAIL_PASSWORD=test-only' \
 		'OPENMD_NOTION_ENABLED=false' \
 		'OPENMD_QUIZ_GENERATION_ENABLED=false' \
-		'SPRING_AI_OPENAI_BASE_URL=https://us.api.openai.com' \
+		'SPRING_AI_OPENAI_BASE_URL=https://api.openai.com/v1' \
 		'OPENAI_API_KEY=no-key-configured' >"$target"
 }
 
@@ -62,7 +62,7 @@ write_valid_web_env() {
 	printf '%s\n' \
 		'AWS_REGION=ap-northeast-2' \
 		'SERVICE_DOMAIN=nalq.test' \
-		'WEB_DOMAIN=app.nalq.test' \
+		'WEB_DOMAIN=nalq.test' \
 		'API_DOMAIN=api.nalq.test' \
 		'VITE_API_BASE_URL=https://api.nalq.test' \
 		'WEB_S3_BUCKET=nalq-test-web' \
@@ -86,11 +86,11 @@ printf '%s\n' 'SERVER_HOST_PORT=18080' >>"$bad_port_env"
 expect_failure_containing 'SERVER_HOST_PORT must be exactly 8080' \
 	"$SCRIPT_DIR/validate-env.sh" --env-file "$bad_port_env"
 
-global_openai_env="$temporary_directory/global-openai.env"
-cp "$server_env" "$global_openai_env"
-printf '%s\n' 'SPRING_AI_OPENAI_BASE_URL=https://api.openai.com' >>"$global_openai_env"
-expect_failure_containing 'SPRING_AI_OPENAI_BASE_URL must be https://us.api.openai.com' \
-	"$SCRIPT_DIR/validate-env.sh" --env-file "$global_openai_env"
+regional_openai_env="$temporary_directory/regional-openai.env"
+cp "$server_env" "$regional_openai_env"
+printf '%s\n' 'SPRING_AI_OPENAI_BASE_URL=https://us.api.openai.com' >>"$regional_openai_env"
+expect_failure_containing 'SPRING_AI_OPENAI_BASE_URL must be https://api.openai.com/v1' \
+	"$SCRIPT_DIR/validate-env.sh" --env-file "$regional_openai_env"
 
 notion_missing_env="$temporary_directory/notion-missing.env"
 cp "$server_env" "$notion_missing_env"
@@ -158,8 +158,15 @@ write_valid_web_env "$web_env"
 web_cross_site_env="$temporary_directory/web-cross-site.env"
 cp "$web_env" "$web_cross_site_env"
 printf '%s\n' 'WEB_DOMAIN=app.other.test' >>"$web_cross_site_env"
-expect_failure_containing 'WEB_DOMAIN must equal app.SERVICE_DOMAIN' \
+expect_failure_containing 'WEB_DOMAIN must equal SERVICE_DOMAIN or app.SERVICE_DOMAIN' \
 	"$SCRIPT_DIR/validate-web-env.sh" --env-file "$web_cross_site_env"
+
+web_subdomain_env="$temporary_directory/web-subdomain.env"
+cp "$web_env" "$web_subdomain_env"
+printf '%s\n' \
+	'WEB_DOMAIN=app.nalq.test' \
+	'VITE_API_BASE_URL=https://api.nalq.test' >>"$web_subdomain_env"
+"$SCRIPT_DIR/validate-web-env.sh" --env-file "$web_subdomain_env" >/dev/null
 
 web_secret_env="$temporary_directory/web-secret.env"
 cp "$web_env" "$web_secret_env"
@@ -174,6 +181,10 @@ if grep -Eq '/validate-env\.sh|load_env_file ' "$SCRIPT_DIR/deploy-web.sh"; then
 fi
 grep -Fq 'env -i' "$SCRIPT_DIR/deploy-web.sh"
 grep -Fq 'VITE_HOME_VISITS_API_ENABLED=true' "$SCRIPT_DIR/deploy-web.sh"
+if grep -Fq 'VITE_APP_VERSION' "$SCRIPT_DIR/deploy-web.sh"; then
+	printf 'deploy-web must not replace the product app version with a release identifier\n' >&2
+	exit 1
+fi
 
 restore_state="$temporary_directory/restore-state"
 mkdir -p "$restore_state"

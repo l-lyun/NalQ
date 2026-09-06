@@ -211,7 +211,7 @@ export function LearningManagementPage() {
   }
 
   return (
-    <VStack className="learning-shell" minHeight="100dvh" bg="bg.layerBasement">
+    <VStack className="learning-shell" minHeight="100dvh" bg="bg.layerDefault">
       <Box as="main" className="learning-main" bg="bg.layerDefault" width="full" pt="safeArea">
         <VStack
           className="learning-content"

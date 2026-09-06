@@ -1,5 +1,3 @@
-import packageMetadata from '../../../package.json'
-
 import { useLocation, useNavigate } from 'react-router-dom'
 import { ACCOUNT_WITHDRAWAL_COMPLETED_NOTICE } from '@/features/auth/model/loginRouteState'
 
@@ -14,6 +12,8 @@ import {
   normalizeProfilePath,
   profileSubPageNavigationState,
 } from './profileRoutes'
+
+const APP_VERSION = '0.0.0'
 
 export function AuthenticatedProfilePage() {
   const location = useLocation()
@@ -62,7 +62,7 @@ export function AuthenticatedProfilePage() {
       status={status}
       nickname={currentUser.data?.nickname}
       email={currentUser.data?.email}
-      appVersion={import.meta.env.VITE_APP_VERSION?.trim() || packageMetadata.version}
+      appVersion={APP_VERSION}
       logoutPending={logout.isPending}
       logoutError={logout.isError ? '로그아웃하지 못했어요. 다시 시도해주세요.' : undefined}
       onOpenAccount={() => navigate('/profile/account', { state: profileSubPageNavigationState })}

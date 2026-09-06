@@ -5,13 +5,10 @@ import { createBrowserRouter, Navigate, Outlet, RouterProvider } from 'react-rou
 import { queryClient } from '@/app/providers/queryClient'
 import { AuthBootstrap } from '@/app/router/AuthBootstrap'
 import {
-  AuthBootstrapError,
   AuthGate,
-  AuthLoading,
   PublicOnlyGate,
 } from '@/app/router/AuthGate'
 import { AuthenticatedAppShell } from '@/app/shell/AuthenticatedAppShell'
-import { useAuthPhase } from '@/features/auth/model/useAuthPhase'
 import { NotificationCenterProvider } from '@/features/notification/ui/NotificationCenter'
 import {
   quizMockEnabled,
@@ -47,7 +44,6 @@ import { VerifyEmailPage } from '@/pages/verify-email/VerifyEmailPage'
       { path: '/landing-preview', element: <PublicLandingPage /> },
       { path: '/onboarding-preview', element: <OnboardingPage mode="guide" onExit={() => undefined} /> },
     ] : []),
-  { path: '/', element: <RootEntryRoute /> },
   { path: '/terms', element: <TermsPage /> },
   { path: '/privacy', element: <PrivacyPage /> },
   { path: '/support', element: <SupportPage /> },
@@ -60,7 +56,7 @@ import { VerifyEmailPage } from '@/pages/verify-email/VerifyEmailPage'
     element: <PublicOnlyGate />,
     children: [
       { path: '/login', element: <LoginPage /> },
-      ...(import.meta.env.DEV ? [{ path: '/sign-up', element: <SignUpPage /> }] : []),
+      { path: '/sign-up', element: <SignUpPage /> },
       { path: '/verify-email', element: <VerifyEmailPage /> },
     ],
   },
@@ -74,6 +70,7 @@ import { VerifyEmailPage } from '@/pages/verify-email/VerifyEmailPage'
           {
             element: <AuthenticatedAppShell />,
             children: [
+              { path: '/', element: null },
               { path: '/learning', element: null },
               { path: '/learning/materials', element: null },
               { path: '/learning/materials/new', element: null },
@@ -101,20 +98,6 @@ import { VerifyEmailPage } from '@/pages/verify-email/VerifyEmailPage'
   },
   { path: '*', element: <Navigate to="/" replace /> },
 ])
-
-function RootEntryRoute() {
-  const phase = useAuthPhase()
-
-  if (phase === 'bootstrapping') return <AuthLoading />
-  if (phase === 'bootstrap-error') return <AuthBootstrapError />
-  if (phase === 'anonymous') return <PublicLandingPage />
-
-  return (
-    <AuthenticatedNotificationBoundary>
-      <AuthenticatedAppShell />
-    </AuthenticatedNotificationBoundary>
-  )
-}
 
 function AuthenticatedNotificationRoute() {
   return (

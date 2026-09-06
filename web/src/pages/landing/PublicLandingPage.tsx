@@ -40,17 +40,15 @@ export function PublicLandingPage() {
           </VStack>
 
           <VStack width="full" gap="x2">
-            {import.meta.env.DEV ? (
-              <ActionButton
-                className="public-landing-primary"
-                type="button"
-                size="large"
-                variant="brandSolid"
-                onClick={() => navigate('/sign-up')}
-              >
-                가입하고 시작하기
-              </ActionButton>
-            ) : null}
+            <ActionButton
+              className="public-landing-primary"
+              type="button"
+              size="large"
+              variant="brandSolid"
+              onClick={() => navigate('/sign-up', { state: { signUpEntry: '/' } })}
+            >
+              가입하고 시작하기
+            </ActionButton>
             <ActionButton
               className="public-landing-login"
               type="button"

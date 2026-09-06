@@ -52,7 +52,7 @@ scope: repository
 
 ```text
 Web browser / Expo WebView
-  ├─ https://app.<service-domain>  (대안: www)
+  ├─ https://<service-domain>
   │    └─ CloudFront
   │         └─ OAC signed request
   │              └─ private S3 web bucket
@@ -76,7 +76,7 @@ EC2 backup job
 
 - 기준 웹 host는 `app`을 권장한다. `www`를 선택하면 그것을 유일한 기준 origin으로 정하고 다른 host는 redirect만 제공한다.
 - CloudFront가 API를 경로 기반으로 proxy하지 않는다. 웹과 API는 배포·장애·cache 경계를 분리한 두 host로 운영한다.
-- `SERVICE_DOMAIN`을 등록 가능 기준 도메인으로 두고 두 host는 정확히 `https://app.SERVICE_DOMAIN`과 `https://api.SERVICE_DOMAIN`으로 구성한다. PSL 추론 없이 두 validator가 이 관계를 직접 확인하며, 서로 다른 최상위 site를 쓰는 토폴로지는 이번 승인에 포함되지 않는다.
+- `SERVICE_DOMAIN`을 등록 가능 기준 도메인으로 두고 NalQ 운영 host는 정확히 `https://SERVICE_DOMAIN`과 `https://api.SERVICE_DOMAIN`으로 구성한다. 향후 `app.SERVICE_DOMAIN` 웹 host도 두 validator가 허용하지만, 서로 다른 최상위 site를 쓰는 토폴로지는 이번 승인에 포함되지 않는다.
 - CloudFront/S3가 살아 있어도 EC2가 중단되면 보호 기능은 사용할 수 없다. 웹은 API 장애를 로그인 해제나 빈 성공 상태로 오인하지 않고 복구 가능한 오류로 표시한다.
 
 ## 정적 웹: private S3와 CloudFront
@@ -170,7 +170,7 @@ Session Manager의 instance profile 기준은 [Session Manager 권한](https://d
 | CORS origin | 기준 web origin 하나를 정확히 허용 | wildcard와 동적 suffix 허용을 금지한다. |
 | CSRF | 정확한 `Origin` + `X-OpenMD-CSRF: 1` | custom header preflight와 서버 guard를 기존 계약대로 유지한다. |
 
-- 운영 `OPENMD_CORS_ALLOWED_ORIGINS`와 `OPENMD_AUTH_BROWSER_ALLOWED_ORIGINS`에는 `https://app.<service-domain>` 또는 확정한 `https://www.<service-domain>`의 정확한 origin만 넣는다.
+- 운영 `OPENMD_CORS_ALLOWED_ORIGINS`와 `OPENMD_AUTH_BROWSER_ALLOWED_ORIGINS`에는 확정한 `https://<service-domain>`의 정확한 origin만 넣는다.
 - Nginx는 임의의 CORS header를 합성하거나 요청 `Origin`을 반사하지 않는다. Spring Boot 서버만 승인된 web origin에 `Access-Control-Allow-Origin`과 `Access-Control-Allow-Credentials: true`를 반환한다.
 - browser session의 `POST`·`DELETE` preflight는 승인 method/header만 허용하고, 서버는 실제 요청의 `Origin`과 `X-OpenMD-CSRF: 1`을 Redis 접근 전에 검사한다.
 - `__Host-` Cookie를 web host에서도 읽기 위해 `Domain=.example.com`으로 넓히지 않는다. 이는 prefix 조건과 최소 권한을 모두 깨뜨린다.
@@ -178,7 +178,7 @@ Session Manager의 instance profile 기준은 [Session Manager 권한](https://d
 
 ### WebView 영향
 
-- production `EXPO_PUBLIC_WEB_URL`은 CloudFront 기준 HTTPS URL인 `https://app.<service-domain>`으로 설정한다.
+- production `EXPO_PUBLIC_WEB_URL`은 CloudFront 기준 HTTPS URL인 `https://<service-domain>`으로 설정한다.
 - WebView 안의 웹 JavaScript가 `https://api.<service-domain>`의 browser session endpoint를 호출하며 WebView cookie jar가 API host 전용 Cookie를 관리한다.
 - Refresh Token을 JavaScript나 React Native bridge로 전달하지 않고, 네이티브 body endpoint로 자동 fallback하지 않는다.
 - 두 host가 same-site이므로 third-party Cookie 허용에 기대지 않는다. 다만 iOS·Android WebView의 cross-origin `Set-Cookie`, 앱 종료·재실행, 회전과 logout 삭제는 실제 production-like HTTPS 환경에서 각각 검증한다.

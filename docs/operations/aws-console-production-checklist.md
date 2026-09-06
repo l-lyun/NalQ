@@ -19,11 +19,11 @@ Terraform을 사용하지 않는 첫 배포용 체크리스트다. 이 문서는
 
 ## 1. 도메인, DNS와 인증서
 
-- [ ] Route 53 public hosted zone에 `app.<domain>`과 `api.<domain>`을 만들 권한이 있는지 확인한다.
+- [ ] Route 53 public hosted zone에 루트 `<domain>`과 `api.<domain>`을 만들 권한이 있는지 확인한다.
 - [ ] CloudFront용 public ACM certificate를 반드시 `us-east-1`에 요청하고 DNS validation을 완료한다.
-- [ ] `app.<domain>`이 이 certificate의 SAN에 포함되는지 확인한다.
+- [ ] 루트 `<domain>`이 이 certificate의 SAN에 포함되는지 확인한다.
 - [ ] API는 Let's Encrypt를 사용하므로 ACM certificate를 EC2에 복사하지 않는다.
-- [ ] CloudFront 생성 뒤 Route 53의 `app` A/AAAA Alias를 distribution으로 연결한다.
+- [ ] CloudFront 생성 뒤 Route 53 루트의 A/AAAA Alias를 distribution으로 연결한다.
 - [ ] Elastic IP 연결 뒤 `api` A record를 해당 주소로 연결한다.
 
 도메인 구매는 이름의 사용권, DNS는 이름과 목적지의 연결, TLS certificate는 소유권 검증과 전송 암호화다. 어느 하나가 다른 둘을 대신하지 않는다.
@@ -37,6 +37,7 @@ Terraform을 사용하지 않는 첫 배포용 체크리스트다. 이 문서는
 - [ ] OAC를 `always sign`으로 만들고 지정 distribution ARN에 대해서만 `s3:GetObject`를 허용한다.
 - [ ] viewer protocol은 HTTP to HTTPS redirect, allowed methods는 GET/HEAD/OPTIONS로 제한한다.
 - [ ] [`spa-rewrite.js`](../../infra/production/cloudfront/spa-rewrite.js)를 `cloudfront-js-2.0` runtime의 viewer-request CloudFront Function으로 게시·연결한다.
+- [ ] distribution의 `403` 또는 `404`를 `/index.html`의 `200`으로 바꾸는 사용자 정의 오류 응답을 만들지 않는다. asset 오류까지 성공 HTML로 숨기지 않기 위해 SPA 경로 처리는 위 Function만 담당한다.
 - [ ] `index.html`은 no-cache, `assets/*`는 immutable 장기 cache를 사용한다.
 - [ ] CloudFront access log는 첫 배포에서 생략한다. 활성화할 경우 별도 bucket, query-string 제외와 보유기간을 먼저 승인한다.
 

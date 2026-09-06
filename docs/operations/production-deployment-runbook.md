@@ -9,7 +9,7 @@ scope: production-infrastructure
 ## 구성과 의도
 
 ```text
-https://app.<domain> -> CloudFront -> OAC -> private web S3
+https://<domain> -> CloudFront -> OAC -> private web S3
 https://api.<domain> -> Elastic IP -> host Nginx TLS -> 127.0.0.1:8080 -> Spring container
 Spring container -> internal Docker network -> MySQL / Redis
 host backup timer -> MySQL logical dump -> private backup S3
@@ -23,7 +23,7 @@ Terraform은 첫 수동 배포에서 제외한다. 대신 [AWS Console 체크리
 
 ## 외부 적용 전 입력
 
-- Route 53에서 새로 구매할 `SERVICE_DOMAIN`과 정확히 `app.SERVICE_DOMAIN`, `api.SERVICE_DOMAIN`인 hostname
+- Route 53에서 구매한 `SERVICE_DOMAIN`, 웹용 루트 hostname과 정확히 `api.SERVICE_DOMAIN`인 API hostname
 - AWS account, 운영 principal, 서울 AZ
 - web 배포 principal이 사용할 web bucket과 distribution ID
 - 서버/복구 principal이 사용할 backup bucket
@@ -127,7 +127,7 @@ sudo ./scripts/production/rollback-server.sh \
 
 ## 웹 배포와 rollback
 
-웹 배포는 clean Git commit과 서버 원장과 분리된 `/opt/nalq/web-deploy.env`에서만 실행한다. artifact를 `releases/<commit>/`에 보존하고 root asset을 올린 뒤 `index.html`을 마지막에 전환한다. 웹 배포 principal에는 web bucket write와 지정 CloudFront invalidation만 허용하며 서버 원장, backup bucket과 EC2 권한을 주지 않는다. build subprocess에는 공개 `VITE_API_BASE_URL`, 홈 방문 API 활성화 고정값, runtime mode와 release version만 전달한다.
+웹 배포는 clean Git commit과 서버 원장과 분리된 `/opt/nalq/web-deploy.env`에서만 실행한다. artifact를 `releases/<commit>/`에 보존하고 root asset을 올린 뒤 `index.html`을 마지막에 전환한다. 웹 배포 principal에는 web bucket write와 지정 CloudFront invalidation만 허용하며 서버 원장, backup bucket과 EC2 권한을 주지 않는다. build subprocess에는 공개 `VITE_API_BASE_URL`, 홈 방문 API 활성화 고정값과 runtime mode만 전달한다. 배포 commit은 release 경로에서 추적하며 사용자에게 표시하는 앱 버전을 대체하지 않는다.
 
 ```bash
 ./scripts/production/deploy-web.sh --env-file /opt/nalq/web-deploy.env

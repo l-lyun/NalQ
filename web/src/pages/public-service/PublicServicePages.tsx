@@ -18,7 +18,7 @@ function PublicPage({ title, children }: { title: string; children: React.ReactN
   const location = useLocation()
   const returnTo = readPublicReturnPath(location.state)
   return (
-    <VStack className="public-service-shell" minHeight="100dvh" bg="bg.layerBasement">
+    <VStack className="public-service-shell" minHeight="100dvh" bg="bg.layerDefault">
       <Box as="main" className="public-service-main" bg="bg.layerDefault" width="full" pt="safeArea">
         <VStack className="public-service-content" px="spacingX.globalGutter" pt="x4" pb="x10" gap="x6">
           <Flex as="header" align="center" gap="x2">
