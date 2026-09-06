@@ -8,6 +8,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.openmd.server.global.error.BusinessException;
+import com.openmd.server.auth.repository.RefreshSessionStore;
+import com.openmd.server.auth.error.AuthErrorCode;
 import com.openmd.server.push.domain.PushPermission;
 import com.openmd.server.push.domain.PushPlatform;
 import com.openmd.server.push.domain.PushProvider;
@@ -31,10 +33,35 @@ class PushDeviceServiceTest {
   private final PushDeviceTransaction transaction = mock(PushDeviceTransaction.class);
   private final PushRateLimitStore rateLimits = mock(PushRateLimitStore.class);
   private PushDeviceService service;
+  private final RefreshSessionStore sessions = mock(RefreshSessionStore.class);
+  private final PushDeviceLifecycle lifecycle = mock(PushDeviceLifecycle.class);
 
   @BeforeEach
   void setUp() {
-    service = new PushDeviceService(transaction, rateLimits);
+    service = new PushDeviceService(transaction, rateLimits, sessions, lifecycle);
+    when(sessions.isActive("session-42", 42L)).thenReturn(true);
+  }
+
+  @Test
+  void rejectsRegistrationAfterSessionHasEndedWithoutCreatingADevice() {
+    when(sessions.isActive("session-42", 42L)).thenReturn(false);
+    RegisterPushDeviceCommand command = registerCommand();
+    BusinessException error = assertThrows(BusinessException.class,
+        () -> service.register(42L, "session-42", command));
+    assertEquals(AuthErrorCode.INVALID_CREDENTIAL, error.getErrorCode());
+    verify(transaction, never()).register(42L, "session-42", command);
+  }
+
+  @Test
+  void logoutDuringFirstRegistrationCompensatesAfterCommitBeforeReturning() {
+    when(sessions.isActive("session-42", 42L)).thenReturn(true, false);
+    RegisterPushDeviceCommand command = registerCommand();
+    BusinessException error = assertThrows(BusinessException.class,
+        () -> service.register(42L, "session-42", command));
+    assertEquals(AuthErrorCode.INVALID_CREDENTIAL, error.getErrorCode());
+    var order = org.mockito.Mockito.inOrder(transaction, lifecycle);
+    order.verify(transaction).register(42L, "session-42", command);
+    order.verify(lifecycle).revokeSession("session-42");
   }
 
   @Test

@@ -161,3 +161,11 @@ Spring proxy를 거치는 별도 빈으로 나눠 self-invocation에 새 트랜�
 8. `push/config/PushPropertiesTest`, `PushSchedulerTest`: 기본/경계 설정, 잘못된 설정 시작 실패, send OFF에서도 receipt 유지, push/default scheduler 분리.
 
 집중 테스트 → `server/gradlew fastTest` → Docker 환경의 `server/gradlew integrationTest` 순으로 검증한다. 2026-09-06 단계 1 구현은 프로덕션 클래스가 없어서 발생한 compile 실패, V12 전의 Hibernate schema 실패, 보안/CORS 기대 실패를 각각 확인한 뒤 좁은 테스트를 통과시켰다. 최종 전체 검증 결과는 실행 계획에 기록한다. 테스트용 제공자 성공은 실제 푸시 도달 증거가 아니다.
+
+## 8. 클라이언트 연동 중 확인한 로그아웃 경합 보강
+
+최초 기기 등록 전에 logout의 기기 조회가 끝나면 아직 존재하지 않는 행을 정리할 수 없다. `PushDeviceService`는 실제 Redis refresh session의 사용자·ACTIVE 여부를 등록 전과 `PushDeviceTransaction` 프록시의 커밋 후 확인한다. 커밋 후 session이 종료됐다면 `PushDeviceLifecycle.revokeSession`으로 그 session에 속한 연결만 보상 해제하고 AUTH_005를 반환한다. logout이 커밋 후 실행되는 경우에는 기존 logout 정리가 해당 행을 조회할 수 있다. session 조회/정리 의존성 장애는 503으로 처리한다.
+
+이는 등록의 신규 변경을 위한 검사이며 기존 등록을 refresh 자연 만료만으로 주기 해제하지 않는다. MySQL·Redis 원자 트랜잭션을 새로 만들었다는 의미가 아니며, 이미 외부 제공자에 전달된 알림은 회수하지 못한다. 최초 등록 응답과 logout 요청 모두 유실된 경우의 클라이언트 pending 조정은 공유 계약의 경계를 따른다.
+
+서비스 테스트는 미구현 생성자/세션 조회 API의 compile 실패부터 확인했고, 실제 MySQL·Redis 통합에서는 등록 전 세션 확인 직후 실행을 멈추고 logout을 먼저 완료한 뒤 등록을 재개해 최종 REVOKED를 확인한다. 세션 소유자 불일치·만료 key 검사도 포함한다.
