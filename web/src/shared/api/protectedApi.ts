@@ -8,6 +8,11 @@ import {
 } from '@/features/auth/model/tokenVault'
 
 import { ApiClientError, toApiClientError } from './apiError'
+import { assertAuthContext, getAuthContext, type AuthContext } from '@/features/auth/model/authContext'
+
+declare module 'axios' {
+  interface AxiosRequestConfig { authContext?: AuthContext }
+}
 
 type AuthRetryConfig = InternalAxiosRequestConfig & {
   _authRetried?: boolean
@@ -24,7 +29,10 @@ export const protectedApi = axios.create({
 })
 
 protectedApi.interceptors.request.use(async (config) => {
+  config.authContext ??= getAuthContext()
+  assertAuthContext(config.authContext)
   if (shouldRefreshAccessToken()) await refreshAccessToken()
+  assertAuthContext(config.authContext)
 
   const accessToken = getAccessToken()
   if (!accessToken) {
@@ -41,7 +49,10 @@ protectedApi.interceptors.request.use(async (config) => {
 })
 
 protectedApi.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (response.config.authContext) assertAuthContext(response.config.authContext)
+    return response
+  },
   async (error: unknown) => {
     if (!axios.isAxiosError<ApiResponse<unknown>>(error) || !error.config) {
       throw toApiClientError(error)
@@ -49,12 +60,14 @@ protectedApi.interceptors.response.use(
 
     const apiError = toApiClientError(error)
     const config = error.config as AuthRetryConfig
+    if (config.authContext) assertAuthContext(config.authContext)
     const isExpiredAccess = error.response?.status === 401 && apiError.code === 'AUTH_005'
 
     if (!isExpiredAccess || config._authRetried) throw apiError
 
     config._authRetried = true
     await refreshAccessToken()
+    if (config.authContext) assertAuthContext(config.authContext)
 
     const accessToken = getAccessToken()
     if (!accessToken) throw apiError

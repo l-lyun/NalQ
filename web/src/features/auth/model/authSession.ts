@@ -13,27 +13,40 @@ import { refreshAccessToken } from './authRefresh'
 import { getAuthPhase, setAuthPhase } from './authPhaseStore'
 import { broadcastSessionEnded } from './authSessionChannel'
 import { clearAuthAndPrivateCaches, endLocalSession } from './sessionCleanup'
-import { setSessionTokens } from './tokenVault'
+import { clearSessionTokens, setSessionTokens } from './tokenVault'
+import { advanceAuthContext, assertAuthContext, getAuthContext, isCurrentAuthContext } from './authContext'
+import { prepareNativeSessionEnd } from '@/shared/native/nativeSessionLifecycle'
 
 let bootstrapPromise: Promise<void> | null = null
 
 export async function loginAndLoadCurrentUser(payload: LoginRequest) {
+  const context = advanceAuthContext(null, false)
+  clearSessionTokens()
   const tokens = await createSession(payload)
+  assertAuthContext(context)
   setSessionTokens(tokens)
   await clearAuthAndPrivateCaches()
+  assertAuthContext(context)
   return completeCurrentUserSession()
 }
 
 export async function completeSignUpAndLoadCurrentUser(payload: CompleteSignUpRequest) {
+  const context = advanceAuthContext(null, false)
+  clearSessionTokens()
   const tokens = await completeBrowserSignUpTransport(payload)
+  assertAuthContext(context)
   setSessionTokens(tokens)
   await clearAuthAndPrivateCaches()
+  assertAuthContext(context)
   return completeNewUserSession()
 }
 
 export async function recoverCompletedSignUpSession() {
+  const context = advanceAuthContext()
   await refreshAccessToken()
+  assertAuthContext(context)
   await clearAuthAndPrivateCaches()
+  assertAuthContext(context)
   return completeNewUserSession()
 }
 
@@ -48,13 +61,16 @@ async function completeNewUserSession() {
 }
 
 async function loadAndActivateCurrentUser(onLoaded?: (user: CurrentUser) => void) {
+  const context = getAuthContext()
   try {
     const user = await queryClient.fetchQuery(currentUserQueryOptions)
+    assertAuthContext(context)
     onLoaded?.(user)
+    advanceAuthContext(user.id)
     setAuthPhase('authenticated')
     return user
   } catch (error) {
-    if (error instanceof ApiClientError && error.code === 'AUTH_005') {
+    if (isCurrentAuthContext(context) && error instanceof ApiClientError && error.code === 'AUTH_005') {
       await endLocalSession()
     }
     throw error
@@ -62,19 +78,31 @@ async function loadAndActivateCurrentUser(onLoaded?: (user: CurrentUser) => void
 }
 
 export async function logoutCurrentSession() {
+  const pendingEnd = prepareNativeSessionEnd('LOGOUT')
+  const context = advanceAuthContext(null, false)
+  clearSessionTokens()
   try {
+    await pendingEnd
+    assertAuthContext(context)
     await logoutSessionTransport()
   } finally {
-    try {
-      await endLocalSession()
-    } finally {
-      broadcastSessionEnded()
-      window.location.replace('/')
+    if (isCurrentAuthContext(context)) {
+      try {
+        await endLocalSession()
+      } finally {
+        broadcastSessionEnded()
+        window.location.replace('/')
+      }
     }
   }
 }
 
 export async function completeAccountWithdrawal() {
+  const pendingEnd = prepareNativeSessionEnd('WITHDRAWAL')
+  const context = advanceAuthContext(null, false)
+  clearSessionTokens()
+  await pendingEnd
+  if (!isCurrentAuthContext(context)) return
   try {
     await endLocalSession()
   } finally {
@@ -83,11 +111,16 @@ export async function completeAccountWithdrawal() {
 }
 
 async function executeBootstrap() {
+  const context = getAuthContext()
   try {
     await refreshAccessToken()
-    await queryClient.fetchQuery(currentUserQueryOptions)
+    assertAuthContext(context)
+    const user = await queryClient.fetchQuery(currentUserQueryOptions)
+    assertAuthContext(context)
+    advanceAuthContext(user.id)
     setAuthPhase('authenticated')
   } catch (error) {
+    if (!isCurrentAuthContext(context)) return
     if (error instanceof ApiClientError && error.code === 'AUTH_005') {
       await endLocalSession()
       return

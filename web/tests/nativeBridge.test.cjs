@@ -38,7 +38,7 @@ function browser({ native = true, topLevel = true } = {}) {
   }
   target.self = target
   target.top = topLevel ? target : {}
-  if (native) target.ReactNativeWebView = { postMessage: (value) => messages.push(JSON.parse(value)) }
+  if (native) target.NalQNativeBridge = { postMessage: (value) => messages.push(JSON.parse(value)) }
   return { target, messages, timers, listeners,
     emit: (detail) => listeners.get('nalq:native-message')?.({ detail }),
     tick: () => { const callbacks = [...timers.values()]; timers.clear(); callbacks.forEach((cb) => cb()) },
@@ -99,28 +99,34 @@ test('invalid, oversized, stale and mismatched HELLO messages are rejected', () 
 
 test('cleanup and transport failure leave the ordinary web lifecycle usable', () => {
   const host = browser()
-  host.target.ReactNativeWebView.postMessage = () => { throw new Error('native unavailable') }
+  host.target.NalQNativeBridge.postMessage = () => { throw new Error('native unavailable') }
   assert.doesNotThrow(() => startNativeBridge(host.target)())
   assert.equal(host.timers.size, 0)
   assert.equal(host.listeners.size, 0)
 })
 
 test('actual app and web implementations exchange HELLO through the fixed event script', () => {
-  const host = browser()
+  const host = browser({ native: false })
+  const origin = 'https://nalq.test'
+  const nonce = `${requestId}.${sessionId}`
+  host.target.location = { origin }
   host.target.dispatchEvent = (event) => host.listeners.get(event.type)?.(event)
-  host.target.ReactNativeWebView.postMessage = (raw) => {
+  const context = { window: host.target,
+    Event: class { constructor(type) { this.type = type } },
+    CustomEvent: class { constructor(type, options) { this.type = type; this.detail = options.detail } },
+  }
+  host.target.ReactNativeWebView = { postMessage: (transport) => {
+    const raw = native.parseTransportMessage(transport, nonce)
     const ready = native.parseWebReadyMessage(raw)
     assert.ok(ready)
     host.messages.push(ready)
     const reply = native.createHelloMessage(sessionId, ready.messageId, sessionId)
-    assert.deepEqual(reply.payload.capabilities, [])
+    assert.deepEqual(reply.payload.capabilities, ['push-v1'])
     const serialized = native.serializeNativeMessage(reply)
     assert.equal(parseHello(serialized, ready.messageId).bridgeSessionId, sessionId)
-    vm.runInNewContext(native.createNativeMessageDispatchScript(serialized), {
-      window: host.target,
-      CustomEvent: class { constructor(type, options) { this.type = type; this.detail = options.detail } },
-    })
-  }
+    vm.runInNewContext(native.createNativeMessageDispatchScript(serialized, origin, nonce), context)
+  } }
+  vm.runInNewContext(native.createMainDocumentBridgeScript(origin, nonce), context)
   const stop = startNativeBridge(host.target)
   host.tick()
   assert.equal(host.messages.length, 1)
@@ -144,5 +150,16 @@ test('HTTP development contexts can use getRandomValues without randomUUID', () 
   host.target.crypto = { getRandomValues: (bytes) => bytes.fill(1) }
   const stop = startNativeBridge(host.target)
   assert.ok(native.parseWebReadyMessage(JSON.stringify(host.messages[0])))
+  stop()
+})
+
+test('raw RN interface never activates push; late main-document facade can restart negotiation', () => {
+  const host = browser({ native: false })
+  host.target.ReactNativeWebView = { postMessage: () => assert.fail('raw interface must not be used') }
+  const stop = startNativeBridge(host.target)
+  assert.equal(host.messages.length, 0)
+  host.target.NalQNativeBridge = { postMessage: (value) => host.messages.push(JSON.parse(value)) }
+  host.listeners.get('nalq:native-ready')()
+  assert.equal(host.messages.length, 1)
   stop()
 })
