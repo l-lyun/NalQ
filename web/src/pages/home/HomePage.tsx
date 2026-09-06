@@ -29,7 +29,7 @@ export function HomePage(props: HomePageProps) {
   } = props
 
   return (
-    <VStack className="home-shell" minHeight="100dvh" bg="bg.layerBasement">
+    <VStack className="home-shell" minHeight="100dvh" bg="bg.layerDefault">
       <Box as="main" className="home-main" bg="bg.layerDefault" width="full" pt="safeArea">
         <VStack
           className="home-content"

@@ -3,6 +3,9 @@ import { ActionButton, Box, Flex, Icon, Text, VisuallyHidden, VStack } from '@se
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
 
 import { moveOnboardingIndex, type OnboardingMoveSource } from './onboardingCarousel'
+import guideConditionsImage from './assets/nalq-guide-conditions.png'
+import guideLearningImage from './assets/nalq-guide-learning.png'
+import guideReviewImage from './assets/nalq-guide-review.png'
 
 import './onboarding.css'
 
@@ -11,16 +14,19 @@ const slides = [
     title: '읽은 글로 바로 문제를 만들어요',
     description: '노션에 정리해 둔 글이나 텍스트를 가져오면, 그 내용에 맞는 문제를 만들 수 있어요.',
     placeholder: '학습자료에서 문제로 이어지는 앱 화면',
+    image: guideLearningImage,
   },
   {
     title: '공부할 방식은 직접 골라요',
     description: '문제 유형과 난이도, 문제 수를 원하는 대로 정할 수 있어요.',
     placeholder: '문제 유형·난이도·문제 수 선택 앱 화면',
+    image: guideConditionsImage,
   },
   {
     title: '헷갈린 부분만 다시 보면 돼요',
     description: '결과와 관련 내용을 함께 확인하고, 틀린 문제만 모아 다시 풀어보세요.',
     placeholder: '결과와 다시 보기 앱 화면',
+    image: guideReviewImage,
   },
 ] as const
 
@@ -134,8 +140,14 @@ export function OnboardingPage({ mode, onExit }: OnboardingPageProps) {
               <Text textStyle="t4Medium" color="fg.neutralMuted" align="center">
                 {slide.placeholder}
                 <br />
-                <span className="onboarding-capture-caption">앱 화면 캡처 준비 중</span>
+                <span className="onboarding-capture-caption">앱 화면을 불러오지 못했어요</span>
               </Text>
+              <img
+                className="onboarding-capture-image"
+                src={slide.image}
+                alt=""
+                onError={(event) => { event.currentTarget.hidden = true }}
+              />
             </Box>
             <VStack align="flex-start" gap="x3">
               <Text ref={headingRef} as="h2" tabIndex={-1} textStyle="t10Bold" color="fg.neutral">{slide.title}</Text>

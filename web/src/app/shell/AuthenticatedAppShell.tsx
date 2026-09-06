@@ -94,7 +94,7 @@ function AuthenticatedAppShellContent() {
     <VStack
       className={`app-shell${documentScrollEnabled ? ' app-shell--document-scroll' : ''}`}
       minHeight="100dvh"
-      bg="bg.layerBasement"
+      bg="bg.layerDefault"
     >
       {isNotificationsPage ? (
         <Box className="app-tab-viewport"><NotificationsPage /><Outlet /></Box>

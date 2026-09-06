@@ -16,7 +16,7 @@
     "Segoe UI Symbol",
     sans-serif;
   color: var(--seed-color-fg-neutral);
-  background: var(--seed-color-bg-layer-basement);
+  background: var(--seed-color-bg-layer-default);
 }
 
 html:root,
@@ -54,6 +54,7 @@ body,
   min-width: 320px;
   min-height: 100%;
   margin: 0;
+  background: var(--seed-color-bg-layer-default);
 }
 
 body {
