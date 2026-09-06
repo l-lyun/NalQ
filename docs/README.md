@@ -36,6 +36,7 @@ scope: repository
 | 학습자료 만들기 | [학습자료 만들기 PRD](prd/prd-content-import.md) | 검토 중 |
 | 퀴즈 생성·풀이·결과·복습 | [퀴즈 PRD](prd/prd-quiz-learning.md) | 검토 중 |
 | 퀴즈 생성 결과 알림 | [퀴즈 생성 결과 알림 PRD](prd/prd-quiz-generation-notifications.md) | 검토 중 |
+| 퀴즈 생성 결과 OS 푸시 | [퀴즈 생성 결과 OS 푸시 PRD](prd/prd-quiz-push-notifications.md) | 초안 |
 
 ## UX
 
@@ -72,6 +73,7 @@ Flow는 여러 화면의 순서와 분기를, Screen Spec은 한 화면의 구�
 | 학습자료·퀴즈·복습 데이터 | [학습자료·퀴즈 데이터](contracts/contract-data-quiz-learning.md) | Data Contract | 검토 중 |
 | 퀴즈 생성 결과 알림 | [알림 API](contracts/contract-api-notifications.md) | API Contract | 검토 중 |
 | 퀴즈 생성 결과 알림 데이터 | [알림 데이터](contracts/contract-data-notifications.md) | Data Contract | 검토 중 |
+| 앱 푸시 기기 등록·알림 조회·메시지 | [푸시 API·브리지 계약](contracts/contract-api-push-notifications.md) | API·메시지 Contract | 초안 |
 
 ## 애플리케이션 TRD
 
@@ -95,6 +97,8 @@ TRD는 각 애플리케이션의 `docs/trd/trd-*.md`에 두며, 파일명과 제
 | App | WebView 퀴즈 상태 | [앱 퀴즈 TRD](../app/docs/trd/trd-quiz-solving.md) | 검토 중 |
 
 ## 실행 계획과 저장소 검증
+
+- [퀴즈 결과 푸시 기술 설계안](plans/plan-quiz-push-notifications.md): 앱·웹·서버 연결, 등록 검증 수준, 발송 내구성 및 검증 계획 제안.
 
 | 관심사 | 원장 | 유형 | 상태 |
 | --- | --- | --- | --- |
