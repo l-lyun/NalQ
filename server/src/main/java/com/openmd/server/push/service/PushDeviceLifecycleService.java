@@ -3,6 +3,7 @@ package com.openmd.server.push.service;
 import com.openmd.server.push.domain.PushDevice;
 import com.openmd.server.push.repository.PushDeviceOperationRepository;
 import com.openmd.server.push.repository.PushDeviceRepository;
+import com.openmd.server.push.repository.PushDeliveryRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -16,14 +17,17 @@ public class PushDeviceLifecycleService implements PushDeviceLifecycle {
 
   private final ObjectProvider<PushDeviceRepository> devices;
   private final ObjectProvider<PushDeviceOperationRepository> operations;
+  private final ObjectProvider<PushDeliveryRepository> deliveries;
   private final Clock clock;
 
   public PushDeviceLifecycleService(
       ObjectProvider<PushDeviceRepository> devices,
       ObjectProvider<PushDeviceOperationRepository> operations,
+      ObjectProvider<PushDeliveryRepository> deliveries,
       ObjectProvider<Clock> clock) {
     this.devices = devices;
     this.operations = operations;
+    this.deliveries = deliveries;
     this.clock = clock.getIfAvailable(Clock::systemUTC);
   }
 
@@ -46,9 +50,11 @@ public class PushDeviceLifecycleService implements PushDeviceLifecycle {
   public void deleteForUser(long userId) {
     PushDeviceOperationRepository operationRepository = operations.getIfAvailable();
     PushDeviceRepository deviceRepository = devices.getIfAvailable();
-    if (operationRepository == null || deviceRepository == null) {
+    PushDeliveryRepository deliveryRepository = deliveries.getIfAvailable();
+    if (operationRepository == null || deviceRepository == null || deliveryRepository == null) {
       return;
     }
+    deliveryRepository.deleteAllByUserId(userId);
     operationRepository.deleteAllBySubjectUserId(userId);
     deviceRepository.deleteAllByUserId(userId);
   }

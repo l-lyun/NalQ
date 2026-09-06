@@ -282,13 +282,58 @@ class PushDeviceInfrastructureIntegrationTest {
     jdbc.update(
         "UPDATE users SET password_hash = ? WHERE id = 42",
         passwordEncoder.encode("password1"));
-    service.register(
+    PushDeviceRegistrationResult original =
+        service.register(
         42L,
         "session-42",
         command(
             "11111111-1111-4111-8111-111111111111",
             "33333333-3333-4333-8333-333333333333",
             TOKEN));
+    long deviceId =
+        jdbc.queryForObject(
+            "SELECT id FROM push_devices WHERE installation_id = ?",
+            Long.class,
+            original.installationId());
+    jdbc.update(
+        """
+        INSERT INTO notifications (
+          public_id, user_id, payload_version, notification_type, quiz_set_id, material_id,
+          target_name, failure_code, action_type, created_at, updated_at
+        ) VALUES (?, 42, 1, 'QUIZ_GENERATION_READY', ?, 'material-1', '자료구조 퀴즈',
+          NULL, 'FOCUS_QUIZ_IN_LIST', NOW(6), NOW(6))
+        """,
+        "99999999-9999-4999-8999-999999999999",
+        "88888888-8888-4888-8888-888888888888");
+    long notificationId =
+        jdbc.queryForObject(
+            "SELECT id FROM notifications WHERE public_id = ?",
+            Long.class,
+            "99999999-9999-4999-8999-999999999999");
+    jdbc.update(
+        """
+        INSERT INTO push_deliveries (
+          notification_id, device_id, user_id, binding_id, token_version, state,
+          attempt_count, expires_at, next_attempt_at, created_at, updated_at
+        ) VALUES (?, ?, 42, ?, 1, 'PENDING', 0,
+          TIMESTAMPADD(HOUR, 1, NOW(6)), NOW(6), NOW(6), NOW(6))
+        """,
+        notificationId,
+        deviceId,
+        original.bindingId());
+    service.register(
+        84L,
+        "session-84",
+        new RegisterPushDeviceCommand(
+            original.installationId(),
+            KEY,
+            "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            NOW,
+            original.revision(),
+            PushPlatform.IOS,
+            PushProvider.EXPO,
+            "ExponentPushToken[bbbbbbbbbbbbbbbbbbbbbb]",
+            PushPermission.GRANTED));
 
     withdrawalService.withdraw(
         42L,
@@ -307,15 +352,76 @@ class PushDeviceInfrastructureIntegrationTest {
         jdbc.queryForObject(
             "SELECT COUNT(*) FROM push_device_operations WHERE subject_user_id = 42",
             Integer.class));
+    assertEquals(
+        0,
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM push_deliveries WHERE user_id = 42", Integer.class));
+    assertEquals(
+        1,
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM push_devices WHERE user_id = 84 AND status = 'ACTIVE'",
+            Integer.class));
+  }
+
+  @Test
+  void retentionDoesNotLetADeletedInstallationReplayAnOldRegistrationIntent() {
+    PushDeviceRegistrationResult registered =
+        service.register(
+            42L,
+            "session-42",
+            command(
+                "11111111-1111-4111-8111-111111111111",
+                "33333333-3333-4333-8333-333333333333",
+                TOKEN));
+    jdbc.update(
+        """
+        UPDATE push_devices
+        SET status='REVOKED', session_id=NULL, binding_id=NULL, push_token=NULL,
+            push_token_digest=NULL,
+            inactive_at=TIMESTAMPADD(MICROSECOND, ?, '1970-01-01 00:00:00.000000')
+        WHERE installation_id=?
+        """,
+        (NOW.minus(Duration.ofDays(31)).getEpochSecond() * 1_000_000L),
+        registered.installationId());
+    jdbc.update(
+        """
+        UPDATE push_device_operations
+        SET expires_at=TIMESTAMPADD(MICROSECOND, ?, '1970-01-01 00:00:00.000000')
+        """,
+        (NOW.minusSeconds(1).getEpochSecond() * 1_000_000L));
+    PushRetentionStore retention = new PushRetentionStore(jdbc);
+    retention.deleteOperationsExpiredAtOrBefore(NOW, 500);
+    retention.deleteInactiveDevicesBefore(NOW.minus(Duration.ofDays(30)), 500);
+
+    BusinessException expired =
+        assertThrows(
+            BusinessException.class,
+            () ->
+                service.register(
+                    42L,
+                    "session-42",
+                    command(
+                        registered.installationId(),
+                        "44444444-4444-4444-8444-444444444444",
+                        TOKEN,
+                        NOW.minus(Duration.ofDays(31)))));
+
+    assertEquals(PushErrorCode.OPERATION_EXPIRED, expired.getErrorCode());
+    assertTrue(devices.findByInstallationId(registered.installationId()).isEmpty());
   }
 
   private RegisterPushDeviceCommand command(
       String installationId, String operationId, String token) {
+    return command(installationId, operationId, token, NOW);
+  }
+
+  private RegisterPushDeviceCommand command(
+      String installationId, String operationId, String token, Instant issuedAt) {
     return new RegisterPushDeviceCommand(
         installationId,
         KEY,
         operationId,
-        NOW,
+        issuedAt,
         0L,
         PushPlatform.IOS,
         PushProvider.EXPO,

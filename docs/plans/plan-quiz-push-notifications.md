@@ -136,3 +136,20 @@ Expo data는 `payloadVersion`, `notificationId`, `bindingId`로 구성하고 표
 - 전체 통합에서 기존 Notion의 고정 Clock과 충돌하는 부팅 실패를 확인했다. 새 전역 Clock 빈 대신 기존 Clock 또는 UTC fallback을 주입하며, `NotionInfrastructureIntegrationTest` 4개 PASS를 확인했다.
 - 첫 커밋 `7cdf8c6`: staged 파일만 임시 체크아웃으로 분리해 `fastTest` 296개, `PushDeviceInfrastructureIntegrationTest` 7개 PASS. 늦은 해제 이후 이전 revision 등록 차단을 실제 MySQL에서 확인했다.
 - 두 번째 커밋 대상도 staged 파일만 분리해 `fastTest` 304개, `PushOutboxIntegrationTest` 6개 PASS. 이후 worker가 추가되기 전 독립적으로 부팅·원자성·소유권을 검증했다.
+- `PushDeliveryEndToEndIntegrationTest` 최초 2개 PASS: 실제 Spring proxy·JPA·MySQL·worker 연결에서 provider 대역 호출 시 TX가 없고 SENDING/RECEIPT_CHECKING이 이미 커밋돼 있음을 확인했다. 원래 제목 snapshot·정확한 1시간 expiresAt, ticket 이후 신규전송 없음·1시간 이후 receipt 조회·읽음 미변경을 확인했다. 토큰 갱신 후 이전 outbox 취소 시나리오 추가분은 최종 전체 검증에 포함한다.
+- Expo adapter의 receipt HTTP 401을 `FAILED`로 해석하던 동작에 대해 `RETRY` 기대 RED를 확인했다. 조회 실패는 24시간까지 조회만 재시도하며, 실제 receipt 오류와 구분했다. `./gradlew fastTest --tests '*ExpoPushGatewayTest' --no-daemon` 12개 PASS: 절대 expiration/최소 data, 개별 오류, 429·Retry-After, malformed 응답, 연결 실패, 전체 응답 body deadline, receipt 누락 및 조회 거절을 제공자 대역으로 확인했다.
+
+### 최종 서버 검증
+
+`cd server && ./gradlew fastTest integrationTest bootJar --no-daemon` **PASS** (3분 39초).
+
+| 대상 | 결과 |
+| --- | --- |
+| fastTest | 331개, 실패·오류·skip 0 |
+| integrationTest | 70개, 실패·오류·skip 0 |
+| bootJar | 실행 JAR 빌드 PASS |
+| diff 검증 | `git diff --check`, staged diff check PASS |
+
+푸시 통합 검사는 기기/Redis 8개, Outbox 6개, claim·retention 9개, 실제 서버 내부 연결 3개를 포함한다. 재활성화 경합 중 기기 보존, 같은 binding의 tokenVersion 변경, 이전 receipt 차단, 정리 후 오래된 PUT 차단, 탈퇴 사용자의 이관 전 delivery 삭제를 확인했다. 기존 Notion·인증·퀴즈 등 전체 서버 회귀도 포함했다.
+
+기기 등록·delivery·scheduler flag는 모두 기본 false다. 웹·앱 코드는 변경하지 않았고 운영 발송 활성화·배포·실제 Expo/APNs/FCM 호출은 하지 않았다. 실기기 foreground 억제·cold start·푸시 선택은 후속 웹/앱 구현과 함께 검증해야 한다. FORCE INDEX EXPLAIN은 인덱스 존재·사용 가능성만 증명하며, 대표 운영 데이터의 자연 실행계획·조회 부하·백업 복원 후 보존 정리는 미검증이다.
