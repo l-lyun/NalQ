@@ -1,5 +1,5 @@
 import { Box, Snackbar, VStack } from '@seed-design/react'
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 
@@ -28,6 +28,13 @@ function AuthenticatedAppShellContent() {
   const navigate = useNavigate()
   const activeTab = getAppTab(location.pathname)
   const pendingTabRef = useRef<AppTabId | null>(null)
+  const activeTabRef = useRef(activeTab)
+  const documentScrollEnabledRef = useRef(false)
+  const tabScrollPositionsRef = useRef<Record<AppTabId, number>>({
+    home: 0,
+    learning: 0,
+    profile: 0,
+  })
   const [visitedTabs, setVisitedTabs] = useState<Record<AppTabId, boolean>>({
     home: activeTab === 'home',
     learning: activeTab === 'learning',
@@ -35,6 +42,24 @@ function AuthenticatedAppShellContent() {
   })
   const [notificationSlot, setNotificationSlot] = useState<HTMLElement | null>(null)
   const isNotificationsPage = location.pathname === '/notifications'
+  const documentScrollEnabled = !isNotificationsPage && isTopLevelTabPath(location.pathname)
+
+  const rememberActiveTabScrollPosition = () => {
+    if (!documentScrollEnabledRef.current) return
+    tabScrollPositionsRef.current[activeTabRef.current] = window.scrollY
+  }
+
+  useEffect(() => {
+    window.addEventListener('scroll', rememberActiveTabScrollPosition, { passive: true })
+    return () => window.removeEventListener('scroll', rememberActiveTabScrollPosition)
+  }, [])
+
+  useLayoutEffect(() => {
+    activeTabRef.current = activeTab
+    documentScrollEnabledRef.current = documentScrollEnabled
+    const nextScrollTop = documentScrollEnabled ? tabScrollPositionsRef.current[activeTab] : 0
+    window.scrollTo(0, nextScrollTop)
+  }, [activeTab, documentScrollEnabled])
 
   useLayoutEffect(() => {
     setVisitedTabs((current) => current[activeTab] ? current : { ...current, [activeTab]: true })
@@ -56,13 +81,18 @@ function AuthenticatedAppShellContent() {
     if (tab === activeTab && isTopLevelTabPath(location.pathname)) return
     if (pendingTabRef.current === tab) return
     const replace = pendingTabRef.current !== null
+    rememberActiveTabScrollPosition()
     pendingTabRef.current = tab
     setVisitedTabs((current) => current[tab] ? current : { ...current, [tab]: true })
     navigate(appTabPaths[tab], { replace })
   }
 
   return (
-    <VStack className="app-shell" minHeight="100dvh" bg="bg.layerBasement">
+    <VStack
+      className={`app-shell${documentScrollEnabled ? ' app-shell--document-scroll' : ''}`}
+      minHeight="100dvh"
+      bg="bg.layerDefault"
+    >
       {isNotificationsPage ? (
         <Box className="app-tab-viewport"><NotificationsPage /><Outlet /></Box>
       ) : (
@@ -74,7 +104,7 @@ function AuthenticatedAppShellContent() {
             <Outlet />
           </Box>
           {notificationSlot ? createPortal(<NotificationBell />, notificationSlot) : null}
-          {isTopLevelTabPath(location.pathname) ? (
+          {documentScrollEnabled ? (
             <Snackbar.AvoidOverlap>
               <div className="app-bottom-navigation-boundary"><AppBottomNavigation activeTab={activeTab} onNavigate={navigateToTab} /></div>
             </Snackbar.AvoidOverlap>

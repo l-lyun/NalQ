@@ -38,7 +38,7 @@ scope: production-infrastructure
 | `WEB_S3_BUCKET` | 예 | private web origin bucket 이름 |
 | `CLOUDFRONT_DISTRIBUTION_ID` | 예 | invalidation 대상 distribution |
 
-웹 build subprocess는 기존 shell environment를 상속하지 않고 현재 Node 실행 파일을 우선하는 `PATH`, 임시 디렉터리와 `VITE_API_BASE_URL`, 고정 runtime mode, release version만 전달받는다. 이미 구현·승인된 홈 방문 기록 API는 별도 운영 knob를 추가하지 않고 `VITE_HOME_VISITS_API_ENABLED=true`로 고정한다. 사용자 home, npm 설정이나 AWS credential은 build에 전달하지 않는다. S3/CloudFront 작업은 build가 끝난 뒤 웹 배포 principal로 실행한다.
+웹 build subprocess는 기존 shell environment를 상속하지 않고 현재 Node 실행 파일을 우선하는 `PATH`, 임시 디렉터리와 `VITE_API_BASE_URL`, 고정 runtime mode만 전달받는다. 이미 구현·승인된 홈 방문 기록 API는 별도 운영 knob를 추가하지 않고 `VITE_HOME_VISITS_API_ENABLED=true`로 고정한다. 사용자에게 표시하는 앱 버전은 웹 소스에서 관리하며 배포 commit SHA를 주입하지 않는다. 사용자 home, npm 설정이나 AWS credential은 build에 전달하지 않는다. S3/CloudFront 작업은 build가 끝난 뒤 웹 배포 principal로 실행한다.
 
 ## 데이터 저장소
 
@@ -84,7 +84,7 @@ Cookie의 Secure, SameSite, Path와 OpenAPI/Swagger 비활성화는 운영 Compo
 
 | 이름 | 비밀 | 초기값 |
 | --- | --- | --- |
-| `SPRING_AI_OPENAI_BASE_URL` | 아니요 | 개인정보처리방침과 맞춘 미국 처리 endpoint `https://us.api.openai.com` 고정 |
+| `SPRING_AI_OPENAI_BASE_URL` | 아니요 | 일반 OpenAI project용 표준 endpoint `https://api.openai.com/v1` 고정 |
 | `OPENAI_API_KEY` | 예 | 비활성 상태는 `no-key-configured` |
 | `OPENMD_QUIZ_GENERATION_ENABLED` | 아니요 | key 승인 전 `false` |
 | `OPENMD_QUIZ_GENERATION_MODEL` | 아니요 | 실제 계정 접근 가능 model 확인 |
@@ -94,7 +94,7 @@ Cookie의 Secure, SameSite, Path와 OpenAPI/Swagger 비활성화는 운영 Compo
 | `OPENMD_QUIZ_GENERATION_WORKER_COUNT` | 아니요 | t3.small에서는 `1`부터 시작 |
 | `OPENMD_QUIZ_GENERATION_QUEUE_CAPACITY` | 아니요 | t3.small에서는 `4`부터 시작 |
 
-운영 배포 검증은 `SPRING_AI_OPENAI_BASE_URL`이 정확히 `https://us.api.openai.com`인지 확인하며 다른 값은 거부한다. Compose는 이 값을 Spring Boot의 `spring.ai.openai.base-url` 속성으로 전달한다. 실제 퀴즈 생성을 활성화하기 전에는 운영 project의 데이터 처리 지역 설정과 이 endpoint를 사용한 API 호출 성공을 별도로 확인한다.
+운영 배포 검증은 `SPRING_AI_OPENAI_BASE_URL`이 정확히 `https://api.openai.com/v1`인지 확인하며 다른 값은 거부한다. Compose는 이 값을 Spring Boot의 `spring.ai.openai.base-url` 속성으로 전달한다. OpenAI Java SDK는 여기에 `chat/completions` 같은 상대 경로를 붙이므로 `/v1`을 생략하면 잘못된 endpoint로 요청된다. `us.api.openai.com` 같은 지역 endpoint는 해당 데이터 레지던시로 생성된 project와 API key가 확인된 경우에만 별도 계약 변경 후 사용한다. 실제 퀴즈 생성을 활성화하기 전에는 운영 project와 이 endpoint를 사용한 API 호출 성공을 별도로 확인한다.
 
 ## 변경 절차
 

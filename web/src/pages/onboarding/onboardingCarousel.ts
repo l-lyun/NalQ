@@ -1,4 +1,4 @@
-export type OnboardingMoveSource = 'carousel' | 'control'
+export type OnboardingMoveSource = 'carousel' | 'control' | 'keyboard'
 
 export function moveOnboardingIndex(
   current: number,
@@ -11,6 +11,6 @@ export function moveOnboardingIndex(
 
   return {
     index,
-    focusHeading: source === 'control' && reachedBoundary,
+    focusHeading: source === 'keyboard' || (source === 'control' && reachedBoundary),
   }
 }

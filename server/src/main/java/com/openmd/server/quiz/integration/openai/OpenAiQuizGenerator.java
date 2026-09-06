@@ -70,7 +70,10 @@ public class OpenAiQuizGenerator implements QuizGenerator {
         return mapped(response == null ? null : response.entity());
       } catch (RuntimeException exception) {
         if (attempt < networkRetry && transientFailure(exception)) continue;
-        log.warn("OpenAI quiz generation attempt failed category={}", category(exception));
+        log.warn(
+            "OpenAI quiz generation attempt failed category={} exceptionTypes={}",
+            category(exception),
+            exceptionTypes(exception));
         return QuizGeneratedBatch.failed();
       }
     }
@@ -132,6 +135,21 @@ public class OpenAiQuizGenerator implements QuizGenerator {
       }
     }
     return "PROVIDER_RESPONSE_INVALID";
+  }
+
+  String exceptionTypes(Throwable failure) {
+    StringBuilder types = new StringBuilder();
+    Throwable current = failure;
+    int depth = 0;
+    while (current != null && depth < 8) {
+      if (types.length() > 0) types.append('>');
+      types.append(current.getClass().getSimpleName());
+      Throwable next = current.getCause();
+      if (next == current) break;
+      current = next;
+      depth++;
+    }
+    return types.toString();
   }
 
   private String loadPrompt(String version) {

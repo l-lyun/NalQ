@@ -53,7 +53,7 @@ write_valid_server_env() {
 		'SPRING_MAIL_PASSWORD=test-only' \
 		'OPENMD_NOTION_ENABLED=false' \
 		'OPENMD_QUIZ_GENERATION_ENABLED=false' \
-		'SPRING_AI_OPENAI_BASE_URL=https://us.api.openai.com' \
+		'SPRING_AI_OPENAI_BASE_URL=https://api.openai.com/v1' \
 		'OPENAI_API_KEY=no-key-configured' >"$target"
 }
 
@@ -86,11 +86,11 @@ printf '%s\n' 'SERVER_HOST_PORT=18080' >>"$bad_port_env"
 expect_failure_containing 'SERVER_HOST_PORT must be exactly 8080' \
 	"$SCRIPT_DIR/validate-env.sh" --env-file "$bad_port_env"
 
-global_openai_env="$temporary_directory/global-openai.env"
-cp "$server_env" "$global_openai_env"
-printf '%s\n' 'SPRING_AI_OPENAI_BASE_URL=https://api.openai.com' >>"$global_openai_env"
-expect_failure_containing 'SPRING_AI_OPENAI_BASE_URL must be https://us.api.openai.com' \
-	"$SCRIPT_DIR/validate-env.sh" --env-file "$global_openai_env"
+regional_openai_env="$temporary_directory/regional-openai.env"
+cp "$server_env" "$regional_openai_env"
+printf '%s\n' 'SPRING_AI_OPENAI_BASE_URL=https://us.api.openai.com' >>"$regional_openai_env"
+expect_failure_containing 'SPRING_AI_OPENAI_BASE_URL must be https://api.openai.com/v1' \
+	"$SCRIPT_DIR/validate-env.sh" --env-file "$regional_openai_env"
 
 notion_missing_env="$temporary_directory/notion-missing.env"
 cp "$server_env" "$notion_missing_env"
@@ -181,6 +181,10 @@ if grep -Eq '/validate-env\.sh|load_env_file ' "$SCRIPT_DIR/deploy-web.sh"; then
 fi
 grep -Fq 'env -i' "$SCRIPT_DIR/deploy-web.sh"
 grep -Fq 'VITE_HOME_VISITS_API_ENABLED=true' "$SCRIPT_DIR/deploy-web.sh"
+if grep -Fq 'VITE_APP_VERSION' "$SCRIPT_DIR/deploy-web.sh"; then
+	printf 'deploy-web must not replace the product app version with a release identifier\n' >&2
+	exit 1
+fi
 
 restore_state="$temporary_directory/restore-state"
 mkdir -p "$restore_state"

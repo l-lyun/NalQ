@@ -611,7 +611,7 @@ export function QuizFlowPage({
   }
 
   return (
-    <VStack className="quiz-shell" minHeight="100dvh" bg="bg.layerBasement">
+    <VStack className="quiz-shell" minHeight="100dvh" bg="bg.layerDefault">
       <Box as="main" className="quiz-main" bg="bg.layerDefault" width="full" pt="safeArea">
         {scene === 'CONDITIONS' ? (
           <ConditionsScreen

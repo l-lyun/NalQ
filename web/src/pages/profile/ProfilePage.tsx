@@ -56,9 +56,9 @@ export function ProfilePage({
   const displayName = nickname || '닉네임 미설정'
 
   return (
-    <VStack className="profile-shell" minHeight="100dvh" bg="bg.layerBasement">
+    <VStack className="profile-shell" minHeight="100dvh" bg="bg.layerDefault">
       <Box as="main" className="profile-main" bg="bg.layerDefault" width="full" pt="safeArea">
-        <VStack className="profile-content" px="spacingX.globalGutter" pt="x4" pb="spacingY.screenBottom" gap="x3">
+        <VStack className="profile-content" px="spacingX.globalGutter" pt="x6" pb="spacingY.screenBottom" gap="x3">
           <Flex as="header" align="center" justify="space-between" gap="x3">
             <Text as="h1" textStyle="t12Bold" color="fg.neutral">마이페이지</Text>
             <div className="app-notification-slot" data-app-notification-slot />
