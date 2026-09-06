@@ -18,7 +18,7 @@ export function HomeSectionDivider() {
 export function SectionHeader({ id, title, actionLabel, onAction }: SectionHeaderProps) {
   return (
     <Flex align="center" justify="space-between" gap="x3" wrap>
-      <Text as="h2" id={id} textStyle="t10Bold" color="fg.neutral">
+      <Text as="h2" id={id} textStyle="t7Bold" color="fg.neutral">
         {title}
       </Text>
       {actionLabel && onAction ? (

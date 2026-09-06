@@ -102,7 +102,7 @@ export function QuizManagementCard({
         onClick={onToggle}
       >
         <VStack minWidth="0px" gap="x1" align="flex-start">
-          <Text className="learning-long-title" textStyle="t7Bold" color="fg.neutral">
+          <Text className="learning-long-title" textStyle="t5Bold" color="fg.neutral">
             {title}
           </Text>
           <Text textStyle="t4Regular" color="fg.neutralMuted">

@@ -72,7 +72,7 @@ export function AccountSettingsPage({
           <ActionButton type="button" size="medium" variant="neutralWeak" onClick={onRetry}>다시 시도</ActionButton>
         </VStack>
       ) : (
-        <VStack gap="x8">
+        <VStack gap="x6">
           <form onSubmit={handleSubmit} noValidate>
             <VStack gap="x6">
             <Field.Root>
@@ -126,7 +126,7 @@ export function AccountSettingsPage({
           </form>
           <Divider as="div" color="stroke.neutralSubtle" />
           <VStack as="section" gap="x3" align="flex-start" aria-labelledby="account-withdrawal-title">
-            <Text as="h2" id="account-withdrawal-title" textStyle="t7Bold" color="fg.neutral">계정 삭제</Text>
+            <Text as="h2" id="account-withdrawal-title" textStyle="t6Bold" color="fg.neutral">계정 삭제</Text>
             <Text textStyle="t4Regular" color="fg.neutralMuted">
               탈퇴하면 계정 사용이 즉시 중단되고 이전 학습 기록은 복구할 수 없어요.
             </Text>
@@ -190,9 +190,9 @@ export function AccountWithdrawalPage({
     <ProfileSubPage title="회원탈퇴" onBack={onBack} backDisabled={withdrawal.isPending}>
       {step === 'impact' ? (
         <VStack gap="x6" align="stretch">
-          <Box bg="bg.criticalWeak" borderRadius="r3" p="x5">
+          <Box bg="bg.criticalWeak" borderRadius="r3" p="x4">
             <VStack gap="x3" align="flex-start">
-              <Text as="h2" textStyle="t7Bold" color="fg.critical">탈퇴 전에 확인해 주세요</Text>
+              <Text as="h2" textStyle="t6Bold" color="fg.critical">탈퇴 전에 확인해 주세요</Text>
               <Text as="p" textStyle="t5Regular" color="fg.neutral">
                 탈퇴 즉시 NalQ 계정과 모든 로그인 세션을 더 이상 사용할 수 없어요.
               </Text>
@@ -306,7 +306,7 @@ function ProfileSubPage({
             <ActionButton type="button" size="small" variant="ghost" layout="iconOnly" aria-label="마이페이지로 돌아가기" disabled={backDisabled} onClick={onBack}>
               <Icon svg={<IconArrowLeftLine />} size="x5" />
             </ActionButton>
-            <Text as="h1" textStyle="t10Bold" color="fg.neutral">{title}</Text>
+            <Text as="h1" textStyle="t9Bold" color="fg.neutral">{title}</Text>
             <div className="app-notification-slot" data-app-notification-slot />
           </Flex>
           {children}
