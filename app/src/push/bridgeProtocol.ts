@@ -30,6 +30,15 @@ export interface HelloMessage {
   };
 }
 
+export interface NativeFeatureMessage {
+  version: typeof PUSH_BRIDGE_VERSION;
+  type: string;
+  messageId: string;
+  bridgeSessionId: string;
+  authEpoch: number;
+  payload: unknown;
+}
+
 export interface AuthStateMessage {
   version: typeof PUSH_BRIDGE_VERSION;
   type: 'AUTH_STATE';
@@ -53,6 +62,77 @@ export type AuthStateDecision =
       accepted: false;
       reason: 'capability-not-negotiated' | 'epoch-regressed' | 'epoch-conflict';
     };
+
+export type PushStateResultPayload = {
+  requestId: string;
+  outcome: 'SUCCESS';
+  data: {
+    revision: number;
+    belongsToCurrentUser: boolean;
+    bindingId: string | null;
+    status: 'ACTIVE' | 'DISABLED' | 'REVOKED';
+    platform: 'IOS' | 'ANDROID';
+  };
+} | {
+  requestId: string;
+  outcome: 'NOT_FOUND';
+} | {
+  requestId: string;
+  outcome: 'RETRY';
+  errorCode: string;
+  retryAfterMs?: number;
+} | {
+  requestId: string;
+  outcome: 'FAILED';
+  errorCode: string;
+  retryAfterMs?: number;
+};
+
+export type PushRegisterResultPayload = {
+  operationId: string;
+  outcome: 'SUCCESS';
+  data: {
+    installationId: string;
+    revision: number;
+    bindingId: string | null;
+    status: 'ACTIVE' | 'DISABLED' | 'REVOKED';
+    userId: number;
+  };
+} | {
+  operationId: string;
+  outcome: 'RETRY';
+  errorCode: string;
+  retryAfterMs?: number;
+} | {
+  operationId: string;
+  outcome: 'FAILED';
+  errorCode: string;
+  retryAfterMs?: number;
+};
+
+export type PushRevokeResultPayload = {
+  operationId: string;
+  outcome: 'SUCCESS';
+  data: { revoked: boolean };
+} | {
+  operationId: string;
+  outcome: 'RETRY';
+  errorCode: string;
+  retryAfterMs?: number;
+} | {
+  operationId: string;
+  outcome: 'FAILED';
+  errorCode: string;
+  retryAfterMs?: number;
+};
+
+export type WebFeatureMessage =
+  | AuthStateMessage
+  | (NativeFeatureMessage & { type: 'PUSH_REGISTER_REQUEST'; payload: { authEpoch: number } })
+  | (NativeFeatureMessage & { type: 'PUSH_STATE_RESULT'; payload: PushStateResultPayload })
+  | (NativeFeatureMessage & { type: 'PUSH_REGISTER_RESULT'; payload: PushRegisterResultPayload })
+  | (NativeFeatureMessage & { type: 'SESSION_ENDING'; payload: { reason: 'LOGOUT' | 'WITHDRAWAL' } })
+  | (NativeFeatureMessage & { type: 'PUSH_REVOKE_RESULT'; payload: PushRevokeResultPayload });
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -156,7 +236,7 @@ export function createHelloMessage(
     payload: {
       version: PUSH_BRIDGE_VERSION,
       bridgeSessionId,
-      capabilities: [],
+      capabilities: [PUSH_BRIDGE_CAPABILITY],
       replyTo,
     },
   };
@@ -246,7 +326,32 @@ export function decideAuthState(
   return { accepted: true, state: next };
 }
 
-export function serializeNativeMessage(message: HelloMessage) {
+export function createNativeFeatureMessage(
+  type: string,
+  bridgeSessionId: string,
+  authEpoch: number,
+  payload: unknown,
+  messageId: string,
+): NativeFeatureMessage {
+  if (
+    !isUuid(bridgeSessionId)
+    || !isUuid(messageId)
+    || !Number.isSafeInteger(authEpoch)
+    || authEpoch < 0
+  ) {
+    throw new Error('Native feature envelope is invalid.');
+  }
+  return {
+    version: PUSH_BRIDGE_VERSION,
+    type,
+    messageId,
+    bridgeSessionId,
+    authEpoch,
+    payload,
+  };
+}
+
+export function serializeNativeMessage(message: HelloMessage | NativeFeatureMessage) {
   const serialized = JSON.stringify(message);
   if (utf8ByteLength(serialized) > MAX_BRIDGE_MESSAGE_BYTES) {
     throw new Error('Native bridge message exceeds the size limit.');
@@ -254,10 +359,199 @@ export function serializeNativeMessage(message: HelloMessage) {
   return serialized;
 }
 
-export function createNativeMessageDispatchScript(serializedMessage: string) {
+export function parseTransportMessage(raw: string, expectedDocumentNonce: string) {
+  if (utf8ByteLength(raw) > MAX_BRIDGE_MESSAGE_BYTES + 512) {
+    return null;
+  }
+  const value = parseMessageJsonWithLimit(raw, MAX_BRIDGE_MESSAGE_BYTES + 512);
+  if (
+    !value
+    || !hasExactKeys(value, ['transportVersion', 'documentNonce', 'message'])
+    || value.transportVersion !== 1
+    || value.documentNonce !== expectedDocumentNonce
+    || typeof value.message !== 'string'
+    || utf8ByteLength(value.message) > MAX_BRIDGE_MESSAGE_BYTES
+  ) {
+    return null;
+  }
+  return value.message;
+}
+
+function parseMessageJsonWithLimit(raw: string, limit: number): Record<string, unknown> | null {
+  if (utf8ByteLength(raw) > limit) {
+    return null;
+  }
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return isRecord(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+export function createMainDocumentBridgeScript(webOrigin: string, documentNonce: string) {
+  const expectedOrigin = JSON.stringify(webOrigin);
+  const nonce = JSON.stringify(documentNonce);
+  const nativeEvent = JSON.stringify(NATIVE_MESSAGE_EVENT);
+  const readyEvent = JSON.stringify('nalq:native-ready');
+  return `(() => {
+    const expectedOrigin = ${expectedOrigin};
+    const documentNonce = ${nonce};
+    if (window.self !== window.top || window.location.origin !== expectedOrigin) return true;
+    const nativeBridge = window.ReactNativeWebView;
+    if (!nativeBridge || typeof nativeBridge.postMessage !== 'function') return true;
+    const rawPostMessage = nativeBridge.postMessage.bind(nativeBridge);
+    const facade = {};
+    Object.defineProperty(facade, 'postMessage', { value: (message) => {
+      if (typeof message !== 'string') return;
+      rawPostMessage(JSON.stringify({ transportVersion: 1, documentNonce, message }));
+    } });
+    Object.freeze(facade);
+    Object.defineProperty(window, 'NalQNativeBridge', { value: facade, configurable: true });
+    Object.defineProperty(window, '__nalqDispatchNativeV1', { value: (candidateNonce, message) => {
+      if (candidateNonce !== documentNonce || typeof message !== 'string') return;
+      window.dispatchEvent(new CustomEvent(${nativeEvent}, { detail: message }));
+    }, configurable: true });
+    window.dispatchEvent(new Event(${readyEvent}));
+    return true;
+  })();`;
+}
+
+export function createNativeMessageDispatchScript(
+  serializedMessage: string,
+  webOrigin: string,
+  documentNonce: string,
+) {
   if (utf8ByteLength(serializedMessage) > MAX_BRIDGE_MESSAGE_BYTES) {
     throw new Error('Native bridge message exceeds the size limit.');
   }
 
-  return `window.dispatchEvent(new CustomEvent(${JSON.stringify(NATIVE_MESSAGE_EVENT)}, { detail: ${JSON.stringify(serializedMessage)} })); true;`;
+  return `(() => {
+    if (window.self !== window.top || window.location.origin !== ${JSON.stringify(webOrigin)}) return true;
+    const dispatch = window.__nalqDispatchNativeV1;
+    if (typeof dispatch === 'function') dispatch(${JSON.stringify(documentNonce)}, ${JSON.stringify(serializedMessage)});
+    return true;
+  })(); true;`;
+}
+
+function isRetryAfter(value: unknown) {
+  return value === undefined || (Number.isSafeInteger(value)
+    && (value as number) >= 0
+    && (value as number) <= 86_400_000);
+}
+
+function isStableErrorCode(value: unknown) {
+  return typeof value === 'string' && /^[A-Z][A-Z0-9_]{1,63}$/.test(value);
+}
+
+function parseResultPayload(
+  payload: unknown,
+  idKey: 'requestId' | 'operationId',
+) {
+  if (!isRecord(payload) || !isUuid(payload[idKey]) || typeof payload.outcome !== 'string') {
+    return null;
+  }
+  if (payload.outcome === 'RETRY' || payload.outcome === 'FAILED') {
+    const keys = payload.retryAfterMs === undefined
+      ? [idKey, 'outcome', 'errorCode']
+      : [idKey, 'outcome', 'errorCode', 'retryAfterMs'];
+    if (!hasExactKeys(payload, keys) || !isStableErrorCode(payload.errorCode)
+      || !isRetryAfter(payload.retryAfterMs)) {
+      return null;
+    }
+  }
+  return payload;
+}
+
+function parseDeviceState(value: unknown) {
+  return isRecord(value)
+    && hasExactKeys(value, [
+      'revision', 'belongsToCurrentUser', 'bindingId', 'status', 'platform',
+    ])
+    && Number.isSafeInteger(value.revision)
+    && (value.revision as number) >= 0
+    && typeof value.belongsToCurrentUser === 'boolean'
+    && (value.bindingId === null || isUuid(value.bindingId))
+    && (value.status === 'ACTIVE' || value.status === 'DISABLED' || value.status === 'REVOKED')
+    && (value.platform === 'IOS' || value.platform === 'ANDROID');
+}
+
+function parseRegistrationResult(value: unknown) {
+  return isRecord(value)
+    && hasExactKeys(value, [
+      'installationId', 'revision', 'bindingId', 'status', 'userId',
+    ])
+    && isUuid(value.installationId)
+    && Number.isSafeInteger(value.revision)
+    && (value.revision as number) >= 0
+    && (value.bindingId === null || isUuid(value.bindingId))
+    && (value.status === 'ACTIVE' || value.status === 'DISABLED' || value.status === 'REVOKED')
+    && Number.isSafeInteger(value.userId)
+    && (value.userId as number) > 0;
+}
+
+export function parseWebFeatureMessage(
+  raw: string,
+  activeBridgeSessionId: string,
+): WebFeatureMessage | null {
+  const value = parseMessageJson(raw);
+  if (!value || !hasExactKeys(value, [
+    'version', 'type', 'messageId', 'bridgeSessionId', 'authEpoch', 'payload',
+  ]) || value.version !== PUSH_BRIDGE_VERSION || !isUuid(value.messageId)
+    || value.bridgeSessionId !== activeBridgeSessionId
+    || !Number.isSafeInteger(value.authEpoch) || (value.authEpoch as number) < 0) {
+    return null;
+  }
+
+  if (value.type === 'AUTH_STATE') {
+    return parseAuthStateMessage(raw, activeBridgeSessionId);
+  }
+
+  const payload = value.payload;
+  if (!isRecord(payload)) {
+    return null;
+  }
+
+  if (value.type === 'PUSH_REGISTER_REQUEST') {
+    return hasExactKeys(payload, ['authEpoch']) && payload.authEpoch === value.authEpoch
+      ? value as unknown as WebFeatureMessage
+      : null;
+  }
+  if (value.type === 'SESSION_ENDING') {
+    return hasExactKeys(payload, ['reason'])
+      && (payload.reason === 'LOGOUT' || payload.reason === 'WITHDRAWAL')
+      ? value as unknown as WebFeatureMessage
+      : null;
+  }
+  if (value.type === 'PUSH_STATE_RESULT') {
+    const parsed = parseResultPayload(payload, 'requestId');
+    if (!parsed) return null;
+    if (payload.outcome === 'SUCCESS') {
+      if (!hasExactKeys(payload, ['requestId', 'outcome', 'data']) || !parseDeviceState(payload.data)) return null;
+    } else if (payload.outcome === 'NOT_FOUND') {
+      if (!hasExactKeys(payload, ['requestId', 'outcome'])) return null;
+    } else if (payload.outcome !== 'RETRY' && payload.outcome !== 'FAILED') return null;
+    return value as unknown as WebFeatureMessage;
+  }
+  if (value.type === 'PUSH_REGISTER_RESULT') {
+    const parsed = parseResultPayload(payload, 'operationId');
+    if (!parsed) return null;
+    if (payload.outcome === 'SUCCESS') {
+      if (!hasExactKeys(payload, ['operationId', 'outcome', 'data'])
+        || !parseRegistrationResult(payload.data)) return null;
+    } else if (payload.outcome !== 'RETRY' && payload.outcome !== 'FAILED') return null;
+    return value as unknown as WebFeatureMessage;
+  }
+  if (value.type === 'PUSH_REVOKE_RESULT') {
+    if (value.authEpoch !== 0) return null;
+    const parsed = parseResultPayload(payload, 'operationId');
+    if (!parsed) return null;
+    if (payload.outcome === 'SUCCESS') {
+      if (!hasExactKeys(payload, ['operationId', 'outcome', 'data'])
+        || !isRecord(payload.data) || !hasExactKeys(payload.data, ['revoked'])
+        || typeof payload.data.revoked !== 'boolean') return null;
+    } else if (payload.outcome !== 'RETRY' && payload.outcome !== 'FAILED') return null;
+    return value as unknown as WebFeatureMessage;
+  }
+  return null;
 }

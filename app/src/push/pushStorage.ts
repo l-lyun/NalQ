@@ -17,6 +17,10 @@ export interface ActivePushBinding {
   bindingId: string;
   userId: number;
   revision: number;
+  platform: 'IOS' | 'ANDROID';
+  permission: 'GRANTED';
+  pushToken: string;
+  tokenVersion: number;
 }
 
 export interface PendingRegistration {
@@ -32,10 +36,22 @@ export interface PendingRegistration {
 }
 
 export interface PendingRevoke {
+  installationId: string;
+  installationKey: string;
   operationId: string;
   operationIssuedAt: string;
   bindingId: string;
   expectedRevision: number;
+}
+
+export interface LastRegistrationAck {
+  operationId: string;
+  installationId: string;
+  userId: number;
+  authEpoch: number;
+  bindingId: string | null;
+  revision: number;
+  completedAt: string;
 }
 
 export interface PushStorageState {
@@ -44,6 +60,7 @@ export interface PushStorageState {
   activeBinding: ActivePushBinding | null;
   pendingRegistration: PendingRegistration | null;
   pendingRevokes: PendingRevoke[];
+  lastRegistrationAck?: LastRegistrationAck | null;
 }
 
 export class PushStorageCorruptedError extends Error {
@@ -95,7 +112,11 @@ function isActiveBinding(value: unknown): value is ActivePushBinding {
   return isRecord(value)
     && isUuid(value.bindingId)
     && isPositiveInteger(value.userId)
-    && isNonNegativeInteger(value.revision);
+    && isNonNegativeInteger(value.revision)
+    && (value.platform === 'IOS' || value.platform === 'ANDROID')
+    && value.permission === 'GRANTED'
+    && isNonEmptyString(value.pushToken)
+    && isNonNegativeInteger(value.tokenVersion);
 }
 
 function isPendingRegistration(value: unknown): value is PendingRegistration {
@@ -114,10 +135,24 @@ function isPendingRegistration(value: unknown): value is PendingRegistration {
 
 function isPendingRevoke(value: unknown): value is PendingRevoke {
   return isRecord(value)
+    && isUuid(value.installationId)
+    && typeof value.installationKey === 'string'
+    && INSTALLATION_KEY_PATTERN.test(value.installationKey)
     && isUuid(value.operationId)
     && isIsoInstant(value.operationIssuedAt)
     && isUuid(value.bindingId)
     && isNonNegativeInteger(value.expectedRevision);
+}
+
+function isLastRegistrationAck(value: unknown): value is LastRegistrationAck {
+  return isRecord(value)
+    && isUuid(value.operationId)
+    && isUuid(value.installationId)
+    && isPositiveInteger(value.userId)
+    && isNonNegativeInteger(value.authEpoch)
+    && (value.bindingId === null || isUuid(value.bindingId))
+    && isNonNegativeInteger(value.revision)
+    && isIsoInstant(value.completedAt);
 }
 
 export function isPushStorageState(value: unknown): value is PushStorageState {
@@ -127,7 +162,10 @@ export function isPushStorageState(value: unknown): value is PushStorageState {
     && (value.activeBinding === null || isActiveBinding(value.activeBinding))
     && (value.pendingRegistration === null || isPendingRegistration(value.pendingRegistration))
     && Array.isArray(value.pendingRevokes)
-    && value.pendingRevokes.every(isPendingRevoke);
+    && value.pendingRevokes.every(isPendingRevoke)
+    && (value.lastRegistrationAck === undefined
+      || value.lastRegistrationAck === null
+      || isLastRegistrationAck(value.lastRegistrationAck));
 }
 
 function cloneState(state: PushStorageState): PushStorageState {
@@ -159,6 +197,7 @@ export class PushStorageRepository {
         activeBinding: null,
         pendingRegistration: null,
         pendingRevokes: [],
+        lastRegistrationAck: null,
       };
       this.assertValid(state);
       await this.storage.setItem(PUSH_STORAGE_KEY, JSON.stringify(state));

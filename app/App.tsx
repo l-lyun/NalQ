@@ -6,9 +6,12 @@ import {
   createInstallationCredentials,
   nativePushStorage,
 } from './src/push/nativePushStorage';
+import { installForegroundNotificationSuppression } from './src/push/nativeNotificationProvider';
 import { OpenMdWebView } from './src/shell/OpenMdWebView';
 import { ShellStateView } from './src/shell/ShellStateView';
 import { resolveWebUrl } from './src/shell/webUrl';
+
+installForegroundNotificationSuppression();
 
 export default function App() {
   const webUrl = resolveWebUrl(process.env.EXPO_PUBLIC_WEB_URL, __DEV__);

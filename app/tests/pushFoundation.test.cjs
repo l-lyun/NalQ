@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const ts = require('typescript');
+const vm = require('node:vm');
 
 require.extensions['.ts'] = (module, filename) => {
   const source = fs.readFileSync(filename, 'utf8');
@@ -19,10 +20,13 @@ const {
   MAX_BRIDGE_MESSAGE_BYTES,
   NATIVE_MESSAGE_EVENT,
   createHelloMessage,
+  createMainDocumentBridgeScript,
   createNativeMessageDispatchScript,
   decideAuthState,
   parseAuthStateMessage,
   parseWebReadyMessage,
+  parseTransportMessage,
+  parseWebFeatureMessage,
   serializeNativeMessage,
   utf8ByteLength,
 } = require('../src/push/bridgeProtocol.ts');
@@ -112,15 +116,87 @@ test('HELLO correlates to WEB_READY and dispatches a JSON string on the fixed ev
   assert.deepEqual(hello.payload, {
     version: 1,
     bridgeSessionId: SESSION_ID,
-    capabilities: [],
+    capabilities: ['push-v1'],
     replyTo: READY_ID,
   });
 
   const serialized = serializeNativeMessage(hello);
-  const script = createNativeMessageDispatchScript(serialized);
-  assert.ok(script.includes(JSON.stringify(NATIVE_MESSAGE_EVENT)));
+  const script = createNativeMessageDispatchScript(
+    serialized,
+    'https://nalq.app',
+    'document-secret',
+  );
+  assert.ok(script.includes('__nalqDispatchNativeV1'));
+  assert.ok(script.includes(JSON.stringify('https://nalq.app')));
+  assert.ok(script.includes(JSON.stringify('document-secret')));
   assert.ok(script.includes(JSON.stringify(serialized)));
   assert.ok(script.endsWith('true;'));
+});
+
+test('document transport requires the native nonce and installs only in the trusted top frame', () => {
+  const wrapped = JSON.stringify({
+    transportVersion: 1,
+    documentNonce: 'document-secret',
+    message: webReady(),
+  });
+
+  assert.equal(parseTransportMessage(wrapped, 'document-secret'), webReady());
+  assert.equal(parseTransportMessage(wrapped, 'different-secret'), null);
+  assert.equal(parseTransportMessage(JSON.stringify({
+    transportVersion: 1,
+    documentNonce: 'document-secret',
+    message: webReady(),
+    extra: true,
+  }), 'document-secret'), null);
+
+  const script = createMainDocumentBridgeScript('https://nalq.app', 'document-secret');
+  assert.ok(script.includes('window.self !== window.top'));
+  assert.ok(script.includes('window.location.origin'));
+  assert.ok(script.includes(JSON.stringify('https://nalq.app')));
+  assert.ok(script.includes(JSON.stringify('nalq:native-ready')));
+  assert.ok(script.includes("Object.defineProperty(window, 'NalQNativeBridge'"));
+});
+
+test('the transport facade does not expose its nonce and stale native dispatch is rejected', () => {
+  const posted = [];
+  const events = [];
+  const window = {
+    location: { origin: 'https://nalq.app' },
+    ReactNativeWebView: { postMessage: (message) => posted.push(message) },
+    dispatchEvent: (event) => events.push(event),
+  };
+  window.self = window;
+  window.top = window;
+  class Event {
+    constructor(type) { this.type = type; }
+  }
+  class CustomEvent extends Event {
+    constructor(type, init) { super(type); this.detail = init.detail; }
+  }
+  const context = { window, Event, CustomEvent, JSON, Object };
+
+  vm.runInNewContext(
+    createMainDocumentBridgeScript('https://nalq.app', 'first-document-secret'),
+    context,
+  );
+  assert.equal(window.NalQNativeBridge.postMessage.toString().includes('first-document-secret'), false);
+  window.NalQNativeBridge.postMessage(webReady());
+  assert.equal(parseTransportMessage(posted[0], 'first-document-secret'), webReady());
+  assert.equal(parseTransportMessage(webReady(), 'first-document-secret'), null);
+
+  vm.runInNewContext(createNativeMessageDispatchScript(
+    serializeNativeMessage(createHelloMessage(SESSION_ID, READY_ID, HELLO_ID)),
+    'https://nalq.app',
+    'stale-document-secret',
+  ), context);
+  assert.equal(events.filter((event) => event.type === NATIVE_MESSAGE_EVENT).length, 0);
+
+  vm.runInNewContext(createNativeMessageDispatchScript(
+    serializeNativeMessage(createHelloMessage(SESSION_ID, READY_ID, HELLO_ID)),
+    'https://nalq.app',
+    'first-document-secret',
+  ), context);
+  assert.equal(events.filter((event) => event.type === NATIVE_MESSAGE_EVENT).length, 1);
 });
 
 test('AUTH_STATE rejects another bridge session and stays inactive without push-v1', () => {
@@ -167,6 +243,44 @@ test('AUTH_STATE does not regress or change identity inside one epoch', () => {
   });
 });
 
+test('feature results require exact payloads and revoke results use epoch zero', () => {
+  const stateResult = JSON.stringify({
+    version: 1,
+    type: 'PUSH_STATE_RESULT',
+    messageId: '88888888-8888-4888-8888-888888888888',
+    bridgeSessionId: SESSION_ID,
+    authEpoch: 3,
+    payload: {
+      requestId: '99999999-9999-4999-8999-999999999999',
+      outcome: 'SUCCESS',
+      data: {
+        revision: 1,
+        belongsToCurrentUser: true,
+        bindingId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        status: 'ACTIVE',
+        platform: 'IOS',
+      },
+    },
+  });
+  assert.equal(parseWebFeatureMessage(stateResult, SESSION_ID).type, 'PUSH_STATE_RESULT');
+  assert.equal(parseWebFeatureMessage(stateResult.replace('"platform":"IOS"', '"platform":"IOS","extra":true'), SESSION_ID), null);
+
+  const revokeResult = (authEpoch) => JSON.stringify({
+    version: 1,
+    type: 'PUSH_REVOKE_RESULT',
+    messageId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    bridgeSessionId: SESSION_ID,
+    authEpoch,
+    payload: {
+      operationId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      outcome: 'SUCCESS',
+      data: { revoked: false },
+    },
+  });
+  assert.equal(parseWebFeatureMessage(revokeResult(0), SESSION_ID).type, 'PUSH_REVOKE_RESULT');
+  assert.equal(parseWebFeatureMessage(revokeResult(3), SESSION_ID), null);
+});
+
 test('concurrent installation bootstrap creates and persists only one credential', async () => {
   const storage = new MemoryStorage();
   const repository = new PushStorageRepository(storage);
@@ -209,6 +323,8 @@ test('serialized updates retain concurrent pending revoke mutations', async () =
   await repository.getOrCreateInstallation(async () => installation());
 
   const revoke = (suffix) => ({
+    installationId: installation().installationId,
+    installationKey: installation().installationKey,
     operationId: `${suffix}${suffix}${suffix}${suffix}${suffix}${suffix}${suffix}${suffix}-${suffix}${suffix}${suffix}${suffix}-4${suffix}${suffix}${suffix}-8${suffix}${suffix}${suffix}-${suffix.repeat(12)}`,
     operationIssuedAt: '2026-09-07T00:00:00.000Z',
     bindingId: `${suffix.repeat(8)}-${suffix.repeat(4)}-4${suffix.repeat(3)}-8${suffix.repeat(3)}-${suffix.repeat(12)}`,

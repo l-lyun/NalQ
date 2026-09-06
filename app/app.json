@@ -33,7 +33,13 @@
     },
     "owner": "hhhyyuns-team",
     "plugins": [
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "quiz-results"
+        }
+      ]
     ]
   }
 }
