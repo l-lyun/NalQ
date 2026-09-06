@@ -47,6 +47,7 @@ export function OnboardingPage({ mode, onExit }: OnboardingPageProps) {
   const headingRef = useRef<HTMLHeadingElement | null>(null)
   const shouldFocusHeading = useRef(false)
   const slide = slides[index]
+  const captureHintId = `onboarding-capture-hint-${index}`
   const previousAvailable = index > 0
   const nextAvailable = index < slides.length - 1
 
@@ -73,6 +74,30 @@ export function OnboardingPage({ mode, onExit }: OnboardingPageProps) {
       event.preventDefault()
       move(1)
     }
+  }
+
+  const handleCaptureKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    const capture = event.currentTarget
+    const pageDistance = capture.clientHeight * 0.8
+    const distances: Partial<Record<string, number>> = {
+      ArrowUp: -40,
+      ArrowDown: 40,
+      PageUp: -pageDistance,
+      PageDown: pageDistance,
+    }
+
+    if (event.key === 'Home' || event.key === 'End') {
+      event.preventDefault()
+      event.stopPropagation()
+      capture.scrollTo({ top: event.key === 'Home' ? 0 : capture.scrollHeight })
+      return
+    }
+
+    const distance = distances[event.key]
+    if (distance === undefined) return
+    event.preventDefault()
+    event.stopPropagation()
+    capture.scrollBy({ top: distance })
   }
 
   const handlePointerDown = (event: PointerEvent<HTMLElement>) => {
@@ -135,23 +160,37 @@ export function OnboardingPage({ mode, onExit }: OnboardingPageProps) {
           onPointerUp={handlePointerUp}
           onPointerCancel={() => { swipeStart.current = null }}
         >
-          <VStack key={slide.title} className="onboarding-slide" gap="x6">
-            <Box className="onboarding-capture-slot" bg="bg.neutralWeak" borderRadius="r4" aria-hidden>
-              <Text textStyle="t4Medium" color="fg.neutralMuted" align="center">
-                {slide.placeholder}
-                <br />
-                <span className="onboarding-capture-caption">앱 화면을 불러오지 못했어요</span>
-              </Text>
-              <img
-                className="onboarding-capture-image"
-                src={slide.image}
-                alt=""
-                onError={(event) => { event.currentTarget.hidden = true }}
-              />
-            </Box>
+          <VStack key={slide.title} className="onboarding-slide" gap="x4">
             <VStack align="flex-start" gap="x3">
               <Text ref={headingRef} as="h2" tabIndex={-1} textStyle="t10Bold" color="fg.neutral">{slide.title}</Text>
               <Text as="p" textStyle="t5Regular" color="fg.neutralMuted">{slide.description}</Text>
+            </VStack>
+            <VStack className="onboarding-capture" gap="x2">
+              <Box
+                className="onboarding-capture-slot"
+                bg="bg.neutralWeak"
+                borderRadius="r4"
+                role="region"
+                tabIndex={0}
+                aria-label={slide.placeholder}
+                aria-describedby={captureHintId}
+                onKeyDown={handleCaptureKeyDown}
+              >
+                <Text className="onboarding-capture-fallback" textStyle="t4Medium" color="fg.neutralMuted" align="center">
+                  {slide.placeholder}
+                  <br />
+                  <span className="onboarding-capture-caption">앱 화면을 불러오지 못했어요</span>
+                </Text>
+                <img
+                  className="onboarding-capture-image"
+                  src={slide.image}
+                  alt=""
+                  onError={(event) => { event.currentTarget.hidden = true }}
+                />
+              </Box>
+              <Text id={captureHintId} textStyle="t3Regular" color="fg.neutralMuted" align="center">
+                모바일 화면을 위아래로 스크롤해 보세요.
+              </Text>
             </VStack>
           </VStack>
         </VStack>
