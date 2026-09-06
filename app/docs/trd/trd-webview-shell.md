@@ -36,7 +36,8 @@ scope: app
 - 푸시 알림, 카메라, 파일 선택, 공유, 생체 인증과 백그라운드 작업
 - React Native에서 NalQ API를 직접 호출하거나 Refresh Token을 네이티브 저장소로 옮기는 것
 - Expo Router 기반의 여러 네이티브 화면과 네이티브 하단 탭
-- 네이티브-웹 메시지 브리지와 임의 JavaScript 주입
+- [`push-v1` 브리지 기반](trd-push-bridge-foundation.md)을 넘어선 기기 등록·권한·푸시 선택 처리
+- 계약 없는 임의 JavaScript 주입
 - 오프라인 콘텐츠 캐시와 오프라인 편집·동기화
 - App/Universal Link, OAuth 복귀와 Notion 외부 인증의 최종 계약
 - 스토어 메타데이터, 서명, 제출과 운영 배포
@@ -49,7 +50,7 @@ scope: app
 - `App.tsx`는 검증된 환경 URL을 단일 `OpenMdWebView`에 전달하고 구성 오류를 네이티브 상태로 표시한다.
 - 공개 웹 주소 자리인 `EXPO_PUBLIC_WEB_URL` 예시와 개발 기본값 `http://localhost:5173`을 사용한다.
 - `src/shell/`이 로딩·동일-origin 최상위 문서 오류·재시도, 동일 origin URL 정책, 외부 링크, Android 뒤로 가기와 플랫폼별 WebView 복구를 소유한다.
-- Expo Router와 네이티브-웹 메시지 브리지는 사용하지 않는다.
+- Expo Router는 사용하지 않는다. 푸시 브리지는 별도 TRD에 따라 빈 capability handshake만 연결되어 있고 등록 기능은 비활성이다.
 
 ### Web
 
@@ -107,7 +108,7 @@ Expo Router는 네이티브 화면이 하나인 1차 셸에는 추가하지 않�
 - Android 첫 요청은 `onShouldStartLoadWithRequest`가 호출되지 않을 수 있으므로 초기 환경 URL 검증을 별도로 수행한다.
 - 새 창 요청은 별도 WebView를 만들지 않고 같은 URL 정책으로 외부 열기 또는 차단한다.
 
-1차 구현에는 웹-네이티브 메시지 브리지를 만들지 않는다. 이후 메시지가 필요하면 메시지 이름, 방향, payload schema, 버전과 허용 origin을 별도 계약으로 정하고 수신 payload를 신뢰하지 않는다.
+푸시 브리지는 [공유 계약](../../../docs/contracts/contract-api-push-notifications.md)과 [앱 푸시 브리지 TRD](trd-push-bridge-foundation.md)에 따라 별도 경계로 관리한다. 현재는 민감한 값을 전달하지 않는 handshake만 연결하며, 그 밖의 메시지를 임의로 추가하거나 수신 payload를 신뢰하지 않는다.
 
 ### 4. 뒤로 가기
 

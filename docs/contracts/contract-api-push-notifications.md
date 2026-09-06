@@ -161,15 +161,17 @@ Expo 전송에는 동일한 절대 만료 시각을 `expiration`(Unix 초)으로
 }
 ```
 
-- native는 검증된 웹 origin의 최상위 문서에서만 제한된 수신 통로를 설치하고 handshake를 진행한다. `HELLO` 초기 교환만 session 미설정 상태를 허용한다. 이후 양쪽은 negotiated version·session을 검증한다.
+- native는 검증된 웹 origin의 최상위 문서에서만 제한된 수신 통로를 설치하고 handshake를 진행한다. 최초 `WEB_READY`는 `bridgeSessionId=null`, `authEpoch=0`, `payload={ versions: [1] }`로 전송한다. `HELLO`는 native가 생성한 session을 envelope와 payload에 동일하게 담고 `authEpoch=0`으로 응답한다. 이후 기능 메시지는 negotiated version·session을 검증한다.
 - 메시지 이름별 방향·payload schema를 검증한다. 크기 상한은 8KiB 제안. 알 수 없는 버전/종류·잘못된 JSON은 무시하고 진단 코드만 남긴다. 메시지 전체를 로그에 남기지 않는다.
 - `window.ReactNativeWebView` 존재만으로 기능을 활성화하지 않는다. web-ready/hello 응답 및 허용된 기능 목록을 확인한다. bridgeSession은 문서 reload마다 바뀌고 메시지에 든 임의 코드·URL을 평가하지 않는다.
-- native → web 전달에는 고정 이벤트 수신 함수를 사용하며, 문자열 직렬화·escape를 거쳐 데이터를 전달한다. 전달 payload를 실행 코드로 연결하지 않는다.
+- native → web 전달에는 고정 이벤트 `nalq:native-message`를 사용하며 `CustomEvent.detail`에 envelope의 JSON 문자열을 전달한다. 문자열 직렬화·escape를 거쳐 데이터를 전달하고, 전달 payload를 실행 코드로 연결하지 않는다.
+- `HELLO.payload.replyTo`는 응답 대상 `WEB_READY.messageId`다. 웹은 현재 handshake 요청과 일치하는 응답만 수락한다. 같은 문서의 재시도/React 재마운트에 native는 같은 session으로 응답하되 현재 요청의 replyTo를 사용한다. 문서 reload는 새 session을 만든다.
+- 단계적 구현에서는 `capabilities=[]`로 transport handshake만 제공할 수 있다. `push-v1`은 등록·해제 및 관련 안전 경계가 준비된 앱만 광고한다. 웹 역시 해당 기능 구현과 capability 협상이 모두 완료되기 전에는 AUTH_STATE·기기 등록 등 푸시 기능 메시지를 보내지 않는다. 빈 목록을 푸시 지원으로 해석하지 않는다.
 
 | 종류 | 방향 | payload와 완료 조건 |
 | --- | --- | --- |
 | `WEB_READY` | Web → App | 지원 versions. 최초/문서 재시작 시 전송 |
-| `HELLO` | App → Web | 선택 version, bridgeSessionId, capabilities(`push-v1`) |
+| `HELLO` | App → Web | 선택 version, bridgeSessionId, capabilities(`push-v1` 또는 미지원 시 빈 목록), replyTo(`WEB_READY.messageId`) |
 | `AUTH_STATE` | Web → App | phase(`authenticated`, `anonymous`, `bootstrapping`), authEpoch, 인증 완료 시 userId. 토큰 없음 |
 | `PUSH_REGISTER_REQUEST` | Web → App | 현재 authEpoch. 앱 최초 인증·복귀 때만 요청 |
 | `PUSH_DEVICE` | App → Web | 설치 ID/key, operationId, operationIssuedAt, expectedRevision, platform, token, permission. JWT는 포함하지 않음 |

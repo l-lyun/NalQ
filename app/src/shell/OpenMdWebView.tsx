@@ -3,10 +3,12 @@ import { BackHandler, Linking, Platform, StyleSheet, Text, View } from 'react-na
 import WebView, {
   type WebViewNavigation,
 } from 'react-native-webview';
+import { randomUUID } from 'expo-crypto';
 import type {
   ShouldStartLoadRequest,
   WebViewErrorEvent,
   WebViewHttpErrorEvent,
+  WebViewMessageEvent,
   WebViewNavigationEvent,
   WebViewOpenWindowEvent,
 } from 'react-native-webview/lib/WebViewTypes';
@@ -19,6 +21,17 @@ import {
   shouldHandleWebViewBack,
 } from './navigationPolicy';
 import { ShellStateView, type ShellState } from './ShellStateView';
+import {
+  PUSH_BRIDGE_VERSION,
+  createHelloMessage,
+  createNativeMessageDispatchScript,
+  decideAuthState,
+  parseAuthStateMessage,
+  parseWebReadyMessage,
+  serializeNativeMessage,
+  type AcceptedAuthState,
+  type HelloMessage,
+} from '../push/bridgeProtocol';
 
 interface OpenMdWebViewProps {
   webOrigin: string;
@@ -36,6 +49,9 @@ export function OpenMdWebView({ webOrigin, webUrl }: OpenMdWebViewProps) {
   const loadFailedRef = useRef(false);
   const pendingMainDocumentUrlRef = useRef(webUrl);
   const visibleMainDocumentUrlRef = useRef(webUrl);
+  const bridgeSessionIdRef = useRef<string | null>(null);
+  const lastHelloRef = useRef<{ replyTo: string; message: HelloMessage } | null>(null);
+  const acceptedAuthStateRef = useRef<AcceptedAuthState | null>(null);
 
   const [canGoBack, setCanGoBack] = useState(false);
   const [documentUrl, setDocumentUrl] = useState(webUrl);
@@ -146,9 +162,63 @@ export function OpenMdWebView({ webOrigin, webUrl }: OpenMdWebViewProps) {
 
     pendingMainDocumentUrlRef.current = navigation.url;
     loadFailedRef.current = false;
+    bridgeSessionIdRef.current = randomUUID();
+    lastHelloRef.current = null;
+    acceptedAuthStateRef.current = null;
 
     if (!documentVisibleRef.current) {
       setShellState('loading');
+    }
+  }, [webOrigin]);
+
+  const handleBridgeMessage = useCallback((event: WebViewMessageEvent) => {
+    const sourceNavigation = classifyNavigation(event.nativeEvent.url, webOrigin);
+    if (sourceNavigation.action !== 'internal') {
+      return;
+    }
+
+    const rawMessage = event.nativeEvent.data;
+    const webReady = parseWebReadyMessage(rawMessage);
+    if (webReady) {
+      if (!webReady.payload.versions.includes(PUSH_BRIDGE_VERSION)) {
+        return;
+      }
+
+      const bridgeSessionId = bridgeSessionIdRef.current;
+      if (!bridgeSessionId) {
+        return;
+      }
+
+      let hello = lastHelloRef.current?.replyTo === webReady.messageId
+        ? lastHelloRef.current.message
+        : null;
+      if (hello === null) {
+        hello = createHelloMessage(
+          bridgeSessionId,
+          webReady.messageId,
+          randomUUID(),
+        );
+        lastHelloRef.current = { replyTo: webReady.messageId, message: hello };
+      }
+
+      const serializedHello = serializeNativeMessage(hello);
+      webViewRef.current?.injectJavaScript(createNativeMessageDispatchScript(serializedHello));
+      return;
+    }
+
+    const bridgeSessionId = bridgeSessionIdRef.current;
+    if (!bridgeSessionId) {
+      return;
+    }
+
+    const authState = parseAuthStateMessage(rawMessage, bridgeSessionId);
+    if (!authState) {
+      return;
+    }
+
+    const decision = decideAuthState(acceptedAuthStateRef.current, authState, []);
+    if (decision.accepted) {
+      acceptedAuthStateRef.current = decision.state;
     }
   }, [webOrigin]);
 
@@ -260,6 +330,7 @@ export function OpenMdWebView({ webOrigin, webUrl }: OpenMdWebViewProps) {
         onHttpError={handleHttpError}
         onLoad={handleLoad}
         onLoadStart={handleLoadStart}
+        onMessage={handleBridgeMessage}
         onNavigationStateChange={handleNavigationStateChange}
         onOpenWindow={handleOpenWindow}
         onRenderProcessGone={handleRendererTerminated}
