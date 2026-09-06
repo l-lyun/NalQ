@@ -165,6 +165,33 @@ class BearerAccessTokenFilterTest {
 		assertEquals("", response.getContentAsString());
 	}
 
+	@Test
+	void ignoresAnInvalidBearerOnlyOnTheExactLimitedPushRevokeEndpoint() throws Exception {
+		AccessTokenService tokens = AccessTokenService.create(SECRET, Clock.fixed(NOW, ZoneOffset.UTC));
+		BearerAccessTokenFilter filter = new BearerAccessTokenFilter(
+			tokens, mock(UserRepository.class), JsonMapper.builder().build()
+		);
+		MockHttpServletRequest revoke = new MockHttpServletRequest(
+			"POST", "/api/v1/push-devices/11111111-1111-4111-8111-111111111111/revoke"
+		);
+		revoke.addHeader("Authorization", "Bearer expired-or-forged");
+		MockHttpServletResponse revokeResponse = new MockHttpServletResponse();
+
+		filter.doFilter(revoke, revokeResponse, new MockFilterChain());
+
+		assertEquals(200, revokeResponse.getStatus());
+
+		MockHttpServletRequest register = new MockHttpServletRequest(
+			"PUT", "/api/v1/push-devices/11111111-1111-4111-8111-111111111111"
+		);
+		register.addHeader("Authorization", "Bearer expired-or-forged");
+		MockHttpServletResponse registerResponse = new MockHttpServletResponse();
+
+		filter.doFilter(register, registerResponse, new MockFilterChain());
+
+		assertEquals(401, registerResponse.getStatus());
+	}
+
 	private UserRepository activeUsers(long userId) {
 		UserRepository users = mock(UserRepository.class);
 		User active = mock(User.class);

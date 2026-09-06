@@ -7,6 +7,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.openmd.server.auth.domain.User;
@@ -22,6 +23,7 @@ import com.openmd.server.auth.security.AccessTokenService;
 import com.openmd.server.auth.security.IssuedAccessToken;
 import com.openmd.server.global.entity.BaseEntity;
 import com.openmd.server.global.error.BusinessException;
+import com.openmd.server.push.service.PushDeviceLifecycle;
 import java.lang.reflect.Field;
 import java.time.Instant;
 import java.util.Optional;
@@ -37,11 +39,12 @@ class AuthServiceTest {
 	private final PasswordEncoder passwords = mock(PasswordEncoder.class);
 	private final RefreshTokenService refreshTokens = mock(RefreshTokenService.class);
 	private final AccessTokenService accessTokens = mock(AccessTokenService.class);
+	private final PushDeviceLifecycle pushDevices = mock(PushDeviceLifecycle.class);
 	private AuthService service;
 
 	@BeforeEach
 	void setUp() {
-		service = new AuthService(users, passwords, refreshTokens, accessTokens);
+		service = new AuthService(users, passwords, refreshTokens, accessTokens, pushDevices);
 	}
 
 	@Test
@@ -178,9 +181,25 @@ class AuthServiceTest {
 
 	@Test
 	void logoutStillRevokesThePresentedRefreshCredential() {
+		when(refreshTokens.inspect("current-refresh")).thenReturn(new RefreshTokenSession(
+			42L, "session-42", NOW.plusSeconds(3600)
+		));
+
 		service.logout("current-refresh");
 
 		verify(refreshTokens).revoke("current-refresh");
+		verify(pushDevices).revokeSession("session-42");
+	}
+
+	@Test
+	void invalidLogoutRemainsIdempotentAndNeverTrustsAnUnverifiedSessionId() {
+		when(refreshTokens.inspect("invalid-refresh"))
+			.thenThrow(new BusinessException(AuthErrorCode.INVALID_CREDENTIAL));
+
+		service.logout("invalid-refresh");
+
+		verify(refreshTokens).revoke("invalid-refresh");
+		verifyNoInteractions(pushDevices);
 	}
 
 	private User pendingUser(long id) throws Exception {

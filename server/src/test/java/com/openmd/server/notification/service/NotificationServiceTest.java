@@ -39,6 +39,33 @@ class NotificationServiceTest {
           notifications, quizSets, materials, Clock.fixed(NOW, ZoneOffset.UTC));
 
   @Test
+  void retrievesOneOwnedNotificationWithoutReadingItAndKeepsDeletedTargetSnapshot() {
+    var notification = notification("00000000-0000-4000-8000-000000000020", 20L);
+    when(notifications.findOwnedRetained(notification.getPublicId(), 7L, RETAINED_SINCE))
+        .thenReturn(Optional.of(notification));
+
+    var item = service.get(7L, notification.getPublicId());
+
+    assertEquals(notification.getPublicId(), item.notificationId());
+    assertEquals("퀴즈 20", item.targetName());
+    assertFalse(item.targetAvailable());
+    assertNull(item.readAt());
+    assertNull(notification.getReadAt());
+  }
+
+  @Test
+  void singleLookupRejectsForeignMissingAndExpiredNotificationsUsingOwnedRetentionQuery() {
+    String id = "00000000-0000-4000-8000-000000000020";
+    when(notifications.findOwnedRetained(id, 7L, RETAINED_SINCE)).thenReturn(Optional.empty());
+
+    var error = assertThrows(BusinessException.class, () -> service.get(7L, id));
+
+    assertEquals(CommonErrorCode.RESOURCE_NOT_FOUND, error.getErrorCode());
+    org.mockito.Mockito.verify(notifications).findOwnedRetained(id, 7L, RETAINED_SINCE);
+    org.mockito.Mockito.verifyNoInteractions(quizSets, materials);
+  }
+
+  @Test
   void listsAtMostTwentyRetainedNotificationsInStableOrderAndCountsAllUnread() {
     QuizGenerationNotification recent = notification("00000000-0000-0000-0000-000000000020", 20L);
     QuizGenerationNotification older = notification("00000000-0000-0000-0000-000000000019", 19L);

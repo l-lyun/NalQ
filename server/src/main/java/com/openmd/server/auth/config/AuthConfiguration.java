@@ -31,6 +31,7 @@ import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import com.openmd.server.push.service.PushDeviceLifecycle;
 
 @Configuration
 @ConditionalOnProperty(name = "openmd.auth.enabled", havingValue = "true", matchIfMissing = true)
@@ -101,9 +102,10 @@ public class AuthConfiguration {
 		UserRepository users,
 		PasswordEncoder passwordEncoder,
 		RefreshTokenService refreshTokens,
-		AccessTokenService accessTokens
+		AccessTokenService accessTokens,
+		PushDeviceLifecycle pushDevices
 	) {
-		return new AuthService(users, passwordEncoder, refreshTokens, accessTokens);
+		return new AuthService(users, passwordEncoder, refreshTokens, accessTokens, pushDevices);
 	}
 
 	@Bean
@@ -111,6 +113,7 @@ public class AuthConfiguration {
 		UserRepository users,
 		PasswordEncoder passwordEncoder,
 		RefreshTokenService refreshTokens,
+		PushDeviceLifecycle pushDevices,
 		Clock clock,
 		PlatformTransactionManager transactionManager
 	) {
@@ -118,6 +121,7 @@ public class AuthConfiguration {
 			users,
 			passwordEncoder,
 			refreshTokens,
+			pushDevices,
 			clock,
 			new TransactionTemplate(transactionManager)
 		);

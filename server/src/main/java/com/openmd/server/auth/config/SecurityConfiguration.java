@@ -58,6 +58,9 @@ public class SecurityConfiguration {
 			.authorizeHttpRequests(authorize -> {
 				authorize.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll();
 				authorize.requestMatchers("/api/v1/auth/**").permitAll();
+				authorize.requestMatchers(
+					HttpMethod.POST, "/api/v1/push-devices/*/revoke"
+				).permitAll();
 				authorize.requestMatchers(HttpMethod.GET, "/api/v1/integrations/notion/callback").permitAll();
 				if (apiDocsEnabled) {
 					authorize.requestMatchers(API_DOCUMENTATION_PATHS).permitAll();
@@ -115,7 +118,10 @@ public class SecurityConfiguration {
 		CorsConfiguration general = new CorsConfiguration();
 		general.setAllowedOrigins(List.copyOf(allowedOrigins));
 		general.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-		general.setAllowedHeaders(List.of("Authorization", "Content-Type", "Idempotency-Key"));
+		general.setAllowedHeaders(List.of(
+			"Authorization", "Content-Type", "Idempotency-Key", "X-Push-Installation-Key"
+		));
+		general.setExposedHeaders(List.of("Date", "Retry-After"));
 		general.setAllowCredentials(false);
 		general.setMaxAge(3600L);
 
