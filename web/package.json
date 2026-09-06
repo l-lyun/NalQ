@@ -14,8 +14,9 @@
     "dev:mock": "vite --mode mock",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b --pretty false",
+    "test": "node --test tests/*.test.cjs",
     "lint": "oxlint",
-    "verify": "pnpm licenses:check && pnpm typecheck && pnpm lint && pnpm build",
+    "verify": "pnpm licenses:check && pnpm typecheck && pnpm test && pnpm lint && pnpm build",
     "preview": "vite preview"
   },
   "dependencies": {

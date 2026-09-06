@@ -383,3 +383,15 @@ web/src/
 - 승인된 CSRF 방어 없이 cookie 기반 refresh/logout이 성공하지 않는다.
 - 브라우저 저장소와 콘솔·오류 추적 payload에 토큰 원문이 남지 않는다.
 - Web Locks 지원 환경에서 여러 탭의 refresh 요청이 직렬화된다.
+
+## 18. 네이티브 기기 등록·해제 연결
+
+`AuthBootstrap`은 인증 bootstrap과 독립인 effect에서 `shared/native/nativeBridge.ts`의 transport handshake를 시작하고 해제한다. 일반 브라우저·하위 frame에는 통로를 열지 않는다. 앱이 설치한 `NalQNativeBridge` facade만 사용하며 raw RN 인터페이스가 있는 구앱은 기능을 활성화하지 않는다. WEB_READY는 같은 messageId로 최대 3회 시도한다. 늦은 facade 설치의 native-ready 사건은 새로운 handshake를 시작하며 unmount에서 모든 리스너·타이머·세션 작업을 정리한다.
+
+메시지 원장은 [푸시 브리지 계약](../../../docs/contracts/contract-api-push-notifications.md#6-브리지-envelope와-연결)이다. HELLO의 version/session/replyTo/schema와 push-v1 capability를 확인한 뒤 `pushSession.ts`를 연결한다. `pushProtocol.ts`는 입력 schema를 검증하고 `pushApi.ts`는 설치 자격을 header로만 전달한다. 등록 GET/PUT은 보호 API와 시작 계정 context를 사용하고, revoke는 Cookie·Bearer 없는 별도 클라이언트만 쓴다. 서버 응답은 승인된 필드로 정규화하며 웹 저장소에 설치 자격을 보관하지 않는다.
+
+`authContext.ts`는 로그인 시작·성공·인증 종료의 identity epoch를 관리한다. 보호 요청은 전송 전/refresh 뒤/응답 적용 전 context를 검사하고 refresh 자체도 시작 context가 유지될 때만 토큰을 저장한다. 이전 refresh의 401이 새 계정을 로그아웃시키지 않는다. AUTH_STATE 알림은 microtask로 모아 같은 동기 인증 전이의 중간 상태를 같은 epoch로 보내지 않는다. 정상 access refresh는 epoch를 증가시키지 않는다.
+
+세션 내 상태/변경 HTTP를 직렬화하고 동일 진행 operation을 합친다. native가 의도·멱등 키·해제 pending을 내구 보관하며, 웹은 새 session/계정에 이전 응답을 적용하지 않는다. 로그아웃은 SESSION_ENDING을 먼저 보낸 뒤 즉시 epoch를 바꿔 신규 등록을 차단한다. 내구 ACK를 최대 1.5초 기다린 뒤 기존 logout을 진행하고, 익명 상태에서도 특정 pending revoke만 처리한다. 회원 탈퇴의 기기 제거는 서버가 담당하고, 성공 후 local session 종료 전 native 해제 보존도 요청한다.
+
+`pnpm test`는 순수 검사, 실제 Axios interceptor의 계정 경합, 앱 coordinator와 웹 session의 등록→내구 저장→해제 연결을 대역 HTTP/저장소로 검증하며 `pnpm verify`에 포함한다. 실제 WebView·SecureStore·APNs/FCM 검증과 알림 선택/이동은 별도다. 등록 응답과 logout 요청이 동시에 유실되어 bindingId를 모르는 경우는 공유 계약의 후속 인증 조정 경계를 따른다.

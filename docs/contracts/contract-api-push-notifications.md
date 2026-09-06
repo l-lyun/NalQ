@@ -63,6 +63,7 @@ Native는 Access/Refresh Token을 받거나 사용자 인증 API를 직접 호�
 응답은 기존 `ApiResponse` envelope의 `data`에 `{ installationId, revision, bindingId, status, userId }`를 담는다. `userId`는 현재 인증 사용자이며 native의 pending 계정 분류 보조값이다. 권한 증명으로 사용하지 않는다.
 
 - 플랫폼은 `IOS | ANDROID`, 제공자는 초기 `EXPO`, 등록 권한 상태는 `GRANTED | DENIED`다. 미결정 권한에서는 서버 등록 없이 native 권한 요청을 먼저 실행한다.
+- 등록 변경은 현재 사용자에 속한 활성 refresh session에서만 시작한다. 서버는 등록 트랜잭션 전과 커밋 뒤 세션을 확인한다. 그 사이 로그아웃이 완료됐으면 해당 session의 연결을 해제하고 `AUTH_005`로 응답한다. 이미 등록된 기기를 세션 자연 만료만으로 주기적으로 해제하는 정책은 아니다.
 - `GRANTED`는 유효한 형식의 native-issued token 필수. `DENIED`는 기존 설치를 `DISABLED`로 변경할 때 사용하며 `pushToken`을 생략한다. 신규 거절 기기는 등록하지 않되 응답은 `status=DISABLED`, `revision=0`, `bindingId=null`인 비영속 결과로 반환한다. 비활성화 시 발송용 토큰은 제거한다.
 - 같은 설치·같은 계정의 토큰 갱신은 `bindingId` 유지, `revision` 증가. 다른 계정 연결 또는 해제 후 재연결은 기존 연결을 종료하고 새 `bindingId`를 만든다.
 - 한 기기의 변경으로 다른 설치의 연결은 바뀌지 않는다. `(provider, pushToken)`은 활성 연결에서 중복되지 않는다.
@@ -111,6 +112,7 @@ Native는 Access/Refresh Token을 받거나 사용자 인증 API를 직접 호�
 - 계정 전환 중 이전 revoke가 늦어져도 새 PUT은 같은 설치 key와 최신 revision으로 재연결할 수 있다. 이전 binding의 pending 발송은 취소하고 오래된 revoke는 no-op다.
 - 명시적 서버 logout 성공 시 연결된 `sessionId`의 설치도 해제하도록 인증 서비스에 연결한다. 앱 측 revoke는 만료된 세션·요청 실패를 보완한다. refresh 회전은 연결을 바꾸지 않으며, 세션 자연 만료만으로 기기를 해제하지 않는다.
 - 탈퇴는 서버에서 그 사용자의 모든 기기를 해제한다. 서버에 해제 의도가 도달하기 전 또는 이미 외부로 넘긴 푸시의 표시 취소는 보장하지 않는다.
+- 최초 등록이 반영됐으나 응답을 받지 못하면 native는 bindingId를 알 수 없다. 이때 로그아웃도 서버에 도달하지 않으면 익명 상태에서 현 revoke API로 즉시 해제를 보장할 수 없다. pending 등록을 보존하고 다음 인증된 상태 조회/계정 전환에서 조정한다. 이 경계는 성공한 logout과 지연 등록의 서버 경합 보강과 구분한다.
 
 ## 4. 단일 알림 조회와 이동
 
@@ -161,17 +163,29 @@ Expo 전송에는 동일한 절대 만료 시각을 `expiration`(Unix 초)으로
 }
 ```
 
-- native는 검증된 웹 origin의 최상위 문서에서만 제한된 수신 통로를 설치하고 handshake를 진행한다. `HELLO` 초기 교환만 session 미설정 상태를 허용한다. 이후 양쪽은 negotiated version·session을 검증한다.
+- native는 검증된 웹 origin의 최상위 문서에서만 제한된 수신 통로를 설치하고 handshake를 진행한다. 최초 `WEB_READY`는 `bridgeSessionId=null`, `authEpoch=0`, `payload={ versions: [1] }`로 전송한다. `HELLO`는 native가 생성한 session을 envelope와 payload에 동일하게 담고 `authEpoch=0`으로 응답한다. 이후 기능 메시지는 negotiated version·session을 검증한다.
 - 메시지 이름별 방향·payload schema를 검증한다. 크기 상한은 8KiB 제안. 알 수 없는 버전/종류·잘못된 JSON은 무시하고 진단 코드만 남긴다. 메시지 전체를 로그에 남기지 않는다.
 - `window.ReactNativeWebView` 존재만으로 기능을 활성화하지 않는다. web-ready/hello 응답 및 허용된 기능 목록을 확인한다. bridgeSession은 문서 reload마다 바뀌고 메시지에 든 임의 코드·URL을 평가하지 않는다.
-- native → web 전달에는 고정 이벤트 수신 함수를 사용하며, 문자열 직렬화·escape를 거쳐 데이터를 전달한다. 전달 payload를 실행 코드로 연결하지 않는다.
+- native → web 전달에는 고정 이벤트 `nalq:native-message`를 사용하며 `CustomEvent.detail`에 envelope의 JSON 문자열을 전달한다. 문자열 직렬화·escape를 거쳐 데이터를 전달하고, 전달 payload를 실행 코드로 연결하지 않는다.
+- `HELLO.payload.replyTo`는 응답 대상 `WEB_READY.messageId`다. 웹은 현재 handshake 요청과 일치하는 응답만 수락한다. 같은 문서의 재시도/React 재마운트에 native는 같은 session으로 응답하되 현재 요청의 replyTo를 사용한다. 문서 reload는 새 session을 만든다.
+- 단계적 구현에서는 `capabilities=[]`로 transport handshake만 제공할 수 있다. `push-v1`은 등록·해제 및 관련 안전 경계가 준비된 앱만 광고한다. 웹 역시 해당 기능 구현과 capability 협상이 모두 완료되기 전에는 AUTH_STATE·기기 등록 등 푸시 기능 메시지를 보내지 않는다. 빈 목록을 푸시 지원으로 해석하지 않는다.
+
+### 등록/해제 transport 구현 규약
+
+- 앱은 문서별 임의 `documentNonce`를 만들고 정확한 허용 origin의 최상위 문서에만 closure 기반 `window.NalQNativeBridge.postMessage`를 설치한다. 웹은 raw `ReactNativeWebView.postMessage`로 푸시 기능을 보내지 않는다.
+- facade는 envelope 문자열을 `{ transportVersion: 1, documentNonce, message }`로 감싼다. native는 현재 nonce·exact schema·크기(전체 8KiB+512바이트, 내부 envelope 8KiB)를 검사하며 raw envelope를 거절한다. nonce는 설치 자격이나 사용자 인증을 대체하지 않는다.
+- facade 설치는 `nalq:native-ready` 사건을 보내므로 웹 초기화보다 늦은 설치도 handshake를 재시작할 수 있다. 새 문서에서 session/nonce를 교체하고, native→web 전달도 origin·최상위 문서·현재 nonce를 검사한 고정 수신 함수만 사용한다.
+- 동일-origin 스크립트/frame은 브라우저 권한상 동등하게 신뢰된다. 이 구조는 cross-origin frame과 과거 문서의 raw 메시지를 차단하는 채널 격리이며 정식 바이너리 증명이나 같은 origin의 XSS 방어를 보장하지 않는다.
+- 등록/상태조회는 현재 authEpoch를 사용하고 해제/해제결과는 현재 bridge session에서 `authEpoch=0`으로 보낸다. `SESSION_ENDING_ACK`는 종료 전 epoch라도 현재 session과 요청 messageId가 일치하면 처리한다. 웹은 ACK를 최대 1.5초 기다리고 성공·실패·유실과 무관하게 기존 로그아웃을 진행한다.
 
 | 종류 | 방향 | payload와 완료 조건 |
 | --- | --- | --- |
 | `WEB_READY` | Web → App | 지원 versions. 최초/문서 재시작 시 전송 |
-| `HELLO` | App → Web | 선택 version, bridgeSessionId, capabilities(`push-v1`) |
+| `HELLO` | App → Web | 선택 version, bridgeSessionId, capabilities(`push-v1` 또는 미지원 시 빈 목록), replyTo(`WEB_READY.messageId`) |
 | `AUTH_STATE` | Web → App | phase(`authenticated`, `anonymous`, `bootstrapping`), authEpoch, 인증 완료 시 userId. 토큰 없음 |
 | `PUSH_REGISTER_REQUEST` | Web → App | 현재 authEpoch. 앱 최초 인증·복귀 때만 요청 |
+| `PUSH_STATE_REQUEST` | App → Web | requestId, installationId, installationKey. 등록 이전/경합 복구에 사용하는 인증된 상태 조회 |
+| `PUSH_STATE_RESULT` | Web → App | requestId, outcome(`SUCCESS`, `NOT_FOUND`, `RETRY`, `FAILED`), 성공 시 상태 조회 data |
 | `PUSH_DEVICE` | App → Web | 설치 ID/key, operationId, operationIssuedAt, expectedRevision, platform, token, permission. JWT는 포함하지 않음 |
 | `PUSH_REGISTER_RESULT` | Web → App | 해당 operationId, 성공 응답 또는 안정 오류. native는 epoch·revision 확인 후 보관 |
 | `PUSH_REGISTER_ACK` | App → Web | 해당 operationId, bindingId·revision을 native에 내구 저장 완료. 이때 등록 교환 종료 |
@@ -181,6 +195,20 @@ Expo 전송에는 동일한 절대 만료 시각을 `expiration`(Unix 초)으로
 | `PUSH_REVOKE_RESULT` | Web → App | operationId, 성공/재시도/영구 실패. 성공 시 native pending 제거 |
 | `PUSH_OPEN` | App → Web | notificationId, bindingId. 선택 사건의 messageId는 재전달에서도 유지 |
 | `PUSH_OPEN_ACK` | Web → App | 원래 messageId, outcome(`COMPLETED`, `UNAVAILABLE`), 처리한 계정 userId |
+
+등록/해제 연결의 구체 payload는 다음을 따른다. 각 payload는 아래 필드 외 임의 항목을 거절한다.
+
+- `AUTH_STATE`: `{ phase, authEpoch, userId? }`, userId는 authenticated일 때만 필수이며 payload/envelope epoch가 일치해야 한다.
+- `PUSH_REGISTER_REQUEST`: `{ authEpoch }`.
+- `PUSH_DEVICE`: `{ installationId, installationKey, operationId, operationIssuedAt, expectedRevision, platform, permission, pushToken? }`. DENIED일 때 pushToken을 생략한다.
+- `PUSH_REGISTER_RESULT`: `{ operationId, outcome, data?, errorCode?, retryAfterMs? }`, SUCCESS data는 등록 HTTP 응답이다. RETRY/FAILED는 안정 오류 코드만 전달한다.
+- `PUSH_REGISTER_ACK`: `{ operationId, bindingId, revision, persisted: true }`. 내구 저장 뒤 보내며 마지막 완료 기록을 보관해 중복 성공 응답에도 ACK할 수 있다.
+- `SESSION_ENDING`: `{ reason: 'LOGOUT' | 'WITHDRAWAL' }`, ACK는 `{ requestId: 종료 messageId, persisted }`.
+- `PUSH_REVOKE`: `{ installationId, installationKey, operationId, operationIssuedAt, bindingId, expectedRevision }`.
+- `PUSH_REVOKE_RESULT`: `{ operationId, outcome, data?, errorCode?, retryAfterMs? }`, SUCCESS data는 `{ revoked }`이며 HTTP 404도 종료 가능한 no-op으로 정규화한다.
+- STATE_RESULT의 RETRY/FAILED 역시 `errorCode`, 선택 `retryAfterMs`를 사용한다. RETRY는 동일 논리 요청을 재전송하고 revision/operation 충돌은 최신 상태 조회 뒤 새 의도를 결정한다. Retry-After는 0~24시간 범위로 정규화하고 기본 backoff보다 길면 존중한다.
+
+현재 구현 단위는 등록·해제와 foreground 억제까지다. `PUSH_OPEN`/읽음·선택 ACK와 화면 이동은 후속 구현이며 단순 수신을 완료로 ACK하지 않는다.
 
 native는 푸시 선택을 먼저 내구 저장한다. 새 bridge session에서는 새 envelope로 재전달하되 논리 messageId는 유지한다. 로그인 전 `PUSH_OPEN`도 로그인 유도용으로 전달할 수 있지만 개인 결과 조회와 ACK는 인증 후에만 실행한다.
 

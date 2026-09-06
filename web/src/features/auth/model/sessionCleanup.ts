@@ -4,6 +4,7 @@ import { clearRequestedConfigs } from '@/features/quiz/model/quizRequestedConfig
 
 import { setAuthPhase } from './authPhaseStore'
 import { clearSessionTokens } from './tokenVault'
+import { advanceAuthContext, isCurrentAuthContext } from './authContext'
 
 async function cancelAuthAndPrivateQueries() {
   await Promise.all([
@@ -24,9 +25,11 @@ export async function clearAuthAndPrivateCaches() {
 
 export async function endLocalSession() {
   const user = queryClient.getQueryData<CurrentUser>(['auth', 'me'])
-  await cancelAuthAndPrivateQueries()
-  if (user) clearRequestedConfigs(user.id)
+  const context = advanceAuthContext(null, false)
   clearSessionTokens()
-  removeAuthAndPrivateCaches()
   setAuthPhase('anonymous')
+  await cancelAuthAndPrivateQueries()
+  if (!isCurrentAuthContext(context)) return
+  if (user) clearRequestedConfigs(user.id)
+  removeAuthAndPrivateCaches()
 }

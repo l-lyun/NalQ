@@ -64,8 +64,20 @@ public class RedisRefreshSessionStore implements RefreshSessionStore {
 
 	private final StringRedisTemplate redisTemplate;
 
+	private static final DefaultRedisScript<Long> ACTIVE_SCRIPT = new DefaultRedisScript<>("""
+		if redis.call('HGET', KEYS[1], 'status') ~= 'ACTIVE' then return 0 end
+		if redis.call('HGET', KEYS[1], 'userId') ~= ARGV[1] then return 0 end
+		return 1
+		""", Long.class);
+
 	public RedisRefreshSessionStore(StringRedisTemplate redisTemplate) {
 		this.redisTemplate = redisTemplate;
+	}
+
+	@Override
+	public boolean isActive(String sessionId, long userId) {
+		return Long.valueOf(1L).equals(redisTemplate.execute(ACTIVE_SCRIPT,
+			List.of(sessionKey(sessionId)), Long.toString(userId)));
 	}
 
 	@Override
