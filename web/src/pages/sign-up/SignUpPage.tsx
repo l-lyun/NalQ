@@ -50,7 +50,10 @@ function isSameNickname(left: string, right: string) {
   )
 }
 
-type SignUpRouteState = AuthReturnState & { signUpStep?: 1 | 2 }
+type SignUpRouteState = AuthReturnState & {
+  signUpEntry?: '/' | '/login'
+  signUpStep?: 1 | 2
+}
 
 export function SignUpPage() {
   const location = useLocation()
@@ -126,7 +129,11 @@ export function SignUpPage() {
   function openProfileStep() {
     setProfileStepUnlocked(true)
     navigate('/sign-up', {
-      state: { from: routeState?.from, signUpStep: 2 } satisfies SignUpRouteState,
+      state: {
+        from: routeState?.from,
+        signUpEntry: routeState?.signUpEntry,
+        signUpStep: 2,
+      } satisfies SignUpRouteState,
     })
   }
 
@@ -436,7 +443,13 @@ export function SignUpPage() {
           navigate(-1)
           return
         }
-        navigate('/login', { state: { from: routeState?.from } })
+        const hasValidEntry =
+          routeState?.signUpEntry === '/' || routeState?.signUpEntry === '/login'
+        if (hasValidEntry) {
+          navigate(-1)
+          return
+        }
+        navigate('/', { replace: true })
       }}
       onLogin={() => navigate('/login', { state: { from: routeState?.from } })}
     />

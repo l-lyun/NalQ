@@ -4,6 +4,7 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuthPhase } from '@/features/auth/model/useAuthPhase'
 import { bootstrapAuthSession } from '@/features/auth/model/authSession'
 import { getAutomaticOnboardingAdmission } from '@/features/onboarding/model/automaticOnboarding'
+import { PublicLandingPage } from '@/pages/landing/PublicLandingPage'
 
 export type AuthReturnState = {
   from?: string
@@ -44,6 +45,8 @@ export function AuthGate() {
   if (phase === 'bootstrapping') return <AuthLoading />
   if (phase === 'bootstrap-error') return <AuthBootstrapError />
   if (phase === 'anonymous') {
+    if (location.pathname === '/') return <PublicLandingPage />
+
     const from = `${location.pathname}${location.search}${location.hash}`
     return <Navigate to="/login" replace state={{ from } satisfies AuthReturnState} />
   }

@@ -45,7 +45,7 @@ export function PublicLandingPage() {
               type="button"
               size="large"
               variant="brandSolid"
-              onClick={() => navigate('/sign-up')}
+              onClick={() => navigate('/sign-up', { state: { signUpEntry: '/' } })}
             >
               가입하고 시작하기
             </ActionButton>

@@ -55,7 +55,7 @@ function AuthenticatedAppShellContent() {
   }, [])
 
   useLayoutEffect(() => {
-    if (documentScrollEnabledRef.current) {
+    if (documentScrollEnabledRef.current && documentScrollEnabled) {
       tabScrollPositionsRef.current[activeTabRef.current] = window.scrollY
     }
 

@@ -18,3 +18,10 @@ test('문서 스크롤로 전환해도 탭별 스크롤 위치를 저장하고 �
   assert.match(shellSource, /window\.scrollY/)
   assert.match(shellSource, /window\.scrollTo\(0, nextScrollTop\)/)
 })
+
+test('학습 하위 route 진입 후 축소된 document scroll로 학습 탭 위치를 덮어쓰지 않는다', () => {
+  assert.match(
+    shellSource,
+    /if \(documentScrollEnabledRef\.current && documentScrollEnabled\)\s*\{\s*tabScrollPositionsRef\.current\[activeTabRef\.current\] = window\.scrollY/s,
+  )
+})
