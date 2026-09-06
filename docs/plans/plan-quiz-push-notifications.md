@@ -153,3 +153,45 @@ Expo data는 `payloadVersion`, `notificationId`, `bindingId`로 구성하고 표
 푸시 통합 검사는 기기/Redis 8개, Outbox 6개, claim·retention 9개, 실제 서버 내부 연결 3개를 포함한다. 재활성화 경합 중 기기 보존, 같은 binding의 tokenVersion 변경, 이전 receipt 차단, 정리 후 오래된 PUT 차단, 탈퇴 사용자의 이관 전 delivery 삭제를 확인했다. 기존 Notion·인증·퀴즈 등 전체 서버 회귀도 포함했다.
 
 기기 등록·delivery·scheduler flag는 모두 기본 false다. 웹·앱 코드는 변경하지 않았고 운영 발송 활성화·배포·실제 Expo/APNs/FCM 호출은 하지 않았다. 실기기 foreground 억제·cold start·푸시 선택은 후속 웹/앱 구현과 함께 검증해야 한다. FORCE INDEX EXPLAIN은 인덱스 존재·사용 가능성만 증명하며, 대표 운영 데이터의 자연 실행계획·조회 부하·백업 복원 후 보존 정리는 미검증이다.
+
+## 10. 앱·웹 등록/해제 준비 점검 (2026-09-07)
+
+이번 작업은 최초 준비 점검과 문서화만 포함한다. 앱·웹 기능 구현, 패키지/lockfile 변경, 외부 자격 설정, 네이티브 빌드와 운영 발송 활성화는 포함하지 않는다. 정책과 메시지 의미의 원장은 [공통 계약](../contracts/contract-api-push-notifications.md)이다.
+
+### 기준 브랜치와 서버 CI
+
+- [서버 PR #60](https://github.com/l-lyun/NalQ/pull/60)의 `codex/quiz-push-notification-design`, `fdbdbe96218bd842269c36c82316894b2216340f`에서 `codex/app-push-registration-readiness`를 분기했다.
+- 확인 시점의 원격 HEAD가 로컬 기준 HEAD와 일치했다. [해당 HEAD의 CI](https://github.com/l-lyun/NalQ/actions/runs/34041734464)는 `web-static`, `server-fast`, `server-integration`, `harness-required` 모두 **PASS**였다. 이는 신규 앱 푸시 연동이나 실제 단말 도달의 증거가 아니다.
+- 후속 PR의 base는 서버 PR 브랜치로 두어 서버 구현 diff를 중복 리뷰하지 않는다. 서버 PR 병합 뒤 후속 PR의 base를 재확인한다.
+
+### 현재 연결 지점과 부족한 준비
+
+| 영역 | 저장소에서 확인한 사실 | 다음 구현에서 필요한 작업 |
+| --- | --- | --- |
+| 앱 셸 | Expo SDK 57, `OpenMdWebView`가 WebView ref·문서 로드·origin 판정·복구를 소유한다. 푸시용 메시지 브리지와 AppState/알림 처리는 없다. | 기존 URL 정책을 유지하며 신뢰 origin·문서 세션·메시지 스키마 검증을 추가한다. |
+| 네이티브 저장/알림 | `expo-notifications`, `expo-secure-store`, `expo-device` 직접 의존성이 없다. | SDK 호환 의존성을 준비하고 installation key·binding·pending operation을 보안 저장한다. 난수 생성 및 projectId 접근용 직접 의존성도 구현 시 검토한다. |
+| iOS | `app.json`에 bundle ID와 EAS projectId가 있다. notifications plugin 및 명시적인 push entitlement 설정은 없다. | 실제 자격과 빌드 산출물의 entitlement를 별도로 확인한다. APNs 자격의 존재 여부는 외부 계정을 조회하지 않아 미확인이다. |
+| Android | `android.package`와 FCM 관련 설정이 없다. | package ID를 확정하고 FCM·채널·실기기 빌드를 준비한다. 외부 FCM 자격 상태는 미확인이다. |
+| 검증 빌드 | iOS simulator 프로필은 있지만 physical-device development-client 준비는 없다. | 푸시를 포함한 실기기 개발 빌드 또는 배포 빌드 경로가 필요하다. 기존 production 프로필만으로 실제 수신을 보장하지 않는다. |
+| 웹 인증 | `authSession.ts`에 로그인·부트스트랩·로그아웃 진입점, `AuthBootstrap.tsx`에 최상위 인증 수명주기가 있다. 푸시 handshake와 `authEpoch`는 없다. | 인증 상태와 bridgeSessionId/authEpoch를 연결하고 일반 브라우저에서는 등록 경로를 열지 않는다. |
+| 계정 전환/해제 | `protectedApi.ts`는 재시도 시 현재 토큰을 읽고, `sessionCleanup.ts`는 네이티브 해제 ACK 없이 로컬 인증을 정리한다. | 등록 시작 계정과 비동기 완료 시점을 검증한다. 로그아웃 전 pending revoke 내구 저장/ACK를 공통 계약에 맞춰 연결한다. |
+
+앱 구현 시 [앱 셸 TRD](../../app/docs/trd/trd-webview-shell.md)의 기존 푸시·브리지 비범위도 갱신해야 한다. 단순히 `ReactNativeWebView` 존재만 검사하거나 사용자 JWT를 네이티브로 넘기는 방식으로 대체하지 않는다.
+
+### 로컬 기준선 검증
+
+| 검사 | 결과 | 근거 |
+| --- | --- | --- |
+| `pnpm -C app typecheck` | **BLOCKED** | 로컬 의존성 연결이 미완성이다. pnpm의 자동 설치가 registry DNS/network 제한(`ENOTFOUND`)으로 실패해 타입 검사는 시작되지 않았다. |
+| `pnpm -C web typecheck` | **BLOCKED** | 같은 의존성 자동 설치 실패로 타입 검사는 시작되지 않았다. |
+| `node --test app/tests/*.test.cjs` | **BLOCKED** | `typescript` 모듈을 찾지 못해 기존 정책 테스트 로딩 단계에서 종료했다. 동작 assertion 실패와 구분한다. |
+
+의존성 준비 후 앱 `pnpm typecheck && pnpm test`, 웹 `pnpm typecheck`를 다시 실행해야 한다. 위 BLOCKED는 이전 서버 CI PASS를 무효화하지 않으며, 서버 CI PASS 역시 현재 로컬 앱·웹 검증을 대체하지 않는다.
+
+### 다음 구현 단위 제안 — 아직 미구현
+
+1. **브리지와 내구 상태 기반**: 계약의 handshake·버전·origin·bridgeSessionId/authEpoch 검증, SecureStore 상태/재전송 경계를 구현하고 잘못된 origin·세션·메시지 거절 테스트를 추가한다.
+2. **기기 등록/해제 연결**: 인증된 앱의 권한 요청과 토큰 획득, 웹의 인증 API 등록, 결과/ACK, 로그아웃 전 pending revoke 저장과 재시도, 계정 전환·재설치/토큰 갱신 경계를 구현한다. 계약상 필요한 복구를 생략한 상태를 완료로 보고하지 않는다.
+3. **foreground 억제와 회귀 확인**: 앱 초기화부터 알림 표시를 억제하고 앱·웹 자동 검증을 실행한다. 무음·무진동 및 실제 단말 수신은 실기기로 별도 확인한다.
+
+푸시 탭 이동·cold start 복원은 별도 후속 단위로 남긴다. 의존성 설치·신규 브리지·실기기 빌드 준비가 남아 있으므로, 남은 약 50분 안에 등록/해제 전체와 실기기 검증까지 완료한다고 확약하지 않는다. 다음 작업에서는 먼저 의존성 기준선을 복구하고 검증 가능한 첫 구현 단위를 완료하는 것을 목표로 한다.
