@@ -21,6 +21,7 @@ scope: shared
 | `revision` | Server, 0부터 증가하는 정수 | 설치 상태 변경의 순서. 재등록·권한 변경·연결 변경 때 비교 |
 | `bindingId` | Server, 불투명 UUID | 설치와 계정의 한 활성 연결. 계정 전환·연결 해제 후 재등록 시 새 값 |
 | `operationId` | Native, UUID | 한 HTTP 변경 의도의 멱등 키. 전송 재시도에서도 동일 값 |
+| `operationIssuedAt` | Native, UTC 시각 | 변경 의도 최초 생성 시각. 동일 operation 재시도에서 변경 불가 |
 | `bridgeSessionId` | Native, 문서 인스턴스별 UUID | reload·renderer 재생성 전 메시지 배제 |
 | `authEpoch` | Web, 현재 실행 중 단조 증가 정수 | 로그인 시작·성공, 계정 전환·로그아웃·인증 종료의 비동기 작업 격리 |
 
@@ -50,6 +51,7 @@ Native는 Access/Refresh Token을 받거나 사용자 인증 API를 직접 호�
 ```json
 {
   "operationId": "11111111-1111-4111-8111-111111111111",
+  "operationIssuedAt": "2026-09-06T00:00:00Z",
   "expectedRevision": 0,
   "platform": "IOS",
   "provider": "EXPO",
@@ -70,7 +72,17 @@ Native는 Access/Refresh Token을 받거나 사용자 인증 API를 직접 호�
 - 같은 `(installationId, operationId)`와 동일한 인증 사용자·요청 내용은 같은 결과를 반환한다. 다른 내용 또는 다른 사용자로 키를 재사용하면 `409 PUSH_OPERATION_CONFLICT`다. 저장된 응답이 현재 revision보다 오래됐으면 native는 적용하지 않는다.
 - 웹·native는 설치당 변경 요청 한 개만 진행한다. 네트워크 실패에는 같은 operation을 재전송하고, 새 권한/계정 변경은 앞선 결과를 회수하거나 상태를 재조회한 뒤 처리한다.
 
-### 재설치·토큰 유실 복구 초안
+### 변경 요청 수명과 기록 삭제
+
+복구·보존 정책은 2026-09-06 사용자 승인이다. 다음 요청 시간 검증은 이를 구현하기 위한 기술 설계안이다.
+
+- PUT과 revoke는 `operationIssuedAt`(ISO-8601 UTC)을 필수로 추가한다. JSON 요청에 이 필드를 포함하며 고정 예시가 아닌 실제 의도 생성 시각을 사용한다. native의 `PUSH_DEVICE`·pending revoke에도 같은 값을 보관·전달한다.
+- 서버는 인증/설치 자격 검증 후 서버 시각 기준 24시간 이상 된 요청 또는 5분 넘게 미래인 요청을 `409 PUSH_OPERATION_EXPIRED`로 거절한다. 만료 검사 후 멱등 응답을 조회하며 만료 요청은 DB 상태를 변경하지 않는다. 서버 응답 `Date`를 시계 오차 진단에 사용하고 잘못된 기기 시각으로 무한 요청하지 않는다.
+- 같은 operation은 요청 내용·시각을 바꾸지 않는다. 만료 후 등록은 현재 인증·권한·설치 상태를 다시 확인한 최신 의도만 새 operation으로 제출한다. 기존 설치가 404면 이전 `expectedRevision=0` 요청을 재생하지 않고 새 설치 ID/key로 등록한다. 늦은 revoke는 원래 binding에만 적용한다. 만료됐으면 새 operation으로 재시도할 수 있으나 binding을 현재 연결로 바꾸지 않는다. 404는 대상이 이미 없어 해제할 수 없는 종료 상태로 처리한다.
+- 멱등 결과는 최초 처리 후 7일 보관하고 재시도로 기한을 연장하지 않는다. 요청 digest에는 operationIssuedAt을 포함한다. 비활성 설치는 `inactiveAt + 30일`에 삭제하고 no-op 해제로 inactiveAt을 갱신하지 않는다. 토큰은 비활성화 때 즉시 제거한다.
+- 이 시간 검증은 30일 뒤 삭제된 설치에 과거 최초 HTTP 요청이 재생되는 것을 막는다. 인증 사용자가 시각을 바꿔 만드는 새로운 요청의 정식 앱 여부를 증명하지 않는다. 그 경계는 기존 MVP 인증·설치 소유권 범위를 따른다. 24시간 만료·30일 삭제·서버 시계 경계는 통합 테스트로 검증한다.
+
+### 재설치·토큰 유실 복구
 
 - 앱 bootstrap·로그인·foreground 복귀에서 권한과 Expo 토큰을 확인하고 native token 변경 listener에서도 Expo 토큰을 다시 취득한다. 네트워크 실패는 기존 연결을 지우지 않고 재시도한다. 이미 허용한 권한을 다시 동의받는 흐름은 만들지 않는다.
 - 설치 ID/key가 남으면 같은 설치에 CAS 갱신한다. 토큰 변경 시 tokenVersion을 증가시키고 이전 버전의 미발송 작업은 취소한다. 이미 외부로 접수된 푸시의 회수는 보장하지 않는다.
@@ -85,6 +97,7 @@ Native는 Access/Refresh Token을 받거나 사용자 인증 API를 직접 호�
 ```json
 {
   "operationId": "22222222-2222-4222-8222-222222222222",
+  "operationIssuedAt": "2026-09-06T00:00:00Z",
   "bindingId": "33333333-3333-4333-8333-333333333333",
   "expectedRevision": 4
 }
@@ -106,7 +119,7 @@ Native는 Access/Refresh Token을 받거나 사용자 인증 API를 직접 호�
 - 본인 소유이고 생성 후 90일 보존 범위인 알림만 반환한다. 이 기간과 결과 필드 의미는 기존 알림 Contract를 따른다.
 - 서버 조회의 `actionType`으로 성공은 `/learning/quizzes?focus={quizSetId}`, 실패는 `/learning/{materialId}/quiz`로 이동한다. 푸시에 담긴 임의 URL은 실행하지 않는다.
 - `targetAvailable=false`면 `대상을 찾을 수 없어요.` 안내 후 `/notifications`로 이동하고 해당 알림을 읽음 처리한다.
-- 단일 조회 자체의 404는 타인·만료·없는 알림을 구분하지 않는다. 개인 정보나 추정 목적지를 표시하지 않고 `알림을 찾을 수 없어요.` 안내 후 현재 계정 알림함으로 이동한다. 읽음 요청은 만들지 않는다. 이 복구 문구는 기술 초안의 제안이다.
+- 단일 조회 자체의 404는 타인·만료·없는 알림을 구분하지 않는다. 개인 정보나 추정 목적지를 표시하지 않고 `알림을 찾을 수 없어요.` 안내 후 현재 계정 알림함으로 이동한다. 읽음 요청은 만들지 않는다. 2026-09-06 승인된 복구 정책이다.
 - 단일 조회 200 뒤 목적지 조회에서 대상 404가 발생해도 대상 없음 흐름으로 복구한다. 네트워크 오류·5xx·401은 대상 삭제로 취급하지 않는다.
 - native의 마지막 연결 정보로 현재 계정이 다름을 알 수 있으면 해당 open을 실행하지 않고 같은 계정 로그인까지 보류한다. 일치 정보가 없어도 최종 서버 조회는 반드시 수행한다.
 
@@ -159,7 +172,7 @@ Expo 전송에는 동일한 절대 만료 시각을 `expiration`(Unix 초)으로
 | `HELLO` | App → Web | 선택 version, bridgeSessionId, capabilities(`push-v1`) |
 | `AUTH_STATE` | Web → App | phase(`authenticated`, `anonymous`, `bootstrapping`), authEpoch, 인증 완료 시 userId. 토큰 없음 |
 | `PUSH_REGISTER_REQUEST` | Web → App | 현재 authEpoch. 앱 최초 인증·복귀 때만 요청 |
-| `PUSH_DEVICE` | App → Web | 설치 ID/key, operationId, expectedRevision, platform, token, permission. JWT는 포함하지 않음 |
+| `PUSH_DEVICE` | App → Web | 설치 ID/key, operationId, operationIssuedAt, expectedRevision, platform, token, permission. JWT는 포함하지 않음 |
 | `PUSH_REGISTER_RESULT` | Web → App | 해당 operationId, 성공 응답 또는 안정 오류. native는 epoch·revision 확인 후 보관 |
 | `PUSH_REGISTER_ACK` | App → Web | 해당 operationId, bindingId·revision을 native에 내구 저장 완료. 이때 등록 교환 종료 |
 | `SESSION_ENDING` | Web → App | logout/withdrawal 이유, 종료 전 authEpoch. revoke 의도 보존 요청 |
@@ -188,7 +201,7 @@ native는 푸시 선택을 먼저 내구 저장한다. 새 bridge session에서�
 - 웹의 내구 저장소(IndexedDB 제안)에 `{ userId, notificationId, notificationCreatedAt, queuedAt, nextAttemptAt }`를 저장한다. `(userId, notificationId)` unique. open 완료 기록과 한 트랜잭션으로 기록해 ACK 유실 뒤 중복 이동을 줄인다.
 - 기존 읽음 PUT을 재사용하고 성공한 항목만 제거한다. 첫 `readAt`은 기존 서버 규칙을 유지한다. 다른 기기에서 이미 읽은 경우도 성공이다.
 - 네트워크·429·5xx는 제한된 backoff, 401은 인증 복구 대기, 404는 만료/삭제로 큐 제거. 잘못된 요청 등 영구 4xx는 계속 재시도하지 않고 최소 진단을 남긴다. 화면을 되돌리거나 오류 팝업을 표시하지 않는다.
-- 앱 bootstrap·foreground·online 복귀에서 현재 계정 큐만 실행한다. 로그아웃/다른 계정에서는 정지·격리하고 **같은 계정으로 돌아오면 재개**하는 초안이다. 탈퇴 또는 알림 보존 기간 종료 시 제거한다. 기존 실행 계획의 로그아웃 시 삭제 제안을 이 방식으로 구체화한다.
+- 앱 bootstrap·foreground·online 복귀에서 현재 계정 큐만 실행한다. 로그아웃/다른 계정에서는 정지·격리하고 **같은 계정으로 돌아오면 재개**한다. 탈퇴 또는 알림 보존 기간 종료 시 제거한다. 2026-09-06 승인된 정책이다.
 - 알림 생성 후 90일이라는 기존 원장 수명을 넘겨 재시도하지 않는다. 앱 재설치·사용자 저장소 삭제 뒤 복원까지 보장하지 않는다.
 - 서버 성공 전 badge를 임의로 차감하지 않고, 성공 후 캐시 갱신으로 다른 화면과 맞춘다. 재시도 완료 전 잠시 unread로 보일 수 있지만 푸시 목적지 이용은 막지 않는다.
 
@@ -203,6 +216,7 @@ native는 푸시 선택을 먼저 내구 저장한다. 새 bridge session에서�
 | 404 `COMMON_003` | 설치/key 검증 실패 또는 알림 없음·타인·만료 | endpoint별 안전한 종료, 존재 여부 추측 금지 |
 | 409 `PUSH_REVISION_CONFLICT` | 상태 변경 경합 | 설치 상태 재조회 후 최신 의도만 적용 |
 | 409 `PUSH_OPERATION_CONFLICT` | 멱등 키의 내용·사용자 불일치 | 키를 임의 반복하지 않고 오류 진단 |
+| 409 `PUSH_OPERATION_EXPIRED` | 변경 요청 유효 시간 초과 또는 미래 시각 | 시각·최신 의도·연결 상태 재확인, 동일 요청 자동 반복 금지 |
 | 409 `PUSH_TOKEN_CONFLICT` | 다른 소유 연결의 동일 토큰 | 이전 계정 정보 노출·자동 탈취 없이 등록 중단 |
 | 429 `PUSH_RATE_LIMITED` | 등록/해제 요청 빈도 초과 | Retry-After가 있으면 존중, backoff |
 | 5xx `COMMON_999` | 일시적 서버 실패 | 같은 operation으로 제한 재시도 |
@@ -211,7 +225,7 @@ native는 푸시 선택을 먼저 내구 저장한다. 새 bridge session에서�
 
 - 구앱 + 신규 웹: handshake 없으면 기존 알림 기능만 사용한다. 신규 앱 + 구웹: pending 선택을 보관하되 알 수 없는 메시지를 강제로 실행하지 않는다. 둘 다 퀴즈 이용을 막지 않는다.
 - 서버 변경은 endpoint 추가와 기존 읽음 API 재사용이다. 브리지 실패를 이유로 원격 웹 버전을 가정해 임의 스크립트를 주입하거나 WebView 전체를 재시작하지 않는다.
-- 기기 기록·제한 해제 자격은 활성 등록을 유지하는 동안 필요하다. 비활성 설치와 멱등 기록의 보존은 미결정 항목이다. 만료 후 늦은 등록 재시도는 revision 검사로 새 상태를 덮어쓰지 못하게 한다.
+- 기기 기록·제한 해제 자격은 활성 등록을 유지하는 동안 필요하다. 비활성 설치 30일·멱등 기록 7일과 변경 요청 시간 검증은 위 수명 규칙을 따른다. revision과 요청 시간 검사로 오래된 재시도가 새 상태를 덮어쓰거나 삭제된 설치를 복원하지 못하게 한다.
 - delivery·receipt 진단 기록은 delivery 생성 시각부터 30일로 결정했다. 알림 ID, 설치/연결 참조, 상태·시각·시도 횟수·정규화 오류·필요한 ticket ID만 보관하고 토큰/key/퀴즈 제목/본문/제공자 원문을 복제하지 않는다. 만료 배치 삭제를 검증하고 탈퇴 시 연결된 기록은 별도 법적 근거 없이 30일을 채우려고 유지하지 않는다. 기존 알림함은 90일, 활성 등록 자격은 별도 수명이다.
 - 토큰/key는 접근을 제한하고 payload/header 로깅에서 제거한다. 개인 제목을 delivery 로그에 복제하지 않는다. 계정 탈퇴 시 연결과 발송 대상 제거는 필수이며 법적 보존 기간은 이 문서에서 새로 정하지 않는다.
 - 문서 검증 대상: 정상 등록/동일 재시도, revision 충돌, 늦은 revoke, 두 기기, 재설치 동일 토큰, 계정 변경 중 401 refresh, cold-start 중 인증, ACK 유실, 삭제 대상/알림 자체 404, 읽음 저장 실패/재접속, 구앱·구웹 호환.
@@ -219,7 +233,7 @@ native는 푸시 선택을 먼저 내구 저장한다. 새 bridge session에서�
 ## 남은 제품·운영 결정
 
 - 소급 제외와 결과 확정 후 1시간 발송은 확정이다. 등록·복구 시 과거 결과에 delivery를 추가하지 않는다.
-- 재설치 복구는 위 초안으로 검토하며 비활성 설치·멱등 기록 수명은 추가 결정이 필요하다. 발송 기록 30일과 일괄 적용하지 않는다.
+- 재설치 복구·비활성 설치 30일·멱등 기록 7일 정책은 승인됐다. 요청 유효 시간과 파일별 구현 경계는 서버 TRD의 기술 설계·테스트로 구체화한다.
 - PRD의 개인정보처리방침·국외 이전 고지 및 법적 근거 검토는 출시 전 충족해야 한다. OS 권한으로 대체하지 않는다.
 - 초기 5초/50건, retry backoff·상한, receipt 조회 간격, 브리지 8KiB는 기술 기본값 제안이다. 실제 SDK·DB·단말 검증 후 TRD에서 조정한다.
-- 읽음 큐·pending open의 계정 격리 보존과 알림 자체 404 안내는 위 초안 규칙으로 검토한다. 제품 합의와 차이가 있으면 PRD를 함께 조정한다.
+- 읽음 큐의 계정 격리·재개 및 알림 자체 404 안내는 승인됐다. pending open의 구체 저장소·재전달 구현은 공유 ACK 조건을 유지해야 한다.

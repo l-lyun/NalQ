@@ -85,6 +85,7 @@ TRD는 각 애플리케이션의 `docs/trd/trd-*.md`에 두며, 파일명과 제
 | Server | 브라우저 Refresh Token Cookie | [서버 Cookie 전환 TRD](../server/docs/trd/trd-browser-refresh-cookie.md) | 구현 동기화, 웹 전환 완료 |
 | Server | OpenAPI와 Swagger UI | [서버 OpenAPI 운영 TRD](../server/docs/trd/trd-openapi-documentation.md) | 초안 |
 | Server | 패키지 구조 | [서버 패키지 구조 TRD](../server/docs/trd/trd-package-structure.md) | 구현 동기화 |
+| Server | 퀴즈 푸시 파일 구조·트랜잭션 | [서버 푸시 TRD](../server/docs/trd/trd-quiz-push-notifications.md) | 구현 전 초안 |
 | Server | 학습자료 생성·조회 | [학습자료 생성·조회 TRD](../server/docs/trd/trd-learning-material-creation.md) | 구현 동기화 |
 | Server | Notion 단일 페이지 가져오기 | [Notion 가져오기 TRD](../server/docs/trd/trd-notion-page-import.md) | 검토 중 |
 | Server | LLM 퀴즈 생성 워커 | [LLM 퀴즈 생성 워커 TRD](../server/docs/trd/trd-llm-quiz-generation-worker.md) | 구현 동기화 |
