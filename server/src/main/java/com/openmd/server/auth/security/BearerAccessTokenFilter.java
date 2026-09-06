@@ -38,11 +38,24 @@ public class BearerAccessTokenFilter extends OncePerRequestFilter {
 	protected boolean shouldNotFilter(HttpServletRequest request) {
 		String requestUri = request.getRequestURI();
 		return requestUri.startsWith("/api/v1/auth/")
+			|| isPushRevokeRequest(request)
 			|| requestUri.equals("/v3/api-docs")
 			|| requestUri.startsWith("/v3/api-docs/")
 			|| requestUri.equals("/v3/api-docs.yaml")
 			|| requestUri.equals("/swagger-ui.html")
 			|| requestUri.startsWith("/swagger-ui/");
+	}
+
+	private boolean isPushRevokeRequest(HttpServletRequest request) {
+		if (!request.getMethod().equals("POST")) {
+			return false;
+		}
+		String path = request.getRequestURI();
+		String contextPath = request.getContextPath();
+		if (contextPath != null && !contextPath.isEmpty() && path.startsWith(contextPath)) {
+			path = path.substring(contextPath.length());
+		}
+		return path.matches("/api/v1/push-devices/[^/]+/revoke");
 	}
 
 	@Override

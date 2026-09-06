@@ -63,7 +63,7 @@ Native는 Access/Refresh Token을 받거나 사용자 인증 API를 직접 호�
 응답은 기존 `ApiResponse` envelope의 `data`에 `{ installationId, revision, bindingId, status, userId }`를 담는다. `userId`는 현재 인증 사용자이며 native의 pending 계정 분류 보조값이다. 권한 증명으로 사용하지 않는다.
 
 - 플랫폼은 `IOS | ANDROID`, 제공자는 초기 `EXPO`, 등록 권한 상태는 `GRANTED | DENIED`다. 미결정 권한에서는 서버 등록 없이 native 권한 요청을 먼저 실행한다.
-- `GRANTED`는 유효한 형식의 native-issued token 필수. `DENIED`는 기존 설치를 `DISABLED`로 변경할 때 사용하며 `pushToken`을 생략한다. 신규 거절 기기는 등록하지 않는다. 비활성화 시 발송용 토큰은 제거한다.
+- `GRANTED`는 유효한 형식의 native-issued token 필수. `DENIED`는 기존 설치를 `DISABLED`로 변경할 때 사용하며 `pushToken`을 생략한다. 신규 거절 기기는 등록하지 않되 응답은 `status=DISABLED`, `revision=0`, `bindingId=null`인 비영속 결과로 반환한다. 비활성화 시 발송용 토큰은 제거한다.
 - 같은 설치·같은 계정의 토큰 갱신은 `bindingId` 유지, `revision` 증가. 다른 계정 연결 또는 해제 후 재연결은 기존 연결을 종료하고 새 `bindingId`를 만든다.
 - 한 기기의 변경으로 다른 설치의 연결은 바뀌지 않는다. `(provider, pushToken)`은 활성 연결에서 중복되지 않는다.
 - 동일 토큰이 다른 설치에 이미 있으면 같은 인증 사용자 소유일 때만 그 이전 활성 토큰 연결을 대체할 수 있다. 다른 사용자 소유이면 `409 PUSH_TOKEN_CONFLICT`로 거절하고 이전 소유자 정보를 노출하지 않는다. 정상적인 같은 설치 계정 전환은 설치 key로 기존 연결을 증명하므로 허용한다.
@@ -106,7 +106,7 @@ Native는 Access/Refresh Token을 받거나 사용자 인증 API를 직접 호�
 - `X-Push-Installation-Key` 필수. 이 endpoint만 사용자 Bearer를 요구하지 않는다. 로그아웃 후에도 **그 설치의 특정 연결 해제만** 재시도할 수 있도록 제한된 자격을 사용한다. 등록·조회·다른 기기 조작 권한은 주지 않는다.
 - 웹은 전용 제한 클라이언트로 호출한다. 기존 공통 anonymous endpoint처럼 명시적인 보안 경로·CORS·빈도 제한을 설정한다. native는 웹이 없을 때 직접 사용자 API를 호출하지 않고 pending revoke를 보관한다.
 - key가 유효하고 요청 binding이 현재 연결이면 revision 비교 후 해제한다. 이미 해제됐거나 새 binding으로 바뀐 경우 성공 no-op; 늦게 온 이전 해제가 새 연결을 해제하지 않는다. 현재 binding은 같지만 revision이 다르면 409다.
-- 정상 해제는 `200` + `data: { revoked: true }`; 설치 key 오류와 설치 없음은 404. 결과와 무관하게 사용자 로그아웃을 무한 대기시키지 않는다.
+- 정상 해제는 `200` + `data: { revoked: true }`; 같은 operation을 재생하면 최초 결과를 그대로 반환한다. 자격이 유효하지만 요청 binding이 이미 현재 연결이 아니어서 변경할 상태가 없으면 `200` + `data: { revoked: false }`인 성공 no-op이며 native는 해당 pending revoke를 종료한다. 설치 key 오류와 설치 없음은 404. 결과와 무관하게 사용자 로그아웃을 무한 대기시키지 않는다.
 - 로그아웃 시작 때 웹이 native에 `SESSION_ENDING`을 보내고 native가 revoke 의도를 먼저 보존한다. 보존 ACK 후 웹이 revoke와 기존 logout을 시도한다. ACK가 없거나 저장에 실패하면 제한된 대기 후 기존 logout은 진행하고 미보존 진단을 남긴다. 다음 WebView bootstrap은 로그인 여부와 관계없이 보존된 pending revoke를 먼저 처리할 수 있다.
 - 계정 전환 중 이전 revoke가 늦어져도 새 PUT은 같은 설치 key와 최신 revision으로 재연결할 수 있다. 이전 binding의 pending 발송은 취소하고 오래된 revoke는 no-op다.
 - 명시적 서버 logout 성공 시 연결된 `sessionId`의 설치도 해제하도록 인증 서비스에 연결한다. 앱 측 revoke는 만료된 세션·요청 실패를 보완한다. refresh 회전은 연결을 바꾸지 않으며, 세션 자연 만료만으로 기기를 해제하지 않는다.
@@ -219,7 +219,7 @@ native는 푸시 선택을 먼저 내구 저장한다. 새 bridge session에서�
 | 409 `PUSH_OPERATION_EXPIRED` | 변경 요청 유효 시간 초과 또는 미래 시각 | 시각·최신 의도·연결 상태 재확인, 동일 요청 자동 반복 금지 |
 | 409 `PUSH_TOKEN_CONFLICT` | 다른 소유 연결의 동일 토큰 | 이전 계정 정보 노출·자동 탈취 없이 등록 중단 |
 | 429 `PUSH_RATE_LIMITED` | 등록/해제 요청 빈도 초과 | Retry-After가 있으면 존중, backoff |
-| 5xx `COMMON_999` | 일시적 서버 실패 | 같은 operation으로 제한 재시도 |
+| 5xx `COMMON_999` | 일시적 서버 실패. Redis 제한 저장소 장애로 변경 요청을 안전하게 판정할 수 없는 503 포함 | 같은 operation으로 제한 재시도 |
 
 ## 10. 호환성·보존·검증 경계
 
