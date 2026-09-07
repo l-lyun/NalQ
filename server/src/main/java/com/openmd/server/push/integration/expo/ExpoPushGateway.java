@@ -124,7 +124,11 @@ public final class ExpoPushGateway implements PushGateway {
     return switch (node.path("details").path("error").asText("")) {
       case "DeviceNotRegistered" ->
           new PushGatewayResult(Outcome.INVALID_TOKEN, null, "DEVICE_NOT_REGISTERED", Duration.ZERO);
-      case "MessageRateExceeded" -> PushGatewayResult.retry("MESSAGE_RATE_EXCEEDED");
+      case "MessageRateExceeded" ->
+          ticket
+              ? PushGatewayResult.retry("MESSAGE_RATE_EXCEEDED")
+              : new PushGatewayResult(
+                  Outcome.FAILED, null, "MESSAGE_RATE_EXCEEDED", Duration.ZERO);
       case "MessageTooBig" ->
           new PushGatewayResult(Outcome.FAILED, null, "MESSAGE_TOO_BIG", Duration.ZERO);
       case "MismatchSenderId", "InvalidCredentials" ->

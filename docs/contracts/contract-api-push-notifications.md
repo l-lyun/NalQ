@@ -25,6 +25,8 @@ scope: shared
 | `bridgeSessionId` | Native, 문서 인스턴스별 UUID | reload·renderer 재생성 전 메시지 배제 |
 | `authEpoch` | Web, 현재 실행 중 단조 증가 정수 | 로그인 시작·성공, 계정 전환·로그아웃·인증 종료의 비동기 작업 격리 |
 
+서버는 `installationId`의 UUID 영문을 소문자로 정규화해 조회·저장·멱등 digest에 사용한다. 기존 대문자 기록도 같은 설치로 처리하며 응답의 설치 ID는 정규형을 사용한다.
+
 Native는 Access/Refresh Token을 받거나 사용자 인증 API를 직접 호출하지 않는다. 웹이 기존 Bearer 인증으로 등록한다. 사용자 ID·세션 ID는 서버 principal에서 결정하며 요청 body의 사용자 식별자를 신뢰하지 않는다.
 
 설치 key는 TLS header로만 전달하고 서버에는 digest를 저장한다. native와 허용된 WebView 간 필요한 동안만 전달하며 웹 localStorage·URL·로그·분석 사건에는 기록하지 않는다. 브리지 검증 실패 또는 지원 버전 불일치 시 푸시 연결만 중단하고 기존 웹 기능은 유지한다.

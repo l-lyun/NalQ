@@ -150,6 +150,50 @@ public final class PushDeliveryClaimStore {
         .flatMap(row -> prepare(attempt, row, now));
   }
 
+  public List<PushDeliveryAttempt> renewSendLeases(
+      List<PushDeliveryAttempt> attempts, Instant now, Duration leaseDuration) {
+    if (attempts.isEmpty()) {
+      return List.of();
+    }
+    Instant renewedUntil = now.plus(leaseDuration);
+    String attemptPredicate =
+        String.join(
+            " OR ",
+            java.util.Collections.nCopies(attempts.size(), "(id = ? AND attempt_id = ?)"));
+    List<Object> updateParameters = new ArrayList<>();
+    updateParameters.add(epochMicros(renewedUntil));
+    updateParameters.add(epochMicros(now));
+    updateParameters.add(epochMicros(now));
+    addAttemptParameters(updateParameters, attempts);
+    int updated =
+        jdbc.update(
+            "UPDATE push_deliveries SET lease_until = "
+                + "TIMESTAMPADD(MICROSECOND, ?, '1970-01-01 00:00:00.000000'), "
+                + "updated_at = TIMESTAMPADD(MICROSECOND, ?, '1970-01-01 00:00:00.000000') "
+                + "WHERE state = 'SENDING' AND lease_until > "
+                + "TIMESTAMPADD(MICROSECOND, ?, '1970-01-01 00:00:00.000000') AND ("
+                + attemptPredicate
+                + ")",
+            updateParameters.toArray());
+    if (updated == attempts.size()) {
+      return List.copyOf(attempts);
+    }
+
+    List<Object> queryParameters = new ArrayList<>();
+    queryParameters.add(epochMicros(renewedUntil));
+    addAttemptParameters(queryParameters, attempts);
+    return List.copyOf(
+        jdbc.query(
+            "SELECT id, attempt_id FROM push_deliveries "
+                + "WHERE state = 'SENDING' AND lease_until = "
+                + "TIMESTAMPADD(MICROSECOND, ?, '1970-01-01 00:00:00.000000') AND ("
+                + attemptPredicate
+                + ") ORDER BY id",
+            (rs, row) ->
+                new PushDeliveryAttempt(rs.getLong("id"), rs.getString("attempt_id")),
+            queryParameters.toArray()));
+  }
+
   public Optional<SendFence> lockSendFence(PushDeliveryAttempt attempt) {
     return jdbc.query(
             """
@@ -387,6 +431,14 @@ public final class PushDeliveryClaimStore {
 
   private Long nullableEpochMicros(Instant value) {
     return value == null ? null : epochMicros(value);
+  }
+
+  private void addAttemptParameters(
+      List<Object> parameters, List<PushDeliveryAttempt> attempts) {
+    for (PushDeliveryAttempt attempt : attempts) {
+      parameters.add(attempt.deliveryId());
+      parameters.add(attempt.attemptId());
+    }
   }
 
   private Instant instant(long epochMicros) {

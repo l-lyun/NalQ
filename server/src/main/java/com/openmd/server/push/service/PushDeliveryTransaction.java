@@ -34,6 +34,12 @@ public class PushDeliveryTransaction {
   }
 
   @Transactional
+  public List<PushDeliveryAttempt> renewSendLeases(
+      List<PushDeliveryAttempt> attempts, Instant now, Duration leaseDuration) {
+    return store.renewSendLeases(attempts, now, leaseDuration);
+  }
+
+  @Transactional
   public void recordSendResult(
       PushDeliveryAttempt attempt, PushGatewayResult result, Instant now) {
     Optional<PushDeliveryClaimStore.SendFence> fence = store.lockSendFence(attempt);

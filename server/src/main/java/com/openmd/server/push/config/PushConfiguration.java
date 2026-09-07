@@ -53,28 +53,28 @@ public class PushConfiguration {
 
   @Bean
   @ConditionalOnExpression(
-      "'${openmd.push.delivery-enabled:false}' == 'true' or '${openmd.push.scheduler-enabled:false}' == 'true'")
+      "${openmd.push.delivery-enabled:false} or ${openmd.push.scheduler-enabled:false}")
   PushDeliveryClaimStore pushDeliveryClaimStore(ObjectProvider<JdbcTemplate> jdbc) {
     return new PushDeliveryClaimStore(jdbc.getObject());
   }
 
   @Bean
   @ConditionalOnExpression(
-      "'${openmd.push.delivery-enabled:false}' == 'true' or '${openmd.push.scheduler-enabled:false}' == 'true'")
+      "${openmd.push.delivery-enabled:false} or ${openmd.push.scheduler-enabled:false}")
   PushRetentionStore pushRetentionStore(ObjectProvider<JdbcTemplate> jdbc) {
     return new PushRetentionStore(jdbc.getObject());
   }
 
   @Bean
   @ConditionalOnExpression(
-      "'${openmd.push.delivery-enabled:false}' == 'true' or '${openmd.push.scheduler-enabled:false}' == 'true'")
+      "${openmd.push.delivery-enabled:false} or ${openmd.push.scheduler-enabled:false}")
   PushDeliveryPolicy pushDeliveryPolicy() {
     return new PushDeliveryPolicy(() -> ThreadLocalRandom.current().nextDouble());
   }
 
   @Bean
   @ConditionalOnExpression(
-      "'${openmd.push.delivery-enabled:false}' == 'true' or '${openmd.push.scheduler-enabled:false}' == 'true'")
+      "${openmd.push.delivery-enabled:false} or ${openmd.push.scheduler-enabled:false}")
   PushDeliveryTransaction pushDeliveryTransaction(
       PushDeliveryClaimStore store, PushDeliveryPolicy policy) {
     return new PushDeliveryTransaction(store, policy);
@@ -82,7 +82,7 @@ public class PushConfiguration {
 
   @Bean
   @ConditionalOnExpression(
-      "'${openmd.push.delivery-enabled:false}' == 'true' or '${openmd.push.scheduler-enabled:false}' == 'true'")
+      "${openmd.push.delivery-enabled:false} or ${openmd.push.scheduler-enabled:false}")
   PushRetentionService pushRetentionService(
       PushRetentionStore store, ObjectProvider<Clock> clock, PushProperties properties) {
     return new PushRetentionService(
@@ -91,7 +91,7 @@ public class PushConfiguration {
 
   @Bean
   @ConditionalOnExpression(
-      "'${openmd.push.delivery-enabled:false}' == 'true' or '${openmd.push.scheduler-enabled:false}' == 'true'")
+      "${openmd.push.delivery-enabled:false} or ${openmd.push.scheduler-enabled:false}")
   PushGateway pushGateway(
       ObjectMapper mapper, ObjectProvider<Clock> clock, PushProperties properties) {
     HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
@@ -106,7 +106,7 @@ public class PushConfiguration {
 
   @Bean
   @ConditionalOnExpression(
-      "'${openmd.push.delivery-enabled:false}' == 'true' or '${openmd.push.scheduler-enabled:false}' == 'true'")
+      "${openmd.push.delivery-enabled:false} or ${openmd.push.scheduler-enabled:false}")
   PushDeliveryWorker pushDeliveryWorker(
       PushDeliveryTransaction transactions,
       PushGateway gateway,

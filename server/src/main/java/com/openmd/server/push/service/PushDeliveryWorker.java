@@ -8,6 +8,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -42,6 +43,16 @@ public final class PushDeliveryWorker {
     for (PushDeliveryAttempt claim : claims) {
       transactions.prepareSend(claim, clock.instant()).ifPresent(prepared::add);
     }
+    if (prepared.isEmpty()) {
+      return;
+    }
+    List<PushDeliveryAttempt> renewed =
+        transactions.renewSendLeases(
+            prepared.stream().map(PreparedPushDelivery::attempt).toList(),
+            clock.instant(),
+            leaseDuration);
+    var renewedSet = new HashSet<>(renewed);
+    prepared.removeIf(delivery -> !renewedSet.contains(delivery.attempt()));
     if (prepared.isEmpty()) {
       return;
     }
