@@ -12,6 +12,9 @@ import com.openmd.server.auth.dto.model.RefreshTokenSession;
 import com.openmd.server.auth.service.AccountWithdrawalService;
 import com.openmd.server.auth.service.AuthService;
 import com.openmd.server.auth.service.RefreshTokenService;
+import com.openmd.server.auth.repository.RefreshSessionStore;
+import com.openmd.server.push.service.PushDeviceTransaction;
+import com.openmd.server.push.service.PushDeviceLifecycle;
 import com.openmd.server.push.domain.PushDeviceStatus;
 import com.openmd.server.push.domain.PushPermission;
 import com.openmd.server.push.domain.PushPlatform;
@@ -109,6 +112,9 @@ class PushDeviceInfrastructureIntegrationTest {
   @Autowired AccountWithdrawalService withdrawalService;
   @Autowired PasswordEncoder passwordEncoder;
   @Autowired PlatformTransactionManager transactionManager;
+  @Autowired RefreshSessionStore sessions;
+  @Autowired PushDeviceTransaction deviceTransaction;
+  @Autowired PushDeviceLifecycle deviceLifecycle;
 
   @BeforeEach
   void setUp() {
@@ -123,6 +129,56 @@ class PushDeviceInfrastructureIntegrationTest {
               connection.serverCommands().flushAll();
               return null;
             });
+    for (String session : List.of("session-42", "old-session", "new-session")) {
+      sessions.create(session, 42L, session, "test-digest", Instant.now().plusSeconds(3600));
+    }
+    for (String session : List.of("session-84", "other-session")) {
+      sessions.create(session, 84L, session, "test-digest", Instant.now().plusSeconds(3600));
+    }
+  }
+
+  @Test
+  void logoutBeforeFirstRegistrationCommitIsCompensatedWithRealRedisAndMysql() throws Exception {
+    IssuedRefreshToken refresh = refreshTokens.issue(42L);
+    CountDownLatch checkedBeforeLogout = new CountDownLatch(1);
+    CountDownLatch logoutCompleted = new CountDownLatch(1);
+    var checks = new java.util.concurrent.atomic.AtomicInteger();
+    RefreshSessionStore observedSessions = org.mockito.Mockito.mock(RefreshSessionStore.class);
+    org.mockito.Mockito.when(observedSessions.isActive(refresh.sessionId(), 42L)).thenAnswer(invocation -> {
+      boolean active = sessions.isActive(refresh.sessionId(), 42L);
+      if (checks.incrementAndGet() == 1) {
+        checkedBeforeLogout.countDown();
+        assertTrue(logoutCompleted.await(10, TimeUnit.SECONDS));
+      }
+      return active;
+    });
+    PushDeviceService raced = new PushDeviceService(deviceTransaction, rateLimits, observedSessions, deviceLifecycle);
+    try (ExecutorService executor = Executors.newSingleThreadExecutor()) {
+      Future<?> registration = executor.submit(() -> raced.register(42L, refresh.sessionId(),
+          command("11111111-1111-4111-8111-111111111111", "33333333-3333-4333-8333-333333333333", TOKEN)));
+      try {
+        assertTrue(checkedBeforeLogout.await(10, TimeUnit.SECONDS));
+        authService.logout(refresh.token());
+        assertEquals(0L, devices.count());
+      } finally {
+        logoutCompleted.countDown();
+      }
+      var failure = assertThrows(java.util.concurrent.ExecutionException.class,
+          () -> registration.get(10, TimeUnit.SECONDS));
+      assertTrue(failure.getCause() instanceof BusinessException);
+      assertEquals(com.openmd.server.auth.error.AuthErrorCode.INVALID_CREDENTIAL,
+          ((BusinessException) failure.getCause()).getErrorCode());
+      assertEquals(PushDeviceStatus.REVOKED,
+          devices.findByInstallationId("11111111-1111-4111-8111-111111111111").orElseThrow().getStatus());
+    }
+  }
+
+  @Test
+  void activeSessionLookupChecksOwnershipAndRejectsExpiredKeys() {
+    assertTrue(sessions.isActive("session-42", 42L));
+    assertFalse(sessions.isActive("session-42", 84L));
+    sessions.create("expired", 42L, "expired", "digest", Instant.now().minusSeconds(1));
+    assertFalse(sessions.isActive("expired", 42L));
   }
 
   @Test

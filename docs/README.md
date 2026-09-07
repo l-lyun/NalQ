@@ -96,6 +96,7 @@ TRD는 각 애플리케이션의 `docs/trd/trd-*.md`에 두며, 파일명과 제
 | Web | 학습자료 생성·조회 통합 | [웹 학습자료 TRD](../web/docs/trd/trd-learning-materials.md) | 구현 동기화 |
 | Web | 퀴즈 화면 상태 | [웹 퀴즈 TRD](../web/docs/trd/trd-quiz-solving.md) | 검토 중 |
 | App | Expo WebView 앱 셸 | [앱 셸 TRD](../app/docs/trd/trd-webview-shell.md) | 초안 |
+| App | 푸시 기기 등록·해제·foreground 억제 | [앱 푸시 브리지 TRD](../app/docs/trd/trd-push-bridge-foundation.md) | 연동·자동 검증 완료, 실기기 미검증 |
 | App | WebView 퀴즈 상태 | [앱 퀴즈 TRD](../app/docs/trd/trd-quiz-solving.md) | 검토 중 |
 
 ## 실행 계획과 저장소 검증
@@ -117,6 +118,7 @@ TRD는 각 애플리케이션의 `docs/trd/trd-*.md`에 두며, 파일명과 제
 | 첫 수동 운영 배포·rollback·backup·restore | [운영 배포와 복구 Runbook](operations/production-deployment-runbook.md) | 초안·저장소 구현 |
 | Route 53·S3·CloudFront·ACM·EC2 수동 구성 | [AWS Console 운영 체크리스트](operations/aws-console-production-checklist.md) | 초안·외부 적용 전 |
 | 운영 환경 변수·비밀 주입 계약 | [운영 환경 변수 원장](operations/production-environment-variables.md) | 초안 |
+| Windows에서 푸시 실기기 빌드 준비·수신 점검 | [푸시 실기기 테스트 Runbook](../app/docs/push-device-testing.md) | 저장소 준비, 외부 자격·실기기 검증 전 |
 
 ## 문서 템플릿
 

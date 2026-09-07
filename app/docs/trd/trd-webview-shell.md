@@ -36,7 +36,8 @@ scope: app
 - 푸시 알림, 카메라, 파일 선택, 공유, 생체 인증과 백그라운드 작업
 - React Native에서 NalQ API를 직접 호출하거나 Refresh Token을 네이티브 저장소로 옮기는 것
 - Expo Router 기반의 여러 네이티브 화면과 네이티브 하단 탭
-- 네이티브-웹 메시지 브리지와 임의 JavaScript 주입
+- 푸시 선택·목적지 이동 처리. 기기 등록·권한·해제는 [별도 푸시 TRD](trd-push-bridge-foundation.md)에서 관리한다.
+- 계약 없는 임의 JavaScript 주입
 - 오프라인 콘텐츠 캐시와 오프라인 편집·동기화
 - App/Universal Link, OAuth 복귀와 Notion 외부 인증의 최종 계약
 - 스토어 메타데이터, 서명, 제출과 운영 배포
@@ -49,7 +50,8 @@ scope: app
 - `App.tsx`는 검증된 환경 URL을 단일 `OpenMdWebView`에 전달하고 구성 오류를 네이티브 상태로 표시한다.
 - 공개 웹 주소 자리인 `EXPO_PUBLIC_WEB_URL` 예시와 개발 기본값 `http://localhost:5173`을 사용한다.
 - `src/shell/`이 로딩·동일-origin 최상위 문서 오류·재시도, 동일 origin URL 정책, 외부 링크, Android 뒤로 가기와 플랫폼별 WebView 복구를 소유한다.
-- Expo Router와 네이티브-웹 메시지 브리지는 사용하지 않는다.
+- 현재 임시 브랜드 시안은 네이티브 시작 화면과 첫 WebView 문서 로딩 overlay에 `assets/nalq-splash-dragon.png` 끌어안기 차콜 용가리를 220dp, `#FFF8F2` 배경으로 함께 사용해 전환 사이의 시각적 단절을 줄인다. 오류·재시도 화면은 기존 중립 상태 UI를 유지한다.
+- Expo Router는 사용하지 않는다. 푸시 브리지는 별도 TRD에 따라 문서 nonce 검증 후 `push-v1` 등록·해제를 연결한다. 실제 단말 수신은 별도 검증 대상이다.
 
 ### Web
 
@@ -107,7 +109,7 @@ Expo Router는 네이티브 화면이 하나인 1차 셸에는 추가하지 않�
 - Android 첫 요청은 `onShouldStartLoadWithRequest`가 호출되지 않을 수 있으므로 초기 환경 URL 검증을 별도로 수행한다.
 - 새 창 요청은 별도 WebView를 만들지 않고 같은 URL 정책으로 외부 열기 또는 차단한다.
 
-1차 구현에는 웹-네이티브 메시지 브리지를 만들지 않는다. 이후 메시지가 필요하면 메시지 이름, 방향, payload schema, 버전과 허용 origin을 별도 계약으로 정하고 수신 payload를 신뢰하지 않는다.
+푸시 브리지는 [공유 계약](../../../docs/contracts/contract-api-push-notifications.md)과 [앱 푸시 브리지 TRD](trd-push-bridge-foundation.md)에 따라 별도 경계로 관리한다. 최상위 신뢰 origin의 문서 nonce·세션·스키마를 검증한 채널에서만 설치 증빙과 등록·해제 메시지를 전달한다. JWT는 네이티브로 전달하지 않으며, 그 밖의 메시지를 임의로 추가하거나 수신 payload를 신뢰하지 않는다.
 
 ### 4. 뒤로 가기
 
@@ -125,7 +127,7 @@ Expo Router는 네이티브 화면이 하나인 1차 셸에는 추가하지 않�
 
 | 상태 | 소유 계층 | 처리 |
 | --- | --- | --- |
-| 앱 시작과 첫 문서 로드 | Native | 스플래시 뒤 짧은 로딩 상태 |
+| 앱 시작과 첫 문서 로드 | Native | 같은 브랜드 자산을 사용하는 네이티브 스플래시와 짧은 로딩 상태 |
 | 동일-origin 최상위 문서 network/HTTP 실패 | Native | 간단한 설명과 실패한 문서 URL의 `다시 시도` |
 | WebView renderer/content process 종료 | Native | 복구 안내 후 WebView 재생성 또는 reload |
 | 인증 bootstrap, API 401/5xx와 화면 데이터 오류 | Web | 기존 웹 상태와 재시도 사용 |
@@ -150,6 +152,7 @@ Expo Router는 네이티브 화면이 하나인 1차 셸에는 추가하지 않�
 
 - 1차 기본안은 WebView를 edge-to-edge로 두고 현재 웹의 `viewport-fit=cover`와 SEED safe-area 변수가 inset을 한 번 소비하게 하는 것이다.
 - 네이티브 셸은 StatusBar 글자 스타일과 배경 역할만 맞추고 WebView에 별도 상·하단 padding을 중복 적용하지 않는다.
+- 학습·마이페이지처럼 문서 높이가 viewport보다 짧아도 사용자가 세로로 당겼을 때 플랫폼의 overscroll 반응을 보여준다. Android는 WebView `overScrollMode="always"`를 사용하고, iOS는 `bounces`와 1pt 하단 scroll inset을 함께 사용해 콘텐츠나 새로고침 동작을 추가하지 않고 native bounce를 활성화한다.
 - Android WebView에서 CSS safe-area가 시스템 bar를 보호하지 못하는 것이 실기기에서 확인되면 네이티브 소유 방식으로 전환한다. 이때 네이티브 inset을 적용하고 웹은 첫 paint 전에 `data-openmd-safe-area="consumed"`를 설정하는 명시적인 셸 신호를 소비해야 한다.
 - runtime에 임의 JavaScript를 뒤늦게 주입해 safe area를 바꾸는 방식은 첫 화면 점프와 이중 적용 가능성 때문에 기본안으로 쓰지 않는다.
 - 키보드가 열린 상태에서 가입 폼, 붙여넣기 textarea와 퀴즈 하단 행동이 가려지지 않는지 두 플랫폼에서 확인한다.
@@ -203,6 +206,7 @@ Android `BackHandler`와 WebView ref의 실제 결합은 렌더러가 필요한 
 - 외부 HTTPS, `mailto:`와 `tel:`이 WebView를 이탈해 적절한 앱으로 열리고 복귀 시 기존 화면을 유지한다.
 - 최초 로드와 이후 동일-origin 최상위 문서 탐색의 네트워크 중단·HTTP 오류, renderer 종료 뒤 재시도가 동작한다.
 - 노치, Android edge-to-edge, 홈 인디케이터와 키보드에서 상단 제목·하단 탭·고정 행동이 가려지거나 이중 padding되지 않는다.
+- 학습·마이페이지의 짧은 문서에서 iOS는 당긴 뒤 native bounce로 복원되고 Android는 플랫폼 overscroll 표시를 보이며, 실제 새로고침이 일어나지 않는다. iOS의 추가 scroll 범위는 bounce 활성화를 위한 1pt로 제한한다.
 - 320px 상당의 작은 viewport, 큰 글자와 긴 한국어 문구에서 웹 화면이 잘리거나 수평 스크롤되지 않는다.
 
 ## 단계 제안
