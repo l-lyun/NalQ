@@ -43,7 +43,10 @@ export function PixelSprite({ frame, hat, className }: PixelSpriteProps) {
           <feComponentTransfer in="whiteness" result="foreground">
             <feFuncA type="discrete" tableValues="1 1 1 0" />
           </feComponentTransfer>
-          <feComposite in="SourceGraphic" in2="foreground" operator="in" />
+          {/* Pull the binary matte two source pixels inward so blended white
+              edge pixels do not flash while the sprite frames advance. */}
+          <feMorphology in="foreground" operator="erode" radius="2" result="trimmedForeground" />
+          <feComposite in="SourceGraphic" in2="trimmedForeground" operator="in" />
         </filter>
       </defs>
       {/* Keep the same upper-body pixels in every frame, so generated variations
