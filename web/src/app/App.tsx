@@ -43,6 +43,7 @@ import { VerifyEmailPage } from '@/pages/verify-email/VerifyEmailPage'
     ...(import.meta.env.DEV ? [
       { path: '/landing-preview', element: <PublicLandingPage /> },
       { path: '/onboarding-preview', element: <OnboardingPage mode="guide" onExit={() => undefined} /> },
+      { path: '/experiments/pixel-room', lazy: () => import('@/experiments/pixel-room/PixelRoomExperimentPage') },
     ] : []),
   { path: '/terms', element: <TermsPage /> },
   { path: '/privacy', element: <PrivacyPage /> },
