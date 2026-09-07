@@ -62,7 +62,7 @@ export function PixelSprite({ frame, hat, className }: PixelSpriteProps) {
         </svg>
       </g>
       {hat !== 'none' && (
-        <g transform="translate(38 -43) scale(.86)">
+        <g transform="translate(38 -23) scale(.86)">
           <svg width="627" height="627" viewBox={`${hat === 'beanie' ? 887 : 0} 0 887 887`} overflow="hidden">
             <image href={hatsUrl} width="1774" height="887" filter={`url(#${matteId})`} />
           </svg>
