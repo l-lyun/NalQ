@@ -50,6 +50,7 @@ interface OpenMdWebViewProps {
 type VisibleShellState = Extract<ShellState, 'loading' | 'load-error' | 'renderer-error'> | 'ready';
 
 const EXTERNAL_LINK_ERROR_DURATION_MS = 4_000;
+const IOS_SHORT_DOCUMENT_BOUNCE_INSET = 1;
 
 export function OpenMdWebView({ webOrigin, webUrl }: OpenMdWebViewProps) {
   const webViewRef = useRef<WebView>(null);
@@ -455,12 +456,20 @@ export function OpenMdWebView({ webOrigin, webUrl }: OpenMdWebViewProps) {
     Platform.OS === 'ios'
       ? {
           allowsBackForwardNavigationGestures: false,
+          bounces: true,
+          contentInset: {
+            bottom: IOS_SHORT_DOCUMENT_BOUNCE_INSET,
+            left: 0,
+            right: 0,
+            top: 0,
+          },
           sharedCookiesEnabled: false,
         }
       : Platform.OS === 'android'
         ? {
             allowFileAccess: false,
             mixedContentMode: 'never' as const,
+            overScrollMode: 'always' as const,
             setSupportMultipleWindows: true,
             thirdPartyCookiesEnabled: false,
           }

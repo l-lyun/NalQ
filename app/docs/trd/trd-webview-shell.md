@@ -151,6 +151,7 @@ Expo Router는 네이티브 화면이 하나인 1차 셸에는 추가하지 않�
 
 - 1차 기본안은 WebView를 edge-to-edge로 두고 현재 웹의 `viewport-fit=cover`와 SEED safe-area 변수가 inset을 한 번 소비하게 하는 것이다.
 - 네이티브 셸은 StatusBar 글자 스타일과 배경 역할만 맞추고 WebView에 별도 상·하단 padding을 중복 적용하지 않는다.
+- 학습·마이페이지처럼 문서 높이가 viewport보다 짧아도 사용자가 세로로 당겼을 때 플랫폼의 overscroll 반응을 보여준다. Android는 WebView `overScrollMode="always"`를 사용하고, iOS는 `bounces`와 1pt 하단 scroll inset을 함께 사용해 콘텐츠나 새로고침 동작을 추가하지 않고 native bounce를 활성화한다.
 - Android WebView에서 CSS safe-area가 시스템 bar를 보호하지 못하는 것이 실기기에서 확인되면 네이티브 소유 방식으로 전환한다. 이때 네이티브 inset을 적용하고 웹은 첫 paint 전에 `data-openmd-safe-area="consumed"`를 설정하는 명시적인 셸 신호를 소비해야 한다.
 - runtime에 임의 JavaScript를 뒤늦게 주입해 safe area를 바꾸는 방식은 첫 화면 점프와 이중 적용 가능성 때문에 기본안으로 쓰지 않는다.
 - 키보드가 열린 상태에서 가입 폼, 붙여넣기 textarea와 퀴즈 하단 행동이 가려지지 않는지 두 플랫폼에서 확인한다.
@@ -204,6 +205,7 @@ Android `BackHandler`와 WebView ref의 실제 결합은 렌더러가 필요한 
 - 외부 HTTPS, `mailto:`와 `tel:`이 WebView를 이탈해 적절한 앱으로 열리고 복귀 시 기존 화면을 유지한다.
 - 최초 로드와 이후 동일-origin 최상위 문서 탐색의 네트워크 중단·HTTP 오류, renderer 종료 뒤 재시도가 동작한다.
 - 노치, Android edge-to-edge, 홈 인디케이터와 키보드에서 상단 제목·하단 탭·고정 행동이 가려지거나 이중 padding되지 않는다.
+- 학습·마이페이지의 짧은 문서에서 iOS는 당긴 뒤 native bounce로 복원되고 Android는 플랫폼 overscroll 표시를 보이며, 실제 새로고침이 일어나지 않는다. iOS의 추가 scroll 범위는 bounce 활성화를 위한 1pt로 제한한다.
 - 320px 상당의 작은 viewport, 큰 글자와 긴 한국어 문구에서 웹 화면이 잘리거나 수평 스크롤되지 않는다.
 
 ## 단계 제안
