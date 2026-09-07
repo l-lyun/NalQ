@@ -121,7 +121,18 @@ pnpm dlx eas-cli@latest build --platform ios --profile device-preview
 
 `device:create`이 보여 주는 URL이나 QR을 테스트 iPhone에서 열어 UDID를 등록한다. 그 뒤 만든 `device-preview` 빌드만 해당 ad hoc provisioning 목록의 기기에 설치할 수 있다. `credentials` 또는 첫 build prompt에서 Push Notifications를 활성화하고 APNs key 생성·사용을 확인한다. 새 기기를 추가했다면 provisioning profile을 갱신하는 새 빌드가 필요하다.
 
-빌드 상세에서 bundle identifier가 `com.nalq.app`인지 확인하고 build 산출물의 `aps-environment` entitlement가 빠지지 않았는지 별도로 확인한다. 설치 후 권한 요청과 Expo push token 취득 성공은 앱 등록 준비의 증거다. APNs 발송 자격은 background·종료 상태에서 실제 푸시가 도착해야 검증 완료로 기록한다. iOS Simulator는 원격 푸시 수신 검증을 대신하지 않는다.
+빌드 상세에서 bundle identifier가 `com.nalq.app`인지 확인하고 build 산출물의 `aps-environment` entitlement가 빠지지 않았는지 별도로 확인한다. 설치 후 권한 요청과 Expo push token 취득 성공은 앱 등록 준비의 증거다. APNs 발송 자격은 background·종료 상태에서 실제 푸시가 도착해야 검증 완료로 기록한다.
+
+### iOS Simulator 1차 검증
+
+Expo 공식 안내에 따라 Xcode 14 이상, macOS 13 이상, iOS 16 이상 Simulator에서도 원격 푸시를 테스트할 수 있다. 로컬 실행 전 Xcode 라이선스 동의·초기 설치와 iOS Simulator runtime 설치를 완료한다. `ios-simulator` 프로필은 EAS `preview` 환경을 사용하며 `device-preview`의 실기기 ad hoc 빌드와 구분한다.
+
+```sh
+pnpm dlx eas-cli@latest build --platform ios --profile ios-simulator
+pnpm dlx eas-cli@latest build:run --platform ios
+```
+
+Simulator에서 권한 요청, Expo token 취득·기기 등록, foreground 억제와 background 수신을 1차 확인한다. payload 주입만 확인한 경우에는 Expo/APNs 경유 수신 성공으로 기록하지 않는다. 실제 iPhone의 서명·provisioning·설치, 재설치 시 SecureStore 동작과 background·일반 종료 수신은 별도 실기기 인수 항목이다. Simulator 성공만으로 실기기 검증 완료로 판정하지 않는다.
 
 ## 5. 검증 서버에서 발송 활성화
 
