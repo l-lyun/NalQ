@@ -6,7 +6,7 @@ scope: app
 
 # [TRD · App] 푸시 브리지와 기기 등록·해제
 
-- 상태: 앱 등록·해제 구현 및 자동 검증, 실제 개발 빌드·기기 검증 전
+- 상태: 앱 등록·해제 구현 및 자동 검증, 실기기 내부 배포 빌드 준비 완료·외부 자격과 기기 검증 전
 - 소유 애플리케이션: `app/`
 - 제품 원장: [퀴즈 생성 결과 OS 푸시 PRD](../../../docs/prd/prd-quiz-push-notifications.md)
 - 공유 계약: [푸시 API·브리지 계약](../../../docs/contracts/contract-api-push-notifications.md)
@@ -64,6 +64,16 @@ PushStorageState
 - 로그인 직후 웹 요청, app foreground 복귀와 native push token 변경 listener가 등록 확인을 시작한다. provider 실패는 같은 사용자·epoch 동안 제한된 backoff로 재시도한다.
 - 전역 notification handler는 foreground에서 banner, notification list, sound와 badge를 모두 끈다. 앱 내 Snackbar와 알림함은 웹 책임으로 유지한다.
 
+## 실기기 내부 배포 빌드 경계
+
+- iOS bundle identifier와 Android package는 `com.nalq.app`으로 맞춘다. Android Firebase 앱도 같은 package로 등록해야 한다.
+- EAS `device-preview`는 `preview` 환경의 Release internal distribution이다. Android는 직접 설치 가능한 APK, iOS는 등록 기기용 ad hoc provisioning 산출물을 만들며 설치 뒤 Metro를 요구하지 않는다.
+- `EXPO_PUBLIC_WEB_URL`은 preview 빌드가 접근 가능한 HTTPS 주소여야 한다. 공개 빌드 설정이므로 credential을 포함하지 않는다.
+- Android `google-services.json`은 저장소에 넣지 않고 EAS `GOOGLE_SERVICES_JSON` file 변수로 주입한다. `app.config.js`는 값이 있을 때만 `android.googleServicesFile`에 전달한다.
+- EAS pre-install 사전점검은 앱 식별자, project ID, notification channel, 내부 배포 profile, HTTPS URL과 Android Firebase package 일치를 검증한다. credential 본문은 출력하지 않으며 누락·불일치 때 native build 전에 실패한다.
+- Android client 설정 파일과 FCM V1 서비스 계정 private key는 서로 다른 입력이다. 후자는 Expo의 FCM 발송 자격 저장소에만 두며 app config나 환경 파일에 넣지 않는다. iOS APNs key와 ad hoc provisioning도 EAS/Apple 자격 경계에서 관리한다.
+- 계정·자격·단말이 필요한 실행 절차와 수신 판정은 [푸시 실기기 테스트 Runbook](../push-device-testing.md)을 따른다.
+
 ## 상태 조회·등록·재시도
 
 1. 인증된 `AUTH_STATE`와 같은 epoch의 `PUSH_REGISTER_REQUEST`만 처리한다.
@@ -80,7 +90,10 @@ PushStorageState
 ```text
 app/
   App.tsx
+  app.config.js
   app.json
+  eas.json
+  scripts/check-device-build-readiness.cjs
   src/push/
     bridgeProtocol.ts
     nativeNotificationProvider.ts
@@ -91,6 +104,7 @@ app/
   tests/
     pushFoundation.test.cjs
     pushRegistration.test.cjs
+    deviceBuildReadiness.test.cjs
 ```
 
 ## 자동 검증
@@ -104,13 +118,14 @@ app/
 - active binding의 pending revoke 선저장과 인증 없는 replay
 - provider/HTTP 응답 유실의 bounded retry와 Retry-After 준수
 - 설치 동시 생성, concurrent mutation 보존과 손상 상태 fail-closed
+- iOS·Android identifier 일치, Release 내부 배포 profile, HTTPS와 Firebase Android package 사전 검증
 
 검증 명령은 `pnpm exec tsc --noEmit`, `pnpm test`, `git diff --check -- app`이다.
 
 ## 실제 기기·운영 후속
 
-- EAS의 iOS APNs key와 Android FCM v1 credential 존재 여부는 저장소만으로 확인하지 않았다.
-- Android application id가 확정된 native development build와 iOS provisioning을 준비해 실제 권한 prompt, Expo token, 등록·로그아웃 해제와 재실행 복구를 확인한다.
+- EAS의 iOS APNs key와 Android FCM v1 credential 존재 여부는 저장소만으로 확인하지 않았다. 내부 배포 profile과 사전점검까지만 준비했으며 원격 build는 실행하지 않았다.
+- EAS 자격과 iOS 테스트 기기 provisioning을 준비해 실제 권한 prompt, Expo token, 등록·로그아웃 해제와 재실행 복구를 확인한다.
 - iOS·Android foreground에서 banner·소리·진동·badge가 모두 억제되고 다른 background 기기에는 계속 표시되는지 확인한다.
 - SecureStore의 삭제·재설치·backup 차이, Android WebView before-content fallback과 token rotation listener는 실기기에서 확인한다.
 - 푸시 선택·화면 이동·읽음 동기화는 별도 후속 구현이다.

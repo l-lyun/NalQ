@@ -238,3 +238,25 @@ Expo data는 `payloadVersion`, `notificationId`, `bindingId`로 구성하고 표
 2. 검증 환경의 서버 등록·delivery·scheduler 설정 후 실기기 권한·토큰 갱신·재설치·계정 전환·로그아웃/오프라인 재시도 검증.
 3. 현재 foreground 기기에서 OS 알림이 없고 다른 기기의 background/종료 상태에서 수신되는지 확인.
 4. 푸시 선택·cold start·재로그인 복원, 알림 단건 조회와 소유권/삭제 대상 처리, 목적지 이동 및 선택/읽음 ACK를 별도 구현한다.
+
+## 13. Windows에서 실기기 테스트 준비 (2026-09-07)
+
+- 사용자 요청 범위: 실기기가 없는 Windows에서 빌드 설정과 사전 검증을 준비한다. 실제 수신 검증은 단말 확보 후 진행한다.
+- **확정**: Android application ID는 사용자 확인에 따라 `com.nalq.app`으로 사용한다. iOS bundle identifier도 기존 `com.nalq.app`을 유지한다.
+- 준비·실행 절차의 원장은 [푸시 실기기 테스트 Runbook](../../app/docs/push-device-testing.md)이다. 앱 내부 빌드 결정은 [앱 푸시 TRD](../../app/docs/trd/trd-push-bridge-foundation.md)를 따른다.
+- Windows에서 EAS 클라우드 빌드를 요청하고 설치 뒤 Metro 없이 실행할 수 있는 내부 배포 빌드를 준비한다. Android Firebase 설정 파일과 검증용 HTTPS 웹 주소를 사전 점검하며, 실제 자격과 환경 주소를 저장소 값으로 가정하지 않는다.
+- 검증 서버에는 현재 브랜치의 서버와 웹이 함께 필요하다. 기존 운영 Compose는 `OPENMD_PUSH_*`를 전달하지 않으므로 환경 파일에 값만 추가해서 활성화되지 않는다. 검증 환경의 명시적인 전달 방법은 Runbook에 둔다.
+- 외부 자격 생성·업로드, EAS 원격 빌드·배포 및 발송 활성화는 아직 수행하지 않았다. `PUSH_OPEN`·cold start 선택 복원·목적지 이동·읽음 ACK는 별도 후속 범위다.
+
+### Windows 웹·서버 기준선
+
+- 초기 **PRE-EXISTING FAILURE**: 기존 V8 SQL의 CRLF 체크아웃 때문에 `NotionMigrationCompatibilityTest` 바이트 비교가 실패했고 웹 라이선스 원장도 같은 줄바꿈 문제로 비교에 실패했다. 두 로컬 파일의 줄바꿈을 저장소 원본 LF로 맞췄다. 서버·웹의 추적 내용 변경은 없다.
+- **PASS**: `server/gradlew.bat fastTest --no-daemon` 재실행, 333개 모두 통과. Windows에서는 저장소의 `.gradle-local`을 `GRADLE_USER_HOME`으로 사용했다.
+- **PASS**: `pnpm -C web verify` — 라이선스·타입·28개 테스트·린트·빌드. 이 PC의 앱 의존성을 고정 lockfile에 맞춰 준비한 뒤 실행했다.
+- **BLOCKED**: Docker 엔진에 연결할 수 없어 MySQL/Redis 통합 검증은 실행하지 않았다. 이전 PR의 통합 PASS를 이번 PC의 실행 결과로 간주하지 않는다.
+
+### 앱 준비 검증
+
+- **PASS**: 앱 타입 검사와 39개 테스트. 사전점검의 HTTPS·Firebase 파일 누락·다른 package 거절과 양 플랫폼 정상 설정을 대역 파일로 확인했다. 실제 자격 파일을 검증한 결과는 아니다.
+- **PASS**: Expo config introspect에서 동적 설정, iOS `aps-environment` 생성, Android `com.nalq.app`과 `quiz-results` 반영 확인. 이는 서명된 APK/IPA 생성이나 실제 APNs/FCM 자격 검증을 대신하지 않는다.
+- **PASS**: 환경 값 없는 사전점검 CLI가 실패로 종료하고 누락 항목을 안내한다. 외부 자격·검증 HTTPS 환경 준비 후 Runbook의 빌드 명령을 실행한다.

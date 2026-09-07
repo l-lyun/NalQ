@@ -22,6 +22,8 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
+    "check:device-build": "node scripts/check-device-build-readiness.cjs",
+    "eas-build-pre-install": "node scripts/check-device-build-readiness.cjs --eas-build",
     "test": "node --test tests/*.test.cjs",
     "typecheck": "tsc --noEmit"
   },

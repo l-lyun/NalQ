@@ -10,6 +10,16 @@
         "simulator": true
       }
     },
+    "device-preview": {
+      "environment": "preview",
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "buildConfiguration": "Release"
+      }
+    },
     "production": {
       "environment": "production",
       "ios": {

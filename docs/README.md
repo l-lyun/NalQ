@@ -117,6 +117,7 @@ TRD는 각 애플리케이션의 `docs/trd/trd-*.md`에 두며, 파일명과 제
 | 첫 수동 운영 배포·rollback·backup·restore | [운영 배포와 복구 Runbook](operations/production-deployment-runbook.md) | 초안·저장소 구현 |
 | Route 53·S3·CloudFront·ACM·EC2 수동 구성 | [AWS Console 운영 체크리스트](operations/aws-console-production-checklist.md) | 초안·외부 적용 전 |
 | 운영 환경 변수·비밀 주입 계약 | [운영 환경 변수 원장](operations/production-environment-variables.md) | 초안 |
+| Windows에서 푸시 실기기 빌드 준비·수신 점검 | [푸시 실기기 테스트 Runbook](../app/docs/push-device-testing.md) | 저장소 준비, 외부 자격·실기기 검증 전 |
 
 ## 문서 템플릿
 
