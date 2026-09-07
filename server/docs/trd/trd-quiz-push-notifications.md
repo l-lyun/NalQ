@@ -124,7 +124,7 @@ Spring proxy를 거치는 별도 빈으로 나눠 self-invocation에 새 트랜�
 | `push_deliveries` | notificationId/deviceId/bindingId unique, tokenVersion, state, attemptId, attemptCount, expiresAt, nextAttemptAt, leaseUntil, ticketId, receiptNextAt, lastErrorCode, createdAt |
 | `push_device_operations` | installationId+operationId unique, 요청 digest/주체/issuedAt, 비밀 없는 결과 snapshot, 최초 처리 시각/삭제 시각 |
 
-- due 조회: `(state,nextAttemptAt,id)`, lease 복구: `(state,leaseUntil,id)`, receipt: `(state,receiptNextAt,id)`, 정리: createdAt/expireAt 및 `(status,inactiveAt,id)` 인덱스를 각 용도에 맞게 둔다. 정리는 각 제한 DELETE를 별도 커밋하고 한 배치가 가득 찬 동안 같은 cutoff를 반복해 실행 시점의 backlog를 소진한다. 통합 테스트의 `FORCE INDEX` EXPLAIN은 목적별 인덱스 존재와 쿼리 사용 가능성만 검증한다. 대표 운영 데이터에서 힌트 없는 자연 선택과 실제 부하는 아직 측정하지 않았다.
+- due 조회: `(state,nextAttemptAt,id)`, lease 복구: `(state,leaseUntil,id)`, receipt: `(state,receiptNextAt,id)`, 정리: createdAt/expireAt 및 `(status,inactiveAt,id)` 인덱스를 각 용도에 맞게 둔다. 정리는 각 제한 DELETE를 별도 커밋하고 한 배치가 가득 찬 동안 같은 cutoff를 반복하되, 한 실행에서 유형별 최대 100배치까지만 처리한다. 따라서 기본 `retention-batch-size=500`에서는 delivery·operation·비활성 설치를 각각 최대 50,000건 삭제하고 남은 backlog는 다음 실행에서 이어간다. 통합 테스트의 `FORCE INDEX` EXPLAIN은 목적별 인덱스 존재와 쿼리 사용 가능성만 검증한다. 대표 운영 데이터에서 힌트 없는 자연 선택과 실제 부하는 아직 측정하지 않았다.
 - delivery에는 raw token/제목/본문을 복제하지 않는다. 발송 준비에서 현재 유효 기기 토큰과 알림 snapshot을 조회한다. 삭제 대상의 FK 때문에 기록 정리가 막히지 않도록 migration에서 참조 정리 순서를 명시한다.
 - 30일 delivery, 7일 operation, inactiveAt 기준 30일 설치는 서로 다른 삭제 기준이다. 토큰은 비활성 즉시 제거. 탈퇴 시 해당 사용자 기록을 운영 보존 기한까지 억지로 유지하지 않는다.
 - 비활성 설치 삭제는 후보 ID뿐 아니라 외부 DELETE에서도 status와 inactiveAt cutoff를 다시 검사한다. 정리와 재등록이 경합해 먼저 커밋된 ACTIVE 연결을 삭제하지 않으며, 탈퇴는 기기가 다른 계정으로 이관됐어도 원래 userId의 delivery를 먼저 삭제한다.
