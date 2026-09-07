@@ -50,6 +50,7 @@ scope: app
 - `App.tsx`는 검증된 환경 URL을 단일 `OpenMdWebView`에 전달하고 구성 오류를 네이티브 상태로 표시한다.
 - 공개 웹 주소 자리인 `EXPO_PUBLIC_WEB_URL` 예시와 개발 기본값 `http://localhost:5173`을 사용한다.
 - `src/shell/`이 로딩·동일-origin 최상위 문서 오류·재시도, 동일 origin URL 정책, 외부 링크, Android 뒤로 가기와 플랫폼별 WebView 복구를 소유한다.
+- 현재 임시 브랜드 시안은 네이티브 시작 화면과 첫 WebView 문서 로딩 overlay에 `assets/nalq-splash-dragon.png` 끌어안기 차콜 용가리를 220dp, `#FFF8F2` 배경으로 함께 사용해 전환 사이의 시각적 단절을 줄인다. 오류·재시도 화면은 기존 중립 상태 UI를 유지한다.
 - Expo Router는 사용하지 않는다. 푸시 브리지는 별도 TRD에 따라 문서 nonce 검증 후 `push-v1` 등록·해제를 연결한다. 실제 단말 수신은 별도 검증 대상이다.
 
 ### Web
@@ -126,7 +127,7 @@ Expo Router는 네이티브 화면이 하나인 1차 셸에는 추가하지 않�
 
 | 상태 | 소유 계층 | 처리 |
 | --- | --- | --- |
-| 앱 시작과 첫 문서 로드 | Native | 스플래시 뒤 짧은 로딩 상태 |
+| 앱 시작과 첫 문서 로드 | Native | 같은 브랜드 자산을 사용하는 네이티브 스플래시와 짧은 로딩 상태 |
 | 동일-origin 최상위 문서 network/HTTP 실패 | Native | 간단한 설명과 실패한 문서 URL의 `다시 시도` |
 | WebView renderer/content process 종료 | Native | 복구 안내 후 WebView 재생성 또는 reload |
 | 인증 bootstrap, API 401/5xx와 화면 데이터 오류 | Web | 기존 웹 상태와 재시도 사용 |

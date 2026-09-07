@@ -36,6 +36,15 @@
     "plugins": [
       "expo-secure-store",
       [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#FFF8F2",
+          "image": "./assets/nalq-splash-dragon.png",
+          "imageWidth": 220,
+          "resizeMode": "contain"
+        }
+      ],
+      [
         "expo-notifications",
         {
           "defaultChannel": "quiz-results"
