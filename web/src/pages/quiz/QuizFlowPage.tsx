@@ -869,9 +869,9 @@ function ConditionsScreen({
   return (
     <VStack className="quiz-screen">
       <ScreenHeader title="문제 만들기" backLabel="학습 화면으로 돌아가기" onBack={onBack} />
-      <VStack className="quiz-content" gap="x8">
+      <VStack className="quiz-content" gap="x6">
         <VStack gap="x2">
-          <Text as="h2" textStyle="t10Bold" color="fg.neutral">
+          <Text as="h2" textStyle="t7Bold" color="fg.neutral">
             {materialTitle}
           </Text>
           <Text as="p" textStyle="t5Regular" color="fg.neutralMuted">
@@ -1118,7 +1118,7 @@ function GenerationScreen({
             <ProgressCircle.Range />
           </ProgressCircle.Root>
           <VStack gap="x2" align="center">
-            <Text as="h2" className="quiz-center-copy" textStyle="t10Bold" color="fg.neutral">
+            <Text as="h2" className="quiz-center-copy" textStyle="t7Bold" color="fg.neutral">
               자료를 바탕으로
               <br />
               문제를 만들 수 있어요.
@@ -1212,7 +1212,7 @@ function ReadyScreen({
           <Icon svg={<IconCheckmarkLine />} size="x6" color="palette.staticWhite" />
         </Flex>
         <VStack gap="x2" align="center">
-          <Text as="h2" className="quiz-center-copy" textStyle="t10Bold" color="fg.neutral">
+          <Text as="h2" className="quiz-center-copy" textStyle="t7Bold" color="fg.neutral">
             {ready.actualCount}문제를 만들었어요
           </Text>
           <Text as="p" className="quiz-center-copy" textStyle="t5Regular" color="fg.neutralMuted">
@@ -1288,7 +1288,7 @@ function SolvingScreen({
           </ActionButton>
         }
       />
-      <VStack className="quiz-content quiz-solving-content" gap="x8">
+      <VStack className="quiz-content quiz-solving-content" gap="x6">
         <VStack gap="x3">
           <HStack justify="space-between" align="center" gap="x3">
             <Text textStyle="t5Bold" color="fg.neutral">
@@ -1312,7 +1312,7 @@ function SolvingScreen({
           </div>
         </VStack>
 
-        <VStack key={question.questionId} className="quiz-question-panel" gap="x8">
+        <VStack key={question.questionId} className="quiz-question-panel" gap="x6">
           <VStack gap="x3" aria-live="polite">
             <Text textStyle="t4Bold" color="fg.brand">
               {typeLabels[question.type]}

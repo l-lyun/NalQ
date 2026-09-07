@@ -7,7 +7,7 @@ import { StudyMethodsSection } from './HomeSections'
 export function HomeLoading({ studyMethods }: Pick<HomePageProps, 'studyMethods'>) {
   return (
     <VStack gap="x5" aria-busy="true" aria-label="홈 정보를 불러오는 중">
-      <VStack bg="bg.neutralWeak" borderRadius="r3" p="x5" gap="x3">
+      <VStack bg="bg.neutralWeak" borderRadius="r3" p="x4" gap="x3">
         <Skeleton tone="neutral" radius="8" width="80%" height="x6" />
         <Skeleton tone="neutral" radius="8" width="full" height="x4" />
         <Skeleton tone="neutral" radius="16" width="full" height="x12" />

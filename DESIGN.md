@@ -119,15 +119,17 @@ Use SEED `Text` and its `textStyle` prop. A text style combines font size, line 
 | NalQ role | SEED text style | Typical use |
 | --- | --- | --- |
 | Display statement | `t14Bold` | Rare onboarding or completion statement; not routine app chrome |
-| Screen title | `t12Bold` | Primary page title |
-| Major section title | `t10Bold` | Top-level learning section |
-| Card/list group title | `t8Bold` | Prominent content group or result title |
-| Item title | `t7Bold` or `t7Medium` | Material title, quiz title, strong row title |
+| Screen title | `t9Bold` | Primary application page title; `t10Bold` may be used for a wider layout when needed |
+| Major section title | `t7Bold` | Top-level learning section |
+| Card/list group title | `t6Bold` | Content group or result section title |
+| Item title | `t5Bold` or `t5Medium` | Material title, quiz title, strong row title; preserve the native List recipe |
 | Lead body | `t6Regular` | Short explanatory intro |
 | Default body | `t5Regular` | Reading copy, form copy, question text baseline |
 | Emphasized body | `t5Medium` or `t5Bold` | Inline emphasis or value, not whole paragraphs |
 | Compact body | `t4Regular` | Dense list detail and controls where recipe allows |
 | Metadata | `t3Regular` or `t3Medium` | Dates, counts, supporting labels |
+
+The approved [UI density scope](docs/ux/screen-ui-density.md) changes text styles and spacing in application screens. Preserve existing font family, component variants, colors, outer borders, radii, and elevation. Keep primary CTA and mobile input sizes, safe-area clearances, and navigation targets. Public landing and onboarding display typography retain their screen-specific purpose.
 
 ### SEED scale reference
 
@@ -326,7 +328,7 @@ Primary surface: bg.layerDefault over bg.layerBasement
 Primary text: fg.neutral; support: fg.neutralMuted / fg.neutralSubtle
 Font: Pretendard Variable first for web/WebView, then Korean-capable system sans fallback
 Primary learning action: ActionButton brandSolid, one prominent solid CTA
-Default body: Text t5Regular; screen title: t12Bold
+Default body: Text t5Regular; app screen title: t9Bold; section title: t7Bold
 Layout: mobile-first VStack/List; Grid only for real comparison
 Spacing: semantic aliases first, then x2/x3/x4/x6/x8
 Radius: component recipe first; app panels usually r2-r3
