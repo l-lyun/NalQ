@@ -1,5 +1,6 @@
 package com.openmd.server.push.service;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -9,6 +10,7 @@ import com.openmd.server.push.repository.PushRetentionStore;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 
@@ -47,5 +49,27 @@ class PushRetentionServiceTest {
         .deleteDeliveriesCreatedBefore(now.minusSeconds(30L * 86400L), 500);
     verify(store, times(2)).deleteOperationsExpiredAtOrBefore(now, 500);
     verify(store).deleteInactiveDevicesBefore(now.minusSeconds(30L * 86400L), 500);
+  }
+
+  @Test
+  void stopsAfterOneHundredFullBatchesPerRetentionType() {
+    Instant now = Instant.parse("2026-09-06T06:00:00Z");
+    PushRetentionStore store = org.mockito.Mockito.mock(PushRetentionStore.class);
+    PushRetentionService service =
+        new PushRetentionService(store, Clock.fixed(now, ZoneOffset.UTC), 500);
+    AtomicInteger deliveryBatches = new AtomicInteger();
+    when(store.deleteDeliveriesCreatedBefore(now.minusSeconds(30L * 86400L), 500))
+        .thenAnswer(
+            ignored -> {
+              int invocation = deliveryBatches.incrementAndGet();
+              if (invocation > 100) {
+                throw new AssertionError("retention exceeded its per-run batch limit");
+              }
+              return 500;
+            });
+
+    service.deleteExpired();
+
+    assertEquals(100, deliveryBatches.get());
   }
 }

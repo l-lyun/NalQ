@@ -10,6 +10,7 @@ public class PushRetentionService {
 
   private static final Duration DELIVERY_RETENTION = Duration.ofDays(30);
   private static final Duration INACTIVE_DEVICE_RETENTION = Duration.ofDays(30);
+  private static final int MAX_BATCHES_PER_TYPE_PER_RUN = 100;
 
   private final PushRetentionStore store;
   private final Clock clock;
@@ -29,8 +30,10 @@ public class PushRetentionService {
   }
 
   private void drain(IntSupplier deleteBatch) {
-    while (deleteBatch.getAsInt() == batchSize) {
-      // Continue while a full batch proves that more expired rows may remain.
+    for (int batch = 0; batch < MAX_BATCHES_PER_TYPE_PER_RUN; batch++) {
+      if (deleteBatch.getAsInt() < batchSize) {
+        return;
+      }
     }
   }
 }
