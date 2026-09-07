@@ -4,7 +4,7 @@ import com.openmd.server.push.repository.PushRetentionStore;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import org.springframework.transaction.annotation.Transactional;
+import java.util.function.IntSupplier;
 
 public class PushRetentionService {
 
@@ -21,11 +21,16 @@ public class PushRetentionService {
     this.batchSize = batchSize;
   }
 
-  @Transactional
   public void deleteExpired() {
     Instant now = clock.instant();
-    store.deleteDeliveriesCreatedBefore(now.minus(DELIVERY_RETENTION), batchSize);
-    store.deleteOperationsExpiredAtOrBefore(now, batchSize);
-    store.deleteInactiveDevicesBefore(now.minus(INACTIVE_DEVICE_RETENTION), batchSize);
+    drain(() -> store.deleteDeliveriesCreatedBefore(now.minus(DELIVERY_RETENTION), batchSize));
+    drain(() -> store.deleteOperationsExpiredAtOrBefore(now, batchSize));
+    drain(() -> store.deleteInactiveDevicesBefore(now.minus(INACTIVE_DEVICE_RETENTION), batchSize));
+  }
+
+  private void drain(IntSupplier deleteBatch) {
+    while (deleteBatch.getAsInt() == batchSize) {
+      // Continue while a full batch proves that more expired rows may remain.
+    }
   }
 }

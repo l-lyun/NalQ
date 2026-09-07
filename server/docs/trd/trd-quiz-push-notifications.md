@@ -92,14 +92,14 @@ PushScheduler → PushDeliveryWorker (트랜잭션 없음)
   → PushDeliveryTransaction.recordSendResult (짧은 TX C)
 ```
 
-- claim은 due 인덱스로 `FOR UPDATE SKIP LOCKED` 제한 조회 후 SENDING/attemptId/leaseUntil을 저장한다. 여러 작업자가 같은 시도를 소유하지 않게 한다. lease는 외부 호출 시간 제한보다 충분히 길어야 하며 대기 큐에서 만료되는 대량 선점은 금지한다.
+- claim은 due 인덱스로 `FOR UPDATE SKIP LOCKED` 제한 조회 후 SENDING/attemptId/leaseUntil을 저장한다. 여러 작업자가 같은 시도를 소유하지 않게 한다. prepare가 끝난 묶음은 외부 호출 직전에 아직 만료되지 않은 같은 attempt만 한 SQL로 lease를 다시 연장하고, 갱신에 실패한 항목은 provider payload에서 제외한다. lease는 외부 호출 시간 제한보다 충분히 길어야 하며 대기 큐에서 만료되는 대량 선점은 금지한다.
 - 결과 UPDATE 조건은 `id + expectedState + attemptId`다. 0행이면 오래된 응답으로 간주한다. 전달 오류로 기기를 끌 때도 bindingId/tokenVersion과 현재 토큰이 일치해야 한다.
 - claim·prepare·결과 반영은 `PushDeliveryTransaction`의 서로 다른 짧은 트랜잭션이다. JDBC 시간은 DATETIME을 UTC로 해석하도록 epoch microsecond와 `TIMESTAMPADD`/`TIMESTAMPDIFF`를 사용하고 JPA JDBC timezone도 UTC로 고정한다.
 - prepare의 join 잠금은 `FOR UPDATE OF d`로 delivery만 잠근다. 사용자·기기·알림 행까지 함께 잠가 등록/탈퇴의 user→device 순서와 역전하지 않는다. prepare 시점의 lease 만료와 현재 사용자·bindingId·tokenVersion을 다시 확인한다.
 - receipt claim은 `TICKET_ACCEPTED` 중 due인 행만 별도의 attempt/lease로 확보한다. receipt 조회 실패를 send 재시도로 바꾸지 않는다. 접수 여부 미확정 작업과 이미 ticket을 가진 작업의 lease 복구 경로를 구분한다.
 - 만료 lease는 기존 attempt를 무효화한다. ticket 없는 작업만 남은 발송 기한 내 재시도, ticket 있는 작업은 receipt 확인만 복구한다.
 - 최초 포함 8회가 소진되면 `FAILED`, 원래 1시간 기한이 지났거나 다음 재시도가 기한 밖이면 `EXPIRED`다. claim되지 못한 만료·횟수 소진 행도 제한 배치로 terminal 상태로 닫는다.
-- receipt 조회 HTTP 거절·일시 장애는 실제 단말 전달 실패가 아니므로 send 재시도로 바꾸지 않고 `TICKET_ACCEPTED`로 돌려 최대 접수 후 24시간까지만 다시 조회한다. 24시간 결과 미확정은 `UNKNOWN`, receipt가 반환한 확정 오류만 `FAILED`다.
+- receipt 조회 HTTP 거절·일시 장애는 실제 단말 전달 실패가 아니므로 send 재시도로 바꾸지 않고 `TICKET_ACCEPTED`로 돌려 최대 접수 후 24시간까지만 다시 조회한다. ticket 단계의 `MessageRateExceeded`는 send 재시도 대상으로 유지하지만 receipt가 같은 오류를 반환하면 확정 `FAILED`다. 24시간 결과 미확정은 `UNKNOWN`, receipt가 반환한 확정 오류만 `FAILED`다.
 - 1시간 제한은 notification.createdAt에서 고정한다. 서버 restart/attempt 변경으로 연장하지 않는다. DB unique는 중복 작업 생성만 막으며 Expo 접수 직후 crash의 중복 표시 가능성은 남는다.
 - HTTP와 DB 잠금 사이 계정 변경의 아주 짧은 경합은 남는다. 전송 직전 재확인과 알림 선택 후 서버 소유권 확인을 적용하되 강제 회수를 보장하지 않는다.
 
@@ -124,7 +124,7 @@ Spring proxy를 거치는 별도 빈으로 나눠 self-invocation에 새 트랜�
 | `push_deliveries` | notificationId/deviceId/bindingId unique, tokenVersion, state, attemptId, attemptCount, expiresAt, nextAttemptAt, leaseUntil, ticketId, receiptNextAt, lastErrorCode, createdAt |
 | `push_device_operations` | installationId+operationId unique, 요청 digest/주체/issuedAt, 비밀 없는 결과 snapshot, 최초 처리 시각/삭제 시각 |
 
-- due 조회: `(state,nextAttemptAt,id)`, lease 복구: `(state,leaseUntil,id)`, receipt: `(state,receiptNextAt,id)`, 정리: createdAt/expireAt 및 `(status,inactiveAt,id)` 인덱스를 각 용도에 맞게 둔다. 통합 테스트의 `FORCE INDEX` EXPLAIN은 목적별 인덱스 존재와 쿼리 사용 가능성만 검증한다. 대표 운영 데이터에서 힌트 없는 자연 선택과 실제 부하는 아직 측정하지 않았다.
+- due 조회: `(state,nextAttemptAt,id)`, lease 복구: `(state,leaseUntil,id)`, receipt: `(state,receiptNextAt,id)`, 정리: createdAt/expireAt 및 `(status,inactiveAt,id)` 인덱스를 각 용도에 맞게 둔다. 정리는 각 제한 DELETE를 별도 커밋하고 한 배치가 가득 찬 동안 같은 cutoff를 반복해 실행 시점의 backlog를 소진한다. 통합 테스트의 `FORCE INDEX` EXPLAIN은 목적별 인덱스 존재와 쿼리 사용 가능성만 검증한다. 대표 운영 데이터에서 힌트 없는 자연 선택과 실제 부하는 아직 측정하지 않았다.
 - delivery에는 raw token/제목/본문을 복제하지 않는다. 발송 준비에서 현재 유효 기기 토큰과 알림 snapshot을 조회한다. 삭제 대상의 FK 때문에 기록 정리가 막히지 않도록 migration에서 참조 정리 순서를 명시한다.
 - 30일 delivery, 7일 operation, inactiveAt 기준 30일 설치는 서로 다른 삭제 기준이다. 토큰은 비활성 즉시 제거. 탈퇴 시 해당 사용자 기록을 운영 보존 기한까지 억지로 유지하지 않는다.
 - 비활성 설치 삭제는 후보 ID뿐 아니라 외부 DELETE에서도 status와 inactiveAt cutoff를 다시 검사한다. 정리와 재등록이 경합해 먼저 커밋된 ACTIVE 연결을 삭제하지 않으며, 탈퇴는 기기가 다른 계정으로 이관됐어도 원래 userId의 delivery를 먼저 삭제한다.
@@ -145,7 +145,7 @@ Spring proxy를 거치는 별도 빈으로 나눠 self-invocation에 새 트랜�
 
 외부 호출 전부터 전체 응답 처리까지 deadline을 제한한다. receipt 및 정리 때문에 기존 퀴즈 복구 scheduler가 지연되지 않도록 push 전용 실행 자원을 구성한다. UNKNOWN은 실패/단말 미수신을 확정한 상태가 아니라 제공자 결과를 더 확인할 수 없는 종료 상태다. [Expo 전송·receipt](https://docs.expo.dev/push-notifications/sending-notifications/)
 
-`batch-size`는 1~50, retention batch는 1~500으로 검증하고 lease는 10초 provider deadline보다 길어야 한다. `pushTaskScheduler`를 1-thread 전용 scheduler로 명시하며, 기존 무지정 `@Scheduled` 작업용 `taskScheduler`와 분리한다. 모든 push flag의 기본값은 false다. 주기적 신규 send는 `scheduler-enabled=true`와 `delivery-enabled=true`가 모두 필요하다. `scheduler-enabled=true`이면 delivery가 false여도 기존 ticket의 Expo receipt 조회와 DB 정리는 계속되며, 이는 외부 호출이 전혀 없다는 의미의 OFF가 아니다. 전체 푸시 스케줄을 멈추려면 scheduler도 false로 둔다.
+`batch-size`는 1~50, retention batch는 1~500으로 검증하고 lease는 10초 provider deadline보다 길어야 한다. `pushTaskScheduler`를 1-thread 전용 scheduler로 명시하며, 기존 무지정 `@Scheduled` 작업용 `taskScheduler`와 분리한다. 모든 push flag의 기본값은 false이며 환경 변수의 정상적인 대소문자 불리언 표기를 동일하게 해석한다. 주기적 신규 send는 `scheduler-enabled=true`와 `delivery-enabled=true`가 모두 필요하다. `scheduler-enabled=true`이면 delivery가 false여도 기존 ticket의 Expo receipt 조회와 DB 정리는 계속되며, 이는 외부 호출이 전혀 없다는 의미의 OFF가 아니다. 전체 푸시 스케줄을 멈추려면 scheduler도 false로 둔다.
 
 ## 7. 테스트 파일과 구현 순서
 

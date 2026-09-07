@@ -2,6 +2,7 @@ package com.openmd.server.push.integration.expo;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.openmd.server.push.dto.model.PushGatewayResult;
 import com.openmd.server.push.dto.model.PushGatewayResult.Outcome;
 import com.openmd.server.push.dto.model.PushMessage;
 import com.sun.net.httpserver.HttpServer;
@@ -181,6 +182,25 @@ class ExpoPushGatewayTest {
     var results = gateway().getReceipts(List.of("one", "two"));
     assertEquals(Outcome.INVALID_TOKEN, results.get("one").outcome());
     assertEquals(Outcome.ACCEPTED, results.get("two").outcome());
+  }
+
+  @Test
+  void receiptRateLimitErrorIsAFinalDeliveryFailureWhileTicketRateLimitRemainsRetryable() {
+    response =
+        """
+        {"data":{"receipt":{"status":"error","details":{"error":"MessageRateExceeded"}}}}
+        """;
+
+    PushGatewayResult receipt = gateway().getReceipts(List.of("receipt")).get("receipt");
+
+    assertEquals(Outcome.FAILED, receipt.outcome());
+    assertEquals("MESSAGE_RATE_EXCEEDED", receipt.errorCode());
+
+    response =
+        """
+        {"data":[{"status":"error","details":{"error":"MessageRateExceeded"}}]}
+        """;
+    assertEquals(Outcome.RETRY, gateway().sendBatch(List.of(message())).getFirst().outcome());
   }
 
   @Test

@@ -131,6 +131,27 @@ class PushDeliveryClaimStoreIntegrationTest {
   }
 
   @Test
+  void providerBoundaryRenewalExtendsOnlyAnUnexpiredOwnedSendLease() {
+    insertNotification(201L, "notification-201");
+    insertDelivery(301L, 201L, "PENDING", 0, NOW, NOW.plusSeconds(3600), null, null);
+    var attempt = transactions.claimSend(NOW, 1, Duration.ofSeconds(60)).getFirst();
+    assertTrue(transactions.prepareSend(attempt, NOW.plusSeconds(1)).isPresent());
+
+    assertEquals(
+        List.of(attempt),
+        transactions.renewSendLeases(
+            List.of(attempt), NOW.plusSeconds(59), Duration.ofSeconds(60)));
+    assertEquals(0, transactions.recoverExpiredLeases(NOW.plusSeconds(61), 50));
+
+    assertEquals(1, transactions.recoverExpiredLeases(NOW.plusSeconds(120), 50));
+    assertTrue(
+        transactions
+            .renewSendLeases(
+                List.of(attempt), NOW.plusSeconds(120), Duration.ofSeconds(60))
+            .isEmpty());
+  }
+
+  @Test
   void expiredExhaustedAndOldReceiptRowsBecomeTerminalWithoutProviderClaims() {
     insertNotification(201L, "notification-201");
     insertNotification(202L, "notification-202");
