@@ -266,6 +266,7 @@ Expo data는 `payloadVersion`, `notificationId`, `bindingId`로 구성하고 표
 - #60 리뷰 수정 `3e7bfa0`, `839601d`를 #62와 #63에 반영했다. 설치 UUID 정규화·기존 데이터 호환, receipt 최종 실패, 대문자 플래그, 전송 직전 lease 재검증, 보존 정리 유형별 최대 100배치가 수정 범위다.
 - #63의 splash 의존성 추가 후 갱신되지 않은 서드파티 라이선스 고지를 재생성해 CI 실패를 복구했다.
 - **PASS**: 통합 커밋 `052965e`에서 `./scripts/verify.sh all`. 웹 라이선스·타입·28개 테스트·린트·빌드, 서버 fast 341개·MySQL/Redis integration 74개가 통과했다. 서버 실패·오류·skip은 0이다.
+- **PASS**: `dev`의 기존 UI 밀도 변경을 통합한 `abbf1f2`에서 `pnpm -C web verify`를 재실행했다. 이 동기화는 웹·문서만 변경하며 검증된 서버·앱 코드는 그대로다. 최종 서버 `bootJar`도 통과했다.
 - **PASS**: 앱 타입 검사·39개 테스트, iOS 빌드 사전점검, Expo config introspect, 네이티브 prebuild와 CocoaPods 설치. introspect의 `aps-environment=development`는 최종 서명 산출물 확인이 아니다.
 - 로컬 검증에는 기존 서비스와 분리된 MySQL·Redis, SMTP 수신기와 테스트 계정을 사용한다. `https://localhost:15174`에서 웹·API를 제공하며 서버 registration/delivery/scheduler는 이 로컬 환경에서만 켰다. 운영 배포·운영 플래그 변경은 하지 않았다.
 - **BLOCKED**: macOS 15.7.3 / Xcode 26.3에서 실제 Simulator 네이티브 빌드가 ExpoModulesJSI의 `abs` overload 오류로 실패했다. iOS 26.2 Simulator 구성 요소 설치 뒤에도 동일했다. Expo SDK 57의 최소 Xcode 26.4를 충족하는 EAS 빌드 경로와 `ios-simulator-local` 프로필을 Runbook에 추가했다. 앱 의존성에 임시 우회 패치는 적용하지 않았다.
