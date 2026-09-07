@@ -1,0 +1,10 @@
+[
+  {
+    "name": "dragon",
+    "prompt": "Use case: background-extraction. Edit the supplied image: remove ONLY the entire white/light-gray checkerboard background and output a real RGBA PNG with actual alpha=0 outside the object. This checkerboard is unwanted baked-in pixels, NOT part of the asset. Keep the character/garment exact design, face, body proportions, pose, size, position, colors and crisp pixel silhouette unchanged. Do not redraw or add anything. Preserve cream highlights within object. No white matte, no new checkerboard or shadows. Keep original square framing. Production cutout, actual transparent alpha."
+  },
+  {
+    "name": "top-cardigan",
+    "prompt": "Use case: background-extraction. Edit the supplied image: remove ONLY the entire white/light-gray checkerboard background and output a real RGBA PNG with actual alpha=0 outside the object. This checkerboard is unwanted baked-in pixels, NOT part of the asset. Keep the character/garment exact design, face, body proportions, pose, size, position, colors and crisp pixel silhouette unchanged. Do not redraw or add anything. Preserve cream highlights within object. No white matte, no new checkerboard or shadows. Keep original square framing. Production cutout, actual transparent alpha."
+  }
+]

@@ -67,25 +67,21 @@
   image-rendering: pixelated;
 }
 
-.pixel-room-motion-controls,
-.pixel-room-hat-controls {
+.pixel-room-option-controls {
   width: 100%;
 }
 
-.pixel-room-motion-controls > *,
-.pixel-room-hat-controls > * {
+.pixel-room-option-controls > * {
   min-width: 0;
   flex: 1 1 0;
 }
 
 @media (max-width: 359px) {
-  .pixel-room-motion-controls,
-  .pixel-room-hat-controls {
+  .pixel-room-option-controls {
     flex-wrap: wrap;
   }
 
-  .pixel-room-motion-controls > *,
-  .pixel-room-hat-controls > * {
+  .pixel-room-option-controls > * {
     flex-basis: calc(50% - var(--seed-dimension-x1));
   }
 }

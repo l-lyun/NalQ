@@ -1,0 +1,10 @@
+{
+  "generator": "built-in image_gen",
+  "prompt": "Edit this exact pixel animal character. Dress ONLY its torso and arms in a perfectly FITTED oatmeal cream knitted crewneck sweater. Follow THIS animal's existing shoulders, round belly, tiny arms, original exact body width. Ribbed cuffs above visible paws and hem above short feet. Do NOT enlarge the body, head or silhouette. Preserve exact face, ears, head, feet, tail, pose, placement and scale. No hat or accessories. Same square canvas, animal must not move at all. Pixel-art sweater in same chunky pixel grid as character, subtle rib pattern, no fine photorealistic texture. Real transparent PNG alpha background. No white background, no checkerboard pattern, no ground shadow, no text. Full animal wearing garment, not a separate clothing item.",
+  "cleanupAttempt": "Extract the animal wearing its sweater from the supplied image onto REAL TRANSPARENT ALPHA. Remove all baked-in white/gray checkerboard outside animal, including between limbs and tail. Keep subject identity and all clothing exact. Output real RGBA PNG alpha=0 background. No new checkerboard or other background, no shadow. Preserve canvas size, subject position, scale and pixel outlines.",
+  "result": "Both initial and background-extraction attempts contain baked-in checkerboards. Use garment-only clipping and original character alpha masks in SVG, not full image replacement.",
+  "assets": [
+    "cat-sweater.png",
+    "bear-sweater.png"
+  ]
+}

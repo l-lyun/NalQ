@@ -1,8 +1,14 @@
 import { ActionButton, Box, HStack, Text, VStack } from '@seed-design/react'
 import { useEffect, useReducer, useState, type CSSProperties } from 'react'
 
-import roomImage from './assets/room.png'
-import { PixelSprite, type PixelHat } from './PixelSprite'
+import roomDayImage from './assets/room-day.png'
+import roomNightImage from './assets/room-night.png'
+import {
+  PixelSprite,
+  type PixelCharacter,
+  type PixelHat,
+  type PixelTop,
+} from './PixelSprite'
 import {
   getWalkFrame,
   INITIAL_WALK_STATE,
@@ -18,6 +24,24 @@ const hats: ReadonlyArray<{ id: PixelHat; label: string }> = [
   { id: 'beret', label: '크림 베레모' },
   { id: 'beanie', label: '파란 비니' },
 ]
+
+const characters: ReadonlyArray<{ id: PixelCharacter; label: string }> = [
+  { id: 'dragon', label: '꼬마 용' },
+  { id: 'cat', label: '고양이' },
+  { id: 'bear', label: '곰' },
+]
+
+const rooms = [
+  { id: 'day', label: '낮 공부방', image: roomDayImage },
+  { id: 'night', label: '밤 공부방', image: roomNightImage },
+] as const
+
+const tops: ReadonlyArray<{ id: PixelTop; label: string }> = [
+  { id: 'none', label: '기본 옷' },
+  { id: 'sweater', label: '크림 니트' },
+]
+
+type RoomId = typeof rooms[number]['id']
 
 type RoomSceneStyle = CSSProperties & {
   '--actor-left': string
@@ -45,7 +69,10 @@ export function PixelRoomExperimentPage() {
     (state: typeof INITIAL_WALK_STATE, action: WalkMotionAction) => reduceWalkMotion(state, action),
     INITIAL_WALK_STATE,
   )
+  const [characterId, setCharacterId] = useState<PixelCharacter>('dragon')
+  const [roomId, setRoomId] = useState<RoomId>('day')
   const [hatId, setHatId] = useState<PixelHat>('beret')
+  const [topId, setTopId] = useState<PixelTop>('sweater')
   const reducedMotion = usePrefersReducedMotion()
   const moving = motion.phase === 'running' && !reducedMotion
 
@@ -67,7 +94,10 @@ export function PixelRoomExperimentPage() {
     return () => window.cancelAnimationFrame(animationFrame)
   }, [moving])
 
+  const character = characters.find((item) => item.id === characterId) ?? characters[0]
+  const room = rooms.find((item) => item.id === roomId) ?? rooms[0]
   const hat = hats.find((item) => item.id === hatId) ?? hats[0]
+  const top = tops.find((item) => item.id === topId) ?? tops[0]
   const frame = moving ? getWalkFrame(motion.walkedMs) : 0
   const sceneStyle: RoomSceneStyle = {
     '--actor-left': `${motion.position * 66}%`,
@@ -76,7 +106,7 @@ export function PixelRoomExperimentPage() {
   const motionLabel = reducedMotion
     ? '모션 줄이기 설정으로 멈춰 있음'
     : motion.phase === 'running' ? '걷는 중' : '잠시 멈춤'
-  const sceneLabel = `모자: ${hat.label} · 방향: ${directionLabel} · ${motionLabel}`
+  const sceneLabel = `${character.label} · ${room.label} · 모자: ${hat.label} · 옷: ${top.label} · 방향: ${directionLabel} · ${motionLabel}`
 
   const face = (direction: WalkDirection) => dispatch({ type: 'face', direction })
 
@@ -95,7 +125,7 @@ export function PixelRoomExperimentPage() {
             <Text textStyle="t3Bold" color="fg.brand">개발 전용 미리보기</Text>
             <Text as="h1" textStyle="t9Bold" color="fg.neutral">도트 움직임 실험</Text>
             <Text as="p" textStyle="t4Regular" color="fg.neutralMuted">
-              작은 공부방에서 걷기와 모자 레이어가 자연스럽게 맞는지 확인해요.
+              캐릭터와 방을 바꾸며 걷기·모자·옷 레이어가 자연스럽게 맞는지 확인해요.
             </Text>
           </VStack>
 
@@ -110,11 +140,17 @@ export function PixelRoomExperimentPage() {
               aria-label={sceneLabel}
               style={sceneStyle}
             >
-              <img className="pixel-room-background" src={roomImage} alt="" />
+              <img className="pixel-room-background" src={room.image} alt="" />
               <div className="pixel-room-walk-track" aria-hidden>
                 <div className="pixel-room-actor">
                   <div className="pixel-room-actor-facing" data-direction={motion.direction}>
-                    <PixelSprite className="pixel-room-sprite" frame={frame} hat={hatId} />
+                    <PixelSprite
+                      className="pixel-room-sprite"
+                      character={characterId}
+                      frame={frame}
+                      hat={hatId}
+                      top={topId}
+                    />
                   </div>
                 </div>
               </div>
@@ -127,6 +163,56 @@ export function PixelRoomExperimentPage() {
             ) : null}
           </VStack>
 
+          <VStack as="section" gap="x3" aria-labelledby="pixel-room-character-title">
+            <VStack gap="x1">
+              <Text as="h2" id="pixel-room-character-title" textStyle="t7Bold" color="fg.neutral">
+                캐릭터
+              </Text>
+              <Text textStyle="t3Regular" color="fg.neutralMuted">
+                같은 모자와 옷을 유지한 채 캐릭터 정렬을 비교해요.
+              </Text>
+            </VStack>
+            <HStack className="pixel-room-option-controls" gap="x2">
+              {characters.map((item) => (
+                <ActionButton
+                  key={item.id}
+                  type="button"
+                  size="large"
+                  variant={item.id === characterId ? 'brandOutline' : 'neutralWeak'}
+                  aria-pressed={item.id === characterId}
+                  onClick={() => setCharacterId(item.id)}
+                >
+                  {item.label}
+                </ActionButton>
+              ))}
+            </HStack>
+          </VStack>
+
+          <VStack as="section" gap="x3" aria-labelledby="pixel-room-background-title">
+            <VStack gap="x1">
+              <Text as="h2" id="pixel-room-background-title" textStyle="t7Bold" color="fg.neutral">
+                공부방
+              </Text>
+              <Text textStyle="t3Regular" color="fg.neutralMuted">
+                캐릭터와 꾸미기 조합은 그대로 두고 방만 바꿔요.
+              </Text>
+            </VStack>
+            <HStack className="pixel-room-option-controls" gap="x2">
+              {rooms.map((item) => (
+                <ActionButton
+                  key={item.id}
+                  type="button"
+                  size="large"
+                  variant={item.id === roomId ? 'brandOutline' : 'neutralWeak'}
+                  aria-pressed={item.id === roomId}
+                  onClick={() => setRoomId(item.id)}
+                >
+                  {item.label}
+                </ActionButton>
+              ))}
+            </HStack>
+          </VStack>
+
           <VStack as="section" gap="x3" aria-labelledby="pixel-room-motion-title">
             <VStack gap="x1">
               <Text as="h2" id="pixel-room-motion-title" textStyle="t7Bold" color="fg.neutral">
@@ -136,7 +222,7 @@ export function PixelRoomExperimentPage() {
                 버튼은 터치하거나 키보드로 선택할 수 있어요.
               </Text>
             </VStack>
-            <HStack className="pixel-room-motion-controls" gap="x2">
+            <HStack className="pixel-room-option-controls" gap="x2">
               <ActionButton
                 type="button"
                 size="large"
@@ -167,16 +253,41 @@ export function PixelRoomExperimentPage() {
             </HStack>
           </VStack>
 
+          <VStack as="section" gap="x3" aria-labelledby="pixel-room-top-title">
+            <VStack gap="x1">
+              <Text as="h2" id="pixel-room-top-title" textStyle="t7Bold" color="fg.neutral">
+                옷
+              </Text>
+              <Text textStyle="t3Regular" color="fg.neutralMuted">
+                세 캐릭터 모두 원래 몸 크기를 유지한 착용 이미지로 비교해요.
+              </Text>
+            </VStack>
+            <HStack className="pixel-room-option-controls" gap="x2">
+              {tops.map((item) => (
+                <ActionButton
+                  key={item.id}
+                  type="button"
+                  size="large"
+                  variant={item.id === topId ? 'brandOutline' : 'neutralWeak'}
+                  aria-pressed={item.id === topId}
+                  onClick={() => setTopId(item.id)}
+                >
+                  {item.label}
+                </ActionButton>
+              ))}
+            </HStack>
+          </VStack>
+
           <VStack as="section" gap="x3" aria-labelledby="pixel-room-hat-title">
             <VStack gap="x1">
               <Text as="h2" id="pixel-room-hat-title" textStyle="t7Bold" color="fg.neutral">
-                보유 모자
+                모자
               </Text>
               <Text textStyle="t3Regular" color="fg.neutralMuted">
-                구매·코인 없이 레이어 정렬만 확인하는 실험이에요.
+                구매·코인·실제 보유 상태 없이 착용 정렬만 확인해요.
               </Text>
             </VStack>
-            <HStack className="pixel-room-hat-controls" gap="x2">
+            <HStack className="pixel-room-option-controls" gap="x2">
               {hats.map((item) => (
                 <ActionButton
                   key={item.id}
