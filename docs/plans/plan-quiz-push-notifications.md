@@ -260,3 +260,13 @@ Expo data는 `payloadVersion`, `notificationId`, `bindingId`로 구성하고 표
 - **PASS**: 앱 타입 검사와 39개 테스트. 사전점검의 HTTPS·Firebase 파일 누락·다른 package 거절과 양 플랫폼 정상 설정을 대역 파일로 확인했다. 실제 자격 파일을 검증한 결과는 아니다.
 - **PASS**: Expo config introspect에서 동적 설정, iOS `aps-environment` 생성, Android `com.nalq.app`과 `quiz-results` 반영 확인. 이는 서명된 APK/IPA 생성이나 실제 APNs/FCM 자격 검증을 대신하지 않는다.
 - **PASS**: 환경 값 없는 사전점검 CLI가 실패로 종료하고 누락 항목을 안내한다. 외부 자격·검증 HTTPS 환경 준비 후 Runbook의 빌드 명령을 실행한다.
+
+## 14. macOS 리뷰 수정 통합·로컬 푸시 테스트 준비 (2026-09-07)
+
+- #60 리뷰 수정 `3e7bfa0`, `839601d`를 #62와 #63에 반영했다. 설치 UUID 정규화·기존 데이터 호환, receipt 최종 실패, 대문자 플래그, 전송 직전 lease 재검증, 보존 정리 유형별 최대 100배치가 수정 범위다.
+- #63의 splash 의존성 추가 후 갱신되지 않은 서드파티 라이선스 고지를 재생성해 CI 실패를 복구했다.
+- **PASS**: 통합 커밋 `052965e`에서 `./scripts/verify.sh all`. 웹 라이선스·타입·28개 테스트·린트·빌드, 서버 fast 341개·MySQL/Redis integration 74개가 통과했다. 서버 실패·오류·skip은 0이다.
+- **PASS**: 앱 타입 검사·39개 테스트, iOS 빌드 사전점검, Expo config introspect, 네이티브 prebuild와 CocoaPods 설치. introspect의 `aps-environment=development`는 최종 서명 산출물 확인이 아니다.
+- 로컬 검증에는 기존 서비스와 분리된 MySQL·Redis, SMTP 수신기와 테스트 계정을 사용한다. `https://localhost:15174`에서 웹·API를 제공하며 서버 registration/delivery/scheduler는 이 로컬 환경에서만 켰다. 운영 배포·운영 플래그 변경은 하지 않았다.
+- **BLOCKED**: macOS 15.7.3 / Xcode 26.3에서 실제 Simulator 네이티브 빌드가 ExpoModulesJSI의 `abs` overload 오류로 실패했다. iOS 26.2 Simulator 구성 요소 설치 뒤에도 동일했다. Expo SDK 57의 최소 Xcode 26.4를 충족하는 EAS 빌드 경로와 `ios-simulator-local` 프로필을 Runbook에 추가했다. 앱 의존성에 임시 우회 패치는 적용하지 않았다.
+- **BLOCKED**: 이 기록 시점에는 EAS 로그인이 준비되지 않아 원격 네이티브 빌드·설치, Expo/APNs 경유 수신과 실제 iOS 기기 인수는 미실행이다. `PUSH_OPEN`과 목적지 이동은 여전히 후속 구현 범위다.
