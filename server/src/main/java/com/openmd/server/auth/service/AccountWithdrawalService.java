@@ -16,6 +16,7 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.support.TransactionOperations;
 import org.springframework.transaction.TransactionException;
+import com.openmd.server.push.service.PushDeviceLifecycle;
 
 public final class AccountWithdrawalService {
 
@@ -24,6 +25,7 @@ public final class AccountWithdrawalService {
 	private final UserRepository userRepository;
 	private final PasswordEncoder passwordEncoder;
 	private final RefreshTokenService refreshTokenService;
+	private final PushDeviceLifecycle pushDevices;
 	private final Clock clock;
 	private final TransactionOperations transactions;
 
@@ -31,12 +33,14 @@ public final class AccountWithdrawalService {
 		UserRepository userRepository,
 		PasswordEncoder passwordEncoder,
 		RefreshTokenService refreshTokenService,
+		PushDeviceLifecycle pushDevices,
 		Clock clock,
 		TransactionOperations transactions
 	) {
 		this.userRepository = userRepository;
 		this.passwordEncoder = passwordEncoder;
 		this.refreshTokenService = refreshTokenService;
+		this.pushDevices = pushDevices;
 		this.clock = clock;
 		this.transactions = transactions;
 	}
@@ -88,6 +92,7 @@ public final class AccountWithdrawalService {
 		if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
 			throw new BusinessException(AuthErrorCode.WITHDRAWAL_PASSWORD_MISMATCH);
 		}
+		pushDevices.deleteForUser(userId);
 		user.withdraw(requestId, clock.instant());
 		userRepository.flush();
 		return result(user);
