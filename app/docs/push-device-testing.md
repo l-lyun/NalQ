@@ -127,9 +127,17 @@ pnpm dlx eas-cli@latest build --platform ios --profile device-preview
 
 Expo 공식 안내에 따라 Xcode 14 이상, macOS 13 이상, iOS 16 이상 Simulator에서도 원격 푸시를 테스트할 수 있다. 로컬 실행 전 Xcode 라이선스 동의·초기 설치와 iOS Simulator runtime 설치를 완료한다. `ios-simulator` 프로필은 EAS `preview` 환경을 사용하며 `device-preview`의 실기기 ad hoc 빌드와 구분한다.
 
+푸시 지원 OS 조건과 앱 빌드 도구 조건은 다르다. 현재 앱의 Expo SDK 57 네이티브 빌드에는 Xcode 26.4 이상이 필요하다. Xcode 26.3에서는 ExpoModulesJSI의 `JavaScriptCodable+Date.swift`에서 `abs` overload 컴파일 오류가 재현됐다. 지원되는 Xcode로 업데이트하거나 EAS Build를 사용한다. 근거: [Expo 도구 최소 버전](https://expo.dev/changelog/sdk-56#tool-version-bumps), [동일 빌드 오류와 유지관리자 안내](https://github.com/expo/expo/issues/48522).
+
 ```sh
 pnpm dlx eas-cli@latest build --platform ios --profile ios-simulator
 pnpm dlx eas-cli@latest build:run --platform ios
+```
+
+맥의 로컬 서버를 사용할 경우 `ios-simulator-local` 프로필은 공개 웹 주소를 `https://localhost:15174`로 고정한다. 이 주소에서 해당 브랜치의 웹과 API를 제공하고, 테스트 Simulator에 로컬 인증서 신뢰를 설정한 뒤 빌드·설치한다. EAS에는 빌드 소스와 공개 주소만 전달하며 로컬 인증서 private key나 서버 비밀은 업로드하지 않는다. 이 프로필은 localhost가 맥을 가리키는 Simulator 전용이며 실제 iPhone에는 사용하지 않는다.
+
+```sh
+pnpm dlx eas-cli@latest build --platform ios --profile ios-simulator-local
 ```
 
 Simulator에서 권한 요청, Expo token 취득·기기 등록, foreground 억제와 background 수신을 1차 확인한다. payload 주입만 확인한 경우에는 Expo/APNs 경유 수신 성공으로 기록하지 않는다. 실제 iPhone의 서명·provisioning·설치, 재설치 시 SecureStore 동작과 background·일반 종료 수신은 별도 실기기 인수 항목이다. Simulator 성공만으로 실기기 검증 완료로 판정하지 않는다.
