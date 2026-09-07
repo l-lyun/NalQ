@@ -266,6 +266,49 @@ class PushDeviceInfrastructureIntegrationTest {
   }
 
   @Test
+  void registrationUpdatesAnExistingUppercaseInstallationWithoutCreatingADuplicate() {
+    String installationId = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+    PushDeviceRegistrationResult registered =
+        service.register(
+            42L,
+            "session-42",
+            command(
+                installationId,
+                "33333333-3333-4333-8333-333333333333",
+                TOKEN));
+    jdbc.update(
+        "UPDATE push_devices SET installation_id = UPPER(installation_id) WHERE installation_id = ?",
+        installationId);
+    jdbc.update(
+        "UPDATE push_device_operations SET installation_id = UPPER(installation_id) WHERE installation_id = ?",
+        installationId);
+
+    PushDeviceRegistrationResult updated =
+        service.register(
+            42L,
+            "session-42",
+            new RegisterPushDeviceCommand(
+                installationId,
+                KEY,
+                "44444444-4444-4444-8444-444444444444",
+                NOW,
+                registered.revision(),
+                PushPlatform.IOS,
+                PushProvider.EXPO,
+                TOKEN,
+                PushPermission.GRANTED));
+
+    assertEquals(2L, updated.revision());
+    assertEquals(installationId, updated.installationId());
+    assertEquals(
+        1,
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM push_devices WHERE installation_id = ?",
+            Integer.class,
+            installationId));
+  }
+
+  @Test
   void reinstallMovesTheSameUsersTokenButNeverTakesAnotherUsersToken() {
     service.register(
         42L,

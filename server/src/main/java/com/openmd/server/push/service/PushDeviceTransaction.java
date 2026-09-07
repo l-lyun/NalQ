@@ -89,10 +89,10 @@ public class PushDeviceTransaction {
   @Transactional(readOnly = true)
   public PushDeviceStatusResult status(
       long userId, String installationId, String installationKey) {
-    requireCanonicalUuid(installationId);
+    String canonicalInstallationId = canonicalUuid(installationId);
     PushDevice device =
         devices
-            .findByInstallationId(installationId)
+            .findByInstallationId(canonicalInstallationId)
             .filter(
                 found ->
                     credentials.matchesInstallationKey(
@@ -111,6 +111,7 @@ public class PushDeviceTransaction {
   public PushDeviceRegistrationResult register(
       long userId, String sessionId, RegisterPushDeviceCommand command) {
     validateRegistration(command);
+    String installationId = canonicalUuid(command.installationId());
     User user =
         users
             .findByIdForUpdate(userId)
@@ -119,7 +120,7 @@ public class PushDeviceTransaction {
       throw new BusinessException(AuthErrorCode.INVALID_CREDENTIAL);
     }
     Instant now = clock.instant();
-    Optional<PushDevice> currentView = devices.findByInstallationId(command.installationId());
+    Optional<PushDevice> currentView = devices.findByInstallationId(installationId);
     String keyDigest;
     try {
       keyDigest = credentials.digestInstallationKey(command.installationKey());
@@ -158,7 +159,7 @@ public class PushDeviceTransaction {
             : devices.findAllByInstallationIdInForUpdate(installationIdsToLock);
     Optional<PushDevice> currentOptional =
         lockedDevices.stream()
-            .filter(device -> device.getInstallationId().equals(command.installationId()))
+            .filter(device -> canonicalUuid(device.getInstallationId()).equals(installationId))
             .findFirst();
     Optional<PushDevice> tokenOwner =
         tokenDigest == null
@@ -179,9 +180,16 @@ public class PushDeviceTransaction {
     if (currentOptional.isPresent()) {
       Optional<PushDeviceOperation> replay =
           operations.findByInstallationIdAndOperationId(
-              command.installationId(), command.operationId());
+              installationId, command.operationId());
       if (replay.isPresent()) {
-        if (!replay.get().matchesRegistration(userId, requestDigest)) {
+        boolean currentDigestMatches = replay.get().matchesRegistration(userId, requestDigest);
+        boolean legacyDigestMatches =
+            replay
+                .get()
+                .matchesRegistration(
+                    userId,
+                    requestDigest(command, currentOptional.get().getInstallationId()));
+        if (!currentDigestMatches && !legacyDigestMatches) {
           throw new BusinessException(PushErrorCode.OPERATION_CONFLICT);
         }
         return replay.get().registrationResult();
@@ -191,7 +199,7 @@ public class PushDeviceTransaction {
     if (command.permission() == PushPermission.DENIED) {
       if (currentOptional.isEmpty()) {
         return new PushDeviceRegistrationResult(
-            command.installationId(), 0L, null, PushDeviceStatus.DISABLED, userId);
+            installationId, 0L, null, PushDeviceStatus.DISABLED, userId);
       }
       PushDevice current = currentOptional.get();
       requireRevision(current, command.expectedRevision());
@@ -201,7 +209,7 @@ public class PushDeviceTransaction {
       PushDeviceRegistrationResult result = registrationResult(current, userId);
       operations.save(
           PushDeviceOperation.successfulRegistration(
-              command.installationId(),
+              installationId,
               command.operationId(),
               userId,
               requestDigest,
@@ -219,7 +227,7 @@ public class PushDeviceTransaction {
       moveTokenIfAllowed(tokenOwner, null, userId, now);
       current =
           PushDevice.registered(
-              command.installationId(),
+              installationId,
               keyDigest,
               userId,
               sessionId,
@@ -250,7 +258,7 @@ public class PushDeviceTransaction {
     PushDeviceRegistrationResult result = registrationResult(current, userId);
     operations.save(
         PushDeviceOperation.successfulRegistration(
-            command.installationId(),
+            installationId,
             command.operationId(),
             userId,
             requestDigest,
@@ -263,9 +271,10 @@ public class PushDeviceTransaction {
   @Transactional
   public PushDeviceRevokeResult revoke(RevokePushDeviceCommand command) {
     validateRevoke(command);
+    String installationId = canonicalUuid(command.installationId());
     PushDevice current =
         devices
-            .findByInstallationIdForUpdate(command.installationId())
+            .findByInstallationIdForUpdate(installationId)
             .filter(
                 found ->
                     credentials.matchesInstallationKey(
@@ -276,9 +285,12 @@ public class PushDeviceTransaction {
     String requestDigest = requestDigest(command);
     Optional<PushDeviceOperation> replay =
         operations.findByInstallationIdAndOperationId(
-            command.installationId(), command.operationId());
+            installationId, command.operationId());
     if (replay.isPresent()) {
-      if (!replay.get().matchesRevoke(requestDigest)) {
+      boolean currentDigestMatches = replay.get().matchesRevoke(requestDigest);
+      boolean legacyDigestMatches =
+          replay.get().matchesRevoke(requestDigest(command, current.getInstallationId()));
+      if (!currentDigestMatches && !legacyDigestMatches) {
         throw new BusinessException(PushErrorCode.OPERATION_CONFLICT);
       }
       return replay.get().revokeResult();
@@ -294,7 +306,7 @@ public class PushDeviceTransaction {
     PushDeviceRevokeResult result = new PushDeviceRevokeResult(matchesBinding);
     operations.save(
         PushDeviceOperation.successfulRevoke(
-            command.installationId(),
+            installationId,
             command.operationId(),
             current.getUserId(),
             requestDigest,
@@ -305,13 +317,17 @@ public class PushDeviceTransaction {
   }
 
   public String requestDigest(RegisterPushDeviceCommand command) {
+    return requestDigest(command, canonicalUuid(command.installationId()));
+  }
+
+  private String requestDigest(RegisterPushDeviceCommand command, String installationId) {
     String tokenDigest =
         command.pushToken() == null ? "-" : credentials.digestPushToken(command.pushToken());
     return credentials.digestRequest(
         String.join(
             "|",
             "REGISTER",
-            command.installationId(),
+            installationId,
             command.operationId(),
             command.operationIssuedAt().toString(),
             Long.toString(command.expectedRevision()),
@@ -322,11 +338,15 @@ public class PushDeviceTransaction {
   }
 
   private String requestDigest(RevokePushDeviceCommand command) {
+    return requestDigest(command, canonicalUuid(command.installationId()));
+  }
+
+  private String requestDigest(RevokePushDeviceCommand command, String installationId) {
     return credentials.digestRequest(
         String.join(
             "|",
             "REVOKE",
-            command.installationId(),
+            installationId,
             command.operationId(),
             command.operationIssuedAt().toString(),
             command.bindingId(),
@@ -349,7 +369,7 @@ public class PushDeviceTransaction {
 
   private PushDeviceRegistrationResult registrationResult(PushDevice device, long userId) {
     return new PushDeviceRegistrationResult(
-        device.getInstallationId(),
+        canonicalUuid(device.getInstallationId()),
         device.getRevision(),
         device.getBindingId(),
         device.getStatus(),
@@ -363,8 +383,8 @@ public class PushDeviceTransaction {
   }
 
   private void validateRegistration(RegisterPushDeviceCommand command) {
-    requireCanonicalUuid(command.installationId());
-    requireCanonicalUuid(command.operationId());
+    canonicalUuid(command.installationId());
+    canonicalUuid(command.operationId());
     if (command.expectedRevision() < 0
         || command.operationIssuedAt() == null
         || command.platform() == null
@@ -384,15 +404,15 @@ public class PushDeviceTransaction {
   }
 
   private void validateRevoke(RevokePushDeviceCommand command) {
-    requireCanonicalUuid(command.installationId());
-    requireCanonicalUuid(command.operationId());
-    requireCanonicalUuid(command.bindingId());
+    canonicalUuid(command.installationId());
+    canonicalUuid(command.operationId());
+    canonicalUuid(command.bindingId());
     if (command.expectedRevision() < 0 || command.operationIssuedAt() == null) {
       throw new BusinessException(CommonErrorCode.INVALID_INPUT);
     }
   }
 
-  private void requireCanonicalUuid(String input) {
+  private String canonicalUuid(String input) {
     try {
       UUID parsed = UUID.fromString(input);
       if (input == null
@@ -400,6 +420,7 @@ public class PushDeviceTransaction {
           || !parsed.toString().equalsIgnoreCase(input)) {
         throw new IllegalArgumentException("non-canonical UUID");
       }
+      return parsed.toString();
     } catch (RuntimeException exception) {
       throw new BusinessException(CommonErrorCode.INVALID_INPUT);
     }

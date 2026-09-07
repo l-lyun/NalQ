@@ -121,6 +121,83 @@ class PushDeviceTransactionTest {
   }
 
   @Test
+  void installationUuidCaseDoesNotChangeTheIdempotencyDigest() {
+    String installationId = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+    RegisterPushDeviceCommand lowercase =
+        new RegisterPushDeviceCommand(
+            installationId,
+            KEY,
+            OPERATION_ID,
+            NOW,
+            0L,
+            PushPlatform.IOS,
+            PushProvider.EXPO,
+            TOKEN,
+            PushPermission.GRANTED);
+    RegisterPushDeviceCommand uppercase =
+        new RegisterPushDeviceCommand(
+            installationId.toUpperCase(java.util.Locale.ROOT),
+            KEY,
+            OPERATION_ID,
+            NOW,
+            0L,
+            PushPlatform.IOS,
+            PushProvider.EXPO,
+            TOKEN,
+            PushPermission.GRANTED);
+
+    assertEquals(transaction.requestDigest(lowercase), transaction.requestDigest(uppercase));
+  }
+
+  @Test
+  void replaysAnOperationStoredBeforeInstallationUuidCanonicalization() {
+    String lowercase = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+    String uppercase = lowercase.toUpperCase(java.util.Locale.ROOT);
+    RegisterPushDeviceCommand command =
+        new RegisterPushDeviceCommand(
+            lowercase,
+            KEY,
+            OPERATION_ID,
+            NOW,
+            1L,
+            PushPlatform.IOS,
+            PushProvider.EXPO,
+            TOKEN,
+            PushPermission.GRANTED);
+    PushDevice existing = activeDevice(uppercase, 42L, "session-42", BINDING_ID, TOKEN);
+    PushDeviceRegistrationResult stored =
+        new PushDeviceRegistrationResult(
+            uppercase, 1L, BINDING_ID, PushDeviceStatus.ACTIVE, 42L);
+    String legacyDigest =
+        credentials.digestRequest(
+            String.join(
+                "|",
+                "REGISTER",
+                uppercase,
+                OPERATION_ID,
+                NOW.toString(),
+                "1",
+                PushPlatform.IOS.name(),
+                PushProvider.EXPO.name(),
+                credentials.digestPushToken(TOKEN),
+                PushPermission.GRANTED.name()));
+    PushDeviceOperation operation =
+        PushDeviceOperation.successfulRegistration(
+            uppercase, OPERATION_ID, 42L, legacyDigest, NOW, stored, NOW);
+    when(devices.findByInstallationId(lowercase)).thenReturn(Optional.of(existing));
+    when(devices.findAllByInstallationIdInForUpdate(java.util.List.of(uppercase)))
+        .thenReturn(java.util.List.of(existing));
+    when(operations.findByInstallationIdAndOperationId(lowercase, OPERATION_ID))
+        .thenReturn(Optional.of(operation));
+
+    PushDeviceRegistrationResult replay =
+        transaction.register(42L, "session-42", command);
+
+    assertEquals(stored, replay);
+    verify(devices, never()).save(any());
+  }
+
+  @Test
   void returnsTheStoredResultForTheSameOperationWithoutMutatingTheDeviceAgain() {
     PushDevice existing = activeDevice(INSTALLATION_ID, 42L, "session-42", BINDING_ID, TOKEN);
     PushDeviceRegistrationResult stored =
