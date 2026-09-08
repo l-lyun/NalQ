@@ -1,6 +1,6 @@
 # NalQ iOS 배포 준비
 
-이 문서는 Apple 계정이나 외부 콘솔에 로그인하지 않고 저장소에서 준비한 iOS 배포 설정과, 계정 소유자가 첫 TestFlight 빌드 전에 확정해야 할 값을 구분한다.
+이 문서는 저장소에 확정된 iOS 배포 설정과 계정 소유자가 TestFlight 업로드 때 실행할 작업을 구분한다. 명령은 별도 표기가 없으면 `app/`에서 실행한다.
 
 ## 저장소에 반영된 값
 
@@ -9,7 +9,7 @@
 | 앱 표시 이름 | `NalQ` | 현재 제품명 기준 |
 | Expo slug | `nalq` | 현재 제품명 기준 |
 | 마케팅 버전 | `1.0.0` | 첫 출시 기준, 출시 범위 확정 시 변경 가능 |
-| iOS build number | `1` | 첫 빌드 시작값, EAS production 빌드가 원격에서 자동 증가 |
+| iOS build number | 로컬 시작값 `1` | EAS 원격 값이 원장이며 production 빌드가 자동 증가 |
 | iOS bundle identifier | `com.nalq.app` | Apple Developer 등록 완료 |
 | EAS project | `@hhhyyuns-team/nalq` | Expo 팀 프로젝트 연결 완료 |
 | App Store Connect Apple ID | `6807688566` | `NalQ` 앱 레코드 생성 및 EAS 제출 설정 연결 완료 |
@@ -18,36 +18,61 @@
 
 `bundleIdentifier`는 App Store에 등록한 뒤 기존 앱에서 바꿀 수 없는 앱 정체성이다. `com.nalq.app`은 Apple Developer의 개인 팀에 등록되어 있다.
 
+## 운영 주소
+
+- production 앱의 `EXPO_PUBLIC_WEB_URL`은 `https://nalq.app`이다. 이 공개 값은 WebView가 열 주소로 앱 번들에 포함된다.
+- 운영 웹은 `VITE_API_BASE_URL=https://api.nalq.app`으로 빌드한다. 앱이 API 주소를 별도로 주입하거나 API를 직접 호출하지 않는다.
+- `app/eas.json`의 production 프로필은 EAS의 `production` 환경을 사용한다. 로컬 `.env`나 preview 환경 값으로 production 빌드를 대신하지 않는다.
+
 ## EAS 프로필
 
 - `ios-simulator`: 인증서 없이 iOS Simulator에서 네이티브 설정을 점검하는 Release 빌드다. `preview` 환경의 `EXPO_PUBLIC_WEB_URL`에는 Simulator에서 접근 가능한 검증용 HTTPS 주소를 등록해야 한다.
 - `production`: App Store/TestFlight용 Release 빌드다. build number는 EAS 원격 값에서 자동 증가한다.
-- `submit.production`: App Store Connect의 `NalQ` 앱 ID를 사용해 제출 대상을 자동으로 선택한다.
+- `submit.production`: App Store Connect의 `NalQ` 앱 ID `6807688566`을 사용해 제출 대상을 자동으로 선택한다.
 
-## 첫 TestFlight 빌드 전에 필요한 계정 작업
+## TestFlight 빌드 전 확인
 
-1. Simulator 검증 전 EAS의 `preview` 환경에 공개 빌드 변수 `EXPO_PUBLIC_WEB_URL`을 Simulator에서 접근 가능한 검증용 HTTPS 주소로 등록한다.
-2. EAS의 `production` 환경에는 같은 이름으로 실제 운영 HTTPS 주소를 등록한다. 두 값은 비밀이 아니지만 각각의 앱 번들에 포함된다.
-3. 운영 WebView URL을 실제 iPhone과 iPad에서 검증한 뒤 production 빌드를 실행한다.
-4. EAS가 관리하는 배포 인증서와 provisioning profile은 Expo 및 Apple 계정에서 관리한다. 인증서나 `.p8` 파일은 저장소에 커밋하지 않는다.
+1. `whoami` 결과가 `hhhyyuns-team/nalq`에 접근 가능한 Expo 계정인지 확인한다. 이 저장소에는 이미 `extra.eas.projectId`가 있으므로 `eas init`을 다시 실행하지 않는다.
+2. EAS production 환경의 `EXPO_PUBLIC_WEB_URL`이 `https://nalq.app`인지 확인하고, 다르면 `env:set`으로 바로잡는다. 이 값은 비밀이 아니므로 `plaintext`로 저장한다.
+3. `check:device-build`를 iOS 범위로 실행한다. 플랫폼을 생략하면 Android용 `GOOGLE_SERVICES_JSON`까지 검사하므로 iOS TestFlight 점검에는 `--platform ios`를 명시한다.
+4. EAS 원격 build number를 조회한다. `app.json`의 `ios.buildNumber`는 원격 버전이 초기화되기 전 시작값이며, production 빌드에서는 `appVersionSource: remote`와 `autoIncrement: buildNumber`가 적용된다.
+5. EAS가 관리하는 distribution certificate와 App Store provisioning profile이 `com.nalq.app`에 연결됐는지 확인한다. Push Notifications capability와 APNs push key도 같은 Apple Developer 팀에 연결한다.
 
-예시 명령은 `app/`에서 실행한다.
-
-```powershell
+```bash
 pnpm dlx eas-cli@latest login
-pnpm dlx eas-cli@latest init
-pnpm dlx eas-cli@latest env:create --environment preview --name EXPO_PUBLIC_WEB_URL --value https://YOUR_PREVIEW_HOST --visibility plaintext
-pnpm dlx eas-cli@latest build --platform ios --profile ios-simulator
-pnpm dlx eas-cli@latest env:create --environment production --name EXPO_PUBLIC_WEB_URL --value https://YOUR_PRODUCTION_HOST --visibility plaintext
-pnpm dlx eas-cli@latest build --platform ios --profile production
-pnpm dlx eas-cli@latest submit --platform ios --profile production
+pnpm dlx eas-cli@latest whoami
+pnpm dlx eas-cli@latest env:list --environment production
+pnpm dlx eas-cli@latest env:set --environment production --name EXPO_PUBLIC_WEB_URL --value https://nalq.app --visibility plaintext
+EXPO_PUBLIC_WEB_URL=https://nalq.app pnpm run check:device-build -- --platform ios
+pnpm dlx eas-cli@latest build:version:get --platform ios --profile production
+pnpm dlx eas-cli@latest credentials --platform ios
 ```
 
-마지막 제출은 빌드를 TestFlight/App Store Connect로 업로드할 뿐 자동으로 App Review를 시작하지 않는다.
+`credentials`에서는 production 프로필을 선택해 build credentials를 확인한다. 인증서, provisioning profile, `.p8` private key와 로그인 정보는 출력물, 저장소, PR에 남기지 않는다.
+
+## 빌드와 TestFlight 업로드
+
+사전 확인이 끝나면 같은 릴리스 커밋에서 production 빌드를 만든다. 빌드가 성공하면 결과에 표시된 EAS build ID를 기록하고, 그 ID를 지정해 제출한다. 다른 브랜치의 최신 빌드를 잘못 선택할 수 있으므로 `--latest`를 사용하지 않는다.
+
+```bash
+pnpm dlx eas-cli@latest build --platform ios --profile production
+pnpm dlx eas-cli@latest submit --platform ios --profile production --id <EAS_BUILD_ID>
+```
+
+다음 항목을 릴리스 기록에 남긴다.
+
+- Git commit SHA, EAS build ID, marketing version과 실제 원격 build number
+- profile이 `production`, bundle identifier가 `com.nalq.app`인지 여부
+- App Store Connect 제출 ID와 처리 상태
+- TestFlight 설치 뒤 로그인·쿠키 유지·로그아웃, 알림 권한, foreground 억제, background와 일반 종료 상태의 실제 Expo/APNs 수신 결과
+
+`submit`은 App Store Connect로 바이너리를 업로드할 뿐 App Store 심사를 시작하지 않는다. 내부 테스터는 Apple의 처리 완료 뒤 사용할 수 있고, 외부 테스터 배포에는 별도의 TestFlight 베타 심사가 필요하다.
+
+현재 로컬 Simulator에서는 알림 권한과 등록, 주입한 background 배너까지 확인했지만 실제 Expo 발송은 `InvalidCredentials`로 거절됐다. `com.nalq.app`의 APNs 자격을 연결하고 TestFlight 설치본에서 실제 수신을 확인하기 전에는 원격 푸시 검증을 완료로 기록하지 않는다.
 
 ## 저장소 밖에서 아직 필요한 출시 자료
 
-- 현재 `assets/icon.png`와 splash 자산은 Expo 기본 자산이므로 최종 NalQ 브랜드 자산으로 교체해야 한다. iOS 아이콘은 1024×1024 PNG, 불투명 배경으로 준비한다.
+- 현재 `assets/icon.png`는 Expo 기본 아이콘이다. TestFlight 내부 검증에는 사용할 수 있지만 외부 테스트나 App Store 심사 전에는 최종 NalQ 아이콘으로 교체한다. iOS 아이콘은 1024×1024 PNG, 불투명 배경으로 준비한다. splash에는 NalQ 용 이미지가 적용돼 있다.
 - `supportsTablet=true`를 유지하면 iPad 화면 동작 검증과 App Store용 iPad 스크린샷이 필요하다. iPhone 전용 출시가 제품 결정이면 첫 제출 전에 `false`로 변경한다.
 - 운영 WebView URL과 API/Cookie 구성이 HTTPS에서 실제로 동작하는지 iPhone과 iPad에서 확인한다.
 - App Store 설명, 키워드, 카테고리, 지원 URL, 개인정보처리방침 URL, 심사용 로그인 계정과 리뷰 메모를 App Store Connect에 입력한다.
