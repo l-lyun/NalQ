@@ -134,6 +134,32 @@ class SecurityConfigurationTest {
 	}
 
 	@Test
+	void pushDevicePreflightAllowsTheInstallationCredentialHeader() throws Exception {
+		CorsFilter filter = new CorsFilter(SecurityConfiguration.buildCorsConfigurationSource(
+			List.of("http://localhost:5173"),
+			List.of("http://localhost:5173")
+		));
+		MockHttpServletRequest request = new MockHttpServletRequest(
+			"OPTIONS", "/api/v1/push-devices/11111111-1111-4111-8111-111111111111/revoke"
+		);
+		request.addHeader("Origin", "http://localhost:5173");
+		request.addHeader("Access-Control-Request-Method", "POST");
+		request.addHeader(
+			"Access-Control-Request-Headers",
+			"content-type,x-push-installation-key"
+		);
+		MockHttpServletResponse response = new MockHttpServletResponse();
+
+		filter.doFilter(request, response, new MockFilterChain());
+
+		assertEquals(200, response.getStatus());
+		assertTrue(response.getHeader("Access-Control-Allow-Headers")
+			.contains("x-push-installation-key"));
+		assertTrue(response.getHeader("Access-Control-Expose-Headers").contains("Retry-After"));
+		assertTrue(response.getHeader("Access-Control-Expose-Headers").contains("Date"));
+	}
+
+	@Test
 	void rejectsWildcardBrowserOriginsBecauseCredentialedCorsRequiresExactOrigins() {
 		assertThrows(IllegalArgumentException.class, () -> SecurityConfiguration.buildCorsConfigurationSource(
 			List.of("http://localhost:5173"),

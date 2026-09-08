@@ -17,24 +17,31 @@ import com.openmd.server.global.error.BusinessException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
+import com.openmd.server.push.service.PushDeviceLifecycle;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class AuthService {
+	private static final Logger log = LoggerFactory.getLogger(AuthService.class);
 
 	private final UserRepository userRepository;
 	private final PasswordEncoder passwordEncoder;
 	private final RefreshTokenService refreshTokenService;
 	private final AccessTokenService accessTokenService;
+	private final PushDeviceLifecycle pushDevices;
 
 	public AuthService(
 		UserRepository userRepository,
 		PasswordEncoder passwordEncoder,
 		RefreshTokenService refreshTokenService,
-		AccessTokenService accessTokenService
+		AccessTokenService accessTokenService,
+		PushDeviceLifecycle pushDevices
 	) {
 		this.userRepository = userRepository;
 		this.passwordEncoder = passwordEncoder;
 		this.refreshTokenService = refreshTokenService;
 		this.accessTokenService = accessTokenService;
+		this.pushDevices = pushDevices;
 	}
 
 	public SessionTokens login(String email, String password) {
@@ -63,7 +70,31 @@ public class AuthService {
 	}
 
 	public void logout(String refreshToken) {
+		RefreshTokenSession verifiedSession = null;
+		try {
+			verifiedSession = refreshTokenService.inspect(refreshToken);
+		} catch (BusinessException exception) {
+			if (exception.getErrorCode() != AuthErrorCode.INVALID_CREDENTIAL) {
+				throw exception;
+			}
+		}
 		refreshTokenService.revoke(refreshToken);
+		if (verifiedSession != null) {
+			revokePushSession(verifiedSession.sessionId());
+		}
+	}
+
+	private void revokePushSession(String sessionId) {
+		for (int attempt = 1; attempt <= 2; attempt++) {
+			try {
+				pushDevices.revokeSession(sessionId);
+				return;
+			} catch (RuntimeException exception) {
+				if (attempt == 2) {
+					log.warn("Refresh session revoked but push device cleanup failed for sessionId={}", sessionId);
+				}
+			}
+		}
 	}
 
 	@Transactional(readOnly = true)

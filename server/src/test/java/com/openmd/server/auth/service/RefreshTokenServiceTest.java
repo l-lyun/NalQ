@@ -96,6 +96,12 @@ class RefreshTokenServiceTest {
 		private final Set<String> used = new HashSet<>();
 
 		@Override
+		public boolean isActive(String sessionId, long userId) {
+			Session session = sessions.get(sessionId);
+			return session != null && session.userId() == userId;
+		}
+
+		@Override
 		public void create(String sessionId, long userId, String familyId, String digest, Instant expiresAt) {
 			sessions.put(sessionId, new Session(userId, digest));
 		}

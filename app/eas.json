@@ -10,6 +10,22 @@
         "simulator": true
       }
     },
+    "ios-simulator-local": {
+      "extends": "ios-simulator",
+      "env": {
+        "EXPO_PUBLIC_WEB_URL": "https://localhost:15174"
+      }
+    },
+    "device-preview": {
+      "environment": "preview",
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "buildConfiguration": "Release"
+      }
+    },
     "production": {
       "environment": "production",
       "ios": {

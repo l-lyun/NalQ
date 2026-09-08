@@ -1,4 +1,4 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 export type ShellState =
   | 'loading'
@@ -36,9 +36,15 @@ export function ShellStateView({ onRetry, state }: ShellStateViewProps) {
         accessibilityLabel="NalQ를 불러오는 중입니다"
         accessibilityLiveRegion="polite"
         accessibilityRole="progressbar"
-        style={styles.container}
+        style={[styles.container, styles.loadingContainer]}
       >
-        <ActivityIndicator color="#FF6600" size="large" />
+        <Image
+          accessible={false}
+          accessibilityIgnoresInvertColors
+          resizeMode="contain"
+          source={require('../../assets/nalq-splash-dragon.png')}
+          style={styles.splashImage}
+        />
         <Text style={styles.loadingText}>NalQ를 불러오는 중이에요</Text>
       </View>
     );
@@ -87,8 +93,15 @@ const styles = StyleSheet.create({
     color: '#5F6672',
     fontSize: 16,
     lineHeight: 24,
-    marginTop: 16,
+    marginTop: 20,
     textAlign: 'center',
+  },
+  loadingContainer: {
+    backgroundColor: '#FFF8F2',
+  },
+  splashImage: {
+    height: 220,
+    width: 220,
   },
   title: {
     color: '#191C20',

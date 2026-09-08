@@ -1,0 +1,273 @@
+---
+document_type: execution-plan
+status: draft
+scope: app-web-server
+---
+
+# 퀴즈 결과 푸시 기술 설계안
+
+- 제품 기준: [OS 푸시 PRD](../prd/prd-quiz-push-notifications.md)
+- 기존 경계: [알림 API](../contracts/contract-api-notifications.md), [알림 데이터](../contracts/contract-data-notifications.md), [앱 셸 TRD](../../app/docs/trd/trd-webview-shell.md)
+- 공유 상세: [푸시 API·브리지 계약 초안](../contracts/contract-api-push-notifications.md)
+- 상태: 2026-09-06 코드 확인을 바탕으로 한 기술 제안. 제품 합의와 기술 선택을 구분한다. 구현·외부 설정은 아직 하지 않았다.
+- 책임: 이번 작업의 전체 접근과 연결 지점을 검토한다. HTTP·메시지·계정 경계의 상세 원장은 공유 Contract 초안이다. 앱별 지속 구현 결정은 해당 TRD에 반영한다.
+
+## 1. 추천 구조
+
+**확정(2026-09-06 사용자 합의)**: Expo Push Service를 공통 발송 경로로 사용한다. Spring 서버가 HTTPS로 요청하고 Expo가 iOS APNs와 Android FCM으로 전달한다. 별도 Node 서버는 필요하지 않다. 직접 APNs·FCM 연동은 세밀한 제어가 필요해질 때 비교한다. [Expo 발송 문서](https://docs.expo.dev/push-notifications/sending-notifications/)
+
+```text
+앱: OS 권한·기기 토큰 ── 제한된 메시지 브리지 ── 웹: 기존 로그인·기기 등록 API
+                                                      │
+웹 또는 앱에서 퀴즈 생성 → 서버: 결과 + 알림 + 기기별 발송 작업 저장
+                                      │ 커밋 이후 별도 발송 작업자
+                                      └→ Expo → APNs / FCM → 각 등록 기기
+앱: 푸시 선택 → 웹 준비·인증 확인 → 알림 재조회 → 목적지 진입 → 읽음 동기화
+```
+
+| 계층 | 책임 | 기존 연결 지점 |
+| --- | --- | --- |
+| App | 권한·토큰, foreground 표시 억제, 알림 선택 보존·전달 | `app/App.tsx`, `app/src/shell/OpenMdWebView.tsx` |
+| Web | 기존 인증으로 등록 API 호출, 알림별 라우팅, 읽음 재시도 | `authSession.ts`, `sessionCleanup.ts`, `notificationPresentation.ts`, `notificationStorage.ts` |
+| Server | 사용자별 기기, 내구성 있는 발송 작업, 외부 오류·receipt 처리 | `QuizGenerationPersistenceService`, `NotificationService`, 인증 로그아웃·탈퇴 경로 |
+
+Access Token은 웹 메모리, Refresh Cookie는 WebView cookie jar에 유지한다. 네이티브에 사용자 토큰을 전달하거나 별도 로그인·refresh를 만들지 않는다. 기존 단일 WebView와 React Router를 사용한다.
+
+## 2. 앱 접속 확인: 두 수준을 구분
+
+- **MVP 범위 확정(2026-09-06 사용자 합의)**: 일반 웹에서는 권한 요청·기기 등록을 실행하지 않고 앱에서 로그인한 경우에만 진행한다. 네이티브 셸과 웹의 버전 있는 handshake 성공 후 흐름을 실행하는 방식으로 설계한다. 토큰은 native API로 발급하고 웹의 기존 인증으로 서버에 등록한다.
+- 서버는 인증 사용자, 설치 식별자, 등록 권한, 토큰 형식과 소유 관계를 검증한다. body의 `userId`, `isApp`, User-Agent를 권한 근거로 사용하지 않는다.
+- **한계**: 브리지 존재·handshake·Expo 토큰 형식은 정식 앱 실행에 대한 암호학적 증명이 아니다. 인증된 사용자의 직접 API 호출까지 차단한다고 주장하지 않는다. 임의 토큰 탈취·재등록 공격을 막는 수준은 별도 설계가 필요하다.
+- **후속 범위**: iOS App Attest, Android Play Integrity로 정식 앱의 증명을 서버에서 검증하는 것은 MVP에 포함하지 않는다. 도입 시 서버 challenge와 요청 내용을 연결하고 환경별 앱 ID·만료·재사용 및 지원하지 않는 기기 처리를 설계한다. [Apple](https://developer.apple.com/documentation/devicecheck/validating-apps-that-connect-to-your-server), [Android](https://developer.android.com/google/play/integrity/overview)
+- 이 합의는 일반 웹과 앱의 기능 진입 구분을 뜻한다. 사용자 인증·기기 소유권 검증을 생략하거나, 브리지 handshake로 위조 요청을 막는다고 간주하지 않는다.
+
+## 3. 기기 등록과 계정 수명주기
+
+1. 웹 인증 bootstrap 또는 로그인·가입 자동 로그인 완료 후 사용자 확인, 브리지 준비 완료를 기다린다. 기존 로그인 사용자의 앱 업데이트 후 첫 진입도 포함한다.
+2. 네이티브가 권한 상태를 확인하고 미결정일 때 OS 팝업을 요청한다. 허용된 경우 project ID 기반 Expo 토큰을 발급한다. Android는 후속 지원 때 채널을 함께 설정한다.
+3. 설치별 무작위 `installationId`와 `installationKey`를 네이티브 보안 저장소에 보관한다. 영구 하드웨어 ID는 사용하지 않는다. key·revision·binding의 의미와 재설치 토큰 충돌 처리는 공유 Contract를 따른다.
+4. 웹은 기기 정보를 기존 인증 API 클라이언트로 등록한다. 사용자·세션은 서버 `AccessPrincipal(userId, sessionId)`에서 결정한다.
+5. 앱 복귀·토큰 변경·같은 계정 재로그인 때 갱신한다. 다른 기기 행은 덮어쓰지 않는다. 계정 전환은 해당 설치의 이전 연결을 끊고 새 연결 revision을 만든다.
+6. 명시적 로그아웃은 해당 설치 연결을 해제하고, 탈퇴는 전부 해제한다. 웹에서 단순 로그아웃했다고 다른 앱 기기를 일괄 해제하지 않는다.
+
+`push_devices` 후보: `id`, `installationId`, `userId`, `sessionId`, `platform`, `provider`, `token`, `tokenVersion`, `bindingVersion`, `status`, `createdAt`, `updatedAt`. 동일 provider/token은 동시에 여러 계정에 활성 연결하지 않는다. 다른 계정 소유 행을 입력 ID만으로 탈취하지 못하도록 소유 증빙·계정 전환 절차를 Contract에 포함한다.
+
+로그아웃 시 웹의 API 성공에만 기대지 않는다. 현재 `logoutCurrentSession`은 요청 실패에도 로컬 세션을 지우므로, native에 제한된 연결 해제 재시도 정보를 남기는 방안을 검토한다. 서버가 해제를 수신하기 전이나 이미 제공자에 넘긴 푸시까지 즉시 취소할 수는 없다. 세션 자연 만료는 명시적 로그아웃과 구분한다. 자연 만료만으로 기기를 지우면 합의한 '푸시 선택 후 재로그인' 흐름이 사라진다.
+
+## 4. 공유 경계 상세 원장
+
+| 후보 | 의미 |
+| --- | --- |
+| `PUT /api/v1/push-devices/{installationId}` | 현재 계정 기기 연결·토큰 갱신. 설치 증빙 및 예상 연결 revision 검증, 재요청 멱등 |
+| `GET /api/v1/push-devices/{installationId}` | 설치 key를 검증한 뒤 현재 계정 연결 여부·revision 확인 |
+| `POST /api/v1/push-devices/{installationId}/revoke` | 설치 key와 특정 binding으로 로그아웃 후에도 제한된 해제 재시도 |
+| `GET /api/v1/notifications/{notificationId}` | 본인 소유·90일 보존 범위의 단일 알림 및 `targetAvailable` 조회 |
+| 기존 `PUT /api/v1/notifications/{notificationId}/read` | 동일 알림의 최초 읽음만 반영하는 기존 멱등 API 재사용 |
+
+목록 첫 페이지에 없는 오래된 푸시도 열 수 있어야 하므로 단일 조회를 추가한다. 없는 알림·타인 알림은 동일 404다. 알림은 있지만 대상이 삭제된 경우는 `targetAvailable=false`로 구분한다. 네트워크 오류·5xx는 삭제가 아니다.
+
+브리지의 envelope·메시지 표와 ACK 종료 조건은 [공유 Contract](../contracts/contract-api-push-notifications.md#6-브리지-envelope와-연결)가 소유한다. 문서 세션과 인증 epoch를 별도로 검사한다. 특히 기존 `protectedApi`의 refresh·재전송 시 현재 토큰을 다시 읽는 경계에는 시작 계정을 고정해 검증하는 변경이 필요하다.
+
+Expo data는 `payloadVersion`, `notificationId`, `bindingId`로 구성하고 표시 제목은 알림 snapshot을 사용한다. 이동 대상은 서버 단일 조회의 기존 `actionType`·대상 ID로 재구성한다. 상세 의미는 [공유 Contract](../contracts/contract-api-push-notifications.md#5-푸시-데이터)를 따른다.
+
+## 5. 발송 내구성과 실패 처리
+
+- **확정(2026-09-06 사용자 합의)**: 기존 서버의 주기적 스케줄러가 MySQL에 저장된 발송 대기·재시도 작업을 조회해 처리한다. 상시 조회 부하를 감수하고 서버 재시작 뒤에도 미완료 작업을 복구하는 방향을 선택했다.
+- 퀴즈 결과·기존 알림 저장 트랜잭션에서 당시 활성 기기별 `push_deliveries` 행도 저장하는 DB outbox 방식으로 설계한다. 기존 성공·실패·stale/startup recovery의 모든 terminal 경로에 적용한다. 외부 HTTP는 이 트랜잭션 밖에서 실행한다.
+- 별도 Kafka·Redis Queue 없이 기존 MySQL과 제한된 크기의 서버 발송 작업자를 사용한다. 사용자당 등록 기기가 MVP 규모를 크게 넘으면 fan-out을 별도 단계로 분리하는 설계를 다시 검토한다.
+- **초기 설정 제안**: 5초 간격, 한 번에 최대 50건을 처리한다. `state + nextAttemptAt` 인덱스로 도래한 작업만 조회하고, 만료된 lease는 별도 인덱스로 소량 복구한다. 작업자의 빈 처리 용량만큼 claim하고 중첩 실행·무제한 메모리 큐를 막는다. 간격·건수는 설정값으로 두고 실제 조회 계획·처리 지연을 측정해 조정한다.
+- Expo receipt 확인도 같은 스케줄러의 처리 대상에 포함하되 매 주기 외부 조회를 하지 않고 receipt 확인 시각이 된 작업만 처리한다. 발송·receipt 상태별 due 조회를 분리해 대기 작업을 반복 전송하지 않는다.
+- 조회가 없을 때도 주기적 DB 접근은 발생한다. 별도 배포 서비스는 추가하지 않지만 실제 비용 영향은 DB 요금 방식과 부하에 달려 있으므로 무비용으로 간주하지 않는다.
+- 작업 후보 필드: `notificationId`, `deviceId`, `bindingVersion`, `tokenVersion`, `state`, `attemptCount`, `nextAttemptAt`, `leaseUntil`, `ticketId`, `lastErrorCode`. `(notificationId, deviceId, bindingVersion)`은 unique다.
+- `PENDING → SENDING(lease) → TICKET_ACCEPTED → PROVIDER_ACCEPTED`가 정상 흐름이다. 일시 실패는 `RETRY_WAIT`, 영구 실패는 `FAILED`, 연결 해제·대상 기간 초과는 `CANCELLED/EXPIRED`로 끝낸다. 공급자 접수를 실제 단말 수신이나 읽음으로 기록하지 않는다.
+- 작업 claim과 결과 저장만 짧은 DB 트랜잭션으로 처리한다. HTTP 중 DB 잠금을 유지하지 않는다. lease 만료 작업은 복구하고, 시도 식별자로 늦은 응답이 새 시도를 덮어쓰지 못하게 한다.
+- 발송 직전 사용자·기기 활성 상태와 연결 revision을 재확인한다. 계정이 바뀐 작업은 취소한다. 이전 토큰 receipt의 오류로 새 토큰을 비활성화하지 않도록 token version도 비교한다.
+- 429·5xx·네트워크 오류는 상한 있는 지수 backoff와 jitter로 재시도한다. 잘못된 payload·인증 설정 오류는 무한 재시도하지 않는다. 발송 횟수와 간격은 기술 설정으로 구체화하되, 발송 기한은 합의된 결과 확정 후 1시간을 넘기지 않는다.
+- `expiresAt`은 원래 알림 생성 시각을 기준으로 고정한다. claim 시와 외부 전송 직전에 만료를 확인하고 미접수 작업은 `EXPIRED`로 종료한다. Expo expiration도 같은 절대 시각으로 설정한다. ticket 접수 후 receipt 조회는 기한이 지나도 별도 일정에 따라 처리하며 만료된 알림을 재발송하지 않는다. 상세는 [발송 유효 시간 계약](../contracts/contract-api-push-notifications.md#발송-유효-시간)을 따른다.
+- Expo ticket 후 receipt를 조회하고 `DeviceNotRegistered`는 해당 토큰을 비활성화한다. receipt는 제공자 인계 확인이며 단말 표시 증명이 아니다. [Expo 오류·receipt](https://docs.expo.dev/push-notifications/sending-notifications/)
+- 서버가 제공자 접수 직후 죽거나 응답을 잃으면 재시도 중복이 가능하다. DB unique는 중복 작업 생성만 막으며 OS 배너 exactly-once를 보장하지 않는다. 앱의 중복 열기/읽음은 ID로 막고, OS 표시 중복은 별도 플랫폼 수단의 지원 범위 안에서 줄인다.
+- 소급 발송하지 않는다. 기능 활성화 후 결과 확정 당시 활성인 기기 연결만 대상이며 신규 등록·재설치 복구로 과거 결과의 delivery를 추가하지 않는다. 발송 TTL은 결과 확정 후 1시간이다.
+- 발송·receipt 최소 진단 기록은 delivery 생성 후 30일 보관한다. 기존 서버 스케줄러에서 만료 인덱스 기반 제한 배치로 정리하고 발송 작업과 트랜잭션을 분리한다. 백업 보존·복원 시 만료 데이터 재정리도 출시 전 검증한다. 활성 토큰·멱등 기록의 수명과 혼동하지 않는다.
+
+## 6. foreground·알림 선택·읽음
+
+- 서버에 '현재 사용 중' heartbeat를 유지하지 않는다. 서버는 기기별 발송을 수행하고 앱의 notification handler가 foreground에서 banner/list/sound/badge를 모두 끄는 방향을 제안한다. Android 진동까지 실제 기기에서 검증한다. handler는 WebView나 인증 완료를 기다리지 않고 앱 초기화 시 설치한다. [Expo SDK](https://docs.expo.dev/versions/latest/sdk/notifications/)
+- background에서 이미 표시된 푸시를 앱 foreground 진입 시 소급 삭제하는 정책은 이번 합의에 포함하지 않는다. 표시 여부는 수신 당시 앱 상태 기준이다.
+- 실행 중 응답 listener와 cold-start의 마지막 응답 조회를 모두 연결한다. native 로컬 저장소에 pending open을 먼저 보존하고 웹 처리 ACK 후 해제한다. SDK의 마지막 응답도 처리 후 정리해 다음 실행 때 재이동하지 않게 한다.
+- listener는 WebView mount 전에 가능한 이른 앱 초기화 시점에 설치한다. 같은 `messageId`의 재전달은 새 화면 이동을 만들지 않는다. ACK는 목적지 진입(또는 대상 없음 복구)과 읽음 의도의 내구 저장이 완료됐을 때 보낸다. 서버 읽음 성공까지 native ACK를 미루지 않는다. 로그인 대기·네트워크 조회 실패에는 완료 ACK를 보내지 않는다.
+- pending open이 기존 계정 연결에 속함을 확인할 수 있으면 그 계정 범위로 보존하고 다른 계정에서는 실행하지 않는다. 최종 서버 소유권 조회는 항상 필요하다. 단일 조회 404는 타인 소유와 만료를 구분할 수 없으므로 상세 이동·읽음 요청 없이 안전하게 종료하며, 이 경우의 pending 정리·안내는 공유 Contract에서 명시한다.
+- WebView 준비 후 내부 notification 진입 route로 전달하고 로그인·소유권·대상 조회를 거친다. 기존 React Router에서 이동하며 정상 열기 때문에 WebView를 remount하지 않는다.
+- 단순 `navigate` 호출 직후 읽지 않는다. 성공 퀴즈의 대상 카드 또는 실패 자료의 생성 조건이 확인된 뒤 읽음 의도를 저장한다. 삭제 대상은 안내·알림함 복구 완료 뒤 저장한다. 다른 계정·조회 실패 때는 읽음 의도를 만들지 않는다.
+- 읽음 의도와 open 완료 기록은 웹 IndexedDB에 함께 내구 저장하는 방안으로 구체화했다. 필드·멱등키·재시도 조건은 [공유 Contract](../contracts/contract-api-push-notifications.md#8-읽음-재시도)를 따른다. 조회 캐시는 서버 성공 후 갱신하며 재시도 실패를 Snackbar로 알리지 않는다.
+- 실패 시 foreground·online에서 제한적으로 재시도, 다음 bootstrap/복귀에서도 같은 사용자 큐만 처리한다. 401은 재인증까지 중단, 404는 알림 만료/삭제로 큐 제거, 429·5xx는 backoff한다. 계정이 바뀌면 실행 중 요청을 취소하고 다른 계정 큐를 실행하지 않는다.
+- 로그아웃·다른 계정 사용 시 해당 계정 읽음 큐를 정지·격리하고 같은 계정 재접속 시 재개한다. 탈퇴·알림 보존 기간 종료 시 정리한다. '다음 앱 접속에도 동기화' 합의에 맞춰 기존 로그아웃 시 삭제 제안을 공유 Contract에서 보완했다. `sessionCleanup.ts`의 종료 이유를 구분해야 한다.
+- 로컬 저장 실패를 메모리 성공으로 숨기지 않는다. 재시작 보존이 불가능한 상태는 진단에 남기고 화면은 유지한다. 앱 재설치·OS 데이터 삭제까지 큐 보존을 약속하지 않는다.
+
+## 7. 기존 문서와 변경 경계
+
+서버 파일 배치, 기존 코드 연결 지점, 트랜잭션·잠금·기술 기본값 및 테스트 파일은 [서버 푸시 TRD](../../server/docs/trd/trd-quiz-push-notifications.md)에 구체화한다. 서버 구현·실행 검증 현황은 아래 9절에 기록한다.
+
+앱 셸 TRD의 '브리지·푸시 비범위'는 현재 버전 설명이다. 이 설계 채택 시 해당 절을 확장하고 허용 메시지를 공유 Contract에 연결한다. 기존 알림 API는 유지하면서 단일 조회와 기기 API를 추가한다. PRD의 중복 표시 방지 목표를 OS exactly-once로 확대하지 않는다.
+
+발송 제공자는 Expo Push Service, MVP 앱 구분은 일반 웹에서 등록 흐름 제외로 확정됐다. 재설치 복구·404 안내·읽음 큐 정책과 비활성 설치 30일·멱등 기록 7일은 2026-09-06 승인됐다. 공유 계약에 오래된 변경 요청의 수명 검증안을 추가했고 서버 TRD에 파일·트랜잭션 설계를 정리했다. PRD의 개인정보·국외 이전 출시 요건은 별도 확인이 필요하다.
+
+## 8. 구현 전 확인 및 검증 계획
+
+- iOS: APNs 자격·push entitlement, EAS development/release 빌드, SDK 호환 패키지 설치가 필요하다. Android: package ID·FCM 자격·채널·빌드 구성을 후속 추가한다. 외부 자격 상태는 이번에 확인하지 않았다. [Expo 설정](https://docs.expo.dev/push-notifications/push-notifications-setup/)
+- 서버 테스트: terminal 모든 경로의 작업 생성 원자성, 다기기 fan-out, worker 중단·lease 복구, 계정 전환 경합, ticket/receipt 오류, token version, 소유권과 단일 조회. 구현 때 저장소의 test-first 규칙 적용.
+- 웹·앱 테스트: 웹 단독 미등록, 로그인 성공 후 권한 요청, 새 설치·토큰 갱신, cold/warm 진입, 다른 계정 404, 삭제 대상, durable read 재시도·계정 분리, 구버전 handshake 무응답.
+- 실기기: 두 기기 중 하나 foreground/다른 하나 background, 종료 앱에서 알림 선택, 제목 표시, OS 권한 변경, 로그아웃 직전 발송, 네트워크 단절 후 재접속.
+- 배포 순서 제안: additive 서버 기능(발송 off) → 구앱 호환 웹 → 푸시 앱 빌드 → 실제 생성 E2E → 신규 알림부터 발송 활성화. rollback은 발송 중단 후 기존 알림함 유지.
+- 설계 단계에서는 문서 diff·참조를 확인했다. 이후 서버 실행 검증은 9절에 구분한다. 단말 도달·권한 팝업·foreground 무음 동작은 아직 미검증이다.
+
+## 9. 서버 구현 진행 기록 (2026-09-06)
+
+- 사용자 승인 범위: 서버만 구현하며 기기 관리 → Outbox·단일 조회 → 발송 Worker·정리 순서로 커밋을 분리한다. 웹·앱과 운영 발송 활성화는 제외한다.
+- 변경 전 기준선: `cd server && ./gradlew fastTest --no-daemon` PASS (267 tests). Java 21 및 Docker 28.5.1 확인.
+- 단일 알림 GET: 구현 전 MVC 테스트가 HTTP 404로 실패한 것을 확인한 후 라우트·서비스 구현. `./gradlew fastTest --tests '*NotificationControllerTest' --tests '*NotificationServiceTest' --no-daemon` PASS. 이후 응답 필드 검증 보강은 최종 회귀에서 재실행한다.
+- 기기 관리·Expo 경계: 테스트 먼저 추가하고 미구현 타입에 대한 `compileTestJava` 실패 확인. 이는 동작 assertion 실패와 구분한다. 실제 MySQL/Redis 경합과 HTTP timeout 검증 결과는 실행 후 기록한다.
+- 실제 Expo/APNs/FCM 호출과 단말 수신은 검증 대상에 포함하지 않는다. 가짜 제공자 테스트를 실제 발송 성공으로 보고하지 않는다.
+- Outbox 연결 전 기존 결과 저장 테스트의 `saveAndFlush` 기대가 실제 `WantedButNotInvoked`로 실패함을 확인했다. 이후 다섯 terminal 경로를 공통 저장 helper로 연결했다.
+- `./gradlew fastTest --tests '*push.*' --tests '*Notification*' --no-daemon` PASS (중간 검증; 최종 전체 회귀는 별도).
+- `./gradlew integrationTest --tests '*PushOutboxIntegrationTest' --no-daemon` PASS (6 tests, MySQL 8.4): SQL CHECK로 outbox insert 실패 강제 후 QuizSet/notification/delivery 전체 rollback, 다기기·다섯 terminal 경로, 소급 제외, MANDATORY 경계, 단일 조회 소유권·90일을 확인했다.
+- 전체 fast 회귀에서 DB auto-configuration을 제외한 기존 `ServerApplicationTests` 부팅 실패를 확인했다. 발송 비활성 Outbox의 저장소 주입을 지연해 기존 비활성 부팅 경계를 유지하고, `./gradlew fastTest --tests '*ServerApplicationTests' --tests '*PushOutboxServiceTest' --no-daemon` PASS를 확인했다. 활성 상태에서 저장소가 없으면 성공으로 숨기지 않는다.
+- 기기 통합 검증 중 bulk delete의 persistence-context clear 때문에 같은 트랜잭션의 회원 탈퇴 상태가 저장되지 않는 실패를 확인하고 수정했다. 실제 logout/session 해제·탈퇴 정리를 포함한 MySQL/Redis 6개 검사가 통과했다.
+- `lockedRegistrationRefreshesAnAlreadyManagedDeviceAfterConcurrentRevoke`: MySQL REPEATABLE READ와 JPA 1차 캐시를 먼저 만든 후 별도 트랜잭션에서 revoke를 커밋한다. 이전 revision 등록을 허용하는 RED를 확인했다. `refresh(..., PESSIMISTIC_WRITE)`만으로도 회귀가 남아 실제 SQL을 확인했으며, 이미 잠긴 엔티티의 refresh가 non-locking SELECT를 내는 것을 확인했다. 최초 조회한 기기 엔티티만 detach한 뒤 정렬된 locking query가 최신 행을 새로 적재하도록 수정했다. 전체 persistence context를 clear하지 않아 회원 등 다른 managed 객체는 보존한다.
+- 전체 통합에서 기존 Notion의 고정 Clock과 충돌하는 부팅 실패를 확인했다. 새 전역 Clock 빈 대신 기존 Clock 또는 UTC fallback을 주입하며, `NotionInfrastructureIntegrationTest` 4개 PASS를 확인했다.
+- 첫 커밋 `7cdf8c6`: staged 파일만 임시 체크아웃으로 분리해 `fastTest` 296개, `PushDeviceInfrastructureIntegrationTest` 7개 PASS. 늦은 해제 이후 이전 revision 등록 차단을 실제 MySQL에서 확인했다.
+- 두 번째 커밋 대상도 staged 파일만 분리해 `fastTest` 304개, `PushOutboxIntegrationTest` 6개 PASS. 이후 worker가 추가되기 전 독립적으로 부팅·원자성·소유권을 검증했다.
+- `PushDeliveryEndToEndIntegrationTest` 최초 2개 PASS: 실제 Spring proxy·JPA·MySQL·worker 연결에서 provider 대역 호출 시 TX가 없고 SENDING/RECEIPT_CHECKING이 이미 커밋돼 있음을 확인했다. 원래 제목 snapshot·정확한 1시간 expiresAt, ticket 이후 신규전송 없음·1시간 이후 receipt 조회·읽음 미변경을 확인했다. 토큰 갱신 후 이전 outbox 취소 시나리오 추가분은 최종 전체 검증에 포함한다.
+- Expo adapter의 receipt HTTP 401을 `FAILED`로 해석하던 동작에 대해 `RETRY` 기대 RED를 확인했다. 조회 실패는 24시간까지 조회만 재시도하며, 실제 receipt 오류와 구분했다. `./gradlew fastTest --tests '*ExpoPushGatewayTest' --no-daemon` 12개 PASS: 절대 expiration/최소 data, 개별 오류, 429·Retry-After, malformed 응답, 연결 실패, 전체 응답 body deadline, receipt 누락 및 조회 거절을 제공자 대역으로 확인했다.
+
+### 최종 서버 검증
+
+`cd server && ./gradlew fastTest integrationTest bootJar --no-daemon` **PASS** (3분 39초).
+
+| 대상 | 결과 |
+| --- | --- |
+| fastTest | 331개, 실패·오류·skip 0 |
+| integrationTest | 70개, 실패·오류·skip 0 |
+| bootJar | 실행 JAR 빌드 PASS |
+| diff 검증 | `git diff --check`, staged diff check PASS |
+
+푸시 통합 검사는 기기/Redis 8개, Outbox 6개, claim·retention 9개, 실제 서버 내부 연결 3개를 포함한다. 재활성화 경합 중 기기 보존, 같은 binding의 tokenVersion 변경, 이전 receipt 차단, 정리 후 오래된 PUT 차단, 탈퇴 사용자의 이관 전 delivery 삭제를 확인했다. 기존 Notion·인증·퀴즈 등 전체 서버 회귀도 포함했다.
+
+기기 등록·delivery·scheduler flag는 모두 기본 false다. 웹·앱 코드는 변경하지 않았고 운영 발송 활성화·배포·실제 Expo/APNs/FCM 호출은 하지 않았다. 실기기 foreground 억제·cold start·푸시 선택은 후속 웹/앱 구현과 함께 검증해야 한다. FORCE INDEX EXPLAIN은 인덱스 존재·사용 가능성만 증명하며, 대표 운영 데이터의 자연 실행계획·조회 부하·백업 복원 후 보존 정리는 미검증이다.
+
+## 10. 앱·웹 등록/해제 준비 점검 (2026-09-07)
+
+이번 작업은 최초 준비 점검과 문서화만 포함한다. 앱·웹 기능 구현, 패키지/lockfile 변경, 외부 자격 설정, 네이티브 빌드와 운영 발송 활성화는 포함하지 않는다. 정책과 메시지 의미의 원장은 [공통 계약](../contracts/contract-api-push-notifications.md)이다.
+
+### 기준 브랜치와 서버 CI
+
+- [서버 PR #60](https://github.com/l-lyun/NalQ/pull/60)의 `codex/quiz-push-notification-design`, `fdbdbe96218bd842269c36c82316894b2216340f`에서 `codex/app-push-registration-readiness`를 분기했다.
+- 확인 시점의 원격 HEAD가 로컬 기준 HEAD와 일치했다. [해당 HEAD의 CI](https://github.com/l-lyun/NalQ/actions/runs/34041734464)는 `web-static`, `server-fast`, `server-integration`, `harness-required` 모두 **PASS**였다. 이는 신규 앱 푸시 연동이나 실제 단말 도달의 증거가 아니다.
+- 후속 PR의 base는 서버 PR 브랜치로 두어 서버 구현 diff를 중복 리뷰하지 않는다. 서버 PR 병합 뒤 후속 PR의 base를 재확인한다.
+
+### 현재 연결 지점과 부족한 준비
+
+| 영역 | 저장소에서 확인한 사실 | 다음 구현에서 필요한 작업 |
+| --- | --- | --- |
+| 앱 셸 | Expo SDK 57, `OpenMdWebView`가 WebView ref·문서 로드·origin 판정·복구를 소유한다. 푸시용 메시지 브리지와 AppState/알림 처리는 없다. | 기존 URL 정책을 유지하며 신뢰 origin·문서 세션·메시지 스키마 검증을 추가한다. |
+| 네이티브 저장/알림 | `expo-notifications`, `expo-secure-store`, `expo-device` 직접 의존성이 없다. | SDK 호환 의존성을 준비하고 installation key·binding·pending operation을 보안 저장한다. 난수 생성 및 projectId 접근용 직접 의존성도 구현 시 검토한다. |
+| iOS | `app.json`에 bundle ID와 EAS projectId가 있다. notifications plugin 및 명시적인 push entitlement 설정은 없다. | 실제 자격과 빌드 산출물의 entitlement를 별도로 확인한다. APNs 자격의 존재 여부는 외부 계정을 조회하지 않아 미확인이다. |
+| Android | `android.package`와 FCM 관련 설정이 없다. | package ID를 확정하고 FCM·채널·실기기 빌드를 준비한다. 외부 FCM 자격 상태는 미확인이다. |
+| 검증 빌드 | iOS simulator 프로필은 있지만 physical-device development-client 준비는 없다. | 푸시를 포함한 실기기 개발 빌드 또는 배포 빌드 경로가 필요하다. 기존 production 프로필만으로 실제 수신을 보장하지 않는다. |
+| 웹 인증 | `authSession.ts`에 로그인·부트스트랩·로그아웃 진입점, `AuthBootstrap.tsx`에 최상위 인증 수명주기가 있다. 푸시 handshake와 `authEpoch`는 없다. | 인증 상태와 bridgeSessionId/authEpoch를 연결하고 일반 브라우저에서는 등록 경로를 열지 않는다. |
+| 계정 전환/해제 | `protectedApi.ts`는 재시도 시 현재 토큰을 읽고, `sessionCleanup.ts`는 네이티브 해제 ACK 없이 로컬 인증을 정리한다. | 등록 시작 계정과 비동기 완료 시점을 검증한다. 로그아웃 전 pending revoke 내구 저장/ACK를 공통 계약에 맞춰 연결한다. |
+
+앱 구현 시 [앱 셸 TRD](../../app/docs/trd/trd-webview-shell.md)의 기존 푸시·브리지 비범위도 갱신해야 한다. 단순히 `ReactNativeWebView` 존재만 검사하거나 사용자 JWT를 네이티브로 넘기는 방식으로 대체하지 않는다.
+
+### 로컬 기준선 검증
+
+| 검사 | 결과 | 근거 |
+| --- | --- | --- |
+| `pnpm -C app typecheck` | **BLOCKED** | 로컬 의존성 연결이 미완성이다. pnpm의 자동 설치가 registry DNS/network 제한(`ENOTFOUND`)으로 실패해 타입 검사는 시작되지 않았다. |
+| `pnpm -C web typecheck` | **BLOCKED** | 같은 의존성 자동 설치 실패로 타입 검사는 시작되지 않았다. |
+| `node --test app/tests/*.test.cjs` | **BLOCKED** | `typescript` 모듈을 찾지 못해 기존 정책 테스트 로딩 단계에서 종료했다. 동작 assertion 실패와 구분한다. |
+
+의존성 준비 후 앱 `pnpm typecheck && pnpm test`, 웹 `pnpm typecheck`를 다시 실행해야 한다. 위 BLOCKED는 이전 서버 CI PASS를 무효화하지 않으며, 서버 CI PASS 역시 현재 로컬 앱·웹 검증을 대체하지 않는다.
+
+### 다음 구현 단위 제안 — 아직 미구현
+
+1. **브리지와 내구 상태 기반**: 계약의 handshake·버전·origin·bridgeSessionId/authEpoch 검증, SecureStore 상태/재전송 경계를 구현하고 잘못된 origin·세션·메시지 거절 테스트를 추가한다.
+2. **기기 등록/해제 연결**: 인증된 앱의 권한 요청과 토큰 획득, 웹의 인증 API 등록, 결과/ACK, 로그아웃 전 pending revoke 저장과 재시도, 계정 전환·재설치/토큰 갱신 경계를 구현한다. 계약상 필요한 복구를 생략한 상태를 완료로 보고하지 않는다.
+3. **foreground 억제와 회귀 확인**: 앱 초기화부터 알림 표시를 억제하고 앱·웹 자동 검증을 실행한다. 무음·무진동 및 실제 단말 수신은 실기기로 별도 확인한다.
+
+푸시 탭 이동·cold start 복원은 별도 후속 단위로 남긴다. 의존성 설치·신규 브리지·실기기 빌드 준비가 남아 있으므로, 남은 약 50분 안에 등록/해제 전체와 실기기 검증까지 완료한다고 확약하지 않는다. 다음 작업에서는 먼저 의존성 기준선을 복구하고 검증 가능한 첫 구현 단위를 완료하는 것을 목표로 한다.
+
+## 11. 브리지·보안 저장 기반 구현 (2026-09-07)
+
+[준비 점검 PR #62](https://github.com/l-lyun/NalQ/pull/62)의 `cb2a4fd`에서 `codex/push-bridge-foundation`을 분기했다. 이번 단위는 다음 기반만 구현하며 서버 코드와 발송 flag는 변경하지 않는다.
+
+- 앱: 문서 로드별 session, WEB_READY/HELLO, 빈 capability, 보안 저장소 기반 installation ID/key 초기화와 직렬 저장 repository. 손상 상태·저장 실패를 성공으로 처리하거나 기존 key를 자동 덮어쓰지 않는다.
+- 웹: 정상 최상위 문서에서만 handshake를 시도하고 3회 제한 재시도, replyTo·schema·크기 검증과 cleanup을 연결한다. 실제 앱 serializer와 웹 parser를 한 테스트에서 연결했다.
+- 공통 계약: 초기 null session, HELLO.replyTo, 고정 이벤트의 JSON 문자열과 빈 capability의 의미를 구체화했다.
+- 의존성: SDK 호환 Crypto·SecureStore 및 config plugin, 생성된 third-party notices를 반영했다. 앞선 의존성 설치 BLOCKED는 해소했다.
+
+### 검증 결과와 남은 경계
+
+- **PASS**: 앱 `pnpm typecheck && pnpm test`, 웹 `pnpm verify`(타입·테스트·라이선스·린트·빌드).
+- **PASS**: `./scripts/verify.sh all`. 서버 fast/integration은 서버 변경이 없어 기존 결과를 재사용한 `UP-TO-DATE`이며, 이번에 401개 테스트를 새로 실행했다고 보고하지 않는다.
+- **PASS**: `git diff --check`.
+- **미검증**: 실제 iOS/Android SecureStore·WebView 동작과 네이티브 빌드. Node 저장소/DOM 대역 검증은 실기기 검증이 아니다.
+
+현재 WebView SDK의 onMessage에는 최상위 프레임 여부가 없어 origin 검사와 정상 웹 발신 guard만으로 악성 iframe의 출처를 증명하지 못한다. 플랫폼별 한계는 [앱 TRD](../../app/docs/trd/trd-push-bridge-foundation.md)에 기록했다. **native-level 최상위 문서 출처 보강 또는 동등한 격리를 완료하기 전에는 push-v1을 활성화하지 않는다.** 이번에는 자격/사용자 정보를 브리지로 보내지 않는다.
+
+실제 authEpoch·refresh fence, 등록/해제 HTTP, OS 권한·토큰, pending 재전송/ACK, foreground 표시 억제와 푸시 선택은 아직 미구현이다. 다음 단위는 최상위 문서 출처 보호를 먼저 보강한 후 인증·등록/해제의 안전 경계를 연결한다.
+
+## 12. 등록·해제 연결 구현 (2026-09-07, PR #63 후속 커밋)
+
+위 10·11절은 각 준비/기반 단계의 기록이다. 현재 구현 상태는 이 절과 각 애플리케이션 TRD를 따른다.
+
+- 앱: OS 권한·Expo 토큰, Android 채널, foreground 표시·소리·배지 억제, SecureStore 설치 증빙·등록/해제 pending·ACK, 같은 operation 재전송과 토큰/권한 갱신을 연결했다. 기존 설치가 삭제된 404 복구 시 과거 성공 ACK도 확인하여 자격을 회전한다.
+- 브리지: 최상위 exact-origin 문서 nonce facade와 문서 교체 시 무효화, 세션·authEpoch·스키마 검증을 연결했다. 동일 origin의 실행 코드는 신뢰 경계 안에 있으며 앱 증명이나 XSS 방어를 대체하지 않는다.
+- 웹: 인증 상태 전달, 등록 상태 조회·CAS 등록, 로그아웃 전 durable ACK 대기(최대 1.5초), Cookie/Bearer 없는 제한적 해제, 계정 변경 시 늦은 refresh/HTTP 응답 차단을 구현했다.
+- 서버: 등록 직전과 DB 커밋 직후 refresh session 활성 여부를 확인한다. 로그아웃이 등록보다 먼저 끝난 경쟁에서는 해당 세션 기기를 보상 해제한다. 세션 자연 만료만으로 기존 기기를 주기적으로 삭제하지 않는다.
+
+### 검증과 한계
+
+- **PASS**: 앱 타입 검사·32개 테스트, 웹 28개 테스트(실제 앱 coordinator와 웹 session을 연결한 등록→내구 저장→로그아웃 해제 포함).
+- **PASS**: 서버 `fastTest integrationTest bootJar` 전체 실행. fast 333개·실제 MySQL/Redis integration 72개, 실패/오류/skip 0. 등록/로그아웃 경쟁 테스트를 먼저 추가하고 의도한 실패 확인 후 구현했다.
+- 네이티브 API/저장소 대역 테스트는 실기기 권한·수신을 증명하지 않는다. 외부 자격·네이티브 빌드·운영 발송 flag는 설정/활성화하지 않았다.
+- 최초 등록 응답을 잃어 binding을 모르는 동시에 서버 로그아웃 요청까지 유실되면 익명으로 binding을 조회할 수 없다. pending을 보존하고 다음 인증 때 재조정한다. 이미 제공자에 전달된 푸시는 취소를 보장하지 않는다.
+
+### 다음 작업
+
+1. Android application ID 확정, APNs/FCM/EAS 자격과 iOS entitlement 확인, iOS·Android 실기기 개발 빌드 준비. 비밀 값은 저장소에 커밋하지 않는다.
+2. 검증 환경의 서버 등록·delivery·scheduler 설정 후 실기기 권한·토큰 갱신·재설치·계정 전환·로그아웃/오프라인 재시도 검증.
+3. 현재 foreground 기기에서 OS 알림이 없고 다른 기기의 background/종료 상태에서 수신되는지 확인.
+4. 푸시 선택·cold start·재로그인 복원, 알림 단건 조회와 소유권/삭제 대상 처리, 목적지 이동 및 선택/읽음 ACK를 별도 구현한다.
+
+## 13. Windows에서 실기기 테스트 준비 (2026-09-07)
+
+- 사용자 요청 범위: 실기기가 없는 Windows에서 빌드 설정과 사전 검증을 준비한다. 실제 수신 검증은 단말 확보 후 진행한다.
+- **확정**: Android application ID는 사용자 확인에 따라 `com.nalq.app`으로 사용한다. iOS bundle identifier도 기존 `com.nalq.app`을 유지한다.
+- 준비·실행 절차의 원장은 [푸시 실기기 테스트 Runbook](../../app/docs/push-device-testing.md)이다. 앱 내부 빌드 결정은 [앱 푸시 TRD](../../app/docs/trd/trd-push-bridge-foundation.md)를 따른다.
+- Windows에서 EAS 클라우드 빌드를 요청하고 설치 뒤 Metro 없이 실행할 수 있는 내부 배포 빌드를 준비한다. Android Firebase 설정 파일과 검증용 HTTPS 웹 주소를 사전 점검하며, 실제 자격과 환경 주소를 저장소 값으로 가정하지 않는다.
+- 검증 서버에는 현재 브랜치의 서버와 웹이 함께 필요하다. 기존 운영 Compose는 `OPENMD_PUSH_*`를 전달하지 않으므로 환경 파일에 값만 추가해서 활성화되지 않는다. 검증 환경의 명시적인 전달 방법은 Runbook에 둔다.
+- 외부 자격 생성·업로드, EAS 원격 빌드·배포 및 발송 활성화는 아직 수행하지 않았다. `PUSH_OPEN`·cold start 선택 복원·목적지 이동·읽음 ACK는 별도 후속 범위다.
+
+### Windows 웹·서버 기준선
+
+- 초기 **PRE-EXISTING FAILURE**: 기존 V8 SQL의 CRLF 체크아웃 때문에 `NotionMigrationCompatibilityTest` 바이트 비교가 실패했고 웹 라이선스 원장도 같은 줄바꿈 문제로 비교에 실패했다. 두 로컬 파일의 줄바꿈을 저장소 원본 LF로 맞췄다. 서버·웹의 추적 내용 변경은 없다.
+- **PASS**: `server/gradlew.bat fastTest --no-daemon` 재실행, 333개 모두 통과. Windows에서는 저장소의 `.gradle-local`을 `GRADLE_USER_HOME`으로 사용했다.
+- **PASS**: `pnpm -C web verify` — 라이선스·타입·28개 테스트·린트·빌드. 이 PC의 앱 의존성을 고정 lockfile에 맞춰 준비한 뒤 실행했다.
+- **BLOCKED**: Docker 엔진에 연결할 수 없어 MySQL/Redis 통합 검증은 실행하지 않았다. 이전 PR의 통합 PASS를 이번 PC의 실행 결과로 간주하지 않는다.
+
+### 앱 준비 검증
+
+- **PASS**: 앱 타입 검사와 39개 테스트. 사전점검의 HTTPS·Firebase 파일 누락·다른 package 거절과 양 플랫폼 정상 설정을 대역 파일로 확인했다. 실제 자격 파일을 검증한 결과는 아니다.
+- **PASS**: Expo config introspect에서 동적 설정, iOS `aps-environment` 생성, Android `com.nalq.app`과 `quiz-results` 반영 확인. 이는 서명된 APK/IPA 생성이나 실제 APNs/FCM 자격 검증을 대신하지 않는다.
+- **PASS**: 환경 값 없는 사전점검 CLI가 실패로 종료하고 누락 항목을 안내한다. 외부 자격·검증 HTTPS 환경 준비 후 Runbook의 빌드 명령을 실행한다.
+
+## 14. macOS 리뷰 수정 통합·로컬 푸시 테스트 준비 (2026-09-07)
+
+- #60 리뷰 수정 `3e7bfa0`, `839601d`를 #62와 #63에 반영했다. 설치 UUID 정규화·기존 데이터 호환, receipt 최종 실패, 대문자 플래그, 전송 직전 lease 재검증, 보존 정리 유형별 최대 100배치가 수정 범위다.
+- #63의 splash 의존성 추가 후 갱신되지 않은 서드파티 라이선스 고지를 재생성해 CI 실패를 복구했다.
+- **PASS**: 통합 커밋 `052965e`에서 `./scripts/verify.sh all`. 웹 라이선스·타입·28개 테스트·린트·빌드, 서버 fast 341개·MySQL/Redis integration 74개가 통과했다. 서버 실패·오류·skip은 0이다.
+- **PASS**: `dev`의 기존 UI 밀도 변경을 통합한 `abbf1f2`에서 `pnpm -C web verify`를 재실행했다. 이 동기화는 웹·문서만 변경하며 검증된 서버·앱 코드는 그대로다. 최종 서버 `bootJar`도 통과했다.
+- **PASS**: 앱 타입 검사·39개 테스트, iOS 빌드 사전점검, Expo config introspect, 네이티브 prebuild와 CocoaPods 설치. introspect의 `aps-environment=development`는 최종 서명 산출물 확인이 아니다.
+- 로컬 검증에는 기존 서비스와 분리된 MySQL·Redis, SMTP 수신기와 테스트 계정을 사용한다. `https://localhost:15174`에서 웹·API를 제공하며 서버 registration/delivery/scheduler는 이 로컬 환경에서만 켰다. 운영 배포·운영 플래그 변경은 하지 않았다.
+- **BLOCKED**: macOS 15.7.3 / Xcode 26.3에서 실제 Simulator 네이티브 빌드가 ExpoModulesJSI의 `abs` overload 오류로 실패했다. iOS 26.2 Simulator 구성 요소 설치 뒤에도 동일했다. Expo SDK 57의 최소 Xcode 26.4를 충족하는 EAS 빌드 경로와 `ios-simulator-local` 프로필을 Runbook에 추가했다. 앱 의존성에 임시 우회 패치는 적용하지 않았다.
+- **BLOCKED**: 이 기록 시점에는 EAS 로그인이 준비되지 않아 원격 네이티브 빌드·설치, Expo/APNs 경유 수신과 실제 iOS 기기 인수는 미실행이다. `PUSH_OPEN`과 목적지 이동은 여전히 후속 구현 범위다.
