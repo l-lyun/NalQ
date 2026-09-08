@@ -4,6 +4,7 @@ import com.openmd.server.auth.security.AccessPrincipal;
 import com.openmd.server.global.api.ApiResponse;
 import com.openmd.server.notification.dto.request.ReadAllNotificationsRequest;
 import com.openmd.server.notification.dto.response.NotificationPage;
+import com.openmd.server.notification.dto.response.NotificationItem;
 import com.openmd.server.notification.dto.response.NotificationReadAllResult;
 import com.openmd.server.notification.dto.response.NotificationReadResult;
 import com.openmd.server.notification.service.NotificationService;
@@ -33,6 +34,13 @@ public class NotificationController {
       @AuthenticationPrincipal AccessPrincipal principal,
       @RequestParam(required = false) String cursor) {
     return ApiResponse.success(service.list(principal.userId(), cursor, 20));
+  }
+
+  @GetMapping("/{notificationId}")
+  public ApiResponse<NotificationItem> get(
+      @AuthenticationPrincipal AccessPrincipal principal,
+      @PathVariable String notificationId) {
+    return ApiResponse.success(service.get(principal.userId(), notificationId));
   }
 
   @PutMapping("/{notificationId}/read")

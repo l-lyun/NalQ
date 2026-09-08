@@ -152,6 +152,8 @@ Body 없음.
 
 ## 외부 제공자 경계
 
+후속 OS 푸시의 기기 등록·단일 알림 조회·Expo data 규격은 [푸시 API·브리지 계약 초안](contract-api-push-notifications.md)에서 확장한다. 아래 FCM 설명은 기존 확장 예시이며, 후속 Expo transport는 최소 식별자와 인증 후 단일 조회를 사용한다. 기존 목록·읽음 API의 의미는 유지한다.
+
 - 현재 외부 알림 제공자를 사용하지 않는다.
 - FCM 도입 시 이 계약의 `notificationId`, `payloadVersion`, `type`, 대상 식별자, `failureCode`, `actionType`, `createdAt`을 OpenMD가 소유하는 data payload 의미로 재사용한다.
 - FCM token 등록, 플랫폼 권한, 제공자 message ID, 전송 시도·재시도는 별도 기기·전달 계약으로 추가한다. 제공자 원시 오류를 이 알림 목록 API에 노출하지 않는다.
