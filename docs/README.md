@@ -36,11 +36,13 @@ scope: repository
 | 학습자료 만들기 | [학습자료 만들기 PRD](prd/prd-content-import.md) | 검토 중 |
 | 퀴즈 생성·풀이·결과·복습 | [퀴즈 PRD](prd/prd-quiz-learning.md) | 검토 중 |
 | 퀴즈 생성 결과 알림 | [퀴즈 생성 결과 알림 PRD](prd/prd-quiz-generation-notifications.md) | 검토 중 |
+| 퀴즈 생성 결과 OS 푸시 | [퀴즈 생성 결과 OS 푸시 PRD](prd/prd-quiz-push-notifications.md) | 초안 |
 
 ## UX
 
 | 관심사 | 원장 | 유형 | 상태 |
 | --- | --- | --- | --- |
+| 전역 글자·컴포넌트 밀도 | [UI 밀도 조정](ux/screen-ui-density.md) | Screen Spec | 확정·구현 반영 |
 | 이메일 기반 자체 인증 | [인증 흐름](ux/flow-authentication.md) | Flow | 초안 |
 | 학습자료 만들기 | [학습자료 만들기 흐름](ux/flow-content-import.md) | Flow | 검토 중 |
 | Notion 학습자료 가져오기 | [Notion 가져오기 화면](ux/screen-notion-import.md) | Screen Spec | 검토 중 |
@@ -72,6 +74,7 @@ Flow는 여러 화면의 순서와 분기를, Screen Spec은 한 화면의 구�
 | 학습자료·퀴즈·복습 데이터 | [학습자료·퀴즈 데이터](contracts/contract-data-quiz-learning.md) | Data Contract | 검토 중 |
 | 퀴즈 생성 결과 알림 | [알림 API](contracts/contract-api-notifications.md) | API Contract | 검토 중 |
 | 퀴즈 생성 결과 알림 데이터 | [알림 데이터](contracts/contract-data-notifications.md) | Data Contract | 검토 중 |
+| 앱 푸시 기기 등록·알림 조회·메시지 | [푸시 API·브리지 계약](contracts/contract-api-push-notifications.md) | API·메시지 Contract | 초안 |
 
 ## 애플리케이션 TRD
 
@@ -83,6 +86,7 @@ TRD는 각 애플리케이션의 `docs/trd/trd-*.md`에 두며, 파일명과 제
 | Server | 브라우저 Refresh Token Cookie | [서버 Cookie 전환 TRD](../server/docs/trd/trd-browser-refresh-cookie.md) | 구현 동기화, 웹 전환 완료 |
 | Server | OpenAPI와 Swagger UI | [서버 OpenAPI 운영 TRD](../server/docs/trd/trd-openapi-documentation.md) | 초안 |
 | Server | 패키지 구조 | [서버 패키지 구조 TRD](../server/docs/trd/trd-package-structure.md) | 구현 동기화 |
+| Server | 퀴즈 푸시 파일 구조·트랜잭션 | [서버 푸시 TRD](../server/docs/trd/trd-quiz-push-notifications.md) | 서버 구현·자동 검증 완료, 실기기 미검증 |
 | Server | 학습자료 생성·조회 | [학습자료 생성·조회 TRD](../server/docs/trd/trd-learning-material-creation.md) | 구현 동기화 |
 | Server | Notion 단일 페이지 가져오기 | [Notion 가져오기 TRD](../server/docs/trd/trd-notion-page-import.md) | 검토 중 |
 | Server | LLM 퀴즈 생성 워커 | [LLM 퀴즈 생성 워커 TRD](../server/docs/trd/trd-llm-quiz-generation-worker.md) | 구현 동기화 |
@@ -92,9 +96,12 @@ TRD는 각 애플리케이션의 `docs/trd/trd-*.md`에 두며, 파일명과 제
 | Web | 학습자료 생성·조회 통합 | [웹 학습자료 TRD](../web/docs/trd/trd-learning-materials.md) | 구현 동기화 |
 | Web | 퀴즈 화면 상태 | [웹 퀴즈 TRD](../web/docs/trd/trd-quiz-solving.md) | 검토 중 |
 | App | Expo WebView 앱 셸 | [앱 셸 TRD](../app/docs/trd/trd-webview-shell.md) | 초안 |
+| App | 푸시 기기 등록·해제·foreground 억제 | [앱 푸시 브리지 TRD](../app/docs/trd/trd-push-bridge-foundation.md) | 연동·자동 검증 완료, 실기기 미검증 |
 | App | WebView 퀴즈 상태 | [앱 퀴즈 TRD](../app/docs/trd/trd-quiz-solving.md) | 검토 중 |
 
 ## 실행 계획과 저장소 검증
+
+- [퀴즈 결과 푸시 기술 설계안](plans/plan-quiz-push-notifications.md): 앱·웹·서버 연결과 발송 내구성 설계, 서버 구현 검증 및 앱·웹 등록/해제 준비 점검.
 
 | 관심사 | 원장 | 유형 | 상태 |
 | --- | --- | --- | --- |
@@ -111,6 +118,9 @@ TRD는 각 애플리케이션의 `docs/trd/trd-*.md`에 두며, 파일명과 제
 | 첫 수동 운영 배포·rollback·backup·restore | [운영 배포와 복구 Runbook](operations/production-deployment-runbook.md) | 초안·저장소 구현 |
 | Route 53·S3·CloudFront·ACM·EC2 수동 구성 | [AWS Console 운영 체크리스트](operations/aws-console-production-checklist.md) | 초안·외부 적용 전 |
 | 운영 환경 변수·비밀 주입 계약 | [운영 환경 변수 원장](operations/production-environment-variables.md) | 초안 |
+| Windows에서 푸시 실기기 빌드 준비·수신 점검 | [푸시 실기기 테스트 Runbook](../app/docs/push-device-testing.md) | 저장소 준비, 외부 자격·실기기 검증 전 |
+| iOS production 빌드·TestFlight 업로드 | [iOS 배포 준비](../app/docs/ios-distribution.md) | 저장소 준비, EAS·Apple 자격 및 업로드 전 |
+| App Store·TestFlight 한국어 소개와 테스트 안내 | [스토어 등록 초안](operations/app-store-metadata-ko.md) | 소개 초안 콘솔 저장·테스트 안내 준비 |
 
 ## 문서 템플릿
 

@@ -29,3 +29,8 @@ export function formatNotificationTime(createdAt: string, now = Date.now()) {
   if (elapsed < day) return `${Math.floor(elapsed / hour)}시간 전`
   return new Intl.DateTimeFormat('ko-KR', { month: 'short', day: 'numeric' }).format(new Date(createdAt))
 }
+
+export function notificationRecoveryNotice(search: string) {
+  const reason = new URLSearchParams(search).get('unavailable')
+  return reason === 'notification' ? '알림을 찾을 수 없어요.' : reason === 'target' ? '대상을 찾을 수 없어요.' : undefined
+}

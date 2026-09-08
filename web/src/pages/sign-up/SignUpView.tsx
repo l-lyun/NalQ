@@ -151,7 +151,7 @@ function SignUpShell({
             </div>
           </VStack>
           <VStack gap="x2">
-            <Text as="h1" textStyle="t12Bold" color="fg.neutral">
+            <Text as="h1" textStyle="t9Bold" color="fg.neutral">
               {title}
             </Text>
             <Text textStyle="t5Regular" color="fg.neutralMuted">
@@ -607,7 +607,7 @@ export function SignUpProfileStep(props: SignUpProfileStepProps) {
           <Box as="section" aria-labelledby="sign-up-terms-title">
             <VStack gap="x4">
               <VStack gap="x1">
-                <Text as="h2" id="sign-up-terms-title" textStyle="t7Bold" color="fg.neutral">
+                <Text as="h2" id="sign-up-terms-title" textStyle="t6Bold" color="fg.neutral">
                   약관 동의
                 </Text>
                 <Text textStyle="t4Regular" color="fg.neutralMuted">

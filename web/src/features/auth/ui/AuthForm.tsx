@@ -27,12 +27,12 @@ export function AuthPage({ title, description, footer, children }: AuthPageProps
         <VStack
           className="auth-page"
           px="spacingX.globalGutter"
-          pt="x10"
+          pt="x6"
           pb="spacingY.screenBottom"
-          gap="x6"
+          gap="x5"
         >
           <VStack as="header" gap="x2">
-            <Text as="h1" textStyle="t12Bold" color="fg.neutral">
+            <Text as="h1" textStyle="t9Bold" color="fg.neutral">
               {title}
             </Text>
             <Text textStyle="t5Regular" color="fg.neutralMuted">

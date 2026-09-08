@@ -39,7 +39,7 @@ export function LearningScreenHeader({
         className="learning-focus-heading"
         ref={headingRef}
         tabIndex={-1}
-        textStyle="t10Bold"
+        textStyle="t9Bold"
         color="fg.neutral"
       >
         {title}
@@ -51,7 +51,7 @@ export function LearningScreenHeader({
 
 export function LearningSectionTitle({ id, children }: { id: string; children: ReactNode }) {
   return (
-    <Text as="h2" id={id} textStyle="t10Bold" color="fg.neutral">
+    <Text as="h2" id={id} textStyle="t7Bold" color="fg.neutral">
       {children}
     </Text>
   )

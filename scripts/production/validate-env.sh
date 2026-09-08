@@ -126,4 +126,11 @@ if [ "${OPENMD_QUIZ_GENERATION_ENABLED:-false}" = "true" ]; then
 	esac
 fi
 
+for push_flag in OPENMD_PUSH_REGISTRATION_ENABLED OPENMD_PUSH_DELIVERY_ENABLED OPENMD_PUSH_SCHEDULER_ENABLED; do
+	case "${!push_flag:-false}" in
+		true|false) ;;
+		*) die "$push_flag must be true or false" ;;
+	esac
+done
+
 log "production environment contract is valid (secret values not printed)"

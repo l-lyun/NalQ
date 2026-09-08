@@ -7,6 +7,7 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
+      "icon": "./assets/nalq-app-icon.png",
       "buildNumber": "1",
       "bundleIdentifier": "com.nalq.app",
       "supportsTablet": true,
@@ -15,6 +16,7 @@
       }
     },
     "android": {
+      "package": "com.nalq.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -31,6 +33,24 @@
         "projectId": "eb4f22d0-514e-49c7-a11b-32f9ca592e93"
       }
     },
-    "owner": "hhhyyuns-team"
+    "owner": "hhhyyuns-team",
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#FFF8F2",
+          "image": "./assets/nalq-splash-dragon.png",
+          "imageWidth": 220,
+          "resizeMode": "contain"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "quiz-results"
+        }
+      ]
+    ]
   }
 }

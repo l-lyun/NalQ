@@ -3,6 +3,7 @@ package com.openmd.server.quiz.service;
 import com.openmd.server.global.error.*;
 import com.openmd.server.notification.domain.QuizGenerationNotification;
 import com.openmd.server.notification.repository.NotificationRepository;
+import com.openmd.server.push.service.PushOutboxService;
 import com.openmd.server.quiz.domain.*;
 import com.openmd.server.quiz.domain.entity.*;
 import com.openmd.server.quiz.domain.type.*;
@@ -27,6 +28,7 @@ public class QuizGenerationPersistenceService {
   private final QuizFillInTheBlankRepository blanks;
   private final QuizFillInTheBlankAnswerRepository blankAnswers;
   private final NotificationRepository notifications;
+  private final PushOutboxService pushOutbox;
 
   public QuizGenerationPersistenceService(
       QuizSetRepository sets,
@@ -36,7 +38,8 @@ public class QuizGenerationPersistenceService {
       QuizEssayAnswerGuideRepository essays,
       QuizFillInTheBlankRepository blanks,
       QuizFillInTheBlankAnswerRepository blankAnswers,
-      NotificationRepository notifications) {
+      NotificationRepository notifications,
+      PushOutboxService pushOutbox) {
     this.sets = sets;
     this.questions = questions;
     this.choices = choices;
@@ -45,6 +48,7 @@ public class QuizGenerationPersistenceService {
     this.blanks = blanks;
     this.blankAnswers = blankAnswers;
     this.notifications = notifications;
+    this.pushOutbox = pushOutbox;
   }
 
   @Transactional
@@ -68,12 +72,12 @@ public class QuizGenerationPersistenceService {
         Math.toIntExact((maxQuestionCount * 4L + 4L) / 5L);
     if (valid.size() < minimumValidQuestionCount) {
       set.fail(QuizSetFailureCode.SOURCE_INSUFFICIENT);
-      notifications.save(QuizGenerationNotification.from(set));
+      saveTerminalNotificationAndOutbox(set);
       return 0;
     }
     for (ValidatedQuizQuestion value : valid) persist(set.getId(), value);
     set.ready();
-    notifications.save(QuizGenerationNotification.from(set));
+    saveTerminalNotificationAndOutbox(set);
     return valid.size();
   }
 
@@ -89,7 +93,7 @@ public class QuizGenerationPersistenceService {
             .orElseThrow(() -> new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND));
     if (set.getStatus() == QuizSetStatus.GENERATING) {
       set.fail(failureCode);
-      notifications.save(QuizGenerationNotification.from(set));
+      saveTerminalNotificationAndOutbox(set);
     }
   }
 
@@ -110,7 +114,7 @@ public class QuizGenerationPersistenceService {
     interrupted.forEach(
         set -> {
           set.fail(QuizSetFailureCode.GENERATION_FAILED);
-          notifications.save(QuizGenerationNotification.from(set));
+          saveTerminalNotificationAndOutbox(set);
         });
     return interrupted.size();
   }
@@ -122,9 +126,15 @@ public class QuizGenerationPersistenceService {
     stale.forEach(
         set -> {
           set.fail(QuizSetFailureCode.GENERATION_FAILED);
-          notifications.save(QuizGenerationNotification.from(set));
+          saveTerminalNotificationAndOutbox(set);
         });
     return stale.stream().map(QuizSet::getPublicId).toList();
+  }
+
+  private void saveTerminalNotificationAndOutbox(QuizSet set) {
+    QuizGenerationNotification notification =
+        notifications.saveAndFlush(QuizGenerationNotification.from(set));
+    pushOutbox.enqueue(notification);
   }
 
   private void persist(long setId, ValidatedQuizQuestion validated) {

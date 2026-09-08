@@ -362,7 +362,7 @@ export function NotionImportPage() {
 
             <VStack gap="x4">
               <Flex align="center" justify="space-between" gap="x3">
-                <Text as="h2" textStyle="t9Bold" color="fg.neutral">페이지 선택</Text>
+                <Text as="h2" textStyle="t7Bold" color="fg.neutral">페이지 선택</Text>
                 <ActionButton
                   type="button"
                   size="small"
@@ -433,7 +433,7 @@ export function NotionImportPage() {
                   </RadioGroup.Root></RadioGroupField.Root>
               ) : (
                 <VStack gap="x2" align="flex-start">
-                  <Text as="p" textStyle="t6Bold" color="fg.neutral">
+                  <Text as="p" textStyle="t5Bold" color="fg.neutral">
                     {committedQuery ? `‘${committedQuery}’와 일치하는 페이지가 없어요` : '가져올 수 있는 페이지가 없어요'}
                   </Text>
                   <Text as="p" textStyle="t4Regular" color="fg.neutralMuted">
@@ -547,7 +547,7 @@ function DisconnectedState({ reauth, callbackNotice, pending, error, onConnect, 
   return (
     <VStack gap="x5" align="stretch">
       <VStack gap="x2" align="flex-start">
-        <Text as="h2" textStyle="t9Bold" color="fg.neutral">{reauth ? '노션을 다시 연결해 주세요' : '노션으로 로그인해 주세요'}</Text>
+        <Text as="h2" textStyle="t7Bold" color="fg.neutral">{reauth ? '노션을 다시 연결해 주세요' : '노션으로 로그인해 주세요'}</Text>
         <Text as="p" textStyle="t5Regular" color="fg.neutralMuted">
           노션 페이지를 가져오려면 워크스페이스 연결이 필요해요. 가져온 내용은 원본 페이지와 자동으로 동기화되지 않아요.
         </Text>

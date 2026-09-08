@@ -14,6 +14,7 @@ import type { QuizGenerationNotification } from '@/features/notification/api/not
 import {
   formatNotificationTime,
   notificationDestination,
+  notificationRecoveryNotice,
   notificationMessage,
 } from '@/features/notification/model/notificationPresentation'
 import { notificationKeys } from '@/features/notification/model/notificationQueries'
@@ -25,7 +26,8 @@ export function NotificationsPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const queryClient = useQueryClient()
-  const [notice, setNotice] = useState<string>()
+  const [localNotice, setNotice] = useState<string>()
+  const notice = notificationRecoveryNotice(location.search) ?? localNotice
   const notifications = useInfiniteQuery({
     queryKey: notificationKeys.list,
     queryFn: ({ pageParam, signal }) => listManagedNotifications(pageParam, signal),

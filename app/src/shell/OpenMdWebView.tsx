@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BackHandler, Linking, Platform, StyleSheet, Text, View } from 'react-native';
+import { AppState, BackHandler, Linking, Platform, StyleSheet, Text, View } from 'react-native';
 import WebView, {
   type WebViewNavigation,
 } from 'react-native-webview';
+import { randomUUID } from 'expo-crypto';
 import type {
   ShouldStartLoadRequest,
   WebViewErrorEvent,
   WebViewHttpErrorEvent,
+  WebViewMessageEvent,
   WebViewNavigationEvent,
   WebViewOpenWindowEvent,
 } from 'react-native-webview/lib/WebViewTypes';
@@ -19,6 +21,33 @@ import {
   shouldHandleWebViewBack,
 } from './navigationPolicy';
 import { ShellStateView, type ShellState } from './ShellStateView';
+import {
+  PUSH_BRIDGE_VERSION,
+  createHelloMessage,
+  createMainDocumentBridgeScript,
+  createNativeFeatureMessage,
+  createNativeMessageDispatchScript,
+  decideAuthState,
+  parseTransportMessage,
+  parseWebFeatureMessage,
+  parseWebReadyMessage,
+  serializeNativeMessage,
+  type AcceptedAuthState,
+  type HelloMessage,
+} from '../push/bridgeProtocol';
+import {
+  createInstallationCredentials,
+  nativePushOpenStorage,
+  nativePushStorage,
+  recordNativeBindingOwner,
+  resolveNativeBindingOwner,
+} from '../push/nativePushStorage';
+import {
+  ExpoNotificationResponseProvider,
+  ExpoPushRegistrationProvider,
+} from '../push/nativeNotificationProvider';
+import { PushOpenCoordinator } from '../push/pushOpenCoordinator';
+import { PushRegistrationCoordinator } from '../push/pushRegistrationCoordinator';
 
 interface OpenMdWebViewProps {
   webOrigin: string;
@@ -28,6 +57,7 @@ interface OpenMdWebViewProps {
 type VisibleShellState = Extract<ShellState, 'loading' | 'load-error' | 'renderer-error'> | 'ready';
 
 const EXTERNAL_LINK_ERROR_DURATION_MS = 4_000;
+const IOS_SHORT_DOCUMENT_BOUNCE_INSET = 1;
 
 export function OpenMdWebView({ webOrigin, webUrl }: OpenMdWebViewProps) {
   const webViewRef = useRef<WebView>(null);
@@ -36,6 +66,57 @@ export function OpenMdWebView({ webOrigin, webUrl }: OpenMdWebViewProps) {
   const loadFailedRef = useRef(false);
   const pendingMainDocumentUrlRef = useRef(webUrl);
   const visibleMainDocumentUrlRef = useRef(webUrl);
+  const bridgeSessionIdRef = useRef<string | null>(randomUUID());
+  const documentNonceRef = useRef(`${randomUUID()}.${randomUUID()}`);
+  const documentStartedRef = useRef(false);
+  const bridgeMessageEnabledRef = useRef(false);
+  const coordinatorSessionRef = useRef<string | null>(null);
+  const lastHelloRef = useRef<{ replyTo: string; message: HelloMessage } | null>(null);
+  const acceptedAuthStateRef = useRef<AcceptedAuthState | null>(null);
+  const registrationProviderRef = useRef<ExpoPushRegistrationProvider | null>(null);
+  const notificationResponseProviderRef = useRef<ExpoNotificationResponseProvider | null>(null);
+  const coordinatorRef = useRef<PushRegistrationCoordinator | null>(null);
+  const pushOpenCoordinatorRef = useRef<PushOpenCoordinator | null>(null);
+
+  if (!registrationProviderRef.current) {
+    registrationProviderRef.current = new ExpoPushRegistrationProvider();
+  }
+  if (!notificationResponseProviderRef.current) {
+    notificationResponseProviderRef.current = new ExpoNotificationResponseProvider();
+  }
+  if (!coordinatorRef.current) {
+    coordinatorRef.current = new PushRegistrationCoordinator({
+      storage: nativePushStorage,
+      createInstallation: createInstallationCredentials,
+      registrationProvider: registrationProviderRef.current,
+      createMessageId: randomUUID,
+      now: () => new Date().toISOString(),
+      schedule: (callback, delayMs) => setTimeout(callback, delayMs),
+      cancelSchedule: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
+      onBindingActivated: async (bindingId, userId) => {
+        await recordNativeBindingOwner(bindingId, userId);
+        await pushOpenCoordinatorRef.current?.flush();
+      },
+      onSessionEnding: async (reason, userId) => {
+        if (reason === 'WITHDRAWAL') {
+          await pushOpenCoordinatorRef.current?.handleWithdrawal(userId);
+        }
+      },
+    });
+  }
+  const coordinator = coordinatorRef.current;
+  if (!pushOpenCoordinatorRef.current) {
+    pushOpenCoordinatorRef.current = new PushOpenCoordinator({
+      storage: nativePushOpenStorage,
+      createMessageId: randomUUID,
+      now: () => new Date().toISOString(),
+      resolveBindingOwner: resolveNativeBindingOwner,
+      clearLastResponseIfMatches: (sdkResponseId) => {
+        notificationResponseProviderRef.current?.clearLastResponseIfMatches(sdkResponseId);
+      },
+    });
+  }
+  const pushOpenCoordinator = pushOpenCoordinatorRef.current;
 
   const [canGoBack, setCanGoBack] = useState(false);
   const [documentUrl, setDocumentUrl] = useState(webUrl);
@@ -44,6 +125,49 @@ export function OpenMdWebView({ webOrigin, webUrl }: OpenMdWebViewProps) {
   const [webViewKey, setWebViewKey] = useState(0);
 
   const source = useMemo(() => ({ uri: documentUrl }), [documentUrl]);
+  const initialDocumentBridgeScript = useMemo(
+    () => createMainDocumentBridgeScript(webOrigin, documentNonceRef.current),
+    [webOrigin],
+  );
+
+  useEffect(() => {
+    const tokenSubscription = registrationProviderRef.current?.subscribeToTokenChanges(() => {
+      void coordinator.refreshRegistration().catch(() => {
+        // 다음 foreground 또는 웹 요청에서 동일 자격으로 다시 확인한다.
+      });
+    });
+    const appStateSubscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        void coordinator.refreshRegistration().catch(() => {
+          // foreground 복귀 실패는 WebView 이용을 막지 않는다.
+        });
+      }
+    });
+    const responseProvider = notificationResponseProviderRef.current;
+    let responseSubscription: { remove(): void } | undefined;
+    try {
+      responseSubscription = responseProvider?.subscribe((candidate) => {
+        void pushOpenCoordinator.capture(candidate).catch(() => {
+          // 선택 저장 실패 시 SDK last response를 유지해 다음 시작에서 다시 시도한다.
+        });
+      });
+      const lastCandidate = responseProvider?.getLastCandidate();
+      if (lastCandidate) {
+        void pushOpenCoordinator.capture(lastCandidate).catch(() => {
+          // cold-start 선택은 SDK last response에 남아 다음 시작에서 다시 시도한다.
+        });
+      }
+    } catch {
+      // 알림 response API를 사용할 수 없어도 WebView 셸은 계속 동작한다.
+    }
+    return () => {
+      tokenSubscription?.remove();
+      responseSubscription?.remove();
+      appStateSubscription.remove();
+      coordinator.disconnect();
+      pushOpenCoordinator.disconnect();
+    };
+  }, [coordinator, pushOpenCoordinator]);
 
   useEffect(() => {
     if (!externalLinkError) {
@@ -135,8 +259,12 @@ export function OpenMdWebView({ webOrigin, webUrl }: OpenMdWebViewProps) {
 
     failedMainDocumentUrlRef.current = failedNavigation.url;
     loadFailedRef.current = true;
+    bridgeMessageEnabledRef.current = false;
+    coordinator.disconnect();
+    pushOpenCoordinator.disconnect();
+    coordinatorSessionRef.current = null;
     setShellState('load-error');
-  }, [webOrigin]);
+  }, [coordinator, pushOpenCoordinator, webOrigin]);
 
   const handleLoadStart = useCallback((event: WebViewNavigationEvent) => {
     const navigation = classifyNavigation(event.nativeEvent.url, webOrigin);
@@ -146,11 +274,172 @@ export function OpenMdWebView({ webOrigin, webUrl }: OpenMdWebViewProps) {
 
     pendingMainDocumentUrlRef.current = navigation.url;
     loadFailedRef.current = false;
+    if (documentStartedRef.current) {
+      bridgeSessionIdRef.current = randomUUID();
+      documentNonceRef.current = `${randomUUID()}.${randomUUID()}`;
+    } else {
+      documentStartedRef.current = true;
+    }
+    coordinator.disconnect();
+    pushOpenCoordinator.disconnect();
+    coordinatorSessionRef.current = null;
+    bridgeMessageEnabledRef.current = false;
+    lastHelloRef.current = null;
+    acceptedAuthStateRef.current = null;
 
     if (!documentVisibleRef.current) {
       setShellState('loading');
     }
+  }, [coordinator, pushOpenCoordinator, webOrigin]);
+
+  const sendNativeFeatureMessage = useCallback((
+    type: string,
+    payload: unknown,
+    authEpoch: number,
+    logicalMessageId?: string,
+  ) => {
+    const bridgeSessionId = bridgeSessionIdRef.current;
+    if (!bridgeSessionId || coordinatorSessionRef.current !== bridgeSessionId) {
+      return null;
+    }
+    const messageId = logicalMessageId ?? randomUUID();
+    const message = createNativeFeatureMessage(
+      type,
+      bridgeSessionId,
+      authEpoch,
+      payload,
+      messageId,
+    );
+    const serialized = serializeNativeMessage(message);
+    webViewRef.current?.injectJavaScript(createNativeMessageDispatchScript(
+      serialized,
+      webOrigin,
+      documentNonceRef.current,
+    ));
+    return messageId;
   }, [webOrigin]);
+
+  const handleBridgeMessage = useCallback((event: WebViewMessageEvent) => {
+    if (!bridgeMessageEnabledRef.current) {
+      return;
+    }
+    const sourceNavigation = classifyNavigation(event.nativeEvent.url, webOrigin);
+    if (sourceNavigation.action !== 'internal') {
+      return;
+    }
+
+    const rawMessage = parseTransportMessage(
+      event.nativeEvent.data,
+      documentNonceRef.current,
+    );
+    if (!rawMessage) {
+      return;
+    }
+    const webReady = parseWebReadyMessage(rawMessage);
+    if (webReady) {
+      if (!webReady.payload.versions.includes(PUSH_BRIDGE_VERSION)) {
+        return;
+      }
+
+      const bridgeSessionId = bridgeSessionIdRef.current;
+      if (!bridgeSessionId) {
+        return;
+      }
+
+      let hello = lastHelloRef.current?.replyTo === webReady.messageId
+        ? lastHelloRef.current.message
+        : null;
+      if (hello === null) {
+        hello = createHelloMessage(
+          bridgeSessionId,
+          webReady.messageId,
+          randomUUID(),
+        );
+        lastHelloRef.current = { replyTo: webReady.messageId, message: hello };
+      }
+
+      const serializedHello = serializeNativeMessage(hello);
+      webViewRef.current?.injectJavaScript(createNativeMessageDispatchScript(
+        serializedHello,
+        webOrigin,
+        documentNonceRef.current,
+      ));
+      if (coordinatorSessionRef.current !== bridgeSessionId) {
+        coordinatorSessionRef.current = bridgeSessionId;
+        coordinator.connect(bridgeSessionId, sendNativeFeatureMessage);
+        void pushOpenCoordinator.connect((pending, authEpoch) => sendNativeFeatureMessage(
+          'PUSH_OPEN',
+          { notificationId: pending.notificationId, bindingId: pending.bindingId },
+          authEpoch,
+          pending.messageId,
+        )).catch(() => {
+          // durable pending은 유지되며 다음 bridge session에서 재전달한다.
+        });
+        void coordinator.flushPendingRevokes().catch(() => {
+          // durable pending은 유지되며 다음 bridge/foreground에서 재시도한다.
+        });
+      }
+      return;
+    }
+
+    const bridgeSessionId = bridgeSessionIdRef.current;
+    if (!bridgeSessionId) {
+      return;
+    }
+
+    const featureMessage = parseWebFeatureMessage(rawMessage, bridgeSessionId);
+    if (!featureMessage) {
+      return;
+    }
+
+    if (featureMessage.type === 'AUTH_STATE') {
+      const decision = decideAuthState(
+        acceptedAuthStateRef.current,
+        featureMessage,
+        ['push-v1'],
+      );
+      if (decision.accepted) {
+        acceptedAuthStateRef.current = decision.state;
+        void coordinator.acceptAuthState(decision.state);
+        void pushOpenCoordinator.acceptAuthState(decision.state).catch(() => {
+          // owner mapping 또는 저장소 실패 시 pending을 유지한다.
+        });
+      }
+      return;
+    }
+    if (featureMessage.type === 'PUSH_REGISTER_REQUEST') {
+      void coordinator.requestRegistration(featureMessage.authEpoch).catch(() => {
+        // 권한/토큰/저장 실패는 다음 명시 요청 또는 foreground에서 재시도한다.
+      });
+      return;
+    }
+    if (featureMessage.type === 'PUSH_STATE_RESULT') {
+      void coordinator.acceptStateResult(featureMessage).catch(() => {});
+      return;
+    }
+    if (featureMessage.type === 'PUSH_REGISTER_RESULT') {
+      void coordinator.acceptRegistrationResult(featureMessage).catch(() => {});
+      return;
+    }
+    if (featureMessage.type === 'SESSION_ENDING') {
+      void coordinator.captureSessionEnding(featureMessage).catch(() => {
+        // 저장 실패 시 ACK를 보내지 않아 웹의 제한 대기 뒤 기존 logout이 진행된다.
+      });
+      return;
+    }
+    if (featureMessage.type === 'PUSH_REVOKE_RESULT') {
+      void coordinator.acceptRevokeResult(featureMessage).catch(() => {});
+      return;
+    }
+    if (featureMessage.type === 'PUSH_OPEN_ACK') {
+      void pushOpenCoordinator.acceptAck(
+        featureMessage.payload,
+        featureMessage.authEpoch,
+      ).catch(() => {
+        // 정리 실패 시 같은 logical messageId를 다음 session에 다시 전달한다.
+      });
+    }
+  }, [coordinator, pushOpenCoordinator, sendNativeFeatureMessage, webOrigin]);
 
   const handleLoad = useCallback((event: WebViewNavigationEvent) => {
     if (loadFailedRef.current) {
@@ -158,12 +447,17 @@ export function OpenMdWebView({ webOrigin, webUrl }: OpenMdWebViewProps) {
     }
 
     const navigation = classifyNavigation(event.nativeEvent.url, webOrigin);
-    if (navigation.action === 'internal') {
-      visibleMainDocumentUrlRef.current = navigation.url;
+    if (navigation.action !== 'internal') {
+      return;
     }
+    visibleMainDocumentUrlRef.current = navigation.url;
 
     documentVisibleRef.current = true;
     failedMainDocumentUrlRef.current = null;
+    bridgeMessageEnabledRef.current = true;
+    webViewRef.current?.injectJavaScript(
+      createMainDocumentBridgeScript(webOrigin, documentNonceRef.current),
+    );
     setShellState('ready');
   }, [webOrigin]);
 
@@ -204,9 +498,13 @@ export function OpenMdWebView({ webOrigin, webUrl }: OpenMdWebViewProps) {
 
   const handleRendererTerminated = useCallback(() => {
     loadFailedRef.current = true;
+    bridgeMessageEnabledRef.current = false;
+    coordinator.disconnect();
+    pushOpenCoordinator.disconnect();
+    coordinatorSessionRef.current = null;
     setCanGoBack(false);
     setShellState('renderer-error');
-  }, []);
+  }, [coordinator, pushOpenCoordinator]);
 
   const retry = useCallback(() => {
     const retryUrl = selectInternalRetryUrl(
@@ -234,12 +532,20 @@ export function OpenMdWebView({ webOrigin, webUrl }: OpenMdWebViewProps) {
     Platform.OS === 'ios'
       ? {
           allowsBackForwardNavigationGestures: false,
+          bounces: true,
+          contentInset: {
+            bottom: IOS_SHORT_DOCUMENT_BOUNCE_INSET,
+            left: 0,
+            right: 0,
+            top: 0,
+          },
           sharedCookiesEnabled: false,
         }
       : Platform.OS === 'android'
         ? {
             allowFileAccess: false,
             mixedContentMode: 'never' as const,
+            overScrollMode: 'always' as const,
             setSupportMultipleWindows: true,
             thirdPartyCookiesEnabled: false,
           }
@@ -253,6 +559,8 @@ export function OpenMdWebView({ webOrigin, webUrl }: OpenMdWebViewProps) {
         allowUniversalAccessFromFileURLs={false}
         domStorageEnabled
         incognito={false}
+        injectedJavaScriptBeforeContentLoaded={initialDocumentBridgeScript}
+        injectedJavaScriptBeforeContentLoadedForMainFrameOnly
         javaScriptCanOpenWindowsAutomatically={false}
         key={webViewKey}
         onContentProcessDidTerminate={handleRendererTerminated}
@@ -260,6 +568,7 @@ export function OpenMdWebView({ webOrigin, webUrl }: OpenMdWebViewProps) {
         onHttpError={handleHttpError}
         onLoad={handleLoad}
         onLoadStart={handleLoadStart}
+        onMessage={handleBridgeMessage}
         onNavigationStateChange={handleNavigationStateChange}
         onOpenWindow={handleOpenWindow}
         onRenderProcessGone={handleRendererTerminated}

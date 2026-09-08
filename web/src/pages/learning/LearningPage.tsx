@@ -388,9 +388,9 @@ function LearningMain({
   onRetryMaterials?: () => void
 }) {
   return (
-    <VStack className="learning-content" px="spacingX.globalGutter" pt="x6" pb="spacingY.screenBottom" gap="x8">
-      <VStack as="header" gap="x5">
-        <Text as="h1" textStyle="t12Bold" color="fg.neutral">
+    <VStack className="learning-content" px="spacingX.globalGutter" pt="x6" pb="spacingY.screenBottom" gap="x6">
+      <VStack as="header" gap="x4">
+        <Text as="h1" textStyle="t9Bold" color="fg.neutral">
           학습
         </Text>
         <ActionButton type="button" size="large" variant="brandSolid" onClick={onNewQuiz}>
@@ -492,10 +492,10 @@ function ChoiceScreen({ title, intro, rows, onBack, headingRef }: {
   headingRef: React.RefObject<HTMLHeadingElement | null>
 }) {
   return (
-    <VStack className="learning-content" px="spacingX.globalGutter" pt="x4" pb="spacingY.screenBottom" gap="x8">
+    <VStack className="learning-content" px="spacingX.globalGutter" pt="x4" pb="spacingY.screenBottom" gap="x6">
       <LearningScreenHeader title={title} onBack={onBack} headingRef={headingRef} />
       <VStack gap="x4">
-        <Text as="p" textStyle="t7Bold" color="fg.neutral">
+        <Text as="p" textStyle="t5Bold" color="fg.neutral">
           {intro}
         </Text>
         <LearningActionList label={intro} rows={rows} outlined />
@@ -585,7 +585,7 @@ function RecentQuizContext({
     <Box bg="bg.neutralWeak" borderRadius="r3" p="x4">
       <VStack gap="x3">
         <VStack gap="x1">
-          <Text as="p" textStyle="t7Bold" color="fg.neutral">
+          <Text as="p" textStyle="t5Bold" color="fg.neutral">
             {review.materialTitle}
           </Text>
           <Text as="p" textStyle="t4Regular" color="fg.neutralMuted">
@@ -956,7 +956,7 @@ function MaterialDetailScreen({ materialId, loadMaterial, onBack, headingRef }: 
             <Text as="h2" textStyle="t5Bold" color="fg.neutralMuted">
               제목
             </Text>
-            <Text as="p" textStyle="t7Medium" color="fg.neutral">
+            <Text as="p" textStyle="t5Medium" color="fg.neutral">
               {state.data.title}
             </Text>
           </VStack>
@@ -986,10 +986,10 @@ function HandoffScreen({ title, description, onBack, headingRef }: {
   headingRef: React.RefObject<HTMLHeadingElement | null>
 }) {
   return (
-    <VStack className="learning-content" px="spacingX.globalGutter" pt="x4" pb="spacingY.screenBottom" gap="x8">
+    <VStack className="learning-content" px="spacingX.globalGutter" pt="x4" pb="spacingY.screenBottom" gap="x6">
       <LearningScreenHeader title={title} onBack={onBack} headingRef={headingRef} />
       <VStack gap="x4" align="flex-start">
-        <Text as="p" textStyle="t6Regular" color="fg.neutralMuted">
+        <Text as="p" textStyle="t5Regular" color="fg.neutralMuted">
           {description}
         </Text>
         <ActionButton type="button" size="medium" variant="neutralWeak" onClick={onBack}>

@@ -38,8 +38,6 @@ export function PublicServiceFooter({ preserveContext = false }: { preserveConte
         </nav>
         </Flex>
         <Flex className="public-service-footer__meta" width="full" gap="x2" align="center" wrap>
-          <Text textStyle="t3Regular" color="fg.neutralMuted">운영자 김도현</Text>
-          <span className="public-service-footer__separator" aria-hidden>·</span>
           <a className="public-service-link public-service-email" href="mailto:nalq.service@gmail.com">
             nalq.service@gmail.com
           </a>

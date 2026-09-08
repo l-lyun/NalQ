@@ -65,6 +65,8 @@ QuizSet terminal 결과를 사용자별로 90일 동안 지속 확인하고 읽�
 
 ## FCM 확장 경계
 
+후속 [푸시 API·브리지 계약 초안](contract-api-push-notifications.md)은 Expo transport data에 최소 식별자만 싣고 나머지 사건 정보를 인증 조회로 가져오는 방식으로 구체화한다. 아래 전체 필드 목록은 이전 FCM 확장 예시이며, 새 transport의 필수 필드 목록은 후속 계약을 따른다. 알림 원장의 데이터 의미는 바뀌지 않는다.
+
 향후 FCM data payload는 최소한 `notificationId`, `payloadVersion`, `type`, `quizSetId`, `materialId`, `failureCode`, `actionType`, `createdAt`을 사용해 inbox와 같은 사건을 식별한다. FCM 수신·열기는 서버 읽음과 자동으로 같지 않으며, 앱에서 사용자가 알림 행동을 선택한 뒤 기존 읽음 API로 동기화한다.
 
 다음 데이터는 알림 원장에 섞지 않고 후속 별도 원장으로 둔다.

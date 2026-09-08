@@ -13,6 +13,9 @@
 
 .home-content {
   box-sizing: border-box;
+  width: 100%;
+  max-width: 640px;
+  min-width: 0;
   margin-inline: auto;
   overflow-wrap: anywhere;
 }

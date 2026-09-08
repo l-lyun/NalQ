@@ -60,7 +60,7 @@ export function ProfilePage({
       <Box as="main" className="profile-main" bg="bg.layerDefault" width="full" pt="safeArea">
         <VStack className="profile-content" px="spacingX.globalGutter" pt="x6" pb="spacingY.screenBottom" gap="x3">
           <Flex as="header" align="center" justify="space-between" gap="x3">
-            <Text as="h1" textStyle="t12Bold" color="fg.neutral">마이페이지</Text>
+            <Text as="h1" textStyle="t9Bold" color="fg.neutral">마이페이지</Text>
             <div className="app-notification-slot" data-app-notification-slot />
           </Flex>
           {status === 'loading' ? <ProfileLoading /> : status === 'error' ? (
@@ -71,11 +71,11 @@ export function ProfilePage({
           ) : (
             <>
               <HStack as="section" gap="x3" align="center" aria-label="계정 요약">
-                <Avatar.Root size="64" aria-label={`${displayName}님의 기본 프로필 이미지`}>
-                  <Avatar.Fallback><Icon svg={<IconPersonCircleFill />} size="x8" color="fg.neutralMuted" /></Avatar.Fallback>
+                <Avatar.Root size="48" aria-label={`${displayName}님의 기본 프로필 이미지`}>
+                  <Avatar.Fallback><Icon svg={<IconPersonCircleFill />} size="x6" color="fg.neutralMuted" /></Avatar.Fallback>
                 </Avatar.Root>
                 <VStack minWidth="0px" align="flex-start" gap="x1">
-                  <Text textStyle="t8Bold" color="fg.neutral">{nickname ? `${nickname}님` : displayName}</Text>
+                  <Text textStyle="t6Bold" color="fg.neutral">{nickname ? `${nickname}님` : displayName}</Text>
                   <Text className="profile-account-email" textStyle="t4Regular" color="fg.neutralMuted">{email}</Text>
                 </VStack>
               </HStack>
@@ -114,7 +114,7 @@ export function ProfilePage({
 function SettingsSection({ title, titleId, children }: { title: string; titleId: string; children: React.ReactNode }) {
   return (
     <VStack as="section" gap="x1" aria-labelledby={titleId}>
-      <Text as="h2" id={titleId} textStyle="t10Bold" color="fg.neutral">{title}</Text>
+      <Text as="h2" id={titleId} textStyle="t7Bold" color="fg.neutral">{title}</Text>
       <List.Root className="profile-list" width="full">{children}</List.Root>
     </VStack>
   )
@@ -156,7 +156,7 @@ function ProfileLoading() {
   return (
     <VStack gap="x3" aria-busy="true" aria-label="마이페이지 정보를 불러오는 중">
       <HStack align="center" gap="x3">
-        <Skeleton tone="neutral" radius="full" width="64px" height="64px" />
+        <Skeleton tone="neutral" radius="full" width="48px" height="48px" />
         <VStack gap="x2">
           <Skeleton tone="neutral" radius="8" width="120px" height="x6" />
           <Skeleton tone="neutral" radius="8" width="200px" height="x4" />

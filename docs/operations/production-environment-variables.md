@@ -106,3 +106,9 @@ Cookie의 Secure, SameSite, Path와 OpenAPI/Swagger 비활성화는 운영 Compo
 6. credential 변경이면 이전 credential을 provider에서 폐기한다.
 
 저장소의 두 example 파일은 이름과 형식의 계약일 뿐 secret 저장소가 아니다. 웹 배포 principal에는 server env, backup bucket과 EC2 접근 권한을 주지 않고 web bucket object/release write와 지정 CloudFront invalidation만 허용한다.
+
+## 푸시 알림
+
+`OPENMD_PUSH_REGISTRATION_ENABLED`, `OPENMD_PUSH_DELIVERY_ENABLED`, `OPENMD_PUSH_SCHEDULER_ENABLED`는 각각 기기 API, 결과 Outbox/발송, 주기 실행을 제어한다. Compose가 서버 컨테이너에 전달하며 기본값은 모두 `false`다. `true` 또는 `false`만 허용한다. 운영 등록을 먼저 활성화해 TestFlight 기기 토큰을 확인한 다음 APNs 키·실제 발송 준비를 확인하고 delivery와 scheduler를 활성화한다.
+
+`OPENMD_PUSH_EXPO_ACCESS_TOKEN`은 Expo enhanced push security를 사용하는 프로젝트에서 필요한 서버 비밀값이다. 사용하지 않으면 빈 값으로 둔다. APNs `.p8`은 EAS에만 등록하며 서버나 웹 공개 환경변수에 넣지 않는다. 웹 배포에도 새 브리지 코드가 포함되어야 로그인 후 권한 요청·토큰 등록이 시작된다.
