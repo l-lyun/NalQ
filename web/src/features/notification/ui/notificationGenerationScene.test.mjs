@@ -13,3 +13,10 @@ test('전역 알림은 실제 생성 scene에서 claim하지 않고 나중에 �
   assert.ok(guard < claim)
   assert.doesNotMatch(source, /isGenerationRoute/)
 })
+
+test('전역 완료 감지는 생성 잠금이 남지 않도록 학습자료 캐시도 갱신한다', () => {
+  assert.match(
+    source,
+    /invalidateQueries\(\{ queryKey: learningMaterialKeys\.all \}\)/,
+  )
+})
