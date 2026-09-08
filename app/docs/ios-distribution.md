@@ -72,9 +72,9 @@ pnpm dlx eas-cli@latest submit --platform ios --profile production --id <EAS_BUI
 
 현재 로컬 Simulator에서는 알림 권한과 등록, 주입한 background 배너까지 확인했지만 실제 Expo 발송은 `InvalidCredentials`로 거절됐다. `com.nalq.app`의 APNs 자격을 연결하고 TestFlight 설치본에서 실제 수신을 확인하기 전에는 원격 푸시 검증을 완료로 기록하지 않는다.
 
-2026-09-08 production 빌드 1.0.0 (2)는 App Store provisioning profile `WCJ39M32JR`에 Push Notifications capability와 `aps-environment` entitlement가 없어 Xcode 서명 단계에서 실패했다. 이후 Apple Developer에서 `com.nalq.app`의 Push Notifications를 활성화하고 같은 profile을 재생성했다. Apple 화면에서 Active와 Push Notifications를 확인했으며, 새 profile 파일을 EAS에 동기화한 뒤 다시 빌드해야 한다.
+2026-09-08 production 빌드 1.0.0 (2)는 App Store provisioning profile `WCJ39M32JR`에 Push Notifications capability와 `aps-environment` entitlement가 없어 Xcode 서명 단계에서 실패했다. 이후 Apple Developer에서 `com.nalq.app`의 Push Notifications를 활성화하고 같은 profile을 재생성했다. 이후 EAS에서 Push Notifications 활성화 상태를 확인하고 새 profile `8JA7LAW6KN`을 생성·연결했다.
 
-같은 날 `NalQ Push` APNs 키를 Production 환경·`com.nalq.app` topic 한정으로 발급했다. 이 키는 TestFlight 설치본을 위한 것이며 Sandbox 빌드의 원격 푸시까지 지원한다고 가정하지 않는다. 키 파일의 안전한 다운로드·EAS 연결과 실제 수신은 별도 확인한다.
+같은 날 `NalQ Push` APNs 키를 Production 환경·`com.nalq.app` topic 한정으로 발급했다. 이 키는 TestFlight 설치본을 위한 것이며 Sandbox 빌드의 원격 푸시까지 지원한다고 가정하지 않는다. 다운로드한 키를 EAS 프로젝트에 연결했다. 실제 수신은 별도 확인한다.
 
 ## 저장소 밖에서 아직 필요한 출시 자료
 
@@ -87,3 +87,5 @@ pnpm dlx eas-cli@latest submit --platform ios --profile production --id <EAS_BUI
 ## 권한 설명 상태
 
 현재 네이티브 앱은 카메라, 사진, 마이크, 위치, 연락처, 추적 권한을 요청하지 않으므로 해당 `Info.plist` 사용 목적 문구를 넣지 않았다. 이후 파일 선택, 촬영, 알림이나 추적 기능을 추가할 때 실제 기능과 함께 최소 권한 및 사용자용 설명을 추가한다.
+
+2026-09-08 후속 검증: 아이콘 포함 [EAS 빌드 1.0.0 (3)](https://expo.dev/accounts/hhhyyuns-team/projects/nalq/builds/bd5d156f-1576-4d98-8501-5904e61a5cc9)가 FINISHED로 완료됐고 App Store Connect 업로드·처리도 완료됐다. 본인 1명만 포함한 `NalQ Internal Test` 내부 그룹에 빌드를 배정했으며, Apple 화면에서 iPad Pro 11(4세대), iOS 26.6.1의 `설치됨 1.0.0 (3)`을 확인했다. 설치는 PASS이며, 실제 원격 푸시 수신과 알림 탭 이동·로그아웃 검증은 아직 미실행이다. App Store 공개 심사는 제출하지 않았다.

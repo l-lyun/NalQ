@@ -88,9 +88,9 @@ NalQ는 회원 계정으로 학습자료를 저장하고 AI 퀴즈를 생성·�
 ## 적용 기록
 
 - 2026-09-08: App Store Connect 한국어 설명·프로모션 문구·키워드·지원/마케팅 URL·저작권·심사 메모를 저장했다. 부제와 교육 카테고리, 개인정보처리방침 URL도 저장했다.
-- TestFlight 베타 앱 설명·피드백 이메일·마케팅/개인정보처리방침 URL을 저장했다. 테스트할 내용과 심사 계정 정보는 아직 콘솔에 입력하지 않았다.
+- TestFlight 베타 앱 설명·피드백 이메일·마케팅/개인정보처리방침 URL을 저장했다. 빌드 3에는 아이콘·로그인 유지·푸시 수신·알림 탭 이동 테스트 항목을 저장했다. 심사 계정 정보는 입력하지 않았다.
 - 사용자가 소개 작업보다 본인 계정의 TestFlight 설치·푸시 검증을 우선하도록 범위를 조정했다. 추가 소개·심사 자료 작업은 중단하고 내부 테스트 준비를 진행한다.
-- EAS 1.0.0 (2)는 기존 provisioning profile의 Push Notifications / aps-environment 누락으로 실패했다. Apple capability 활성화와 profile 재발급은 완료했고, 새 profile을 EAS에 연결한 뒤 아이콘을 포함해 다시 빌드해야 한다.
+- EAS 1.0.0 (2)는 기존 provisioning profile의 Push Notifications / aps-environment 누락으로 실패했다. 이후 새 profile과 APNs 키를 EAS에 연결했고, 아이콘 포함 1.0.0 (3) 빌드·업로드 및 본인 iPad 설치를 확인했다. 실제 푸시 수신 검증은 남아 있다. 상세 증거는 [iOS 배포 기록](../../app/docs/ios-distribution.md)에 기록한다.
 
 ## 작성 기준
 
