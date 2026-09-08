@@ -395,3 +395,10 @@ web/src/
 세션 내 상태/변경 HTTP를 직렬화하고 동일 진행 operation을 합친다. native가 의도·멱등 키·해제 pending을 내구 보관하며, 웹은 새 session/계정에 이전 응답을 적용하지 않는다. 로그아웃은 SESSION_ENDING을 먼저 보낸 뒤 즉시 epoch를 바꿔 신규 등록을 차단한다. 내구 ACK를 최대 1.5초 기다린 뒤 기존 logout을 진행하고, 익명 상태에서도 특정 pending revoke만 처리한다. 회원 탈퇴의 기기 제거는 서버가 담당하고, 성공 후 local session 종료 전 native 해제 보존도 요청한다.
 
 `pnpm test`는 순수 검사, 실제 Axios interceptor의 계정 경합, 앱 coordinator와 웹 session의 등록→내구 저장→해제 연결을 대역 HTTP/저장소로 검증하며 `pnpm verify`에 포함한다. 실제 WebView·SecureStore·APNs/FCM 검증과 알림 선택/이동은 별도다. 등록 응답과 logout 요청이 동시에 유실되어 bindingId를 모르는 경우는 공유 계약의 후속 인증 조정 경계를 따른다.
+
+
+### TestFlight 푸시 선택 처리 (2026-09-08)
+
+`AuthBootstrap`은 router의 navigate를 `pushOpenSession`에 전달한다. 엄격한 PUSH_OPEN 스키마·현재 인증 epoch를 확인한 뒤 보호 API로 알림과 목적지 데이터를 조회한다. 성공 퀴즈는 목록 focus, 실패는 숫자 materialId의 재생성 화면, 없는 알림/대상은 안내가 있는 알림함으로 이동한다. 처리 중 계정 변경은 결과·읽음·ACK를 차단한다.
+
+`pushOpenStore`는 별도 IndexedDB의 opens/reads store를 사용한다. `(userId,messageId)` 완료 기록과 `(userId,notificationId)` 읽음 의도를 원자적으로 저장한 뒤 ACK하며, SDK 재전달은 완료 기록으로 합친다. 저장 실패에는 ACK하지 않고 같은 문서의 재시도는 이미 표시한 목적지로 반복 이동하지 않는다. 읽음 요청은 시작 authContext에 고정하며 foreground/online/5초 tick에서 현재 계정의 기한 도래 항목만 재시도한다. 성공 이후 알림 캐시를 갱신하고 404/영구4xx는 큐에서 제거한다. 로그아웃은 큐를 격리하고 탈퇴 시 해당 계정 큐와 완료 기록을 제거하며, 알림 생성 후 90일을 넘기지 않는다.

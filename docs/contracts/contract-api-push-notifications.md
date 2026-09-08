@@ -210,7 +210,7 @@ Expo 전송에는 동일한 절대 만료 시각을 `expiration`(Unix 초)으로
 - `PUSH_REVOKE_RESULT`: `{ operationId, outcome, data?, errorCode?, retryAfterMs? }`, SUCCESS data는 `{ revoked }`이며 HTTP 404도 종료 가능한 no-op으로 정규화한다.
 - STATE_RESULT의 RETRY/FAILED 역시 `errorCode`, 선택 `retryAfterMs`를 사용한다. RETRY는 동일 논리 요청을 재전송하고 revision/operation 충돌은 최신 상태 조회 뒤 새 의도를 결정한다. Retry-After는 0~24시간 범위로 정규화하고 기본 backoff보다 길면 존중한다.
 
-현재 구현 단위는 등록·해제와 foreground 억제까지다. `PUSH_OPEN`/읽음·선택 ACK와 화면 이동은 후속 구현이며 단순 수신을 완료로 ACK하지 않는다.
+2026-09-08 TestFlight 통합에서는 등록·해제·foreground 억제와 `PUSH_OPEN` 선택 흐름을 연결한다. 웹은 인증된 현재 계정으로 알림·목적지 존재를 조회하고 이동한 뒤, IndexedDB에 open 완료와 읽음 의도를 한 트랜잭션으로 저장해야 ACK한다. 단순 수신을 완료로 ACK하지 않는다.
 
 native는 푸시 선택을 먼저 내구 저장한다. 새 bridge session에서는 새 envelope로 재전달하되 논리 messageId는 유지한다. 로그인 전 `PUSH_OPEN`도 로그인 유도용으로 전달할 수 있지만 개인 결과 조회와 ACK는 인증 후에만 실행한다.
 

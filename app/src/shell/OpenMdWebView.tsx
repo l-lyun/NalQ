@@ -37,9 +37,16 @@ import {
 } from '../push/bridgeProtocol';
 import {
   createInstallationCredentials,
+  nativePushOpenStorage,
   nativePushStorage,
+  recordNativeBindingOwner,
+  resolveNativeBindingOwner,
 } from '../push/nativePushStorage';
-import { ExpoPushRegistrationProvider } from '../push/nativeNotificationProvider';
+import {
+  ExpoNotificationResponseProvider,
+  ExpoPushRegistrationProvider,
+} from '../push/nativeNotificationProvider';
+import { PushOpenCoordinator } from '../push/pushOpenCoordinator';
 import { PushRegistrationCoordinator } from '../push/pushRegistrationCoordinator';
 
 interface OpenMdWebViewProps {
@@ -67,10 +74,15 @@ export function OpenMdWebView({ webOrigin, webUrl }: OpenMdWebViewProps) {
   const lastHelloRef = useRef<{ replyTo: string; message: HelloMessage } | null>(null);
   const acceptedAuthStateRef = useRef<AcceptedAuthState | null>(null);
   const registrationProviderRef = useRef<ExpoPushRegistrationProvider | null>(null);
+  const notificationResponseProviderRef = useRef<ExpoNotificationResponseProvider | null>(null);
   const coordinatorRef = useRef<PushRegistrationCoordinator | null>(null);
+  const pushOpenCoordinatorRef = useRef<PushOpenCoordinator | null>(null);
 
   if (!registrationProviderRef.current) {
     registrationProviderRef.current = new ExpoPushRegistrationProvider();
+  }
+  if (!notificationResponseProviderRef.current) {
+    notificationResponseProviderRef.current = new ExpoNotificationResponseProvider();
   }
   if (!coordinatorRef.current) {
     coordinatorRef.current = new PushRegistrationCoordinator({
@@ -81,9 +93,30 @@ export function OpenMdWebView({ webOrigin, webUrl }: OpenMdWebViewProps) {
       now: () => new Date().toISOString(),
       schedule: (callback, delayMs) => setTimeout(callback, delayMs),
       cancelSchedule: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
+      onBindingActivated: async (bindingId, userId) => {
+        await recordNativeBindingOwner(bindingId, userId);
+        await pushOpenCoordinatorRef.current?.flush();
+      },
+      onSessionEnding: async (reason, userId) => {
+        if (reason === 'WITHDRAWAL') {
+          await pushOpenCoordinatorRef.current?.handleWithdrawal(userId);
+        }
+      },
     });
   }
   const coordinator = coordinatorRef.current;
+  if (!pushOpenCoordinatorRef.current) {
+    pushOpenCoordinatorRef.current = new PushOpenCoordinator({
+      storage: nativePushOpenStorage,
+      createMessageId: randomUUID,
+      now: () => new Date().toISOString(),
+      resolveBindingOwner: resolveNativeBindingOwner,
+      clearLastResponseIfMatches: (sdkResponseId) => {
+        notificationResponseProviderRef.current?.clearLastResponseIfMatches(sdkResponseId);
+      },
+    });
+  }
+  const pushOpenCoordinator = pushOpenCoordinatorRef.current;
 
   const [canGoBack, setCanGoBack] = useState(false);
   const [documentUrl, setDocumentUrl] = useState(webUrl);
@@ -110,12 +143,31 @@ export function OpenMdWebView({ webOrigin, webUrl }: OpenMdWebViewProps) {
         });
       }
     });
+    const responseProvider = notificationResponseProviderRef.current;
+    let responseSubscription: { remove(): void } | undefined;
+    try {
+      responseSubscription = responseProvider?.subscribe((candidate) => {
+        void pushOpenCoordinator.capture(candidate).catch(() => {
+          // 선택 저장 실패 시 SDK last response를 유지해 다음 시작에서 다시 시도한다.
+        });
+      });
+      const lastCandidate = responseProvider?.getLastCandidate();
+      if (lastCandidate) {
+        void pushOpenCoordinator.capture(lastCandidate).catch(() => {
+          // cold-start 선택은 SDK last response에 남아 다음 시작에서 다시 시도한다.
+        });
+      }
+    } catch {
+      // 알림 response API를 사용할 수 없어도 WebView 셸은 계속 동작한다.
+    }
     return () => {
       tokenSubscription?.remove();
+      responseSubscription?.remove();
       appStateSubscription.remove();
       coordinator.disconnect();
+      pushOpenCoordinator.disconnect();
     };
-  }, [coordinator]);
+  }, [coordinator, pushOpenCoordinator]);
 
   useEffect(() => {
     if (!externalLinkError) {
@@ -209,9 +261,10 @@ export function OpenMdWebView({ webOrigin, webUrl }: OpenMdWebViewProps) {
     loadFailedRef.current = true;
     bridgeMessageEnabledRef.current = false;
     coordinator.disconnect();
+    pushOpenCoordinator.disconnect();
     coordinatorSessionRef.current = null;
     setShellState('load-error');
-  }, [coordinator, webOrigin]);
+  }, [coordinator, pushOpenCoordinator, webOrigin]);
 
   const handleLoadStart = useCallback((event: WebViewNavigationEvent) => {
     const navigation = classifyNavigation(event.nativeEvent.url, webOrigin);
@@ -228,6 +281,7 @@ export function OpenMdWebView({ webOrigin, webUrl }: OpenMdWebViewProps) {
       documentStartedRef.current = true;
     }
     coordinator.disconnect();
+    pushOpenCoordinator.disconnect();
     coordinatorSessionRef.current = null;
     bridgeMessageEnabledRef.current = false;
     lastHelloRef.current = null;
@@ -236,18 +290,19 @@ export function OpenMdWebView({ webOrigin, webUrl }: OpenMdWebViewProps) {
     if (!documentVisibleRef.current) {
       setShellState('loading');
     }
-  }, [coordinator, webOrigin]);
+  }, [coordinator, pushOpenCoordinator, webOrigin]);
 
   const sendNativeFeatureMessage = useCallback((
     type: string,
     payload: unknown,
     authEpoch: number,
+    logicalMessageId?: string,
   ) => {
     const bridgeSessionId = bridgeSessionIdRef.current;
     if (!bridgeSessionId || coordinatorSessionRef.current !== bridgeSessionId) {
       return null;
     }
-    const messageId = randomUUID();
+    const messageId = logicalMessageId ?? randomUUID();
     const message = createNativeFeatureMessage(
       type,
       bridgeSessionId,
@@ -312,6 +367,14 @@ export function OpenMdWebView({ webOrigin, webUrl }: OpenMdWebViewProps) {
       if (coordinatorSessionRef.current !== bridgeSessionId) {
         coordinatorSessionRef.current = bridgeSessionId;
         coordinator.connect(bridgeSessionId, sendNativeFeatureMessage);
+        void pushOpenCoordinator.connect((pending, authEpoch) => sendNativeFeatureMessage(
+          'PUSH_OPEN',
+          { notificationId: pending.notificationId, bindingId: pending.bindingId },
+          authEpoch,
+          pending.messageId,
+        )).catch(() => {
+          // durable pending은 유지되며 다음 bridge session에서 재전달한다.
+        });
         void coordinator.flushPendingRevokes().catch(() => {
           // durable pending은 유지되며 다음 bridge/foreground에서 재시도한다.
         });
@@ -338,6 +401,9 @@ export function OpenMdWebView({ webOrigin, webUrl }: OpenMdWebViewProps) {
       if (decision.accepted) {
         acceptedAuthStateRef.current = decision.state;
         void coordinator.acceptAuthState(decision.state);
+        void pushOpenCoordinator.acceptAuthState(decision.state).catch(() => {
+          // owner mapping 또는 저장소 실패 시 pending을 유지한다.
+        });
       }
       return;
     }
@@ -363,8 +429,17 @@ export function OpenMdWebView({ webOrigin, webUrl }: OpenMdWebViewProps) {
     }
     if (featureMessage.type === 'PUSH_REVOKE_RESULT') {
       void coordinator.acceptRevokeResult(featureMessage).catch(() => {});
+      return;
     }
-  }, [coordinator, sendNativeFeatureMessage, webOrigin]);
+    if (featureMessage.type === 'PUSH_OPEN_ACK') {
+      void pushOpenCoordinator.acceptAck(
+        featureMessage.payload,
+        featureMessage.authEpoch,
+      ).catch(() => {
+        // 정리 실패 시 같은 logical messageId를 다음 session에 다시 전달한다.
+      });
+    }
+  }, [coordinator, pushOpenCoordinator, sendNativeFeatureMessage, webOrigin]);
 
   const handleLoad = useCallback((event: WebViewNavigationEvent) => {
     if (loadFailedRef.current) {
@@ -425,10 +500,11 @@ export function OpenMdWebView({ webOrigin, webUrl }: OpenMdWebViewProps) {
     loadFailedRef.current = true;
     bridgeMessageEnabledRef.current = false;
     coordinator.disconnect();
+    pushOpenCoordinator.disconnect();
     coordinatorSessionRef.current = null;
     setCanGoBack(false);
     setShellState('renderer-error');
-  }, [coordinator]);
+  }, [coordinator, pushOpenCoordinator]);
 
   const retry = useCallback(() => {
     const retryUrl = selectInternalRetryUrl(

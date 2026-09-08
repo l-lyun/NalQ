@@ -35,6 +35,11 @@ interface CoordinatorDependencies {
   now: () => string;
   schedule: (callback: () => void, delayMs: number) => unknown;
   cancelSchedule: (handle: unknown) => void;
+  onBindingActivated?: (bindingId: string, userId: number) => Promise<void>;
+  onSessionEnding?: (
+    reason: 'LOGOUT' | 'WITHDRAWAL',
+    userId: number,
+  ) => Promise<void>;
 }
 
 interface StateRequestContext {
@@ -312,6 +317,12 @@ export class PushRegistrationCoordinator {
         state.lastRegistrationAck.authEpoch,
         resultGeneration,
       )) {
+      if (state.lastRegistrationAck.bindingId) {
+        await this.dependencies.onBindingActivated?.(
+          state.lastRegistrationAck.bindingId,
+          state.lastRegistrationAck.userId,
+        );
+      }
       this.sendRegistrationAck(state.lastRegistrationAck);
       return;
     }
@@ -400,6 +411,10 @@ export class PushRegistrationCoordinator {
       };
     });
 
+    if (result.status === 'ACTIVE' && result.bindingId) {
+      await this.dependencies.onBindingActivated?.(result.bindingId, pending.userId);
+    }
+
     if (!this.matchesCurrentAuth(pending.userId, pending.authEpoch, resultGeneration)) {
       return;
     }
@@ -454,8 +469,17 @@ export class PushRegistrationCoordinator {
         // 후속 인증 상태 조회로 조정할 수 있도록 의도를 지우지 않는다.
         pendingRegistration: current.pendingRegistration,
         pendingRevokes: revoke ? [...current.pendingRevokes, revoke] : current.pendingRevokes,
+        lastRegistrationAck: message.payload.reason === 'WITHDRAWAL'
+          && current.lastRegistrationAck?.userId === authenticated.userId
+          ? null
+          : current.lastRegistrationAck,
       };
     }));
+
+    await this.dependencies.onSessionEnding?.(
+      message.payload.reason,
+      authenticated.userId,
+    );
 
     this.send('SESSION_ENDING_ACK', {
       requestId: message.messageId,

@@ -4,7 +4,7 @@ status: implemented
 scope: app
 ---
 
-# [TRD · App] 푸시 브리지와 기기 등록·해제
+# [TRD · App] 푸시 브리지와 기기 등록·해제·선택
 
 - 상태: 앱 등록·해제 구현 및 자동 검증, 실기기 내부 배포 빌드 준비 완료·외부 자격과 기기 검증 전
 - 소유 애플리케이션: `app/`
@@ -14,9 +14,9 @@ scope: app
 
 ## 책임과 현재 범위
 
-이 문서는 Expo 앱이 OS 알림 권한과 Expo push token을 취득하고, 설치 자격·등록·해제 의도를 보안 저장소에 보존하며, 검증된 WebView 최상위 문서를 통해 웹 소유 HTTP 클라이언트에 전달하는 구조를 설명한다.
+이 문서는 Expo 앱이 OS 알림 권한과 Expo push token을 취득하고, 설치 자격·등록·해제 의도와 알림 선택을 보안 저장소에 보존하며, 검증된 WebView 최상위 문서를 통해 웹 소유 HTTP 클라이언트에 전달하는 구조를 설명한다.
 
-앱은 `push-v1` capability를 광고한다. 웹이 협상한 같은 bridge session과 인증 epoch에서만 상태 조회·등록 결과를 적용하고, 사용자 Bearer token은 native로 전달하지 않는다. 푸시 선택과 화면 이동은 이번 구현에 포함하지 않는다.
+앱은 `push-v1` capability를 광고한다. 웹이 협상한 같은 bridge session과 인증 epoch에서만 상태 조회·등록 결과와 선택 완료 ACK를 적용하고, 사용자 Bearer token은 native로 전달하지 않는다. 선택 뒤 서버 조회·화면 이동·읽음 내구 큐는 웹이 소유한다.
 
 ## 문서 수명과 격리된 handshake
 
@@ -55,6 +55,18 @@ PushStorageState
 - 로그아웃·탈퇴 시작은 현재 사용자 active binding을 당시 installation key와 함께 pending revoke로 먼저 저장한다. 그 뒤 `SESSION_ENDING_ACK`와 인증 독립 `PUSH_REVOKE`를 보낸다. 성공·404 no-op 결과를 받은 항목만 제거한다.
 - 등록 응답이 유실돼 bindingId를 아직 모르는 상태에서 session 종료가 시작되면 해당 pending registration을 지우지 않는다. 앱은 추측한 binding으로 해제하지 않고 다음 동일 계정 상태 조회 또는 계정 전환 등록에서 조정한다. 서버 session 종료와 등록 커밋의 경합 보호가 이 공백의 서버측 필수 방어다.
 - 저장 JSON·UUID·key·시각·revision이 손상되면 자동으로 새 설치를 덮어쓰지 않고 실패한다. SecureStore 준비 실패는 WebView 사용을 막지 않으며 다음 등록 trigger에서 재시도한다.
+
+알림 선택은 등록 상태와 독립된 `nalq.push.opens.v1` key에 pending 배열로 저장한다. 각 항목은 앱이 만든 논리 `messageId`, 검증한 `notificationId`·`bindingId`, Expo SDK response ID, 포착 시각과 확인 가능한 binding owner user ID를 담는다. SDK response ID 중복 포착은 기존 논리 messageId로 합치며, 저장이 끝나기 전에는 WebView로 전달하지 않는다.
+
+## 알림 선택·계정 fence·완료 ACK
+
+1. Expo의 cold-start last response와 실행 중 response listener는 기본 알림 탭만 수집한다. data가 정확히 `{ payloadVersion: 1, notificationId, bindingId }`이고 두 ID가 UUID일 때만 pending으로 저장하며 URL이나 임의 명령을 해석하지 않는다.
+2. 새 bridge session은 pending을 동일 논리 messageId와 새 session envelope로 `PUSH_OPEN` 재전달한다. 현재 인증 상태를 받기 전에는 `authEpoch=0` 전달로 로그인 유도만 허용한다.
+3. `AUTH_STATE`를 받으면 pending의 binding owner가 현재 인증 user와 일치할 때만 현재 epoch로 재전달한다. owner는 선택 포착 시점의 active binding 또는 마지막 등록 ACK에서 보존하고, 등록 성공마다 별도 binding-owner 이력을 90일 범위로 갱신한다. 신규 버전 첫 시작에는 기존 active binding과 마지막 ACK도 이 이력으로 승격한다. 확인할 수 없는 과거 binding은 다른 계정의 404를 완료로 오인하지 않도록 인증 조회에 전달하지 않고 pending으로 유지한다.
+4. `PUSH_OPEN_ACK`는 payload의 원래 messageId, `COMPLETED | UNAVAILABLE`, userId를 exact schema로 검증한다. envelope epoch와 현재 authenticated user·epoch, pending owner가 모두 일치할 때만 종료한다. 로그인 대기·다른 계정·저장 실패에는 pending을 제거하지 않는다.
+5. 유효 ACK 뒤 SDK last response가 해당 pending의 SDK ID와 여전히 같을 때만 지우고 pending을 내구 삭제한다. 더 최신 SDK response는 지우지 않는다. SDK 정리 뒤 pending 삭제가 실패해도 pending은 남아 다음 bridge session에서 재전달된다.
+6. 문서 reload·renderer 종료·계정 전환 중 비동기 owner 조회가 끝나더라도 connection generation이 바뀌었으면 이전 session sender로 메시지를 보내지 않는다.
+7. pending 선택과 binding-owner 이력은 90일 경계까지 유지하고 그 뒤 bridge 재전달 전에 정리한다. 만료 pending의 SDK last response도 ID가 정확히 일치할 때만 지운다. 로그아웃은 pending과 owner 이력을 유지하고, 탈퇴는 해당 user의 pending·owner 이력과 마지막 등록 ACK를 내구 삭제한 뒤에만 `SESSION_ENDING_ACK`를 보낸다.
 
 ## 권한·토큰과 foreground
 
@@ -98,11 +110,14 @@ app/
     bridgeProtocol.ts
     nativeNotificationProvider.ts
     nativePushStorage.ts
+    pushOpenCoordinator.ts
+    pushOpenStorage.ts
     pushRegistrationCoordinator.ts
     pushStorage.ts
   src/shell/OpenMdWebView.tsx
   tests/
     pushFoundation.test.cjs
+    pushOpen.test.cjs
     pushRegistration.test.cjs
     deviceBuildReadiness.test.cjs
 ```
@@ -112,6 +127,8 @@ app/
 - top-frame·exact-origin shim, nonce wrapper exact schema, raw/다른 nonce 거절
 - nonce의 facade 함수 비노출과 이전 문서 native dispatch 거절
 - HELLO `push-v1`, session·epoch·payload exact schema와 UTF-8 8KiB 상한
+- cold/warm 선택 validation·내구 dedupe와 session별 동일 logical message 재전달
+- anonymous 로그인 유도, binding owner·auth epoch fence, ACK 뒤 pending·matching SDK response 정리
 - 권한·token 뒤 상태 조회, durable registration 뒤 `PUSH_DEVICE`
 - 저장 실패 때 ACK 금지, 성공 ACK 유실 재응답
 - 문서 reload·계정 전환·session ending과 늦은 등록 결과 fence
@@ -128,4 +145,4 @@ app/
 - EAS 자격과 iOS 테스트 기기 provisioning을 준비해 실제 권한 prompt, Expo token, 등록·로그아웃 해제와 재실행 복구를 확인한다.
 - iOS·Android foreground에서 banner·소리·진동·badge가 모두 억제되고 다른 background 기기에는 계속 표시되는지 확인한다.
 - SecureStore의 삭제·재설치·backup 차이, Android WebView before-content fallback과 token rotation listener는 실기기에서 확인한다.
-- 푸시 선택·화면 이동·읽음 동기화는 별도 후속 구현이다.
+- 선택 뒤 단일 알림 조회·화면 이동·읽음 큐와 완료 저장은 웹 구현과 함께 실제 기기에서 검증한다.

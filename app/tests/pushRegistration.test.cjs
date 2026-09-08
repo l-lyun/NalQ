@@ -72,6 +72,8 @@ function harness(permission = 'GRANTED', overrides = {}) {
     now: () => '2026-09-07T01:00:00.000Z',
     schedule: overrides.schedule ?? (() => null),
     cancelSchedule: overrides.cancelSchedule ?? (() => {}),
+    onBindingActivated: overrides.onBindingActivated,
+    onSessionEnding: overrides.onSessionEnding,
   });
 
   coordinator.connect(SESSION_ID, (type, payload, authEpoch) => {
@@ -292,6 +294,7 @@ test('session ending durably captures the exact binding before ACK and replays r
 
   const persisted = await h.repository.load();
   assert.equal(persisted.activeBinding, null);
+  assert.equal(persisted.lastRegistrationAck.bindingId, BINDING_ID);
   assert.equal(persisted.pendingRevokes.length, 1);
   assert.equal(persisted.pendingRevokes[0].bindingId, BINDING_ID);
   assert.equal(h.sent.at(-2).type, 'SESSION_ENDING_ACK');
@@ -423,4 +426,78 @@ test('anonymous revision conflicts quarantine the original binding instead of gu
 
   assert.deepEqual((await h.repository.load()).pendingRevokes, [revoke]);
   assert.equal(h.sent.length, 0);
+});
+
+test('registration ACK waits for durable binding-owner history and retries it on duplicate success', async () => {
+  let attempts = 0;
+  const h = harness('GRANTED', {
+    onBindingActivated: async (bindingId, userId) => {
+      attempts += 1;
+      assert.equal(bindingId, BINDING_ID);
+      assert.equal(userId, USER_ID);
+      if (attempts === 1) throw new Error('owner history unavailable');
+    },
+  });
+  await authenticateAndRequest(h);
+  await h.coordinator.acceptStateResult({
+    authEpoch: 3,
+    payload: { requestId: h.sent[0].payload.requestId, outcome: 'NOT_FOUND' },
+  });
+  const result = {
+    authEpoch: 3,
+    payload: {
+      operationId: h.sent[1].payload.operationId,
+      outcome: 'SUCCESS',
+      data: {
+        installationId: INSTALLATION_ID,
+        revision: 1,
+        bindingId: BINDING_ID,
+        status: 'ACTIVE',
+        userId: USER_ID,
+      },
+    },
+  };
+
+  await assert.rejects(h.coordinator.acceptRegistrationResult(result), /owner history unavailable/);
+  assert.equal(h.sent.some((message) => message.type === 'PUSH_REGISTER_ACK'), false);
+  await h.coordinator.acceptRegistrationResult(result);
+  assert.equal(attempts, 2);
+  assert.equal(h.sent.at(-1).type, 'PUSH_REGISTER_ACK');
+});
+
+test('withdrawal clears the matching last registration owner before its session-ending ACK', async () => {
+  const endings = [];
+  const h = harness('GRANTED', {
+    onSessionEnding: async (reason, userId) => endings.push({ reason, userId }),
+  });
+  await authenticateAndRequest(h);
+  await h.coordinator.acceptStateResult({
+    authEpoch: 3,
+    payload: { requestId: h.sent[0].payload.requestId, outcome: 'NOT_FOUND' },
+  });
+  await h.coordinator.acceptRegistrationResult({
+    authEpoch: 3,
+    payload: {
+      operationId: h.sent[1].payload.operationId,
+      outcome: 'SUCCESS',
+      data: {
+        installationId: INSTALLATION_ID,
+        revision: 1,
+        bindingId: BINDING_ID,
+        status: 'ACTIVE',
+        userId: USER_ID,
+      },
+    },
+  });
+
+  await h.coordinator.captureSessionEnding({
+    messageId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+    authEpoch: 3,
+    payload: { reason: 'WITHDRAWAL' },
+  });
+
+  const state = await h.repository.load();
+  assert.equal(state.lastRegistrationAck, null);
+  assert.deepEqual(endings, [{ reason: 'WITHDRAWAL', userId: USER_ID }]);
+  assert.equal(h.sent.findLast((message) => message.type === 'SESSION_ENDING_ACK').payload.persisted, true);
 });

@@ -16,6 +16,8 @@ export function createPushOpenSession(connection: NativeConnection, navigate: (p
   let reading = false
   const pending = new Map<string, Extract<NonNullable<ReturnType<typeof parseNativePushMessage>>, { type: 'PUSH_OPEN' }>>()
   const inflight = new Set<string>()
+  const presented = new Set<string>()
+  const loginPrompted = new Set<string>()
   const current = (context: AuthContext) => active && getAuthPhase() === 'authenticated' && context.userId !== null && isCurrentAuthContext(context)
   const ack = (id: string, outcome: 'COMPLETED' | 'UNAVAILABLE', context: AuthContext) => {
     if (current(context)) { connection.send('PUSH_OPEN_ACK', { messageId: id, outcome, userId: context.userId }, context.authEpoch); pending.delete(id) }
@@ -28,6 +30,10 @@ export function createPushOpenSession(connection: NativeConnection, navigate: (p
   }
   async function open(message: NonNullable<ReturnType<typeof pending.get>>) {
     const context = getAuthContext()
+    if (active && getAuthPhase() === 'anonymous' && !loginPrompted.has(message.messageId)) {
+      loginPrompted.add(message.messageId)
+      void navigate('/login').catch(() => { loginPrompted.delete(message.messageId) })
+    }
     if (!current(context) || inflight.has(message.messageId)) return
     // Native sends only the selected binding's known owner; epochs reject stale deliveries.
     if (message.authEpoch !== context.authEpoch) { pending.delete(message.messageId); return }
@@ -41,9 +47,9 @@ export function createPushOpenSession(connection: NativeConnection, navigate: (p
       try { notification = await get<QuizGenerationNotification>(`/api/v1/notifications/${message.payload.notificationId}`, context) }
       catch (error) { if (toApiClientError(error).status !== 404) throw error }
       if (!current(context)) return
-      let destination = '/notifications?unavailable=1'
+      let destination = notification ? '/notifications?unavailable=target' : '/notifications?unavailable=notification'
       if (notification) {
-        if (notification.notificationId !== message.payload.notificationId || !isUuid(notification.quizSetId) || !isUuid(notification.materialId)
+        if (notification.notificationId !== message.payload.notificationId || !isUuid(notification.quizSetId) || typeof notification.materialId !== 'string' || !/^[1-9][0-9]*$/.test(notification.materialId)
           || !Number.isFinite(Date.parse(notification.createdAt)) || !['FOCUS_QUIZ_IN_LIST', 'RECONFIGURE_QUIZ'].includes(notification.actionType)) return
         if (notification.targetAvailable) {
           try {
@@ -53,7 +59,11 @@ export function createPushOpenSession(connection: NativeConnection, navigate: (p
         }
       }
       if (!current(context)) return
-      await navigate(destination)
+      if (!presented.has(key)) {
+        await navigate(destination)
+        if (!current(context)) return
+        presented.add(key)
+      }
       if (!current(context)) return
       const outcome = notification ? 'COMPLETED' as const : 'UNAVAILABLE' as const
       const expiresAt = notification ? Date.parse(notification.createdAt) + LIFETIME : Date.now() + LIFETIME

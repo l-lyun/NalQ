@@ -6,6 +6,7 @@ import type {
   PushRegistrationProvider,
   PushRegistrationTarget,
 } from './pushRegistrationCoordinator';
+import { parsePushOpenCandidate, type PushOpenCandidate } from './pushOpenStorage';
 
 const ANDROID_CHANNEL_ID = 'quiz-results';
 
@@ -77,6 +78,44 @@ export class ExpoPushRegistrationProvider implements PushRegistrationProvider {
       this.lastNativeTokenSignature = signature;
       listener();
     });
+  }
+}
+
+function toPushOpenCandidate(
+  response: Notifications.NotificationResponse | null,
+): PushOpenCandidate | null {
+  if (!response || response.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) {
+    return null;
+  }
+  const data = response.notification.request.content.data;
+  if (!data) {
+    return null;
+  }
+  return parsePushOpenCandidate({
+    ...data,
+    sdkResponseId: response.notification.request.identifier,
+  });
+}
+
+export class ExpoNotificationResponseProvider {
+  getLastCandidate() {
+    return toPushOpenCandidate(Notifications.getLastNotificationResponse());
+  }
+
+  subscribe(listener: (candidate: PushOpenCandidate) => void) {
+    return Notifications.addNotificationResponseReceivedListener((response) => {
+      const candidate = toPushOpenCandidate(response);
+      if (candidate) {
+        listener(candidate);
+      }
+    });
+  }
+
+  clearLastResponseIfMatches(sdkResponseId: string) {
+    const candidate = this.getLastCandidate();
+    if (candidate?.sdkResponseId === sdkResponseId) {
+      Notifications.clearLastNotificationResponse();
+    }
   }
 }
 

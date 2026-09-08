@@ -126,13 +126,20 @@ export type PushRevokeResultPayload = {
   retryAfterMs?: number;
 };
 
+export interface PushOpenAckPayload {
+  messageId: string;
+  outcome: 'COMPLETED' | 'UNAVAILABLE';
+  userId: number;
+}
+
 export type WebFeatureMessage =
   | AuthStateMessage
   | (NativeFeatureMessage & { type: 'PUSH_REGISTER_REQUEST'; payload: { authEpoch: number } })
   | (NativeFeatureMessage & { type: 'PUSH_STATE_RESULT'; payload: PushStateResultPayload })
   | (NativeFeatureMessage & { type: 'PUSH_REGISTER_RESULT'; payload: PushRegisterResultPayload })
   | (NativeFeatureMessage & { type: 'SESSION_ENDING'; payload: { reason: 'LOGOUT' | 'WITHDRAWAL' } })
-  | (NativeFeatureMessage & { type: 'PUSH_REVOKE_RESULT'; payload: PushRevokeResultPayload });
+  | (NativeFeatureMessage & { type: 'PUSH_REVOKE_RESULT'; payload: PushRevokeResultPayload })
+  | (NativeFeatureMessage & { type: 'PUSH_OPEN_ACK'; payload: PushOpenAckPayload });
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -552,6 +559,15 @@ export function parseWebFeatureMessage(
         || typeof payload.data.revoked !== 'boolean') return null;
     } else if (payload.outcome !== 'RETRY' && payload.outcome !== 'FAILED') return null;
     return value as unknown as WebFeatureMessage;
+  }
+  if (value.type === 'PUSH_OPEN_ACK') {
+    return hasExactKeys(payload, ['messageId', 'outcome', 'userId'])
+      && isUuid(payload.messageId)
+      && (payload.outcome === 'COMPLETED' || payload.outcome === 'UNAVAILABLE')
+      && Number.isSafeInteger(payload.userId)
+      && (payload.userId as number) > 0
+      ? value as unknown as WebFeatureMessage
+      : null;
   }
   return null;
 }

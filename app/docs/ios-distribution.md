@@ -90,3 +90,6 @@ pnpm dlx eas-cli@latest submit --platform ios --profile production --id <EAS_BUI
 현재 네이티브 앱은 카메라, 사진, 마이크, 위치, 연락처, 추적 권한을 요청하지 않으므로 해당 `Info.plist` 사용 목적 문구를 넣지 않았다. 이후 파일 선택, 촬영, 알림이나 추적 기능을 추가할 때 실제 기능과 함께 최소 권한 및 사용자용 설명을 추가한다.
 
 2026-09-08 후속 검증: 아이콘 포함 [EAS 빌드 1.0.0 (3)](https://expo.dev/accounts/hhhyyuns-team/projects/nalq/builds/bd5d156f-1576-4d98-8501-5904e61a5cc9)가 FINISHED로 완료됐고 App Store Connect 업로드·처리도 완료됐다. 본인 1명만 포함한 `NalQ Internal Test` 내부 그룹에 빌드를 배정했으며, Apple 화면에서 iPad Pro 11(4세대), iOS 26.6.1의 `설치됨 1.0.0 (3)`을 확인했다. 설치는 PASS이며, 실제 원격 푸시 수신과 알림 탭 이동·로그아웃 검증은 아직 미실행이다. App Store 공개 심사는 제출하지 않았다.
+
+
+후속 통합: PR #64와 #61을 dev에 순서대로 병합하고 #66에 통합했다. 홈 본문은 375px 뷰포트에서 375px, 834/1194px에서 640px이며 가로 넘침이 없음을 실제 Home 컴포넌트 렌더링으로 확인했다. 이 후속 변경에는 PUSH_OPEN 선택·읽음 재시도와 운영 Compose의 푸시 플래그 전달도 포함되므로 새 iOS 빌드가 필요하다. 위 1.0.0 (3) 설치 기록을 후속 선택 구현의 실기기 검증으로 취급하지 않는다. 상점 PR #65는 제외한다.
