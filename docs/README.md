@@ -120,6 +120,7 @@ TRD는 각 애플리케이션의 `docs/trd/trd-*.md`에 두며, 파일명과 제
 | 운영 환경 변수·비밀 주입 계약 | [운영 환경 변수 원장](operations/production-environment-variables.md) | 초안 |
 | Windows에서 푸시 실기기 빌드 준비·수신 점검 | [푸시 실기기 테스트 Runbook](../app/docs/push-device-testing.md) | 저장소 준비, 외부 자격·실기기 검증 전 |
 | iOS production 빌드·TestFlight 업로드 | [iOS 배포 준비](../app/docs/ios-distribution.md) | 저장소 준비, EAS·Apple 자격 및 업로드 전 |
+| App Store·TestFlight 한국어 소개와 테스트 안내 | [스토어 등록 초안](operations/app-store-metadata-ko.md) | 소개 초안 콘솔 저장·테스트 안내 준비 |
 
 ## 문서 템플릿
 

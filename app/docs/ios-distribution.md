@@ -13,6 +13,7 @@
 | iOS bundle identifier | `com.nalq.app` | Apple Developer 등록 완료 |
 | EAS project | `@hhhyyuns-team/nalq` | Expo 팀 프로젝트 연결 완료 |
 | App Store Connect Apple ID | `6807688566` | `NalQ` 앱 레코드 생성 및 EAS 제출 설정 연결 완료 |
+| iOS 앱 아이콘 | `assets/nalq-app-icon.png` | NalQ 전용 불투명 정사각 PNG, iOS에만 연결 |
 | iPad 지원 | 활성화 | 기존 설정 유지, iPad 실기기 검증과 스크린샷 필요 |
 | 수출 규정 | 비면제 암호화 미사용 | 현재 앱이 OS의 표준 HTTPS/WebView만 사용하는 범위 기준 |
 
@@ -36,7 +37,8 @@
 2. EAS production 환경의 `EXPO_PUBLIC_WEB_URL`이 `https://nalq.app`인지 확인하고, 다르면 `env:set`으로 바로잡는다. 이 값은 비밀이 아니므로 `plaintext`로 저장한다.
 3. `check:device-build`를 iOS 범위로 실행한다. 플랫폼을 생략하면 Android용 `GOOGLE_SERVICES_JSON`까지 검사하므로 iOS TestFlight 점검에는 `--platform ios`를 명시한다.
 4. EAS 원격 build number를 조회한다. `app.json`의 `ios.buildNumber`는 원격 버전이 초기화되기 전 시작값이며, production 빌드에서는 `appVersionSource: remote`와 `autoIncrement: buildNumber`가 적용된다.
-5. EAS가 관리하는 distribution certificate와 App Store provisioning profile이 `com.nalq.app`에 연결됐는지 확인한다. Push Notifications capability와 APNs push key도 같은 Apple Developer 팀에 연결한다.
+5. EAS가 관리하는 distribution certificate와 App Store provisioning profile이 `com.nalq.app`에 연결됐는지 확인한다. profile의 상태가 active인 것만으로는 충분하지 않다. Apple Developer App ID에 Push Notifications capability를 활성화한 뒤 `aps-environment` entitlement가 포함되도록 App Store provisioning profile을 다시 발급한다.
+6. 실제 푸시 발송에 사용할 APNs push key도 같은 Apple Developer 팀과 EAS 프로젝트에 연결한다. provisioning profile의 entitlement와 APNs 발송 키는 별개의 자격이다.
 
 ```bash
 pnpm dlx eas-cli@latest login
@@ -70,9 +72,13 @@ pnpm dlx eas-cli@latest submit --platform ios --profile production --id <EAS_BUI
 
 현재 로컬 Simulator에서는 알림 권한과 등록, 주입한 background 배너까지 확인했지만 실제 Expo 발송은 `InvalidCredentials`로 거절됐다. `com.nalq.app`의 APNs 자격을 연결하고 TestFlight 설치본에서 실제 수신을 확인하기 전에는 원격 푸시 검증을 완료로 기록하지 않는다.
 
+2026-09-08 production 빌드 1.0.0 (2)는 App Store provisioning profile `WCJ39M32JR`에 Push Notifications capability와 `aps-environment` entitlement가 없어 Xcode 서명 단계에서 실패했다. 이후 Apple Developer에서 `com.nalq.app`의 Push Notifications를 활성화하고 같은 profile을 재생성했다. Apple 화면에서 Active와 Push Notifications를 확인했으며, 새 profile 파일을 EAS에 동기화한 뒤 다시 빌드해야 한다.
+
+같은 날 `NalQ Push` APNs 키를 Production 환경·`com.nalq.app` topic 한정으로 발급했다. 이 키는 TestFlight 설치본을 위한 것이며 Sandbox 빌드의 원격 푸시까지 지원한다고 가정하지 않는다. 키 파일의 안전한 다운로드·EAS 연결과 실제 수신은 별도 확인한다.
+
 ## 저장소 밖에서 아직 필요한 출시 자료
 
-- 현재 `assets/icon.png`는 Expo 기본 아이콘이다. TestFlight 내부 검증에는 사용할 수 있지만 외부 테스트나 App Store 심사 전에는 최종 NalQ 아이콘으로 교체한다. iOS 아이콘은 1024×1024 PNG, 불투명 배경으로 준비한다. splash에는 NalQ 용 이미지가 적용돼 있다.
+- iOS는 `assets/nalq-app-icon.png`의 NalQ 아이콘을 사용한다. 원본은 1254×1254 RGB PNG이며 투명도가 없다. Expo prebuild가 App Store용 1024×1024 RGB AppIcon을 투명도 없이 생성함을 확인했다. 최상위 `assets/icon.png`와 Android adaptive icon은 이번 iOS 변경 범위에서 유지한다.
 - `supportsTablet=true`를 유지하면 iPad 화면 동작 검증과 App Store용 iPad 스크린샷이 필요하다. iPhone 전용 출시가 제품 결정이면 첫 제출 전에 `false`로 변경한다.
 - 운영 WebView URL과 API/Cookie 구성이 HTTPS에서 실제로 동작하는지 iPhone과 iPad에서 확인한다.
 - App Store 설명, 키워드, 카테고리, 지원 URL, 개인정보처리방침 URL, 심사용 로그인 계정과 리뷰 메모를 App Store Connect에 입력한다.
