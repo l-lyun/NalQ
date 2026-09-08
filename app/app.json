@@ -36,6 +36,15 @@
     "owner": "hhhyyuns-team",
     "plugins": [
       "expo-secure-store",
+      "@react-native-firebase/app",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "dynamic"
+          }
+        }
+      ],
       [
         "expo-splash-screen",
         {

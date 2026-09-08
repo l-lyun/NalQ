@@ -48,6 +48,9 @@ public class PushDeliveryTransaction {
     }
     var current = fence.get();
     switch (result.outcome()) {
+      case CONFIRMED ->
+          store.updateSend(
+              attempt, "PROVIDER_ACCEPTED", null, result.ticketId(), now, null, null, now);
       case ACCEPTED -> {
         if (result.ticketId() == null || result.ticketId().isBlank()) {
           retrySend(attempt, current, result.retryAfter(), "PROVIDER_RESPONSE_INVALID", now);
@@ -98,7 +101,7 @@ public class PushDeliveryTransaction {
     }
     var current = fence.get();
     switch (result.outcome()) {
-      case ACCEPTED -> store.updateReceipt(attempt, "PROVIDER_ACCEPTED", null, null, now);
+      case ACCEPTED, CONFIRMED -> store.updateReceipt(attempt, "PROVIDER_ACCEPTED", null, null, now);
       case PENDING, RETRY -> {
         Optional<Instant> next = policy.nextReceiptCheck(now, current.ticketAcceptedAt());
         store.updateReceipt(

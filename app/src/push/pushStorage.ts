@@ -31,6 +31,7 @@ export interface PendingRegistration {
   expectedRevision: number;
   tokenVersion: number;
   platform: 'IOS' | 'ANDROID';
+  provider: 'EXPO' | 'FCM';
   permission: 'GRANTED' | 'DENIED';
   pushToken: string | null;
 }
@@ -128,9 +129,27 @@ function isPendingRegistration(value: unknown): value is PendingRegistration {
     && isNonNegativeInteger(value.expectedRevision)
     && isNonNegativeInteger(value.tokenVersion)
     && (value.platform === 'IOS' || value.platform === 'ANDROID')
+    && (value.provider === 'EXPO' || value.provider === 'FCM')
     && (value.permission === 'GRANTED' || value.permission === 'DENIED')
     && (value.pushToken === null || isNonEmptyString(value.pushToken))
     && (value.permission === 'GRANTED' ? isNonEmptyString(value.pushToken) : value.pushToken === null);
+}
+
+function normalizeLegacyProvider(value: unknown): unknown {
+  if (!isRecord(value) || value.version !== PUSH_STORAGE_VERSION) {
+    return value;
+  }
+  const pendingRegistration = value.pendingRegistration;
+  if (!isRecord(pendingRegistration) || pendingRegistration.provider !== undefined) {
+    return value;
+  }
+  return {
+    ...value,
+    pendingRegistration: {
+      ...pendingRegistration,
+      provider: 'EXPO',
+    },
+  };
 }
 
 function isPendingRevoke(value: unknown): value is PendingRevoke {
@@ -226,9 +245,13 @@ export class PushStorageRepository {
     }
 
     try {
-      const value: unknown = JSON.parse(raw);
+      const parsed: unknown = JSON.parse(raw);
+      const value = normalizeLegacyProvider(parsed);
       if (!isPushStorageState(value)) {
         throw new PushStorageCorruptedError();
+      }
+      if (value !== parsed) {
+        await this.storage.setItem(PUSH_STORAGE_KEY, JSON.stringify(value));
       }
       return value;
     } catch (error) {

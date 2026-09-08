@@ -126,11 +126,21 @@ if [ "${OPENMD_QUIZ_GENERATION_ENABLED:-false}" = "true" ]; then
 	esac
 fi
 
-for push_flag in OPENMD_PUSH_REGISTRATION_ENABLED OPENMD_PUSH_DELIVERY_ENABLED OPENMD_PUSH_SCHEDULER_ENABLED; do
+for push_flag in OPENMD_PUSH_REGISTRATION_ENABLED OPENMD_PUSH_DELIVERY_ENABLED OPENMD_PUSH_SCHEDULER_ENABLED OPENMD_PUSH_FCM_ENABLED; do
 	case "${!push_flag:-false}" in
 		true|false) ;;
 		*) die "$push_flag must be true or false" ;;
 	esac
 done
+
+if [ "${OPENMD_PUSH_FCM_ENABLED:-false}" = "true" ]; then
+	for name in OPENMD_PUSH_FCM_PROJECT_ID OPENMD_PUSH_FCM_CREDENTIALS_HOST_PATH; do
+		[ -n "${!name:-}" ] || die "$name is required when FCM is enabled"
+	done
+	[[ "$OPENMD_PUSH_FCM_PROJECT_ID" =~ ^[a-z0-9][a-z0-9-]{4,62}$ ]] \
+		|| die "OPENMD_PUSH_FCM_PROJECT_ID has an invalid format"
+	[[ "$OPENMD_PUSH_FCM_CREDENTIALS_HOST_PATH" = /* ]] \
+		|| die "OPENMD_PUSH_FCM_CREDENTIALS_HOST_PATH must be an absolute path"
+fi
 
 log "production environment contract is valid (secret values not printed)"

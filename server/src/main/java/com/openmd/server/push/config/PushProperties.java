@@ -27,6 +27,9 @@ public class PushProperties {
   @NotNull private Duration leaseDuration = Duration.ofSeconds(60);
   @NotNull private URI expoApiBase = URI.create("https://exp.host/--/api/v2/push/");
   private String expoAccessToken = "";
+  private boolean fcmEnabled;
+  private String fcmProjectId = "";
+  private String fcmCredentialsPath = "";
 
   public boolean isRegistrationEnabled() {
     return registrationEnabled;
@@ -95,5 +98,20 @@ public class PushProperties {
 
   public void setExpoAccessToken(String expoAccessToken) {
     this.expoAccessToken = expoAccessToken;
+  }
+
+  public boolean isFcmEnabled() { return fcmEnabled; }
+  public void setFcmEnabled(boolean fcmEnabled) { this.fcmEnabled = fcmEnabled; }
+  public String getFcmProjectId() { return fcmProjectId; }
+  public void setFcmProjectId(String fcmProjectId) { this.fcmProjectId = fcmProjectId; }
+  public String getFcmCredentialsPath() { return fcmCredentialsPath; }
+  public void setFcmCredentialsPath(String fcmCredentialsPath) {
+    this.fcmCredentialsPath = fcmCredentialsPath;
+  }
+
+  @AssertTrue(message = "FCM project and credentials path are required when FCM is enabled")
+  public boolean isFcmConfigurationComplete() {
+    return !fcmEnabled || (fcmProjectId != null && !fcmProjectId.isBlank()
+        && fcmCredentialsPath != null && !fcmCredentialsPath.isBlank());
   }
 }

@@ -42,10 +42,13 @@ export function parseNativePushMessage(raw: unknown, sessionId: string): NativeP
         valid = keys(p, ['requestId', 'installationId', 'installationKey']) && isUuid(p.requestId) && installation(p)
         break
       case 'PUSH_DEVICE':
-        valid = keys(p, ['installationId', 'installationKey', 'operationId', 'operationIssuedAt', 'expectedRevision', 'platform', 'permission'], ['pushToken'])
+        valid = keys(p, ['installationId', 'installationKey', 'operationId', 'operationIssuedAt', 'expectedRevision', 'platform', 'provider', 'permission'], ['pushToken'])
           && installation(p) && operation(p) && (p.platform === 'IOS' || p.platform === 'ANDROID')
+          && (p.provider === 'EXPO' || p.provider === 'FCM')
           && (p.permission === 'GRANTED'
-            ? typeof p.pushToken === 'string' && /^(?:ExponentPushToken|ExpoPushToken)\[[A-Za-z0-9_-]{1,440}\]$/.test(p.pushToken)
+            ? typeof p.pushToken === 'string' && (p.provider === 'EXPO'
+              ? /^(?:ExponentPushToken|ExpoPushToken)\[[A-Za-z0-9_-]{1,440}\]$/.test(p.pushToken)
+              : p.platform === 'IOS' && p.pushToken.length >= 20 && p.pushToken.length <= 512)
             : p.permission === 'DENIED' && !Object.hasOwn(p, 'pushToken'))
         break
       case 'PUSH_REVOKE':

@@ -108,6 +108,9 @@ services:
       OPENMD_PUSH_DELIVERY_ENABLED: "${OPENMD_PUSH_DELIVERY_ENABLED:-false}"
       OPENMD_PUSH_SCHEDULER_ENABLED: "${OPENMD_PUSH_SCHEDULER_ENABLED:-false}"
       OPENMD_PUSH_EXPO_ACCESS_TOKEN: "${OPENMD_PUSH_EXPO_ACCESS_TOKEN:-}"
+      OPENMD_PUSH_FCM_ENABLED: "${OPENMD_PUSH_FCM_ENABLED:-false}"
+      OPENMD_PUSH_FCM_PROJECT_ID: "${OPENMD_PUSH_FCM_PROJECT_ID:-}"
+      OPENMD_PUSH_FCM_CREDENTIALS_PATH: /run/secrets/firebase-admin.json
       OPENMD_QUIZ_GENERATION_ENABLED: "${OPENMD_QUIZ_GENERATION_ENABLED:-false}"
       OPENMD_QUIZ_GENERATION_MODEL: "${OPENMD_QUIZ_GENERATION_MODEL:-gpt-5.6-luna}"
       OPENMD_QUIZ_GENERATION_REASONING_EFFORT: "${OPENMD_QUIZ_GENERATION_REASONING_EFFORT:-low}"
@@ -120,6 +123,11 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    volumes:
+      - type: bind
+        source: "${OPENMD_PUSH_FCM_CREDENTIALS_HOST_PATH:-/dev/null}"
+        target: /run/secrets/firebase-admin.json
+        read_only: true
     networks:
       - backend
       - egress

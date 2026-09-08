@@ -12,10 +12,18 @@ import com.openmd.server.push.service.PushDeliveryWorker;
 import com.openmd.server.push.service.PushGateway;
 import com.openmd.server.push.service.PushRetentionService;
 import com.openmd.server.push.integration.expo.ExpoPushGateway;
+import com.openmd.server.push.integration.fcm.FcmPushGateway;
+import com.openmd.server.push.integration.fcm.GoogleFcmAccessTokenSupplier;
+import com.openmd.server.push.domain.PushProvider;
+import com.openmd.server.push.service.RoutingPushGateway;
+import java.io.IOException;
+import java.net.URI;
 import java.net.http.HttpClient;
+import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.UUID;
+import java.util.EnumMap;
 import java.util.concurrent.ThreadLocalRandom;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
@@ -93,15 +101,27 @@ public class PushConfiguration {
   @ConditionalOnExpression(
       "${openmd.push.delivery-enabled:false} or ${openmd.push.scheduler-enabled:false}")
   PushGateway pushGateway(
-      ObjectMapper mapper, ObjectProvider<Clock> clock, PushProperties properties) {
+      ObjectMapper mapper, ObjectProvider<Clock> clock, PushProperties properties) throws IOException {
     HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
-    return new ExpoPushGateway(
+    Clock runtimeClock = clock.getIfAvailable(Clock::systemUTC);
+    PushGateway expo = new ExpoPushGateway(
         client,
         mapper,
         properties.getExpoApiBase(),
         properties.getExpoAccessToken(),
         Duration.ofSeconds(10),
-        clock.getIfAvailable(Clock::systemUTC));
+        runtimeClock);
+    var gateways = new EnumMap<PushProvider, PushGateway>(PushProvider.class);
+    gateways.put(PushProvider.EXPO, expo);
+    if (properties.isFcmEnabled()) {
+      URI endpoint = URI.create("https://fcm.googleapis.com/v1/projects/"
+          + properties.getFcmProjectId() + "/messages:send");
+      gateways.put(PushProvider.FCM, new FcmPushGateway(
+          client, mapper, endpoint,
+          new GoogleFcmAccessTokenSupplier(Path.of(properties.getFcmCredentialsPath())),
+          Duration.ofSeconds(10), runtimeClock));
+    }
+    return new RoutingPushGateway(gateways, expo);
   }
 
   @Bean

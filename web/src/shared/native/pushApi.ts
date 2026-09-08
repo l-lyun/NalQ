@@ -7,7 +7,8 @@ import type { ApiResponse } from '@/features/auth/api/auth.types'
 export type Installation = { installationId: string; installationKey: string }
 export type DeviceRequest = Installation & {
   operationId: string; operationIssuedAt: string; expectedRevision: number
-  platform: 'IOS' | 'ANDROID'; permission: 'GRANTED' | 'DENIED'; pushToken?: string
+  platform: 'IOS' | 'ANDROID'; provider: 'EXPO' | 'FCM'
+  permission: 'GRANTED' | 'DENIED'; pushToken?: string
 }
 export type RevokeRequest = Installation & {
   operationId: string; operationIssuedAt: string; bindingId: string; expectedRevision: number
@@ -74,9 +75,9 @@ export async function getPushDevice(installation: Installation, context: AuthCon
 export async function registerPushDevice(request: DeviceRequest, context: AuthContext): Promise<PushResult<RegistrationResult>> {
   try {
     assertAuthContext(context)
-    const { operationId, operationIssuedAt, expectedRevision, platform, permission, pushToken } = request
+    const { operationId, operationIssuedAt, expectedRevision, platform, provider, permission, pushToken } = request
     const response = await protectedApi.put<ApiResponse<RegistrationResult>>(path(request), {
-      operationId, operationIssuedAt, expectedRevision, platform, permission, provider: 'EXPO',
+      operationId, operationIssuedAt, expectedRevision, platform, permission, provider,
       ...(permission === 'GRANTED' ? { pushToken } : {}),
     }, { headers: headers(request), authContext: context })
     assertAuthContext(context)

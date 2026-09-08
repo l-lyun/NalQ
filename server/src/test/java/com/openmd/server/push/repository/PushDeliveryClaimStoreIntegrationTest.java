@@ -152,6 +152,19 @@ class PushDeliveryClaimStoreIntegrationTest {
   }
 
   @Test
+  void synchronousProviderConfirmationFinishesWithoutAReceiptClaim() {
+    insertNotification(201L, "notification-201");
+    insertDelivery(301L, 201L, "PENDING", 0, NOW, NOW.plusSeconds(3600), null, null);
+    var attempt = transactions.claimSend(NOW, 1, Duration.ofSeconds(60)).getFirst();
+
+    transactions.recordSendResult(
+        attempt, PushGatewayResult.confirmed("projects/nalq/messages/fcm-1"), NOW.plusSeconds(1));
+
+    assertEquals("PROVIDER_ACCEPTED", state(301L));
+    assertTrue(transactions.claimReceipts(NOW.plusSeconds(60), 1, Duration.ofSeconds(60)).isEmpty());
+  }
+
+  @Test
   void expiredExhaustedAndOldReceiptRowsBecomeTerminalWithoutProviderClaims() {
     insertNotification(201L, "notification-201");
     insertNotification(202L, "notification-202");

@@ -8,7 +8,7 @@ scope: server
 
 ## 1. 범위와 상태
 
-- 2026-09-06 현재 기기 등록·조회·해제, 설치 자격과 멱등 operation, Redis 제한, logout·탈퇴 연계(V12), delivery outbox(V13), send·receipt worker와 retention이 구현됐다. 실제 Expo 도달과 운영 부하 측정은 아직 검증하지 않았다.
+- 2026-09-09 현재 기기 등록·조회·해제, 설치 자격과 멱등 operation, Redis 제한, logout·탈퇴 연계(V12), delivery outbox(V13), send·receipt worker와 retention이 구현됐다. iOS는 provider별 routing을 거쳐 FCM HTTP v1로, Android는 Expo로 발송한다. 실제 새 TestFlight 빌드의 iOS 도달은 아직 검증하지 않았다.
 - 제품 정책은 [PRD](../../../docs/prd/prd-quiz-push-notifications.md), 공개 API·브리지는 [공유 계약](../../../docs/contracts/contract-api-push-notifications.md), 통합 순서는 [실행 계획](../../../docs/plans/plan-quiz-push-notifications.md)이 소유한다.
 - [패키지 규칙](trd-package-structure.md)을 따라 새 `com.openmd.server.push` 기능 도메인을 둔다. 기존 notification은 알림함, push는 기기와 외부 전달을 소유한다. 범용 메시징 프레임워크나 별도 서비스는 만들지 않는다.
 - 출시 자격·개인정보 고지는 이번 서버 파일 설계에서 해결됐다고 간주하지 않는다.
