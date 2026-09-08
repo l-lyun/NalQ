@@ -37,6 +37,8 @@ async function prepareAndroidChannel() {
 }
 
 export class ExpoPushRegistrationProvider implements PushRegistrationProvider {
+  private lastNativeTokenSignature: string | null = null;
+
   async resolve(): Promise<PushRegistrationTarget> {
     if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
       throw new Error('Push registration is available only on iOS and Android.');
@@ -67,7 +69,14 @@ export class ExpoPushRegistrationProvider implements PushRegistrationProvider {
   }
 
   subscribeToTokenChanges(listener: () => void) {
-    return Notifications.addPushTokenListener(() => listener());
+    return Notifications.addPushTokenListener((token) => {
+      const signature = JSON.stringify(token);
+      if (signature === this.lastNativeTokenSignature) {
+        return;
+      }
+      this.lastNativeTokenSignature = signature;
+      listener();
+    });
   }
 }
 
