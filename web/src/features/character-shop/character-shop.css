@@ -1,0 +1,13 @@
+.character-scene { position: relative; width: 100%; aspect-ratio: 3 / 2; overflow: hidden; isolation: isolate; border-radius: var(--seed-radius-r4); background: var(--seed-color-bg-neutral-weak); }
+.character-scene-room { display: block; width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; }
+.character-scene-actor { position: absolute; width: 30%; height: auto; left: 35%; bottom: 3%; image-rendering: pixelated; }
+.character-scene--compact { aspect-ratio: 2 / 1; }
+.character-shop-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--seed-dimension-x3); }
+.character-shop-item { min-width: 0; border: 1px solid var(--seed-color-stroke-neutral-subtle); border-radius: var(--seed-radius-r3); padding: var(--seed-dimension-x3); }
+.character-shop-item .character-scene { border-radius: var(--seed-radius-r2); }
+.character-shop-item .seed-action-button { width: 100%; white-space: normal; height: auto; min-height: var(--seed-dimension-x10); }
+.character-shop-actions { flex-wrap: wrap; }
+.character-shop-actions > * { flex: 1 1 auto; }
+.character-shop-tabs { max-width: 100%; overflow-x: auto; }
+.character-shop-feedback { overflow-wrap: anywhere; }
+@media (max-width: 359px) { .character-shop-grid { gap: var(--seed-dimension-x2); } .character-shop-item { padding: var(--seed-dimension-x2); } }

@@ -1,0 +1,94 @@
+.pixel-room-page {
+  min-width: 320px;
+}
+
+.pixel-room-main {
+  min-width: 0;
+}
+
+.pixel-room-content {
+  max-width: 640px;
+  min-width: 0;
+  margin-inline: auto;
+}
+
+.pixel-room-scene {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  overflow: hidden;
+  border: 1px solid var(--seed-color-stroke-neutral-subtle);
+  background: var(--seed-color-bg-neutral-weak);
+  isolation: isolate;
+}
+
+.pixel-room-background {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: pixelated;
+}
+
+.pixel-room-walk-track {
+  position: absolute;
+  right: 9%;
+  bottom: 3%;
+  left: 9%;
+  height: 55%;
+}
+
+.pixel-room-actor {
+  position: absolute;
+  bottom: 0;
+  left: var(--actor-left);
+  width: 34%;
+  aspect-ratio: 1;
+}
+
+.pixel-room-actor-facing {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform: scaleX(1);
+  transform-origin: center bottom;
+}
+
+.pixel-room-actor-facing[data-direction="-1"] {
+  transform: scaleX(-1);
+}
+
+.pixel-room-sprite {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+
+.pixel-room-option-controls {
+  width: 100%;
+}
+
+.pixel-room-option-controls > * {
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+@media (max-width: 359px) {
+  .pixel-room-option-controls {
+    flex-wrap: wrap;
+  }
+
+  .pixel-room-option-controls > * {
+    flex-basis: calc(50% - var(--seed-dimension-x1));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pixel-room-actor,
+  .pixel-room-actor-facing {
+    transition: none;
+  }
+}

@@ -1,5 +1,6 @@
 package com.openmd.server.quiz.service;
 
+import com.openmd.server.character.service.QuizCompletionRewardService;
 import com.openmd.server.global.api.FieldError;
 import com.openmd.server.global.error.*;
 import com.openmd.server.quiz.domain.ShortAnswerGrader;
@@ -31,6 +32,7 @@ public class QuizAttemptSubmissionService {
   private final QuizFillInTheBlankRepository blanks;
   private final QuizFillInTheBlankAnswerRepository blankAnswers;
   private final QuizAttemptLockService locks;
+  private final QuizCompletionRewardService rewards;
 
   public QuizAttemptSubmissionService(
       QuizSetRepository sets,
@@ -42,7 +44,8 @@ public class QuizAttemptSubmissionService {
       QuizShortAnswerAnswerRepository shortAnswers,
       QuizFillInTheBlankRepository blanks,
       QuizFillInTheBlankAnswerRepository blankAnswers,
-      QuizAttemptLockService locks) {
+      QuizAttemptLockService locks,
+      QuizCompletionRewardService rewards) {
     this.sets = sets;
     this.questions = questions;
     this.attempts = attempts;
@@ -53,6 +56,7 @@ public class QuizAttemptSubmissionService {
     this.blanks = blanks;
     this.blankAnswers = blankAnswers;
     this.locks = locks;
+    this.rewards = rewards;
   }
 
   @Transactional
@@ -62,6 +66,7 @@ public class QuizAttemptSubmissionService {
       String requestedAttemptId,
       List<QuizResponseRequest> responses) {
     String attemptId = canonical(requestedAttemptId);
+    rewards.lockActiveAccount(userId);
     QuizSet set = sets.findOwnedForUpdate(setPublicId, userId).orElseThrow(this::notFound);
     QuizAttempt existing = attempts.findByPublicId(attemptId).orElse(null);
     if (existing != null) {
@@ -92,6 +97,9 @@ public class QuizAttemptSubmissionService {
     }
     attempt.submitted(pendingEssay, now);
     attempts.flush();
+    if (attempt.getStatus() == QuizAttemptStatus.COMPLETED) {
+      rewards.rewardFirstCompletion(userId, set.getId(), attempt.getPublicId());
+    }
     return new QuizAttemptSubmissionResult(true, response(attempt));
   }
 

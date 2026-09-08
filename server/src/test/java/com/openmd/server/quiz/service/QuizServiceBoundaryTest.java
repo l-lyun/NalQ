@@ -6,8 +6,10 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.openmd.server.character.service.QuizCompletionRewardService;
 import com.openmd.server.global.error.BusinessException;
 import com.openmd.server.global.error.CommonErrorCode;
 import com.openmd.server.quiz.domain.entity.QuizAttempt;
@@ -27,8 +29,9 @@ import com.openmd.server.quiz.repository.QuizShortAnswerAnswerRepository;
 import com.openmd.server.quiz.repository.QuizSubmittedAnswerRepository;
 import java.util.List;
 import java.util.Optional;
-import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
 import org.mockito.InOrder;
+import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 
 class QuizServiceBoundaryTest {
@@ -129,7 +132,8 @@ class QuizServiceBoundaryTest {
             mock(QuizShortAnswerAnswerRepository.class),
             mock(QuizFillInTheBlankRepository.class),
             mock(QuizFillInTheBlankAnswerRepository.class),
-            mock(QuizAttemptLockService.class));
+            mock(QuizAttemptLockService.class),
+            mock(QuizCompletionRewardService.class));
 
     BusinessException failure =
         assertThrows(
@@ -137,6 +141,53 @@ class QuizServiceBoundaryTest {
             () -> service.submit(7L, "set", "550e8400-e29b-41d4-a716-446655440000", List.of()));
 
     assertEquals(QuizErrorCode.ATTEMPT_CONFLICT, failure.getErrorCode());
+  }
+
+  @Test
+  void rewardsAnImmediatelyCompletedMainAttemptInTheSubmissionTransaction() throws Exception {
+    QuizSetRepository sets = mock(QuizSetRepository.class);
+    QuizQuestionRepository questions = mock(QuizQuestionRepository.class);
+    QuizAttemptRepository attempts = mock(QuizAttemptRepository.class);
+    QuizAttemptQuestionRepository attemptQuestions = mock(QuizAttemptQuestionRepository.class);
+    QuizCompletionRewardService rewards = mock(QuizCompletionRewardService.class);
+    QuizSet set = mock(QuizSet.class);
+    when(set.getId()).thenReturn(11L);
+    when(set.getStatus()).thenReturn(QuizSetStatus.READY);
+    when(sets.findOwnedForUpdate("set", 7L)).thenReturn(Optional.of(set));
+    when(attempts.findByPublicId("550e8400-e29b-41d4-a716-446655440000"))
+        .thenReturn(Optional.empty());
+    when(questions.findAllByQuizSetIdOrderByNumber(11L)).thenReturn(List.of());
+    when(attempts.saveAndFlush(ArgumentMatchers.any(QuizAttempt.class)))
+        .thenAnswer(
+            invocation -> {
+              QuizAttempt attempt = invocation.getArgument(0);
+              java.lang.reflect.Field id =
+                  com.openmd.server.global.entity.BaseEntity.class.getDeclaredField("id");
+              id.setAccessible(true);
+              id.set(attempt, 31L);
+              return attempt;
+            });
+    when(attemptQuestions.findAllByAttemptIdOrderBySequenceNumber(ArgumentMatchers.anyLong()))
+        .thenReturn(List.of());
+    QuizAttemptSubmissionService service =
+        new QuizAttemptSubmissionService(
+            sets,
+            questions,
+            attempts,
+            attemptQuestions,
+            mock(QuizSubmittedAnswerRepository.class),
+            mock(QuizQuestionChoiceRepository.class),
+            mock(QuizShortAnswerAnswerRepository.class),
+            mock(QuizFillInTheBlankRepository.class),
+            mock(QuizFillInTheBlankAnswerRepository.class),
+            mock(QuizAttemptLockService.class),
+            rewards);
+
+    service.submit(7L, "set", "550e8400-e29b-41d4-a716-446655440000", List.of());
+
+    verify(rewards).lockActiveAccount(7L);
+    verify(rewards)
+        .rewardFirstCompletion(7L, 11L, "550e8400-e29b-41d4-a716-446655440000");
   }
 
   @Test

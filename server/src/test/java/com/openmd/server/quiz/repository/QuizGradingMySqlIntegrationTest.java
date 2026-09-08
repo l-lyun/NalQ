@@ -10,6 +10,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.openmd.server.auth.domain.User;
 import com.openmd.server.auth.repository.UserRepository;
+import com.openmd.server.character.domain.CharacterProfile;
+import com.openmd.server.character.error.CharacterShopErrorCode;
+import com.openmd.server.character.repository.CharacterProfileRepository;
+import com.openmd.server.character.service.CharacterShopService;
 import com.openmd.server.global.error.BusinessException;
 import com.openmd.server.global.error.CommonErrorCode;
 import com.openmd.server.learningmaterial.domain.LearningMaterial;
@@ -48,6 +52,11 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -96,6 +105,8 @@ class QuizGradingMySqlIntegrationTest {
 
   @Autowired JdbcTemplate jdbc;
   @Autowired UserRepository users;
+  @Autowired CharacterProfileRepository characterProfiles;
+  @Autowired CharacterShopService characterShop;
   @Autowired LearningMaterialRepository materials;
   @Autowired QuizSetRepository sets;
   @Autowired QuizQuestionRepository questions;
@@ -492,6 +503,149 @@ class QuizGradingMySqlIntegrationTest {
             () -> submissions.submit(otherOwner.userId(), second.setId(), uuid(2), List.of()));
     assertEquals(QuizErrorCode.ATTEMPT_CONFLICT, reused.getErrorCode());
     assertEquals(1L, jdbc.queryForObject("SELECT COUNT(*) FROM quiz_attempts", Long.class));
+  }
+
+  @Test
+  void concurrentMainCompletionsGrantOnlyOneRewardWithoutDeadlock() throws Exception {
+    ReadyQuiz quiz = readyShortAnswer(fixture());
+    CountDownLatch start = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      Future<?> first =
+          executor.submit(
+              () -> {
+                await(start);
+                submissions.submit(quiz.userId(), quiz.setId(), uuid(21), List.of());
+              });
+      Future<?> second =
+          executor.submit(
+              () -> {
+                await(start);
+                submissions.submit(quiz.userId(), quiz.setId(), uuid(22), List.of());
+              });
+
+      start.countDown();
+      first.get(15, TimeUnit.SECONDS);
+      second.get(15, TimeUnit.SECONDS);
+    } finally {
+      executor.shutdownNow();
+    }
+
+    assertEquals(
+        2,
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM quiz_attempts WHERE user_id=? AND status='COMPLETED'",
+            Integer.class,
+            quiz.userId()));
+    assertEquals(
+        1,
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM quiz_coin_rewards WHERE user_id=?",
+            Integer.class,
+            quiz.userId()));
+    assertEquals(
+        10,
+        jdbc.queryForObject(
+            "SELECT coin_balance FROM character_profiles WHERE user_id=?",
+            Integer.class,
+            quiz.userId()));
+  }
+
+  @Test
+  void concurrentSameItemPurchasesChargeExactlyOnce() throws Exception {
+    Fixture owner = fixture();
+    CharacterProfile profile = CharacterProfile.initial(owner.userId());
+    profile.credit(100);
+    characterProfiles.saveAndFlush(profile);
+    CountDownLatch start = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      Future<?> first =
+          executor.submit(
+              () -> {
+                await(start);
+                characterShop.purchase(owner.userId(), "character-cat");
+              });
+      Future<?> second =
+          executor.submit(
+              () -> {
+                await(start);
+                characterShop.purchase(owner.userId(), "character-cat");
+              });
+      start.countDown();
+      first.get(15, TimeUnit.SECONDS);
+      second.get(15, TimeUnit.SECONDS);
+    } finally {
+      executor.shutdownNow();
+    }
+
+    assertEquals(
+        50,
+        jdbc.queryForObject(
+            "SELECT coin_balance FROM character_profiles WHERE user_id=?",
+            Integer.class,
+            owner.userId()));
+    assertEquals(
+        1,
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM character_owned_items WHERE user_id=? AND item_id='character-cat'",
+            Integer.class,
+            owner.userId()));
+  }
+
+  @Test
+  void competingPurchasesNeverMakeTheBalanceNegative() throws Exception {
+    Fixture owner = fixture();
+    CharacterProfile profile = CharacterProfile.initial(owner.userId());
+    profile.credit(50);
+    characterProfiles.saveAndFlush(profile);
+    CountDownLatch start = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      Future<?> cat =
+          executor.submit(
+              () -> {
+                await(start);
+                characterShop.purchase(owner.userId(), "character-cat");
+              });
+      Future<?> bear =
+          executor.submit(
+              () -> {
+                await(start);
+                characterShop.purchase(owner.userId(), "character-bear");
+              });
+      start.countDown();
+
+      int insufficient = 0;
+      for (Future<?> purchase : List.of(cat, bear)) {
+        try {
+          purchase.get(15, TimeUnit.SECONDS);
+        } catch (java.util.concurrent.ExecutionException failure) {
+          if (failure.getCause() instanceof BusinessException business
+              && business.getErrorCode() == CharacterShopErrorCode.INSUFFICIENT_COINS) {
+            insufficient++;
+          } else {
+            throw failure;
+          }
+        }
+      }
+      assertEquals(1, insufficient);
+    } finally {
+      executor.shutdownNow();
+    }
+
+    assertEquals(
+        0,
+        jdbc.queryForObject(
+            "SELECT coin_balance FROM character_profiles WHERE user_id=?",
+            Integer.class,
+            owner.userId()));
+    assertEquals(
+        1,
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM character_owned_items WHERE user_id=?",
+            Integer.class,
+            owner.userId()));
   }
 
   @Test
@@ -942,6 +1096,15 @@ class QuizGradingMySqlIntegrationTest {
             Integer.class);
     if (count != null && count > 0) {
       jdbc.execute("ALTER TABLE quiz_submitted_answers DROP CHECK test_fail_answer");
+    }
+  }
+
+  private void await(CountDownLatch latch) {
+    try {
+      latch.await();
+    } catch (InterruptedException exception) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException(exception);
     }
   }
 

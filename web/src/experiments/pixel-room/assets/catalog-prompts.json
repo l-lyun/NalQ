@@ -1,0 +1,61 @@
+{
+  "generator": "built-in image_gen",
+  "reference": "C:/Users/SSAFY/Desktop/dohyun/openmd/docs/ux/prototypes/character-room-v1.png",
+  "assets": [
+    {
+      "name": "dragon",
+      "prompt": "Use case: stylized-concept. Create ONE isolated asset for NalQ cozy pixel-art dress-up game. Reference is STYLE ONLY, do not reproduce its UI, text, clothing unless requested. Crisp deliberate square pixel clusters, restrained 24-color earthy palette, charcoal outlines, no blurred edges, no painted smooth rendering, no text/watermark/checkerboard. Actual transparent background with clean alpha, no white matte or halo. Front-facing symmetrical standing neutral pose, large round head, short rounded torso, stubby arms down and short legs, consistent doll proportions. Square image, entire character centered, head occupies upper middle, feet baseline at 86% image height, full silhouette with generous padding. No clothes, hats, jewelry, props or floor shadow. Cute nonhuman animal anatomy. Charcoal baby dragon matching reference character identity, cream rounded muzzle and belly, two tiny warm brown horns, small dark wings and short tail. Calm dot eyes, friendly neutral face.",
+      "path": "C:\\Users\\SSAFY\\.codex\\generated_images\\01a07974-9dea-7d63-a61f-3106401e71ce\\exec-aa394ae3-48ba-4693-ad59-13be5307fc80.png"
+    },
+    {
+      "name": "cat",
+      "prompt": "Use case: stylized-concept. Create ONE isolated asset for NalQ cozy pixel-art dress-up game. Reference is STYLE ONLY, do not reproduce its UI, text, clothing unless requested. Crisp deliberate square pixel clusters, restrained 24-color earthy palette, charcoal outlines, no blurred edges, no painted smooth rendering, no text/watermark/checkerboard. Actual transparent background with clean alpha, no white matte or halo. Front-facing symmetrical standing neutral pose, large round head, short rounded torso, stubby arms down and short legs, consistent doll proportions. Square image, entire character centered, head occupies upper middle, feet baseline at 86% image height, full silhouette with generous padding. No clothes, hats, jewelry, props or floor shadow. Cute nonhuman animal anatomy. Cream-colored cat, tiny triangular ears, warm beige ear interiors and muzzle, small dark dot eyes, tiny brown nose, gently curved tail. Same squat proportions as reference dragon.",
+      "path": "C:\\Users\\SSAFY\\.codex\\generated_images\\01a07974-9dea-7d63-a61f-3106401e71ce\\exec-38d656fa-c8dc-4238-b872-aa20271eddd3.png"
+    },
+    {
+      "name": "bear",
+      "prompt": "Use case: stylized-concept. Create ONE isolated asset for NalQ cozy pixel-art dress-up game. Reference is STYLE ONLY, do not reproduce its UI, text, clothing unless requested. Crisp deliberate square pixel clusters, restrained 24-color earthy palette, charcoal outlines, no blurred edges, no painted smooth rendering, no text/watermark/checkerboard. Actual transparent background with clean alpha, no white matte or halo. Front-facing symmetrical standing neutral pose, large round head, short rounded torso, stubby arms down and short legs, consistent doll proportions. Square image, entire character centered, head occupies upper middle, feet baseline at 86% image height, full silhouette with generous padding. No clothes, hats, jewelry, props or floor shadow. Cute nonhuman animal anatomy. Light caramel brown bear, tiny round ears, cream oval muzzle and belly, dark dot eyes and small brown nose. Same squat proportions as reference dragon.",
+      "path": "C:\\Users\\SSAFY\\.codex\\generated_images\\01a07974-9dea-7d63-a61f-3106401e71ce\\exec-21395a43-2fc9-47d9-9121-40d840fe86ec.png"
+    },
+    {
+      "name": "hat-beret",
+      "prompt": "Use case: stylized-concept. ONE individual inventory asset for NalQ cozy pixel animal dress-up game. Reference image is STYLE ONLY. Crisp square pixel clusters, restrained earthy colors, dark charcoal pixel outline. Square canvas, large centered object with ample padding. Front view, gently volumetric pixel shading, no smooth painted gradients. Actual transparent alpha background, no white backdrop, no checkerboard pattern, no shadow, no text, no UI, no animal, no mannequin, no hanger. A single cream wool beret with small top nub, dark beige underside and short rounded band, matching the reference hat. Soft flattened dome silhouette.",
+      "path": "C:\\Users\\SSAFY\\.codex\\generated_images\\01a07974-9dea-7d63-a61f-3106401e71ce\\exec-cc374484-dd3e-46e6-8793-d15803fe9d28.png"
+    },
+    {
+      "name": "hat-beanie",
+      "prompt": "Use case: stylized-concept. ONE individual inventory asset for NalQ cozy pixel animal dress-up game. Reference image is STYLE ONLY. Crisp square pixel clusters, restrained earthy colors, dark charcoal pixel outline. Square canvas, large centered object with ample padding. Front view, gently volumetric pixel shading, no smooth painted gradients. Actual transparent alpha background, no white backdrop, no checkerboard pattern, no shadow, no text, no UI, no animal, no mannequin, no hanger. A single muted navy blue knitted beanie, rounded crown and wide folded ribbed cuff, no logo or pompom.",
+      "path": "C:\\Users\\SSAFY\\.codex\\generated_images\\01a07974-9dea-7d63-a61f-3106401e71ce\\exec-a69e0118-a6a5-4286-8ff9-b8c1b51ba8ad.png"
+    },
+    {
+      "name": "hat-bucket",
+      "prompt": "Use case: stylized-concept. ONE individual inventory asset for NalQ cozy pixel animal dress-up game. Reference image is STYLE ONLY. Crisp square pixel clusters, restrained earthy colors, dark charcoal pixel outline. Square canvas, large centered object with ample padding. Front view, gently volumetric pixel shading, no smooth painted gradients. Actual transparent alpha background, no white backdrop, no checkerboard pattern, no shadow, no text, no UI, no animal, no mannequin, no hanger. A single warm cocoa brown bucket hat with a short sloping brim and a subtle stitched band, no logo.",
+      "path": "C:\\Users\\SSAFY\\.codex\\generated_images\\01a07974-9dea-7d63-a61f-3106401e71ce\\exec-1a6d44aa-e314-46b8-94a6-f690588233fe.png"
+    },
+    {
+      "name": "top-cardigan",
+      "prompt": "Use case: stylized-concept. ONE individual inventory asset for NalQ cozy pixel animal dress-up game. Reference image is STYLE ONLY. Crisp square pixel clusters, restrained earthy colors, dark charcoal pixel outline. Square canvas, large centered object with ample padding. Front view, gently volumetric pixel shading, no smooth painted gradients. Actual transparent alpha background, no white backdrop, no checkerboard pattern, no shadow, no text, no UI, no animal, no mannequin, no hanger. A single sage green button cardigan for a chubby short animal body. Short wide torso, tiny sleeves pointed slightly down, V neck, three ochre buttons, two tiny patch pockets. EMPTY inside neckline. Garment only, no hands/body.",
+      "path": "C:\\Users\\SSAFY\\.codex\\generated_images\\01a07974-9dea-7d63-a61f-3106401e71ce\\exec-3063c942-23ae-48e7-9e3d-766fd6edb956.png"
+    },
+    {
+      "name": "top-sweater",
+      "prompt": "Use case: stylized-concept. ONE individual inventory asset for NalQ cozy pixel animal dress-up game. Reference image is STYLE ONLY. Crisp square pixel clusters, restrained earthy colors, dark charcoal pixel outline. Square canvas, large centered object with ample padding. Front view, gently volumetric pixel shading, no smooth painted gradients. Actual transparent alpha background, no white backdrop, no checkerboard pattern, no shadow, no text, no UI, no animal, no mannequin, no hanger. A single oatmeal cream cozy ribbed crewneck sweater for a chubby short animal body. Short wide torso, tiny sleeves pointed slightly down, muted beige cuff and hem details. Garment only, no hands/body.",
+      "path": "C:\\Users\\SSAFY\\.codex\\generated_images\\01a07974-9dea-7d63-a61f-3106401e71ce\\exec-b06667da-1ca4-4803-9a71-3156353bb3a5.png"
+    },
+    {
+      "name": "top-overalls",
+      "prompt": "Use case: stylized-concept. ONE individual inventory asset for NalQ cozy pixel animal dress-up game. Reference image is STYLE ONLY. Crisp square pixel clusters, restrained earthy colors, dark charcoal pixel outline. Square canvas, large centered object with ample padding. Front view, gently volumetric pixel shading, no smooth painted gradients. Actual transparent alpha background, no white backdrop, no checkerboard pattern, no shadow, no text, no UI, no animal, no mannequin, no hanger. A single muted denim blue short-legged bib overalls garment for a chubby short animal body, ochre buckles, front square pocket, cream short sleeve shirt underneath, tiny sleeves pointed slightly down. Garment only, no hands/body.",
+      "path": "C:\\Users\\SSAFY\\.codex\\generated_images\\01a07974-9dea-7d63-a61f-3106401e71ce\\exec-fbecbcfe-67ed-4ee6-954c-f81e46805272.png"
+    },
+    {
+      "name": "room-day",
+      "prompt": "Use case: stylized-concept. Create ONE complete room background for NalQ cozy pixel game, horizontal landscape 3:2 image. Reference is only style. Authentic crisp pixel art square clusters, limited earthy palette and dark outlines, no text, no UI, no border, no characters/animals. Cozy wooden study room seen straight-on with slight top-down view of floor, centered back wall and small side walls like reference. Fixed furniture included as part of finished room. Desk with open book and mug back-left, bookcase against back-right wall, window central back wall, potted plant. Crucially bottom 30% of image is unobstructed continuous horizontal wooden floor so character can walk left/right there; no chair or objects in foreground walking strip. Warm clear daytime, blue sky and soft white clouds through window, honey oak wood, cream walls, sage green lamp and small rug tucked behind walking strip. Gentle sunlight. Full bleed opaque background.",
+      "path": "C:\\Users\\SSAFY\\.codex\\generated_images\\01a07974-9dea-7d63-a61f-3106401e71ce\\exec-ac140a1d-aa2a-4ca9-b994-6942234f6206.png"
+    },
+    {
+      "name": "room-night",
+      "prompt": "Use case: stylized-concept. Create ONE complete room background for NalQ cozy pixel game, horizontal landscape 3:2 image. Reference is only style. Authentic crisp pixel art square clusters, limited earthy palette and dark outlines, no text, no UI, no border, no characters/animals. Cozy wooden study room seen straight-on with slight top-down view of floor, centered back wall and small side walls like reference. Fixed furniture included as part of finished room. Desk with open book and mug back-left, bookcase against back-right wall, window central back wall, potted plant. Crucially bottom 30% of image is unobstructed continuous horizontal wooden floor so character can walk left/right there; no chair or objects in foreground walking strip. Quiet midnight library study, deep muted blue walls, walnut wood, warm amber desk lamp illuminating open book, dark indigo sky and crescent moon with small stars through window, a few small string lights along back wall. Inviting readable room, not too dark. Full bleed opaque background.",
+      "path": "C:\\Users\\SSAFY\\.codex\\generated_images\\01a07974-9dea-7d63-a61f-3106401e71ce\\exec-bbebb63b-1c5b-4dee-a4f9-e98520754161.png"
+    }
+  ]
+}

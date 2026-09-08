@@ -19,6 +19,7 @@ import {
 import './profile.css'
 
 export type ProfilePageProps = {
+  characterSection?: React.ReactNode
   status: 'loading' | 'ready' | 'error'
   nickname?: string | null
   email?: string
@@ -37,6 +38,7 @@ export type ProfilePageProps = {
 }
 
 export function ProfilePage({
+  characterSection,
   status,
   nickname,
   email,
@@ -79,6 +81,8 @@ export function ProfilePage({
                   <Text className="profile-account-email" textStyle="t4Regular" color="fg.neutralMuted">{email}</Text>
                 </VStack>
               </HStack>
+
+              {characterSection}
 
               <SettingsSection title="계정" titleId="mypage-account-title">
                 <SettingsRow label="계정설정" onClick={onOpenAccount} />

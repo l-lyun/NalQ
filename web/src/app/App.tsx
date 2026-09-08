@@ -43,6 +43,7 @@ import { VerifyEmailPage } from '@/pages/verify-email/VerifyEmailPage'
     ...(import.meta.env.DEV ? [
       { path: '/landing-preview', element: <PublicLandingPage /> },
       { path: '/onboarding-preview', element: <OnboardingPage mode="guide" onExit={() => undefined} /> },
+      { path: '/experiments/pixel-room', lazy: () => import('@/experiments/pixel-room/PixelRoomExperimentPage') },
     ] : []),
   { path: '/terms', element: <TermsPage /> },
   { path: '/privacy', element: <PrivacyPage /> },
@@ -81,6 +82,8 @@ import { VerifyEmailPage } from '@/pages/verify-email/VerifyEmailPage'
               { path: '/notifications', element: null },
               { path: '/profile', element: null },
               { path: '/profile/guide', element: null },
+              { path: '/profile/character', element: null },
+              { path: '/profile/shop', element: null },
               { path: '/profile/account', element: null },
               { path: '/profile/withdrawal', element: null },
             ],
