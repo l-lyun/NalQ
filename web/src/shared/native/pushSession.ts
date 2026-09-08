@@ -6,7 +6,7 @@ import { installNativeSessionEndingHandler } from './nativeSessionLifecycle'
 import type { NativeConnection, NativeSession } from './nativeBridge'
 
 /** All credentials stay in transient request closures; never persisted or logged by the web. */
-export function createPushSession(connection: NativeConnection): NativeSession {
+export function createPushSession(connection: NativeConnection, open?: NativeSession): NativeSession {
   let active = true
   let ending = false
   let endingEpoch: number | null = null
@@ -86,6 +86,7 @@ export function createPushSession(connection: NativeConnection): NativeSession {
       if (!active) return
       const message = parseNativePushMessage(raw, connection.sessionId)
       if (!message) return
+      if (message.type === 'PUSH_OPEN') { open?.receive(raw); return }
       if (message.type === 'SESSION_ENDING_ACK') {
         // Correlated to the pre-logout epoch; the current auth epoch has already advanced.
         endings.get(message.payload.requestId)?.finish()
@@ -103,6 +104,7 @@ export function createPushSession(connection: NativeConnection): NativeSession {
     },
     stop() {
       active = false
+      open?.stop()
       unsubscribeContext()
       unsubscribePhase()
       removeEndingHandler()

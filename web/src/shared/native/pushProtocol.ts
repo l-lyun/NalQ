@@ -4,6 +4,7 @@ type Envelope<T extends string, P> = {
   version: 1; type: T; messageId: string; bridgeSessionId: string; authEpoch: number; payload: P
 }
 export type NativePushMessage =
+  | Envelope<'PUSH_OPEN', { notificationId: string; bindingId: string }>
   | Envelope<'PUSH_STATE_REQUEST', Installation & { requestId: string }>
   | Envelope<'PUSH_DEVICE', DeviceRequest>
   | Envelope<'PUSH_REVOKE', RevokeRequest>
@@ -34,6 +35,9 @@ export function parseNativePushMessage(raw: unknown, sessionId: string): NativeP
     const p = value.payload
     let valid = false
     switch (value.type) {
+      case 'PUSH_OPEN':
+        valid = keys(p, ['notificationId', 'bindingId']) && isUuid(p.notificationId) && isUuid(p.bindingId)
+        break
       case 'PUSH_STATE_REQUEST':
         valid = keys(p, ['requestId', 'installationId', 'installationKey']) && isUuid(p.requestId) && installation(p)
         break

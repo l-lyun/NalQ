@@ -25,7 +25,7 @@ export function NotificationsPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const queryClient = useQueryClient()
-  const [notice, setNotice] = useState<string>()
+  const [notice, setNotice] = useState<string>(new URLSearchParams(location.search).has('unavailable') ? '대상을 찾을 수 없어요.' : '')
   const notifications = useInfiniteQuery({
     queryKey: notificationKeys.list,
     queryFn: ({ pageParam, signal }) => listManagedNotifications(pageParam, signal),

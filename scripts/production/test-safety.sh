@@ -74,6 +74,16 @@ write_valid_server_env "$server_env"
 "$SCRIPT_DIR/validate-env.sh" --env-file "$server_env" >/dev/null
 "$SCRIPT_DIR/deploy-server.sh" --env-file "$server_env" >/dev/null
 
+for push_flag in OPENMD_PUSH_REGISTRATION_ENABLED OPENMD_PUSH_DELIVERY_ENABLED OPENMD_PUSH_SCHEDULER_ENABLED; do
+	push_env="$temporary_directory/push.env"
+	cp "$server_env" "$push_env"
+	printf '%s=true\n' "$push_flag" >>"$push_env"
+	"$SCRIPT_DIR/validate-env.sh" --env-file "$push_env" >/dev/null
+	printf '%s=invalid\n' "$push_flag" >>"$push_env"
+	expect_failure_containing "$push_flag must be true or false" \
+		"$SCRIPT_DIR/validate-env.sh" --env-file "$push_env"
+done
+
 server_cross_site_env="$temporary_directory/server-cross-site.env"
 cp "$server_env" "$server_cross_site_env"
 printf '%s\n' 'API_DOMAIN=api.other.test' >>"$server_cross_site_env"

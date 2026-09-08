@@ -126,7 +126,7 @@ export function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthBootstrap>
+      <AuthBootstrap navigate={router.navigate}>
         <RouterProvider router={router} />
       </AuthBootstrap>
     </QueryClientProvider>

@@ -1,3 +1,4 @@
+import { clearPushOpenUser } from '@/shared/native/pushOpenStore'
 import { queryClient } from '@/app/providers/queryClient'
 import { createSession } from '@/features/auth/api/auth.api'
 import {
@@ -98,10 +99,12 @@ export async function logoutCurrentSession() {
 }
 
 export async function completeAccountWithdrawal() {
+  const withdrawnUserId = getAuthContext().userId
   const pendingEnd = prepareNativeSessionEnd('WITHDRAWAL')
   const context = advanceAuthContext(null, false)
   clearSessionTokens()
   await pendingEnd
+  if (withdrawnUserId !== null) await clearPushOpenUser(withdrawnUserId).catch(() => undefined)
   if (!isCurrentAuthContext(context)) return
   try {
     await endLocalSession()

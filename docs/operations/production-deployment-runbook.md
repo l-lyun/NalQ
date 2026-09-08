@@ -197,3 +197,11 @@ SERVER_IMAGE=nalq-server:local docker compose \
 실제 production-like 검증에는 유효한 secret을 임시 안전 파일로 주입해 `docker compose up --wait`를 수행하고 종료 시 volume까지 정리한다. 운영 데이터 volume에는 이 검증을 실행하지 않는다.
 
 외부 적용 후에는 S3 직접 접근 거절, CloudFront route, HTTP→HTTPS, certificate hostname, 외부 `8080/3306/6379` 차단, backup/restore를 확인한다. 실제 AWS와 DNS 검증은 승인 전까지 `BLOCKED`로 분류한다.
+
+## TestFlight 푸시 릴리스 순서
+
+1. DB 백업 후 동일 릴리스의 서버 이미지와 Compose를 배포하고 Flyway·health를 확인한다. 위 푸시 환경변수 전달이 있는 Compose 버전이 필요하다.
+2. `OPENMD_PUSH_REGISTRATION_ENABLED=true`로 등록 API를 활성화한다. delivery/scheduler는 수신 준비 확인 전 `false`로 유지한다.
+3. 같은 릴리스의 웹을 배포하고 공개 번들에 `PUSH_REGISTER_REQUEST`와 `/api/v1/push-devices/`가 포함되는지 확인한다.
+4. TestFlight 앱을 재실행하고 로그인·알림 권한·본인 계정 ACTIVE 기기 등록을 확인한다. 기존 권한 결정이 있으면 iOS가 동의창을 다시 띄우지 않을 수 있다.
+5. APNs 키가 EAS에 연결된 상태에서 실제 테스트 발송과 receipt를 확인한 뒤 delivery/scheduler를 활성화하고 퀴즈 생성 결과 발송·알림 탭 이동·로그아웃 해제를 검증한다. Expo 접수 성공과 실물 기기 수신은 각각 기록한다.
