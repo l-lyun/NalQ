@@ -70,7 +70,8 @@ NalQ is an application, not a Notion marketing-site replica. Do not reproduce No
 
 - NalQ's proprietary illustration, character, and decorative asset language is not defined. Do not invent a Notion-like sticker palette.
 - A verified SEED bottom-navigation React component was not found in the current Docs MCP listing. The three-tab product structure remains confirmed, but its implementation primitive must be checked against the installed package before coding.
-- Exact desktop content max-width and whether the product exposes dark appearance remain implementation/design review decisions. Do not turn example widths into global contracts.
+- Home, Learning, Profile, and immersive quiz content use a centered single column capped at 640px on tablets and desktop browsers; narrower viewports use the available width. This shared learning-screen limit was approved for the TestFlight release on 2026-09-08. Public, authentication, and notification pages retain their existing page-specific limits.
+- Whether the product exposes dark appearance remains an implementation/design review decision.
 
 ## Colors
 

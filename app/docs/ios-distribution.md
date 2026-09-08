@@ -15,6 +15,7 @@
 | App Store Connect Apple ID | `6807688566` | `NalQ` 앱 레코드 생성 및 EAS 제출 설정 연결 완료 |
 | iOS 앱 아이콘 | `assets/nalq-app-icon.png` | NalQ 전용 불투명 정사각 PNG, iOS에만 연결 |
 | iPad 지원 | 활성화 | 기존 설정 유지, iPad 실기기 검증과 스크린샷 필요 |
+| 스플래시 | 따뜻한 배경·`contain`·220pt | `expo-splash-screen`이 `assets/nalq-splash-dragon.png` 사용 |
 | 수출 규정 | 비면제 암호화 미사용 | 현재 앱이 OS의 표준 HTTPS/WebView만 사용하는 범위 기준 |
 
 `bundleIdentifier`는 App Store에 등록한 뒤 기존 앱에서 바꿀 수 없는 앱 정체성이다. `com.nalq.app`은 Apple Developer의 개인 팀에 등록되어 있다.
