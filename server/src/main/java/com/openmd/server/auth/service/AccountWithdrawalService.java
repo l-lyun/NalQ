@@ -5,6 +5,7 @@ import com.openmd.server.auth.domain.UserStatus;
 import com.openmd.server.auth.dto.response.AccountWithdrawalResult;
 import com.openmd.server.auth.error.AuthErrorCode;
 import com.openmd.server.auth.repository.UserRepository;
+import com.openmd.server.character.service.CharacterAccountLifecycle;
 import com.openmd.server.global.error.BusinessException;
 import com.openmd.server.global.error.CommonErrorCode;
 import java.time.Clock;
@@ -26,6 +27,7 @@ public final class AccountWithdrawalService {
 	private final PasswordEncoder passwordEncoder;
 	private final RefreshTokenService refreshTokenService;
 	private final PushDeviceLifecycle pushDevices;
+	private final CharacterAccountLifecycle characterAccount;
 	private final Clock clock;
 	private final TransactionOperations transactions;
 
@@ -34,6 +36,7 @@ public final class AccountWithdrawalService {
 		PasswordEncoder passwordEncoder,
 		RefreshTokenService refreshTokenService,
 		PushDeviceLifecycle pushDevices,
+		CharacterAccountLifecycle characterAccount,
 		Clock clock,
 		TransactionOperations transactions
 	) {
@@ -41,6 +44,7 @@ public final class AccountWithdrawalService {
 		this.passwordEncoder = passwordEncoder;
 		this.refreshTokenService = refreshTokenService;
 		this.pushDevices = pushDevices;
+		this.characterAccount = characterAccount;
 		this.clock = clock;
 		this.transactions = transactions;
 	}
@@ -93,6 +97,7 @@ public final class AccountWithdrawalService {
 			throw new BusinessException(AuthErrorCode.WITHDRAWAL_PASSWORD_MISMATCH);
 		}
 		pushDevices.deleteForUser(userId);
+		characterAccount.deleteForUser(userId);
 		user.withdraw(requestId, clock.instant());
 		userRepository.flush();
 		return result(user);

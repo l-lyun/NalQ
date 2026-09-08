@@ -68,7 +68,7 @@ NalQ is an application, not a Notion marketing-site replica. Do not reproduce No
 
 ### Open decisions and exceptions
 
-- NalQ's proprietary illustration, character, and decorative asset language is not defined. Do not invent a Notion-like sticker palette.
+- The 2026-09-08 character-shop scope reuses the pixel-room branch assets for account customization, as approved in `docs/prd/prd-character-shop.md`. Static character poses are used in product screens; walking remains experimental. Keep the surrounding UI on SEED semantic tokens.
 - A verified SEED bottom-navigation React component was not found in the current Docs MCP listing. The three-tab product structure remains confirmed, but its implementation primitive must be checked against the installed package before coding.
 - Exact desktop content max-width and whether the product exposes dark appearance remain implementation/design review decisions. Do not turn example widths into global contracts.
 

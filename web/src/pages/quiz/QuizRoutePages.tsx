@@ -383,6 +383,7 @@ export function QuizMaterialRoutePage() {
         onDeferQuiz: () => navigate('/learning'),
         onResultExit: () => navigate('/learning'),
         onGoHome: () => navigate('/'),
+        onOpenShop: () => navigate('/profile/shop'),
         onStartReview: (attemptId) => startReviewFromResult(
           attemptId,
           queryClient,
@@ -589,6 +590,7 @@ export function QuizSetRoutePage() {
         onDeferQuiz: () => navigate('/learning'),
         onResultExit: () => navigate('/learning'),
         onGoHome: () => navigate('/'),
+        onOpenShop: () => navigate('/profile/shop'),
         onStartReview: (attemptId) => startReviewFromResult(
           attemptId,
           queryClient,
@@ -682,6 +684,7 @@ export function QuizAttemptResultRoutePage() {
       callbacks={{
         onResultExit: () => navigate('/learning'),
         onGoHome: () => navigate('/'),
+        onOpenShop: () => navigate('/profile/shop'),
         onStartReview: () => startReviewFromResult(
           attemptId!,
           queryClient,
@@ -800,6 +803,7 @@ export function ReviewSessionRoutePage() {
         onExitQuiz: () => navigate('/learning'),
         onResultExit: () => navigate('/learning'),
         onGoHome: () => navigate('/'),
+        onOpenShop: () => navigate('/profile/shop'),
         onStartReview: () => startReviewFromResult(
           resultQuery.data!.sourceAttemptId,
           queryClient,

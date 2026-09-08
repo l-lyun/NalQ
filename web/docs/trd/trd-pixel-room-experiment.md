@@ -59,3 +59,7 @@ last_updated: 2026-09-07
 - 실제 iOS/Android WebView와 모든 프레임 조합의 픽셀 단위 의상 호환 검수는 미완료. 이번 결과는 개발 전용 조합 실험이다.
 
 `web/`에서 `pnpm dev --host 127.0.0.1 --port 5178 --strictPort`를 실행하고 `http://127.0.0.1:5178/experiments/pixel-room`을 연다. 로그인과 서버 API 없이 실험할 수 있다. 원본 dev 기능은 기존 경로에서 유지한다.
+
+## 2026-09-08 제품 연결
+
+실험 페이지 자체는 개발 전용으로 유지한다. 별도 [캐릭터 상점 PRD](../../../docs/prd/prd-character-shop.md)와 [상점 API 계약](../../../docs/contracts/contract-api-character-shop.md)에 따라 제품 화면은 기존 PNG와 PixelSprite의 정지 포즈를 공유한다. 따라서 생산 빌드 자산 제외 검증은 실험 당시 기록이며 현재 제품의 자산에는 적용되지 않는다. 학습 보상·구매·장착은 서버 원장으로 구현한다.

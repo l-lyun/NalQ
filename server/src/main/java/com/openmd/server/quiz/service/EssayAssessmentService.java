@@ -1,5 +1,6 @@
 package com.openmd.server.quiz.service;
 
+import com.openmd.server.character.service.QuizCompletionRewardService;
 import com.openmd.server.global.error.BusinessException;
 import com.openmd.server.global.error.CommonErrorCode;
 import com.openmd.server.quiz.domain.entity.QuizAttempt;
@@ -26,16 +27,19 @@ public class EssayAssessmentService {
   private final QuizAttemptQuestionRepository attemptQuestions;
   private final QuizSubmittedAnswerRepository answers;
   private final QuizAttemptLockService locks;
+  private final QuizCompletionRewardService rewards;
 
   public EssayAssessmentService(
       QuizQuestionRepository questions,
       QuizAttemptQuestionRepository attemptQuestions,
       QuizSubmittedAnswerRepository answers,
-      QuizAttemptLockService locks) {
+      QuizAttemptLockService locks,
+      QuizCompletionRewardService rewards) {
     this.questions = questions;
     this.attemptQuestions = attemptQuestions;
     this.answers = answers;
     this.locks = locks;
+    this.rewards = rewards;
   }
 
   @Transactional
@@ -57,6 +61,7 @@ public class EssayAssessmentService {
       String requestedAssessment,
       QuizAttemptType expectedType) {
     GradingOutcome outcome = parse(requestedAssessment);
+    if (expectedType == QuizAttemptType.MAIN) rewards.lockActiveAccount(userId);
     QuizAttempt attempt =
         expectedType == QuizAttemptType.MAIN
             ? locks.lockMain(userId, attemptId)
@@ -94,7 +99,13 @@ public class EssayAssessmentService {
           .orElseThrow()
           .resolveReview(now);
     }
-    if (remaining(attempt) == 0) attempt.complete(now);
+    if (remaining(attempt) == 0) {
+      attempt.complete(now);
+      if (attempt.getType() == QuizAttemptType.MAIN) {
+        rewards.rewardFirstCompletion(
+            userId, attempt.getQuizSetId(), attempt.getPublicId());
+      }
+    }
     return response(attempt, questionId, outcome);
   }
 

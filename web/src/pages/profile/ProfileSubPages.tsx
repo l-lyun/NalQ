@@ -287,7 +287,7 @@ export function AccountWithdrawalPage({
   )
 }
 
-function ProfileSubPage({
+export function ProfileSubPage({
   title,
   onBack,
   backDisabled = false,

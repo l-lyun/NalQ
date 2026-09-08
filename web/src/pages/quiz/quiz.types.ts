@@ -134,6 +134,7 @@ export type QuizPresentationCallbacks = {
   onResultExit?: () => void
   onStartReview?: (resourceId: string) => void | Promise<void>
   onGoHome?: () => void
+  onOpenShop?: () => void
 }
 
 export type QuizFlowScene =

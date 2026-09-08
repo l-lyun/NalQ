@@ -30,6 +30,7 @@ scope: repository
 | 관심사 | 원장 | 상태 |
 | --- | --- | --- |
 | 제품 목표·범위·원칙·내비게이션·용어 | [NalQ 제품 기반](product.md) | 초안 |
+| 학습 보상·상점·캐릭터 | [학습 보상 상점 PRD](prd/prd-character-shop.md) | 사용자 확정·구현 반영 |
 | 홈 | [홈 PRD](prd/prd-home.md) | 초안 |
 | 이메일 기반 자체 인증 | [자체 인증 PRD](prd/prd-local-authentication.md) | 초안 |
 | 마이페이지와 계정 관리 | [마이페이지 계정 관리 PRD](prd/prd-mypage-account-management.md) | 초안 |
@@ -68,6 +69,7 @@ Flow는 여러 화면의 순서와 분기를, Screen Spec은 한 화면의 구�
 | 관심사 | 원장 | 유형 | 상태 |
 | --- | --- | --- | --- |
 | 이메일 기반 자체 인증 | [인증 API](contracts/contract-api-authentication.md) | API Contract | 초안 |
+| 캐릭터 상점·장착·코인 | [캐릭터 상점 API](contracts/contract-api-character-shop.md) | API Contract | 사용자 정책 확정·구현 반영 |
 | 사용자와 인증 | [사용자·인증 데이터](contracts/contract-data-authentication.md) | Data Contract | 초안 |
 | 홈 연속 방문 요약 | [홈 방문 API](contracts/contract-api-home.md) | API Contract | 초안·서버 구현 |
 | 학습자료·퀴즈·복습 | [학습·퀴즈 API](contracts/contract-api-quiz-learning.md) | API Contract | 검토 중 |
@@ -87,10 +89,12 @@ TRD는 각 애플리케이션의 `docs/trd/trd-*.md`에 두며, 파일명과 제
 | Server | OpenAPI와 Swagger UI | [서버 OpenAPI 운영 TRD](../server/docs/trd/trd-openapi-documentation.md) | 초안 |
 | Server | 패키지 구조 | [서버 패키지 구조 TRD](../server/docs/trd/trd-package-structure.md) | 구현 동기화 |
 | Server | 퀴즈 푸시 파일 구조·트랜잭션 | [서버 푸시 TRD](../server/docs/trd/trd-quiz-push-notifications.md) | 서버 구현·자동 검증 완료, 실기기 미검증 |
+| Server | 캐릭터 상점·장착·퀴즈 완료 보상 | [서버 캐릭터 상점 TRD](../server/docs/trd/trd-character-shop.md) | 구현·MySQL 동시성 검증 완료 |
 | Server | 학습자료 생성·조회 | [학습자료 생성·조회 TRD](../server/docs/trd/trd-learning-material-creation.md) | 구현 동기화 |
 | Server | Notion 단일 페이지 가져오기 | [Notion 가져오기 TRD](../server/docs/trd/trd-notion-page-import.md) | 검토 중 |
 | Server | LLM 퀴즈 생성 워커 | [LLM 퀴즈 생성 워커 TRD](../server/docs/trd/trd-llm-quiz-generation-worker.md) | 구현 동기화 |
 | Server | 퀴즈·복습 통합 저장 모델 | [퀴즈 채점 TRD](../server/docs/trd/trd-quiz-grading.md) | 목표 설계 확정, V5 SQL 반영·Java 구현 동기화 전 |
+| Web | 캐릭터 상점·장착·마이페이지 | [웹 캐릭터 상점 TRD](../web/docs/trd/trd-character-shop.md) | 구현·UI 검증 완료 |
 | Web | 인증 상태·토큰·API 통합 | [웹 인증 TRD](../web/docs/trd/trd-authentication.md) | 구현 동기화 |
 | Web | 앱 셸·최상위 탭 상태 보존 | [웹 앱 셸 TRD](../web/docs/trd/trd-app-shell-navigation.md) | 구현 동기화 |
 | Web | 학습자료 생성·조회 통합 | [웹 학습자료 TRD](../web/docs/trd/trd-learning-materials.md) | 구현 동기화 |

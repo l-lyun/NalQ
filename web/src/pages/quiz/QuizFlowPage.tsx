@@ -692,6 +692,7 @@ export function QuizFlowPage({
             onCorrect={() => openCorrection(resultItem)}
             onStartReview={callbacks?.onStartReview ? () => void startReview() : undefined}
             onGoHome={callbacks?.onGoHome}
+            onOpenShop={flowKind === 'REVIEW' ? undefined : callbacks?.onOpenShop}
           />
         ) : null}
       </Box>
@@ -1750,6 +1751,7 @@ function ResultScreen({
   onCorrect,
   onStartReview,
   onGoHome,
+  onOpenShop,
 }: {
   result: QuizResult
   item: QuizResultItem
@@ -1762,6 +1764,7 @@ function ResultScreen({
   onCorrect: () => void
   onStartReview?: () => void
   onGoHome?: () => void
+  onOpenShop?: () => void
 }) {
   const reviewActionAvailable = shouldShowQuizReviewAction(result) && Boolean(onStartReview)
   return (
@@ -1805,6 +1808,10 @@ function ResultScreen({
           </VStack>
         </Grid>
 
+        {onOpenShop ? <VStack gap="x2" align="flex-start">
+          <Text textStyle="t4Regular" color="fg.neutralMuted">퀴즈 세트 첫 완료에는 10코인이 지급돼요. 재풀이와 복습은 제외돼요.</Text>
+          <ActionButton size="small" variant="ghost" onClick={onOpenShop}>상점에서 코인 확인하기</ActionButton>
+        </VStack> : null}
         <VStack as="section" gap="x5" aria-labelledby="quiz-result-question">
           <HStack justify="space-between" align="center" gap="x3">
             <Text textStyle="t4Bold" color="fg.brand">

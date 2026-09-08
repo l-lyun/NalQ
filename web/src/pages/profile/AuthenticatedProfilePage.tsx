@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { ACCOUNT_WITHDRAWAL_COMPLETED_NOTICE } from '@/features/auth/model/loginRouteState'
 
@@ -12,6 +13,9 @@ import {
   normalizeProfilePath,
   profileSubPageNavigationState,
 } from './profileRoutes'
+
+const CharacterProfileSection = lazy(() => import('@/features/character-shop/CharacterShopPages').then((module) => ({ default: module.CharacterProfileSection })))
+const CharacterShopPage = lazy(() => import('@/features/character-shop/CharacterShopPages').then((module) => ({ default: module.CharacterShopPage })))
 
 const APP_VERSION = '0.0.0'
 
@@ -29,6 +33,10 @@ export function AuthenticatedProfilePage() {
   const back = () => {
     if (cameFromProfileMain(location.state)) navigate(-1)
     else navigate('/profile', { replace: true })
+  }
+
+  if (pathname === '/profile/character' || pathname === '/profile/shop') {
+    return <Suspense fallback={<p role="status">공부방을 불러오는 중이에요.</p>}><CharacterShopPage mode={pathname === '/profile/shop' ? 'shop' : 'character'} onBack={back} /></Suspense>
   }
 
   if (pathname === '/profile/account') {
@@ -59,6 +67,7 @@ export function AuthenticatedProfilePage() {
   }
   return (
     <ProfilePage
+      characterSection={<Suspense fallback={<p role="status">공부방을 불러오는 중이에요.</p>}><CharacterProfileSection /></Suspense>}
       status={status}
       nickname={currentUser.data?.nickname}
       email={currentUser.data?.email}

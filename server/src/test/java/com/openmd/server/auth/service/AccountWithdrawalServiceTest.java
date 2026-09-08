@@ -15,6 +15,7 @@ import com.openmd.server.auth.domain.UserStatus;
 import com.openmd.server.auth.dto.response.AccountWithdrawalResult;
 import com.openmd.server.auth.error.AuthErrorCode;
 import com.openmd.server.auth.repository.UserRepository;
+import com.openmd.server.character.service.CharacterAccountLifecycle;
 import com.openmd.server.global.entity.BaseEntity;
 import com.openmd.server.global.error.BusinessException;
 import com.openmd.server.global.error.CommonErrorCode;
@@ -41,6 +42,7 @@ class AccountWithdrawalServiceTest {
 	private final RefreshTokenService refreshTokens = mock(RefreshTokenService.class);
 	private final TransactionOperations transactions = mock(TransactionOperations.class);
 	private final PushDeviceLifecycle pushDevices = mock(PushDeviceLifecycle.class);
+	private final CharacterAccountLifecycle characterAccount = mock(CharacterAccountLifecycle.class);
 	private AccountWithdrawalService service;
 
 	@BeforeEach
@@ -54,6 +56,7 @@ class AccountWithdrawalServiceTest {
 			passwords,
 			refreshTokens,
 			pushDevices,
+			characterAccount,
 			Clock.fixed(NOW, ZoneOffset.UTC),
 			transactions
 		);
@@ -80,6 +83,7 @@ class AccountWithdrawalServiceTest {
 		assertNull(user.getNickname());
 		verify(users).flush();
 		verify(pushDevices).deleteForUser(42L);
+		verify(characterAccount).deleteForUser(42L);
 		verify(refreshTokens).revokeAll(42L);
 	}
 
@@ -131,6 +135,7 @@ class AccountWithdrawalServiceTest {
 		verify(users, never()).flush();
 		verify(refreshTokens, never()).revokeAll(org.mockito.ArgumentMatchers.anyLong());
 		verify(pushDevices, never()).deleteForUser(org.mockito.ArgumentMatchers.anyLong());
+		verify(characterAccount, never()).deleteForUser(org.mockito.ArgumentMatchers.anyLong());
 	}
 
 	@Test

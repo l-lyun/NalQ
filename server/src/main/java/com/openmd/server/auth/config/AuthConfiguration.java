@@ -17,6 +17,7 @@ import com.openmd.server.auth.service.AccountWithdrawalService;
 import com.openmd.server.auth.service.RefreshTokenService;
 import com.openmd.server.auth.service.TwoStepSignUpService;
 import com.openmd.server.auth.service.VerificationEmailSender;
+import com.openmd.server.character.service.CharacterAccountLifecycle;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
@@ -114,6 +115,7 @@ public class AuthConfiguration {
 		PasswordEncoder passwordEncoder,
 		RefreshTokenService refreshTokens,
 		PushDeviceLifecycle pushDevices,
+		CharacterAccountLifecycle characterAccount,
 		Clock clock,
 		PlatformTransactionManager transactionManager
 	) {
@@ -122,6 +124,7 @@ public class AuthConfiguration {
 			passwordEncoder,
 			refreshTokens,
 			pushDevices,
+			characterAccount,
 			clock,
 			new TransactionTemplate(transactionManager)
 		);

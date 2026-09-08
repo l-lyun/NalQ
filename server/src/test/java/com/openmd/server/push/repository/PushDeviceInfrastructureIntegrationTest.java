@@ -433,6 +433,24 @@ class PushDeviceInfrastructureIntegrationTest {
             PushProvider.EXPO,
             "ExponentPushToken[bbbbbbbbbbbbbbbbbbbbbb]",
             PushPermission.GRANTED));
+    jdbc.update(
+        """
+        INSERT INTO character_profiles (
+          user_id, coin_balance, character_item_id, room_item_id, hat_item_id, top_item_id,
+          created_at, updated_at
+        ) VALUES (42, 10, 'character-dragon', 'room-day', 'hat-none', 'top-none', NOW(6), NOW(6))
+        """);
+    jdbc.update(
+        """
+        INSERT INTO character_owned_items (user_id, item_id, created_at, updated_at)
+        VALUES (42, 'hat-beret', NOW(6), NOW(6))
+        """);
+    jdbc.update(
+        """
+        INSERT INTO quiz_coin_rewards (
+          user_id, quiz_set_id, attempt_public_id, amount, created_at, updated_at
+        ) VALUES (42, 11, '66666666-6666-4666-8666-666666666666', 10, NOW(6), NOW(6))
+        """);
 
     withdrawalService.withdraw(
         42L,
@@ -455,6 +473,18 @@ class PushDeviceInfrastructureIntegrationTest {
         0,
         jdbc.queryForObject(
             "SELECT COUNT(*) FROM push_deliveries WHERE user_id = 42", Integer.class));
+    assertEquals(
+        0,
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM character_profiles WHERE user_id = 42", Integer.class));
+    assertEquals(
+        0,
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM character_owned_items WHERE user_id = 42", Integer.class));
+    assertEquals(
+        0,
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM quiz_coin_rewards WHERE user_id = 42", Integer.class));
     assertEquals(
         1,
         jdbc.queryForObject(
