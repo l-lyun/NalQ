@@ -16,6 +16,7 @@ import { type ReactNode, useEffect, useState, useSyncExternalStore } from 'react
 import { useLocation, useNavigate } from 'react-router-dom'
 
 import { useCurrentUser } from '@/features/auth/model/auth.queries'
+import { learningMaterialKeys } from '@/features/learning-material/api/learningMaterial.api'
 import { notificationsEnabled } from '@/features/notification/api/notificationAdapter'
 import type { QuizGenerationNotification } from '@/features/notification/api/notification.types'
 import {
@@ -150,6 +151,7 @@ function NotificationCenterRuntime() {
     completed.forEach((item) => clearPendingGeneration(userId, item.quizSetId))
     void queryClient.invalidateQueries({ queryKey: notificationKeys.all })
     void queryClient.invalidateQueries({ queryKey: quizManagementKeys.all })
+    void queryClient.invalidateQueries({ queryKey: learningMaterialKeys.all })
   }, [pending, pendingQueries, queryClient, userId])
 
   useEffect(() => {
