@@ -5,12 +5,14 @@ const fixture = require('./helpers/loadTs.cjs')
 function setup(os, permission) {
   const calls = []
   let handler
+  let tokenListener
   const sdk = {
     IosAuthorizationStatus: { NOT_DETERMINED: 0, AUTHORIZED: 2, PROVISIONAL: 3, EPHEMERAL: 4 },
     AndroidImportance: { DEFAULT: 3 },
     getPermissionsAsync: async () => { calls.push('read'); return permission },
     requestPermissionsAsync: async () => { calls.push('request'); return { granted: true } },
     getExpoPushTokenAsync: async (options) => { calls.push(['token', options]); return { data: 'ExpoPushToken[test]' } },
+    addPushTokenListener: (listener) => { tokenListener = listener; return { remove() {} } },
     setNotificationChannelAsync: async (id) => calls.push(['channel', id]),
     setNotificationHandler: (next) => { handler = next },
   }
@@ -19,7 +21,7 @@ function setup(os, permission) {
     'react-native': { Platform: { OS: os } },
   })
   const provider = load(path.resolve(__dirname, '../../app/src/push/nativeNotificationProvider.ts'))
-  return { provider, calls, getHandler: () => handler }
+  return { provider, calls, emitToken: (token) => tokenListener?.(token), getHandler: () => handler }
 }
 
 test('foreground handler disables banner, list, sound and badge', async () => {
@@ -47,4 +49,17 @@ test('Android creates its channel first and does not prompt again for granted pe
   const result = await new h.provider.ExpoPushRegistrationProvider().resolve()
   assert.equal(result.platform, 'ANDROID')
   assert.deepEqual(h.calls, [['channel', 'quiz-results'], 'read', ['token', { projectId: 'fixture-project' }]])
+})
+
+test('native token listener ignores duplicate values but reports an actual rotation', () => {
+  const h = setup('ios', { granted: true })
+  const provider = new h.provider.ExpoPushRegistrationProvider()
+  let changes = 0
+  provider.subscribeToTokenChanges(() => { changes++ })
+
+  h.emitToken({ type: 'ios', data: 'same-token' })
+  h.emitToken({ type: 'ios', data: 'same-token' })
+  h.emitToken({ type: 'ios', data: 'rotated-token' })
+
+  assert.equal(changes, 2)
 })

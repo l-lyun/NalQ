@@ -142,6 +142,16 @@ pnpm dlx eas-cli@latest build --platform ios --profile ios-simulator-local
 
 Simulator에서 권한 요청, Expo token 취득·기기 등록, foreground 억제와 background 수신을 1차 확인한다. payload 주입만 확인한 경우에는 Expo/APNs 경유 수신 성공으로 기록하지 않는다. 실제 iPhone의 서명·provisioning·설치, 재설치 시 SecureStore 동작과 background·일반 종료 수신은 별도 실기기 인수 항목이다. Simulator 성공만으로 실기기 검증 완료로 판정하지 않는다.
 
+### macOS 로컬 빌드 검증 기록 (2026-09-08)
+
+- Xcode 26.6과 iOS 18.5 Simulator에서 Release 빌드·설치·실행, 로컬 HTTPS 웹 로그인, 알림 권한 요청·허용, 서버 `IOS / ACTIVE` 등록을 확인했다.
+- `CODE_SIGNING_ALLOWED=NO`로 만든 앱은 실행되더라도 ExpoNotifications의 Keychain 접근이 `ERR_NOTIFICATIONS_KEYCHAIN_ACCESS` (`-34018`)로 실패했다. Simulator에도 `Sign to Run Locally` ad-hoc 서명을 적용해야 한다. 이 서명에는 Apple Developer 인증서가 필요하지 않으며, 실기기 provisioning을 대신하지 않는다.
+- iOS 26.5 새 Simulator는 첫 데이터 마이그레이션과 dyld 캐시 생성에서 정체돼, 이미 초기화된 iOS 18.5 Simulator로 검증했다. CLI의 `Booted` 표시만으로 홈 화면 준비 완료를 판정하지 않는다.
+- 같은 native token 이벤트를 중복 처리하던 수정 전에는 등록 `revision`이 `20 → 60`으로 계속 증가했다. 중복 제거 수정 후에는 약 6분간 `revision=199`, `token_version=1`이 유지됐다. 로그인·foreground에서 수행하는 정상 등록 요청은 유지한다.
+- `simctl push`를 이용한 background 알림 배너를 실제 화면에서 확인했다. 이 결과는 Expo/APNs 경유 수신 성공을 의미하지 않는다.
+- 별도의 실제 Expo 발송 요청은 `InvalidCredentials`로 거절됐다. 응답은 `com.nalq.app` 프로젝트의 APNs 자격 증명이 없음을 명시했다. Expo 로그인과 해당 프로젝트의 APNs 키 설정 후 실제 발송을 다시 검증해야 한다.
+- 테스트 웹·API·DB와 이메일 수신기는 모두 로컬이다. 테스트 SMTP는 인증 메일을 로컬 파일로만 저장하므로 실제 이메일 받은편지함에는 도착하지 않는다. 가입 API가 메일 발송에 실패하면 로컬 SMTP 프로세스가 실행 중인지도 확인한다.
+
 ## 5. 검증 서버에서 발송 활성화
 
 세 플래그의 기본값은 모두 `false`다. 기기 등록에는 registration, 신규 delivery 생성에는 delivery, 주기적 발송에는 scheduler가 모두 필요한 범위대로 활성화돼야 한다.

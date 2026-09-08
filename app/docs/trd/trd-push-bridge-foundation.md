@@ -61,7 +61,7 @@ PushStorageState
 - Android는 `quiz-results` notification channel을 권한·토큰 확인 전에 만들고 app config의 default channel로도 등록한다.
 - 현재 권한이 미결정일 때만 OS 요청을 실행한다. iOS `AUTHORIZED`, `PROVISIONAL`, `EPHEMERAL`과 공통 granted를 허용으로 해석한다. 이미 거절한 사용자를 반복 prompt하지 않는다.
 - 허용이면 EAS `projectId`를 명시해 `getExpoPushTokenAsync`로 Expo token을 받는다. 거절이면 token 없이 `DENIED` 의도를 만든다. iOS·Android 외 플랫폼과 projectId 누락, provider network 오류는 등록 성공으로 처리하지 않는다.
-- 로그인 직후 웹 요청, app foreground 복귀와 native push token 변경 listener가 등록 확인을 시작한다. provider 실패는 같은 사용자·epoch 동안 제한된 backoff로 재시도한다.
+- 로그인 직후 웹 요청, app foreground 복귀와 native push token 변경 listener가 등록 확인을 시작한다. listener는 동일한 native token 이벤트를 중복 변화로 처리하지 않는다. provider 실패는 같은 사용자·epoch 동안 제한된 backoff로 재시도한다.
 - 전역 notification handler는 foreground에서 banner, notification list, sound와 badge를 모두 끈다. 앱 내 Snackbar와 알림함은 웹 책임으로 유지한다.
 
 ## 실기기 내부 배포 빌드 경계
