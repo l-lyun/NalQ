@@ -25,7 +25,7 @@ NalQ는 가지고 있던 글을 문제로 바꾸고, 직접 답을 떠올린 뒤
 객관식·빈칸 채우기·단답형·서술형 중 필요한 유형을 고르고, 난이도와 문제 수를 선택할 수 있습니다. 추가 요청에는 집중해서 연습하고 싶은 내용이나 원하는 출제 방식을 적을 수 있습니다.
 
 <p align="center">
-  <img src="./docs/assets/readme/quiz-create.png" width="430" alt="NalQ 문제 유형, 난이도, 문제 수 선택 화면">
+  <img src="./docs/assets/readme/quiz-create.png" width="215" alt="NalQ 문제 유형, 난이도, 문제 수 선택 화면">
 </p>
 
 ### 2. 읽었던 내용을 직접 떠올려요
@@ -33,7 +33,7 @@ NalQ는 가지고 있던 글을 문제로 바꾸고, 직접 답을 떠올린 뒤
 학습자료를 바탕으로 생성된 문제를 한 문제씩 풀며 알고 있다고 생각했던 내용을 실제로 떠올려 봅니다.
 
 <p align="center">
-  <img src="./docs/assets/readme/quiz-solving.png" width="430" alt="NalQ 객관식 문제 풀이 화면">
+  <img src="./docs/assets/readme/quiz-solving.png" width="215" alt="NalQ 객관식 문제 풀이 화면">
 </p>
 
 ### 3. 점수보다 놓친 내용을 확인해요
@@ -41,7 +41,7 @@ NalQ는 가지고 있던 글을 문제로 바꾸고, 직접 답을 떠올린 뒤
 내 답과 판정, 정답 또는 모범 답안, 해설을 확인하고 관련된 학습자료 본문으로 돌아가 부족했던 부분을 다시 살펴볼 수 있습니다.
 
 <p align="center">
-  <img src="./docs/assets/readme/quiz-result.png" width="430" alt="NalQ 채점 결과와 해설, 학습자료 본문 화면">
+  <img src="./docs/assets/readme/quiz-result.png" width="215" alt="NalQ 채점 결과와 해설, 학습자료 본문 화면">
 </p>
 
 ### 4. 다음에 할 학습을 바로 이어가요
@@ -49,7 +49,7 @@ NalQ는 가지고 있던 글을 문제로 바꾸고, 직접 답을 떠올린 뒤
 홈에서 다시 풀 문제가 있는 퀴즈와 최근 학습자료를 확인하고, 중단했던 학습이나 새로운 문제 만들기로 바로 이동할 수 있습니다.
 
 <p align="center">
-  <img src="./docs/assets/readme/home-review.png" width="430" alt="NalQ 홈의 복습과 최근 학습자료 화면">
+  <img src="./docs/assets/readme/home-review.png" width="215" alt="NalQ 홈의 복습과 최근 학습자료 화면">
 </p>
 
 ---
