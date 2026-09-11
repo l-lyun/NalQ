@@ -24,37 +24,28 @@ NalQ는 가지고 있던 글을 문제로 바꾸고, 직접 답을 떠올린 뒤
   <tr>
     <td width="50%" valign="top">
       <h3>1. 원하는 조건으로 문제를 만들어요</h3>
-      <p>객관식·빈칸 채우기·단답형·서술형 중 필요한 유형을 고르고, 난이도와 문제 수를 선택할 수 있습니다.<br>추가 요청에는 집중해서 연습하고 싶은 내용이나 원하는 출제 방식을 적을 수 있습니다.</p>
+      <p>문제 유형과 난이도, 문제 수를 내게 맞게 골라요.</p>
+      <p align="center"><img src="./docs/assets/readme/quiz-create.png" width="215" alt="NalQ 문제 유형, 난이도, 문제 수 선택 화면"></p>
     </td>
     <td width="50%" valign="top">
       <h3>2. 읽었던 내용을 직접 떠올려요</h3>
-      <p>학습자료를 바탕으로 생성된 문제를 한 문제씩 풀며 알고 있다고 생각했던 내용을 실제로 떠올려 봅니다.</p>
+      <p>내 학습자료로 만든 문제를 풀며 이해를 확인해요.</p>
+      <p align="center"><img src="./docs/assets/readme/quiz-solving.png" width="215" alt="NalQ 객관식 문제 풀이 화면"></p>
     </td>
   </tr>
-  <tr>
-    <td align="center" valign="top">
-      <img src="./docs/assets/readme/quiz-create.png" width="215" alt="NalQ 문제 유형, 난이도, 문제 수 선택 화면">
-    </td>
-    <td align="center" valign="top">
-      <img src="./docs/assets/readme/quiz-solving.png" width="215" alt="NalQ 객관식 문제 풀이 화면">
-    </td>
-  </tr>
+</table>
+
+<table>
   <tr>
     <td width="50%" valign="top">
       <h3>3. 점수보다 놓친 내용을 확인해요</h3>
-      <p>내 답과 판정, 정답 또는 모범 답안, 해설을 확인하고 관련된 학습자료 본문으로 돌아가 부족했던 부분을 다시 살펴볼 수 있습니다.</p>
+      <p>정답과 해설, 원문을 함께 보며 놓친 부분을 찾아요.</p>
+      <p align="center"><img src="./docs/assets/readme/quiz-result.png" width="215" alt="NalQ 채점 결과와 해설, 학습자료 본문 화면"></p>
     </td>
     <td width="50%" valign="top">
       <h3>4. 다음에 할 학습을 바로 이어가요</h3>
-      <p>홈에서 다시 풀 문제가 있는 퀴즈와 최근 학습자료를 확인하고, 중단했던 학습이나 새로운 문제 만들기로 바로 이동할 수 있습니다.</p>
-    </td>
-  </tr>
-  <tr>
-    <td align="center" valign="top">
-      <img src="./docs/assets/readme/quiz-result.png" width="215" alt="NalQ 채점 결과와 해설, 학습자료 본문 화면">
-    </td>
-    <td align="center" valign="top">
-      <img src="./docs/assets/readme/home-review.png" width="215" alt="NalQ 홈의 복습과 최근 학습자료 화면">
+      <p>홈에서 복습할 문제와 최근 학습을 바로 이어가요.</p>
+      <p align="center"><img src="./docs/assets/readme/home-review.png" width="215" alt="NalQ 홈의 복습과 최근 학습자료 화면"></p>
     </td>
   </tr>
 </table>
