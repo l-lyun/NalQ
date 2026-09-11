@@ -13,6 +13,7 @@ import type {
 
 export interface PushRegistrationTarget {
   platform: 'IOS' | 'ANDROID';
+  provider: 'EXPO' | 'FCM';
   permission: 'GRANTED' | 'DENIED';
   pushToken: string | null;
 }
@@ -77,6 +78,7 @@ function sameRegistration(
   return pending.authEpoch === auth.authEpoch
     && pending.userId === auth.userId
     && pending.platform === target.platform
+    && pending.provider === target.provider
     && pending.permission === target.permission
     && pending.pushToken === target.pushToken;
 }
@@ -282,6 +284,7 @@ export class PushRegistrationCoordinator {
       expectedRevision,
       tokenVersion,
       platform: context.target.platform,
+      provider: context.target.provider,
       permission: context.target.permission,
       pushToken: context.target.pushToken,
     };
@@ -574,6 +577,7 @@ export class PushRegistrationCoordinator {
       operationIssuedAt: pending.operationIssuedAt,
       expectedRevision: pending.expectedRevision,
       platform: pending.platform,
+      provider: pending.provider,
       permission: pending.permission,
       ...(pending.permission === 'GRANTED' ? { pushToken: pending.pushToken } : {}),
     }, pending.authEpoch);

@@ -117,7 +117,7 @@ public final class PushDeliveryClaimStore {
                    TIMESTAMPDIFF(MICROSECOND, '1970-01-01 00:00:00.000000', d.lease_until)
                      AS lease_until_micros,
                    pd.status AS device_status, pd.binding_id AS device_binding_id,
-                   pd.token_version AS device_token_version, pd.push_token,
+                   pd.token_version AS device_token_version, pd.provider, pd.push_token,
                    n.public_id, n.target_name, n.notification_type,
                    u.status AS user_status
             FROM push_deliveries d
@@ -139,6 +139,7 @@ public final class PushDeliveryClaimStore {
                     rs.getString("device_status"),
                     rs.getString("device_binding_id"),
                     rs.getLong("device_token_version"),
+                    rs.getString("provider"),
                     rs.getString("push_token"),
                     rs.getString("public_id"),
                     rs.getString("target_name"),
@@ -416,6 +417,7 @@ public final class PushDeliveryClaimStore {
             : "퀴즈를 만들지 못했어요. 앱에서 확인해 주세요.";
     PushMessage message =
         new PushMessage(
+            com.openmd.server.push.domain.PushProvider.valueOf(row.provider()),
             row.pushToken(),
             row.targetName(),
             body,
@@ -465,6 +467,7 @@ public final class PushDeliveryClaimStore {
       String deviceStatus,
       String deviceBindingId,
       long deviceTokenVersion,
+      String provider,
       String pushToken,
       String publicId,
       String targetName,

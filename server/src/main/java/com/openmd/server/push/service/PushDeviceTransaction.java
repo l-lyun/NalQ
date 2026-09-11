@@ -10,6 +10,8 @@ import com.openmd.server.push.domain.PushDevice;
 import com.openmd.server.push.domain.PushDeviceOperation;
 import com.openmd.server.push.domain.PushDeviceStatus;
 import com.openmd.server.push.domain.PushPermission;
+import com.openmd.server.push.domain.PushPlatform;
+import com.openmd.server.push.domain.PushProvider;
 import com.openmd.server.push.dto.command.RegisterPushDeviceCommand;
 import com.openmd.server.push.dto.command.RevokePushDeviceCommand;
 import com.openmd.server.push.dto.response.PushDeviceRegistrationResult;
@@ -41,6 +43,8 @@ public class PushDeviceTransaction {
   private static final Duration MAX_FUTURE_SKEW = Duration.ofMinutes(5);
   private static final Pattern EXPO_TOKEN =
       Pattern.compile("^(?:ExponentPushToken|ExpoPushToken)\\[[A-Za-z0-9_-]{1,440}]$");
+  private static final Pattern FCM_TOKEN =
+      Pattern.compile("^[A-Za-z0-9_.:-]{20,512}$");
 
   private final PushDeviceRepository devices;
   private final UserRepository users;
@@ -392,10 +396,14 @@ public class PushDeviceTransaction {
         || command.permission() == null) {
       throw new BusinessException(CommonErrorCode.INVALID_INPUT);
     }
-    if (command.permission() == PushPermission.GRANTED
-        && (command.pushToken() == null
-            || command.pushToken().length() > 512
-            || !EXPO_TOKEN.matcher(command.pushToken()).matches())) {
+    boolean validGrantedToken = command.pushToken() != null
+        && command.pushToken().length() <= 512
+        && ((command.provider() == PushProvider.EXPO
+                && EXPO_TOKEN.matcher(command.pushToken()).matches())
+            || (command.provider() == PushProvider.FCM
+                && command.platform() == PushPlatform.IOS
+                && FCM_TOKEN.matcher(command.pushToken()).matches()));
+    if (command.permission() == PushPermission.GRANTED && !validGrantedToken) {
       throw new BusinessException(CommonErrorCode.INVALID_INPUT);
     }
     if (command.permission() == PushPermission.DENIED && command.pushToken() != null) {

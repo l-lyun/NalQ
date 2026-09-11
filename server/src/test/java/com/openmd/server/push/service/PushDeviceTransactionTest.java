@@ -121,6 +121,26 @@ class PushDeviceTransactionTest {
   }
 
   @Test
+  void acceptsAnIosFcmRegistrationToken() {
+    String fcmToken = "fcm-registration-token.with-punctuation:1234567890";
+    when(devices.findByInstallationId(INSTALLATION_ID)).thenReturn(Optional.empty());
+    when(devices.findByProviderAndPushTokenDigest(any(), any())).thenReturn(Optional.empty());
+
+    PushDeviceRegistrationResult result = transaction.register(
+        42L,
+        "session-42",
+        new RegisterPushDeviceCommand(
+            INSTALLATION_ID, KEY, OPERATION_ID, NOW, 0L,
+            PushPlatform.IOS, PushProvider.FCM, fcmToken, PushPermission.GRANTED));
+
+    assertEquals(PushDeviceStatus.ACTIVE, result.status());
+    ArgumentCaptor<PushDevice> device = ArgumentCaptor.forClass(PushDevice.class);
+    verify(devices).save(device.capture());
+    assertEquals(PushProvider.FCM, device.getValue().getProvider());
+    assertEquals(fcmToken, device.getValue().getPushToken());
+  }
+
+  @Test
   void installationUuidCaseDoesNotChangeTheIdempotencyDigest() {
     String installationId = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
     RegisterPushDeviceCommand lowercase =

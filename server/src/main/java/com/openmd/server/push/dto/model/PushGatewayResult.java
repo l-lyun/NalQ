@@ -4,7 +4,7 @@ import java.time.Duration;
 
 public record PushGatewayResult(
     Outcome outcome, String ticketId, String errorCode, Duration retryAfter) {
-  public enum Outcome { ACCEPTED, RETRY, INVALID_TOKEN, FAILED, PENDING }
+  public enum Outcome { ACCEPTED, CONFIRMED, RETRY, INVALID_TOKEN, FAILED, PENDING }
 
   public PushGatewayResult {
     if (retryAfter == null || retryAfter.isNegative()) retryAfter = Duration.ZERO;
@@ -16,5 +16,9 @@ public record PushGatewayResult(
 
   public static PushGatewayResult retry(String code) {
     return new PushGatewayResult(Outcome.RETRY, null, code, Duration.ZERO);
+  }
+
+  public static PushGatewayResult confirmed(String providerMessageId) {
+    return new PushGatewayResult(Outcome.CONFIRMED, providerMessageId, null, Duration.ZERO);
   }
 }

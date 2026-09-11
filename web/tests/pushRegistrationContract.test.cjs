@@ -41,7 +41,7 @@ test('actual app coordinator and web session register then durably revoke on log
   const coordinator = new PushRegistrationCoordinator({ storage,
     createInstallation: async () => ({ installationId: uuid(1), installationKey: 'A'.repeat(43),
       createdAt: '2026-09-07T00:00:00Z', tokenVersion: 0 }),
-    registrationProvider: { resolve: async () => ({ platform: 'IOS', permission: 'GRANTED', pushToken: 'ExpoPushToken[test]' }) },
+    registrationProvider: { resolve: async () => ({ platform: 'IOS', provider: 'FCM', permission: 'GRANTED', pushToken: 'firebase-registration-token' }) },
     createMessageId: nextId, now: () => '2026-09-07T00:00:00Z',
     schedule: (callback) => { scheduled.add(callback); return callback },
     cancelSchedule: (callback) => scheduled.delete(callback),

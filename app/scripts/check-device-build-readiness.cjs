@@ -52,6 +52,19 @@ function validateGoogleServicesConfig(value, expectedPackage = EXPECTED_APP_ID) 
   return [];
 }
 
+function validateGoogleServicesPlist(value, expectedBundleId = EXPECTED_APP_ID) {
+  if (typeof value !== 'string') {
+    return ['GoogleService-Info.plist를 읽을 수 없습니다.'];
+  }
+  const bundleId = value.match(
+    /<key>\s*BUNDLE_ID\s*<\/key>\s*<string>\s*([^<]+?)\s*<\/string>/,
+  )?.[1];
+  if (bundleId !== expectedBundleId) {
+    return [`GoogleService-Info.plist에 iOS bundle identifier ${expectedBundleId} 설정이 없습니다.`];
+  }
+  return [];
+}
+
 function hasNotificationPlugin(plugins) {
   if (!Array.isArray(plugins)) return false;
   return plugins.some((plugin) => {
@@ -121,6 +134,26 @@ function checkReadiness({ rootDir, platform, environment }) {
     }
   }
 
+  if (platform === 'ios' || platform === 'all') {
+    const googleServicesPlistPath = environment.GOOGLE_SERVICES_PLIST?.trim();
+    if (!googleServicesPlistPath) {
+      errors.push('GOOGLE_SERVICES_PLIST가 없습니다. Firebase에서 받은 iOS 앱 설정 파일을 file 변수로 연결하세요.');
+    } else {
+      const resolvedPath = path.resolve(rootDir, googleServicesPlistPath);
+      let isReadableFile = false;
+      try {
+        isReadableFile = fs.statSync(resolvedPath).isFile();
+      } catch {
+        // 아래의 동일한 사용자용 오류로 정규화한다.
+      }
+      if (!isReadableFile) {
+        errors.push('GOOGLE_SERVICES_PLIST가 가리키는 파일을 읽을 수 없습니다.');
+      } else {
+        errors.push(...validateGoogleServicesPlist(fs.readFileSync(resolvedPath, 'utf8')));
+      }
+    }
+  }
+
   return errors;
 }
 
@@ -149,5 +182,6 @@ module.exports = {
   checkReadiness,
   parsePlatform,
   validateGoogleServicesConfig,
+  validateGoogleServicesPlist,
   validateHttpsWebUrl,
 };

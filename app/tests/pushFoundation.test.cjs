@@ -357,6 +357,36 @@ test('corrupt durable state fails closed instead of rotating the installation id
   assert.equal(storage.values.get(PUSH_STORAGE_KEY), '{"version":1,"installation":null}');
 });
 
+test('legacy pending Expo registration gains its provider before durable replay', async () => {
+  const storage = new MemoryStorage();
+  storage.values.set(PUSH_STORAGE_KEY, JSON.stringify({
+    version: 1,
+    installation: installation(),
+    activeBinding: null,
+    pendingRegistration: {
+      operationId: '66666666-6666-4666-8666-666666666666',
+      operationIssuedAt: '2026-09-07T00:00:00.000Z',
+      authEpoch: 3,
+      userId: USER_ID,
+      expectedRevision: 0,
+      tokenVersion: 1,
+      platform: 'IOS',
+      permission: 'GRANTED',
+      pushToken: 'ExponentPushToken[legacy-token]',
+    },
+    pendingRevokes: [],
+  }));
+
+  const repository = new PushStorageRepository(storage);
+  const migrated = await repository.load();
+
+  assert.equal(migrated.pendingRegistration.provider, 'EXPO');
+  assert.equal(
+    JSON.parse(storage.values.get(PUSH_STORAGE_KEY)).pendingRegistration.provider,
+    'EXPO',
+  );
+});
+
 test('malformed installation credentials fail closed instead of being treated as durable state', async () => {
   const storage = new MemoryStorage();
   storage.values.set(PUSH_STORAGE_KEY, JSON.stringify({

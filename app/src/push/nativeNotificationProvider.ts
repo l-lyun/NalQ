@@ -1,3 +1,8 @@
+import {
+  getMessaging,
+  getToken as getFcmToken,
+  onTokenRefresh,
+} from '@react-native-firebase/messaging';
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
@@ -37,7 +42,7 @@ async function prepareAndroidChannel() {
   });
 }
 
-export class ExpoPushRegistrationProvider implements PushRegistrationProvider {
+export class NativePushRegistrationProvider implements PushRegistrationProvider {
   private lastNativeTokenSignature: string | null = null;
 
   async resolve(): Promise<PushRegistrationTarget> {
@@ -52,8 +57,20 @@ export class ExpoPushRegistrationProvider implements PushRegistrationProvider {
     }
 
     const platform = Platform.OS === 'ios' ? 'IOS' as const : 'ANDROID' as const;
+    const provider = Platform.OS === 'ios' ? 'FCM' as const : 'EXPO' as const;
     if (!isAuthorized(permission)) {
-      return { platform, permission: 'DENIED', pushToken: null };
+      return { platform, provider, permission: 'DENIED', pushToken: null };
+    }
+
+    if (Platform.OS === 'ios') {
+      // expo-notifications가 APNs 등록을 완료한 뒤 Firebase가 그 APNs token에
+      // 연결된 FCM registration token을 발급하도록 순서를 보장한다.
+      await Notifications.getDevicePushTokenAsync();
+      const pushToken = await getFcmToken(getMessaging());
+      if (typeof pushToken !== 'string' || pushToken.length === 0) {
+        throw new Error('Firebase returned an invalid FCM token.');
+      }
+      return { platform, provider, permission: 'GRANTED', pushToken };
     }
 
     const projectId = Constants.expoConfig?.extra?.eas?.projectId
@@ -66,10 +83,21 @@ export class ExpoPushRegistrationProvider implements PushRegistrationProvider {
     if (typeof pushToken !== 'string' || pushToken.length === 0) {
       throw new Error('Expo returned an invalid push token.');
     }
-    return { platform, permission: 'GRANTED', pushToken };
+    return { platform, provider, permission: 'GRANTED', pushToken };
   }
 
-  subscribeToTokenChanges(listener: () => void) {
+  subscribeToTokenChanges(listener: () => void): { remove(): void } {
+    if (Platform.OS === 'ios') {
+      const unsubscribe = onTokenRefresh(getMessaging(), (token) => {
+        if (token === this.lastNativeTokenSignature) {
+          return;
+        }
+        this.lastNativeTokenSignature = token;
+        listener();
+      });
+      return { remove: unsubscribe };
+    }
+
     return Notifications.addPushTokenListener((token) => {
       const signature = JSON.stringify(token);
       if (signature === this.lastNativeTokenSignature) {

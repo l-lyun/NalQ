@@ -5,7 +5,7 @@ const id = '11111111-1111-4111-8111-111111111111'
 const bindingId = '22222222-2222-4222-8222-222222222222'
 const request = { installationId: id, installationKey: 'A'.repeat(43),
   operationId: '33333333-3333-4333-8333-333333333333', operationIssuedAt: '2026-09-07T00:00:00Z',
-  expectedRevision: 0, platform: 'IOS', permission: 'GRANTED', pushToken: 'ExpoPushToken[test]' }
+  expectedRevision: 0, platform: 'IOS', provider: 'FCM', permission: 'GRANTED', pushToken: 'fcm-token.test:1234567890' }
 const success = (data) => ({ data: { success: true, data, error: null } })
 
 test('registration keeps installation key in its header and projects only approved response fields', async () => {
@@ -20,7 +20,7 @@ test('registration keeps installation key in its header and projects only approv
   assert.equal(result.data.unexpectedSecret, undefined)
   assert.equal(actual[1].installationKey, undefined)
   assert.equal(actual[2].headers['X-Push-Installation-Key'], request.installationKey)
-  assert.equal(actual[1].provider, 'EXPO')
+  assert.equal(actual[1].provider, 'FCM')
   assert.deepEqual(actual[2].authContext, context)
 })
 

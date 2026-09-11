@@ -56,7 +56,7 @@ Native는 Access/Refresh Token을 받거나 사용자 인증 API를 직접 호�
   "operationIssuedAt": "2026-09-06T00:00:00Z",
   "expectedRevision": 0,
   "platform": "IOS",
-  "provider": "EXPO",
+  "provider": "FCM",
   "pushToken": "<native-issued-token>",
   "permission": "GRANTED"
 }
@@ -64,7 +64,7 @@ Native는 Access/Refresh Token을 받거나 사용자 인증 API를 직접 호�
 
 응답은 기존 `ApiResponse` envelope의 `data`에 `{ installationId, revision, bindingId, status, userId }`를 담는다. `userId`는 현재 인증 사용자이며 native의 pending 계정 분류 보조값이다. 권한 증명으로 사용하지 않는다.
 
-- 플랫폼은 `IOS | ANDROID`, 제공자는 초기 `EXPO`, 등록 권한 상태는 `GRANTED | DENIED`다. 미결정 권한에서는 서버 등록 없이 native 권한 요청을 먼저 실행한다.
+- 플랫폼은 `IOS | ANDROID`, 제공자는 `EXPO | FCM`, 등록 권한 상태는 `GRANTED | DENIED`다. 현재 `FCM`은 iOS에서만 허용하고 Android는 `EXPO`를 유지한다. 미결정 권한에서는 서버 등록 없이 native 권한 요청을 먼저 실행한다.
 - 등록 변경은 현재 사용자에 속한 활성 refresh session에서만 시작한다. 서버는 등록 트랜잭션 전과 커밋 뒤 세션을 확인한다. 그 사이 로그아웃이 완료됐으면 해당 session의 연결을 해제하고 `AUTH_005`로 응답한다. 이미 등록된 기기를 세션 자연 만료만으로 주기적으로 해제하는 정책은 아니다.
 - `GRANTED`는 유효한 형식의 native-issued token 필수. `DENIED`는 기존 설치를 `DISABLED`로 변경할 때 사용하며 `pushToken`을 생략한다. 신규 거절 기기는 등록하지 않되 응답은 `status=DISABLED`, `revision=0`, `bindingId=null`인 비영속 결과로 반환한다. 비활성화 시 발송용 토큰은 제거한다.
 - 같은 설치·같은 계정의 토큰 갱신은 `bindingId` 유지, `revision` 증가. 다른 계정 연결 또는 해제 후 재연결은 기존 연결을 종료하고 새 `bindingId`를 만든다.
@@ -87,7 +87,7 @@ Native는 Access/Refresh Token을 받거나 사용자 인증 API를 직접 호�
 
 ### 재설치·토큰 유실 복구
 
-- 앱 bootstrap·로그인·foreground 복귀에서 권한과 Expo 토큰을 확인하고 native token 변경 listener에서도 Expo 토큰을 다시 취득한다. 네트워크 실패는 기존 연결을 지우지 않고 재시도한다. 이미 허용한 권한을 다시 동의받는 흐름은 만들지 않는다.
+- 앱 bootstrap·로그인·foreground 복귀에서 권한과 플랫폼별 provider token을 확인한다. iOS는 APNs 등록 뒤 FCM token을 발급하고 FCM token refresh listener에서 재등록하며, Android는 Expo token을 유지한다. 네트워크 실패는 기존 연결을 지우지 않고 재시도한다. 이미 허용한 권한을 다시 동의받는 흐름은 만들지 않는다.
 - 설치 ID/key가 남으면 같은 설치에 CAS 갱신한다. 토큰 변경 시 tokenVersion을 증가시키고 이전 버전의 미발송 작업은 취소한다. 이미 외부로 접수된 푸시의 회수는 보장하지 않는다.
 - key가 유실되면 새 설치 ID/key를 만들며, 동일 토큰의 기존 소유자와 현재 인증 사용자가 같은 경우에만 token unique 제약과 잠금으로 기존 연결 종료·새 연결 활성화를 원자 처리한다. 다른 기기 연결은 건드리지 않는다. 과거 delivery를 새 연결로 복제하지 않는다.
 - key와 토큰이 모두 바뀌면 이전 설치를 확실히 식별할 수 없으므로 새 기기로 등록한다. 추측으로 같은 계정의 다른 기기를 삭제하지 않는다. 기존 토큰의 `DeviceNotRegistered` 결과는 해당 tokenVersion에 한해 비활성화한다. 서버가 앱 삭제를 즉시 알 수 있다고 가정하지 않는다.

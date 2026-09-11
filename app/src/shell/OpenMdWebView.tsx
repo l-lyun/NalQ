@@ -44,7 +44,7 @@ import {
 } from '../push/nativePushStorage';
 import {
   ExpoNotificationResponseProvider,
-  ExpoPushRegistrationProvider,
+  NativePushRegistrationProvider,
 } from '../push/nativeNotificationProvider';
 import { PushOpenCoordinator } from '../push/pushOpenCoordinator';
 import { PushRegistrationCoordinator } from '../push/pushRegistrationCoordinator';
@@ -73,13 +73,13 @@ export function OpenMdWebView({ webOrigin, webUrl }: OpenMdWebViewProps) {
   const coordinatorSessionRef = useRef<string | null>(null);
   const lastHelloRef = useRef<{ replyTo: string; message: HelloMessage } | null>(null);
   const acceptedAuthStateRef = useRef<AcceptedAuthState | null>(null);
-  const registrationProviderRef = useRef<ExpoPushRegistrationProvider | null>(null);
+  const registrationProviderRef = useRef<NativePushRegistrationProvider | null>(null);
   const notificationResponseProviderRef = useRef<ExpoNotificationResponseProvider | null>(null);
   const coordinatorRef = useRef<PushRegistrationCoordinator | null>(null);
   const pushOpenCoordinatorRef = useRef<PushOpenCoordinator | null>(null);
 
   if (!registrationProviderRef.current) {
-    registrationProviderRef.current = new ExpoPushRegistrationProvider();
+    registrationProviderRef.current = new NativePushRegistrationProvider();
   }
   if (!notificationResponseProviderRef.current) {
     notificationResponseProviderRef.current = new ExpoNotificationResponseProvider();

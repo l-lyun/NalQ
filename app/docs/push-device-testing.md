@@ -140,7 +140,7 @@ pnpm dlx eas-cli@latest build:run --platform ios
 pnpm dlx eas-cli@latest build --platform ios --profile ios-simulator-local
 ```
 
-Simulator에서 권한 요청, Expo token 취득·기기 등록, foreground 억제와 background 수신을 1차 확인한다. payload 주입만 확인한 경우에는 Expo/APNs 경유 수신 성공으로 기록하지 않는다. 실제 iPhone의 서명·provisioning·설치, 재설치 시 SecureStore 동작과 background·일반 종료 수신은 별도 실기기 인수 항목이다. Simulator 성공만으로 실기기 검증 완료로 판정하지 않는다.
+Simulator에서 권한 요청, token 취득·기기 등록, foreground 억제와 background 수신을 1차 확인한다. payload 주입만 확인한 경우에는 FCM/APNs 경유 수신 성공으로 기록하지 않는다. 실제 iPhone의 서명·provisioning·설치, 재설치 시 SecureStore 동작과 background·일반 종료 수신은 별도 실기기 인수 항목이다. Simulator 성공만으로 실기기 검증 완료로 판정하지 않는다.
 
 ### macOS 로컬 빌드 검증 기록 (2026-09-08)
 
@@ -149,7 +149,7 @@ Simulator에서 권한 요청, Expo token 취득·기기 등록, foreground 억�
 - iOS 26.5 새 Simulator는 첫 데이터 마이그레이션과 dyld 캐시 생성에서 정체돼, 이미 초기화된 iOS 18.5 Simulator로 검증했다. CLI의 `Booted` 표시만으로 홈 화면 준비 완료를 판정하지 않는다.
 - 같은 native token 이벤트를 중복 처리하던 수정 전에는 등록 `revision`이 `20 → 60`으로 계속 증가했다. 중복 제거 수정 후에는 약 6분간 `revision=199`, `token_version=1`이 유지됐다. 로그인·foreground에서 수행하는 정상 등록 요청은 유지한다.
 - `simctl push`를 이용한 background 알림 배너를 실제 화면에서 확인했다. 이 결과는 Expo/APNs 경유 수신 성공을 의미하지 않는다.
-- 별도의 실제 Expo 발송 요청은 `InvalidCredentials`로 거절됐다. 응답은 `com.nalq.app` 프로젝트의 APNs 자격 증명이 없음을 명시했다. Expo 로그인과 해당 프로젝트의 APNs 키 설정 후 실제 발송을 다시 검증해야 한다.
+- 별도의 실제 Expo 발송 요청은 `InvalidCredentials`로 거절됐다. 이 기록 이후 iOS 발송 경로를 직접 FCM HTTP v1로 전환했으며 새 TestFlight 빌드에서 실제 수신을 다시 검증해야 한다.
 - 테스트 웹·API·DB와 이메일 수신기는 모두 로컬이다. 테스트 SMTP는 인증 메일을 로컬 파일로만 저장하므로 실제 이메일 받은편지함에는 도착하지 않는다. 가입 API가 메일 발송에 실패하면 로컬 SMTP 프로세스가 실행 중인지도 확인한다.
 
 ## 5. 검증 서버에서 발송 활성화
@@ -163,11 +163,14 @@ $env:OPENMD_PUSH_REGISTRATION_ENABLED = 'true'
 $env:OPENMD_PUSH_DELIVERY_ENABLED = 'true'
 $env:OPENMD_PUSH_SCHEDULER_ENABLED = 'true'
 $env:OPENMD_PUSH_EXPO_ACCESS_TOKEN = 'YOUR_EXPO_ACCESS_TOKEN_IF_ENHANCED_SECURITY_IS_ENABLED'
+$env:OPENMD_PUSH_FCM_ENABLED = 'true'
+$env:OPENMD_PUSH_FCM_PROJECT_ID = 'nalq-30866'
+$env:OPENMD_PUSH_FCM_CREDENTIALS_PATH = 'C:\secure\firebase-admin.json'
 ```
 
 Expo access token security를 사용하지 않는 프로젝트라면 `OPENMD_PUSH_EXPO_ACCESS_TOKEN`은 빈 값으로 둘 수 있다. 활성화한 프로젝트에서는 secret store에서 주입하며 로그나 저장소에 남기지 않는다.
 
-현재 `infra/production/compose.yml`의 `server.environment`는 `OPENMD_PUSH_*`를 전달하지 않는다. `production.env`에 값만 추가해도 컨테이너에 들어가지 않는다. 운영 데이터와 분리된 검증 환경·테스트 계정에서만 아래 내용을 예를 들어 `compose.push-test.yml`이라는 로컬 override로 저장하고, 기본 Compose와 함께 명시적으로 적용한다.
+`infra/production/compose.yml`은 푸시 플래그와 FCM 프로젝트를 서버에 전달하고 서비스 계정 JSON을 읽기 전용으로 마운트한다. 운영에서는 `OPENMD_PUSH_FCM_CREDENTIALS_HOST_PATH`가 Git 밖의 mode `600` 파일을 가리키게 한다.
 
 ```yaml
 services:
@@ -196,7 +199,7 @@ docker compose --env-file .\infra\production\production.env -f .\infra\productio
 1. 앱을 새로 설치하고 로그인한다. 첫 로그인 직후 OS 알림 권한 요청이 한 번 나타나는지, 허용 뒤 앱 이용이 계속되는지 확인한다.
 2. 서버에서 해당 테스트 사용자에게 `push_devices.status=ACTIVE`, 올바른 `platform`, 새 `revision`과 `token_version`이 생겼는지만 확인한다.
 3. 앱을 foreground에 둔 채 웹이나 다른 기기에서 퀴즈 생성 성공·실패를 만든다. 앱 내 기존 Snackbar/알림함은 동작하고 OS banner, 알림 목록, 소리, 진동, badge는 생기지 않아야 한다.
-4. 앱을 background로 보내고 새 결과를 만든다. 제목과 성공·실패 문구가 표시되고, delivery가 ticket/receipt 처리 상태로 진행하는지 확인한다.
+4. 앱을 background로 보내고 새 결과를 만든다. 제목과 성공·실패 문구가 표시되고, iOS FCM delivery가 `PROVIDER_ACCEPTED`로 진행하는지 확인한다. 이 상태는 FCM 접수 증명이며 단말 표시 증명은 별도로 기록한다.
 5. 최근 앱 화면에서 앱을 닫아 프로세스가 없는 일반 종료 상태를 만든 뒤 새 결과를 만든다. OS 설정의 `강제 중지`는 알림 전달 자체를 막을 수 있으므로 이 종료 시나리오에 사용하지 않는다. OS 알림 표시까지만 확인하며, 알림을 눌렀을 때 목적지 이동은 이번 단계의 합격 조건이 아니다.
 6. 알림 권한을 거절한 새 설치에서도 로그인과 퀴즈 이용이 막히지 않고 서버가 `DENIED` 등록 의도에 `DISABLED`, `revision=0` 비영속 결과를 반환하는지 확인한다. 같은 로그인에서 OS prompt가 반복되지 않아야 한다.
 7. 로그인 상태에서 네트워크를 끊고 앱을 foreground 복귀시킨 뒤 네트워크를 복구하고 다시 foreground로 전환한다. 등록 재시도가 회복되고 중복 active 기기가 생기지 않는지 확인한다.
@@ -206,16 +209,16 @@ docker compose --env-file .\infra\production\production.env -f .\infra\productio
 11. provider가 실제 token을 교체한 경우 foreground 복귀 또는 token listener 뒤 같은 installation의 `token_version`이 증가하고 이전 token이 활성 상태로 남지 않는지 기록한다. 단순 문자열 모의 입력은 실기기 token rotation 검증으로 세지 않는다.
 12. 가능하면 같은 계정으로 두 기기를 등록한다. foreground 기기에서는 OS 표시가 억제되고 background 기기에는 표시되는지 확인한다.
 
-각 실행에는 플랫폼·OS 버전, 앱 build ID, 권한 상태, 앱 상태, notification ID, delivery state와 시각만 기록한다. Expo ticket 성공은 단말 표시 증명이 아니므로 실제 표시 결과를 별도로 기록한다.
+각 실행에는 플랫폼·OS 버전, 앱 build ID, 권한 상태, 앱 상태, notification ID, delivery state와 시각만 기록한다. provider 접수 성공은 단말 표시 증명이 아니므로 실제 표시 결과를 별도로 기록한다.
 
 ## 7. 판정과 문제 분리
 
 - 빌드 전 사전점검 실패: HTTPS, app ID, EAS 환경 변수 또는 Firebase client 파일 문제다.
-- 앱에서 Expo token 취득 실패: Android `google-services.json`/Firebase API 제한, iOS entitlement/APNs provisioning, EAS project ID 또는 네트워크를 확인한다.
+- 앱에서 token 취득 실패: Android는 `google-services.json`/Expo project ID, iOS는 `GoogleService-Info.plist`, entitlement/APNs provisioning과 Firebase 설정을 확인한다.
 - 기기 등록 API가 생기지 않음: 검증 웹·서버 버전, `OPENMD_PUSH_REGISTRATION_ENABLED`, CORS/cookie와 bridge handshake를 확인한다.
 - delivery가 생기지 않음: `OPENMD_PUSH_DELIVERY_ENABLED`와 결과 확정 시각 이후 생성 여부를 확인한다. 등록 전 결과는 소급 발송하지 않는다.
-- ticket이 진행하지 않음: `OPENMD_PUSH_SCHEDULER_ENABLED`, 서버 egress, Expo access token 설정을 확인한다.
-- ticket은 성공했지만 기기에 없음: provider receipt, 비활성 token, OS 권한·집중 모드·배터리 정책과 앱 foreground 여부를 확인한다.
+- 발송 상태가 진행하지 않음: `OPENMD_PUSH_SCHEDULER_ENABLED`, 서버 egress, provider 자격 설정을 확인한다.
+- provider 접수 성공이지만 기기에 없음: 비활성 token, APNs 자격, OS 권한·집중 모드·배터리 정책과 앱 foreground 여부를 확인한다.
 
 외부 계정 자격 생성·업로드, EAS 원격 build 실행, 앱 설치와 실제 수신은 계정 및 단말 소유자가 수행해야 한다. 저장소 준비는 그 직전까지 완료되어 있다.
 

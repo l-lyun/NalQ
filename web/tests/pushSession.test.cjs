@@ -4,7 +4,7 @@ const fixture = require('./helpers/loadTs.cjs')
 const uuid = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
 const installation = { installationId: uuid(1), installationKey: 'A'.repeat(43) }
 const device = { ...installation, operationId: uuid(2), operationIssuedAt: '2026-09-07T00:00:00Z',
-  expectedRevision: 0, platform: 'IOS', permission: 'GRANTED', pushToken: 'ExpoPushToken[test_token]' }
+  expectedRevision: 0, platform: 'IOS', provider: 'FCM', permission: 'GRANTED', pushToken: 'fcm-token.test:1234567890' }
 const settle = () => new Promise((resolve) => setImmediate(resolve))
 function envelope(type, payload, epoch) {
   return JSON.stringify({ version: 1, type, messageId: uuid(3), bridgeSessionId: uuid(4), authEpoch: epoch, payload })

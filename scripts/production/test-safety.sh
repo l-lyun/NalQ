@@ -84,6 +84,25 @@ for push_flag in OPENMD_PUSH_REGISTRATION_ENABLED OPENMD_PUSH_DELIVERY_ENABLED O
 		"$SCRIPT_DIR/validate-env.sh" --env-file "$push_env"
 done
 
+fcm_invalid_boolean_env="$temporary_directory/fcm-invalid-boolean.env"
+cp "$server_env" "$fcm_invalid_boolean_env"
+printf '%s\n' 'OPENMD_PUSH_FCM_ENABLED=invalid' >>"$fcm_invalid_boolean_env"
+expect_failure_containing 'OPENMD_PUSH_FCM_ENABLED must be true or false' \
+	"$SCRIPT_DIR/validate-env.sh" --env-file "$fcm_invalid_boolean_env"
+
+fcm_missing_env="$temporary_directory/fcm-missing.env"
+cp "$server_env" "$fcm_missing_env"
+printf '%s\n' 'OPENMD_PUSH_FCM_ENABLED=true' >>"$fcm_missing_env"
+expect_failure_containing 'OPENMD_PUSH_FCM_PROJECT_ID is required' \
+	"$SCRIPT_DIR/validate-env.sh" --env-file "$fcm_missing_env"
+
+fcm_valid_env="$temporary_directory/fcm-valid.env"
+cp "$fcm_missing_env" "$fcm_valid_env"
+printf '%s\n' \
+	'OPENMD_PUSH_FCM_PROJECT_ID=nalq-test' \
+	'OPENMD_PUSH_FCM_CREDENTIALS_HOST_PATH=/opt/nalq/secrets/firebase-admin.json' >>"$fcm_valid_env"
+"$SCRIPT_DIR/validate-env.sh" --env-file "$fcm_valid_env" >/dev/null
+
 server_cross_site_env="$temporary_directory/server-cross-site.env"
 cp "$server_env" "$server_cross_site_env"
 printf '%s\n' 'API_DOMAIN=api.other.test' >>"$server_cross_site_env"

@@ -65,6 +65,7 @@ function harness(permission = 'GRANTED', overrides = {}) {
       resolve: async () => ({
         permission,
         platform: 'IOS',
+        provider: 'FCM',
         pushToken: permission === 'GRANTED' ? TOKEN : null,
       }),
     },
@@ -108,6 +109,7 @@ test('registration queries state, persists one intent, and ACKs only after a suc
   });
 
   assert.equal(h.sent[1].type, 'PUSH_DEVICE');
+  assert.equal(h.sent[1].payload.provider, 'FCM');
   assert.equal(h.sent[1].payload.pushToken, TOKEN);
   const persistedIntent = await h.repository.load();
   assert.equal(persistedIntent.pendingRegistration.operationId, h.sent[1].payload.operationId);
@@ -213,7 +215,7 @@ test('token provider failures retry only while the same authenticated epoch rema
       resolve: async () => {
         attempts += 1;
         if (attempts === 1) throw new Error('temporary token failure');
-        return { permission: 'GRANTED', platform: 'IOS', pushToken: TOKEN };
+        return { permission: 'GRANTED', platform: 'IOS', provider: 'FCM', pushToken: TOKEN };
       },
     },
     schedule: (callback, delayMs) => {

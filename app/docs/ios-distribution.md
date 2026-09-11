@@ -67,11 +67,11 @@ pnpm dlx eas-cli@latest submit --platform ios --profile production --id <EAS_BUI
 - Git commit SHA, EAS build ID, marketing version과 실제 원격 build number
 - profile이 `production`, bundle identifier가 `com.nalq.app`인지 여부
 - App Store Connect 제출 ID와 처리 상태
-- TestFlight 설치 뒤 로그인·쿠키 유지·로그아웃, 알림 권한, foreground 억제, background와 일반 종료 상태의 실제 Expo/APNs 수신 결과
+- TestFlight 설치 뒤 로그인·쿠키 유지·로그아웃, 알림 권한, foreground 억제, background와 일반 종료 상태의 실제 FCM/APNs 수신 결과
 
 `submit`은 App Store Connect로 바이너리를 업로드할 뿐 App Store 심사를 시작하지 않는다. 내부 테스터는 Apple의 처리 완료 뒤 사용할 수 있고, 외부 테스터 배포에는 별도의 TestFlight 베타 심사가 필요하다.
 
-현재 로컬 Simulator에서는 알림 권한과 등록, 주입한 background 배너까지 확인했지만 실제 Expo 발송은 `InvalidCredentials`로 거절됐다. `com.nalq.app`의 APNs 자격을 연결하고 TestFlight 설치본에서 실제 수신을 확인하기 전에는 원격 푸시 검증을 완료로 기록하지 않는다.
+현재 로컬 Simulator에서는 알림 권한과 등록, 주입한 background 배너까지 확인했다. 이후 iOS 발송을 직접 FCM HTTP v1로 전환하고 Firebase에 APNs 키를 연결했다. 새 TestFlight 설치본에서 실제 수신을 확인하기 전에는 원격 푸시 검증을 완료로 기록하지 않는다.
 
 2026-09-08 production 빌드 1.0.0 (2)는 App Store provisioning profile `WCJ39M32JR`에 Push Notifications capability와 `aps-environment` entitlement가 없어 Xcode 서명 단계에서 실패했다. 이후 Apple Developer에서 `com.nalq.app`의 Push Notifications를 활성화하고 같은 profile을 재생성했다. 이후 EAS에서 Push Notifications 활성화 상태를 확인하고 새 profile `8JA7LAW6KN`을 생성·연결했다.
 
